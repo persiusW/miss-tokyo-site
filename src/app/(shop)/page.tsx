@@ -12,20 +12,29 @@ export default async function HomePage() {
         .eq("is_active", true)
         .limit(4);
 
-    const formattedProducts = (products || []).map((p: any) => ({
+    const productImages = [
+        "https://images.unsplash.com/photo-1603487742131-4160ec999306?q=80&w=1000&auto=format&fit=crop", // Black Slide
+        "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=1000&auto=format&fit=crop",  // Brown Slide
+        "https://images.unsplash.com/photo-1560343090-f0409e92791a?q=80&w=1000&auto=format&fit=crop",  // Textured Neutral
+        "https://images.unsplash.com/photo-1514989940723-e8e51635b782?q=80&w=1000&auto=format&fit=crop"   // Classic Leather
+    ];
+
+    const formattedProducts = (products || []).map((p: any, idx: number) => ({
         slug: p.slug || p.id,
         name: p.name,
         price: `${p.price} GHS`,
-        imageUrl: p.image_url || "https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&q=80&w=1000",
+        imageUrl: p.image_url || productImages[idx % productImages.length],
         category: p.category || "Collection",
     }));
 
     return (
         <>
             <Hero
-                title="BADU"
+                title="Crafted in Ghana. Designed for Everywhere."
                 subtitle="Visual Silence. Uncompromised Quality."
-                imageUrl="https://images.unsplash.com/photo-1522079031023-ebc22d716d1f?auto=format&fit=crop&q=80&w=2000"
+                imageUrl="https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?q=80&w=2560&auto=format&fit=crop"
+                ctaText="Shop the Collection"
+                ctaLink="/shop"
             />
 
             <section className="py-24 md:py-32 px-6 max-w-4xl mx-auto text-center">

@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Ruflo / Claude Flow — never commit these
+.claude/
+.claude-flow/
+.swarm/
+.mcp.json
+CLAUDE.md
+claude-flow.config.json

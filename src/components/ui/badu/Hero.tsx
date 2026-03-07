@@ -4,9 +4,11 @@ interface HeroProps {
     title: string;
     subtitle?: string;
     imageUrl: string;
+    ctaText?: string;
+    ctaLink?: string;
 }
 
-export function Hero({ title, subtitle, imageUrl }: HeroProps) {
+export function Hero({ title, subtitle, imageUrl, ctaText, ctaLink }: HeroProps) {
     return (
         <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
             <div className="absolute inset-0 z-0">
@@ -25,9 +27,14 @@ export function Hero({ title, subtitle, imageUrl }: HeroProps) {
                     {title}
                 </h1>
                 {subtitle && (
-                    <p className="text-sm md:text-base tracking-[0.2em] uppercase max-w-2xl mx-auto drop-shadow-sm">
+                    <p className="text-sm md:text-base tracking-[0.2em] uppercase max-w-2xl mx-auto drop-shadow-sm mb-8">
                         {subtitle}
                     </p>
+                )}
+                {ctaText && ctaLink && (
+                    <a href={ctaLink} className="inline-block px-8 py-4 border border-white text-white text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-colors">
+                        {ctaText}
+                    </a>
                 )}
             </div>
         </section>
