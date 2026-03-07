@@ -14,12 +14,12 @@ export async function POST(request: Request) {
         if (productId) {
             const { data: product } = await supabase
                 .from("products")
-                .select("price")
+                .select("price_ghs")
                 .eq("id", productId)
                 .single();
 
-            if (product && product.price) {
-                amountInGHS = Number(product.price);
+            if (product && product.price_ghs) {
+                amountInGHS = Number(product.price_ghs);
             }
         }
 

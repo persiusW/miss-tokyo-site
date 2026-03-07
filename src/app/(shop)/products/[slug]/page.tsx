@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     const { slug } = await params;
     const { data: product } = await supabase
         .from("products")
-        .select("name, description, image_url")
+        .select("name, description, image_urls")
         .eq("slug", slug)
         .single();
 
@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
             title: `${product.name} | Badu`,
             description: product.description || `Our signature piece. Minimalist design featuring premium Ghanaian leather. Discover the ${product.name}.`,
             openGraph: {
-                images: product.image_url ? [{ url: product.image_url }] : [],
+                images: product.image_urls?.[0] ? [{ url: product.image_urls[0] }] : [],
             }
         };
     }
@@ -48,8 +48,8 @@ export default async function ProductPage({ params }: { params: { slug: string }
     const colors = product.colors || ["Noir", "Cognac", "Sand"];
     const stitching = product.stitching || ["Tonal", "Contrast White"];
     const sizes = product.sizes || ["39", "40", "41", "42", "43", "44", "45", "46"];
-    const imageUrl = product.image_url || "https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&q=80&w=1000";
-    const priceStr = `${product.price || 300} GHS`;
+    const imageUrl = product.image_urls?.[0] || "https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&q=80&w=1000";
+    const priceStr = `${product.price_ghs || 300} GHS`;
 
     return (
         <div className="pt-24 pb-32 px-6 md:px-12 max-w-7xl mx-auto">

@@ -6,8 +6,7 @@ import { supabase } from "@/lib/supabase";
 type Contact = {
     id: string;
     email: string;
-    first_name?: string;
-    last_name?: string;
+    name?: string;
     source: "order" | "custom_request" | "newsletter";
     created_at: string;
 };
@@ -24,11 +23,11 @@ export default function CustomersPage() {
         setLoading(true);
         try {
             // Fetch from orders
-            const { data: ordersData, error: ordersError } = await supabase.from("orders").select("id, email, first_name, last_name, created_at");
+            const { data: ordersData, error: ordersError } = await supabase.from("orders").select("id, customer_email, created_at");
             const orders = ordersError ? [] : ordersData;
 
             // Fetch from custom requests
-            const { data: customReqsData, error: customReqsError } = await supabase.from("custom_requests").select("id, email, first_name, last_name, created_at");
+            const { data: customReqsData, error: customReqsError } = await supabase.from("custom_requests").select("id, customer_email, customer_name, created_at");
             const customReqs = customReqsError ? [] : customReqsData;
 
             // Fetch from newsletter
@@ -38,10 +37,10 @@ export default function CustomersPage() {
             const aggregated: Contact[] = [];
 
             (orders || []).forEach((o: any) => {
-                aggregated.push({ ...o, source: "order" });
+                aggregated.push({ id: o.id, email: o.customer_email, created_at: o.created_at, source: "order" });
             });
             (customReqs || []).forEach((c: any) => {
-                aggregated.push({ ...c, source: "custom_request" });
+                aggregated.push({ id: c.id, email: c.customer_email, name: c.customer_name, created_at: c.created_at, source: "custom_request" });
             });
             (newsletters || []).forEach((n: any) => {
                 aggregated.push({ ...n, source: "newsletter" });
@@ -103,7 +102,7 @@ export default function CustomersPage() {
                                 <tr key={`${contact.id}-${idx}`} className="hover:bg-neutral-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <span className="font-medium text-neutral-900">
-                                            {contact.first_name ? `${contact.first_name} ${contact.last_name || ""}` : "Unnamed Contact"}
+                                            {contact.name || "Unnamed Contact"}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ReactNode } from "react";
+import { LogoutButton } from "@/components/ui/badu/LogoutButton";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     return (
@@ -94,14 +95,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                     SEO Management
                                 </Link>
                             </li>
+                            <li>
+                                <Link href="/cms" className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors">
+                                    Site Assets (CMS)
+                                </Link>
+                            </li>
                         </ul>
                     </div>
                 </nav>
 
-                <div className="p-4 border-t border-neutral-200">
+                <div className="p-4 border-t border-neutral-200 space-y-1">
                     <Link href="/" className="block px-4 py-2 text-sm text-neutral-500 hover:text-black transition-colors">
                         &larr; Return to Storefront
                     </Link>
+                    <LogoutButton />
                 </div>
             </aside>
 

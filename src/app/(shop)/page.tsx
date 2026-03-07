@@ -12,6 +12,12 @@ export default async function HomePage() {
         .eq("is_active", true)
         .limit(4);
 
+    const { data: assetsData } = await supabase.from("site_assets").select("*");
+    const siteAssets = (assetsData || []).reduce((acc: any, asset: any) => {
+        acc[asset.section_key] = asset;
+        return acc;
+    }, {});
+
     const productImages = [
         "https://images.unsplash.com/photo-1603487742131-4160ec999306?q=80&w=1000&auto=format&fit=crop", // Black Slide
         "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=1000&auto=format&fit=crop",  // Brown Slide
@@ -22,9 +28,9 @@ export default async function HomePage() {
     const formattedProducts = (products || []).map((p: any, idx: number) => ({
         slug: p.slug || p.id,
         name: p.name,
-        price: `${p.price} GHS`,
-        imageUrl: p.image_url || productImages[idx % productImages.length],
-        category: p.category || "Collection",
+        price: `${p.price_ghs} GHS`,
+        imageUrl: p.image_urls?.[0] || productImages[idx % productImages.length],
+        category: p.category_type || "Collection",
     }));
 
     return (
@@ -32,7 +38,7 @@ export default async function HomePage() {
             <Hero
                 title="Crafted in Ghana. Designed for Everywhere."
                 subtitle="Visual Silence. Uncompromised Quality."
-                imageUrl="https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?q=80&w=2560&auto=format&fit=crop"
+                imageUrl={siteAssets['home_hero']?.image_url || "https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?q=80&w=2560&auto=format&fit=crop"}
                 ctaText="Shop the Collection"
                 ctaLink="/shop"
             />

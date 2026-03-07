@@ -28,15 +28,11 @@ export function CustomOrderForm() {
         try {
             const { error } = await supabase.from("custom_requests").insert([
                 {
-                    first_name: formData.firstName,
-                    last_name: formData.lastName,
-                    email: formData.email,
-                    request_type: formData.requestType,
-                    details: formData.details,
-                    preferences: {
-                        stitchColor: formData.stitchColor,
-                        soleTone: formData.soleTone,
-                    },
+                    customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
+                    customer_email: formData.email,
+                    stitch_refinement: formData.stitchColor || null,
+                    sole_tone: formData.soleTone || null,
+                    status: "inquiry",
                 }
             ]);
 

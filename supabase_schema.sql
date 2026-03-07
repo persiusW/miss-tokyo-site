@@ -100,3 +100,36 @@ CREATE TABLE IF NOT EXISTS public.site_metadata (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT site_metadata_pkey PRIMARY KEY (page_path)
 );
+
+---------------------------------------------------
+-- 7. CONTENT MANAGEMENT (CMS)
+---------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.site_assets (
+  section_key text NOT NULL UNIQUE,
+  image_url text,
+  alt_text text,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT site_assets_pkey PRIMARY KEY (section_key)
+);
+
+-- Insert initial placeholder data for the CMS
+INSERT INTO public.site_assets (section_key, image_url, alt_text) VALUES
+('home_hero', 'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?q=80&w=2560&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Hero Image'),
+('gallery_img_1', 'https://images.unsplash.com/photo-1610963197825-f71e98950d87?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Leather Craft and Stitching'),
+('gallery_img_2', 'https://images.unsplash.com/photo-1481277542470-605612bd2d61?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Macro Leather Texture'),
+('gallery_img_3', 'https://images.unsplash.com/photo-1531604250646-2f0e818c4f06?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Minimalist Architecture Space'),
+('gallery_img_4', 'https://images.unsplash.com/photo-1618220179428-22790b46a0eb?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Warm Tones and Abstract Design'),
+('craft_img_1', 'https://images.unsplash.com/photo-1610963197825-f71e98950d87?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Leather Craft and Stitching'),
+('craft_img_2', 'https://images.unsplash.com/photo-1481277542470-605612bd2d61?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Macro Leather Texture'),
+('craft_img_3', 'https://images.unsplash.com/photo-1531604250646-2f0e818c4f06?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Minimalist Architecture Space')
+ON CONFLICT (section_key) DO NOTHING;
+
+---------------------------------------------------
+-- 8. STORAGE BUCKETS (MANUAL SETUP REQUIRED)
+---------------------------------------------------
+-- 1. Go to your Supabase Dashboard -> Storage
+-- 2. Click "New Bucket" and name it strictly: site-assets
+-- 3. Mark the bucket as "Public" during creation.
+-- 4. Under "Policies" for the site-assets bucket, click "New Policy".
+-- 5. Create a policy for "SELECT": Allow anyone (anon) to select (read) files.
+-- 6. Create a policy for "INSERT" & "UPDATE": Allow authenticated users to upload/update files.

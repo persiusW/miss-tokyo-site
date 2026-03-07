@@ -60,11 +60,11 @@ export default function SEOMangementPage() {
         setSaving(true);
 
         try {
-            if (formData.id) {
-                await supabase.from("site_metadata").update(formData).eq("id", formData.id);
-            } else {
-                await supabase.from("site_metadata").insert([formData]);
-            }
+            const { page_path, title, description, og_image_url, keywords } = formData;
+            await supabase.from("site_metadata").upsert(
+                { page_path, title, description, og_image_url, keywords, updated_at: new Date().toISOString() },
+                { onConflict: "page_path" }
+            );
             await fetchMetadata();
             alert("SEO metadata saved successfully.");
         } catch (err) {

@@ -5,17 +5,13 @@ import { supabase } from "@/lib/supabase";
 
 type CustomRequest = {
     id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    request_type: string;
+    customer_name: string;
+    customer_email: string;
+    strap_color: string | null;
+    sole_tone: string | null;
+    stitch_refinement: string | null;
     status: string;
-    details: string;
     created_at: string;
-    preferences: {
-        stitchColor?: string;
-        soleTone?: string;
-    }
 };
 
 const STATUS_OPTIONS = [
@@ -97,20 +93,21 @@ export default function CustomRequestsPage() {
                                 <tr key={req.id} className="hover:bg-neutral-50 transition-colors align-top group">
                                     <td className="px-6 py-4 max-w-[200px]">
                                         <div className="flex flex-col">
-                                            <span className="font-medium text-neutral-900">{req.first_name} {req.last_name}</span>
-                                            <a href={`mailto:${req.email}`} className="text-xs text-neutral-500 border-b border-transparent hover:border-neutral-500 transition-colors self-start mt-1">
-                                                {req.email}
+                                            <span className="font-medium text-neutral-900">{req.customer_name || "—"}</span>
+                                            <a href={`mailto:${req.customer_email}`} className="text-xs text-neutral-500 border-b border-transparent hover:border-neutral-500 transition-colors self-start mt-1">
+                                                {req.customer_email}
                                             </a>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className="capitalize">{req.request_type.replace('_', ' ')}</span>
+                                        <span className="capitalize text-neutral-600">Bespoke</span>
                                     </td>
                                     <td className="px-6 py-4 max-w-[250px] truncate">
                                         <div className="flex flex-col gap-1 text-xs">
-                                            {req.preferences?.stitchColor && <span>Stitch: {req.preferences.stitchColor}</span>}
-                                            {req.preferences?.soleTone && <span>Sole: {req.preferences.soleTone}</span>}
-                                            {!req.preferences?.stitchColor && !req.preferences?.soleTone && <span className="text-neutral-400">None specified</span>}
+                                            {req.stitch_refinement && <span>Stitch: {req.stitch_refinement}</span>}
+                                            {req.sole_tone && <span>Sole: {req.sole_tone}</span>}
+                                            {req.strap_color && <span>Strap: {req.strap_color}</span>}
+                                            {!req.stitch_refinement && !req.sole_tone && !req.strap_color && <span className="text-neutral-400">None specified</span>}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-neutral-600">

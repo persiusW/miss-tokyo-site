@@ -1,6 +1,15 @@
 import Image from "next/image";
+import { supabase } from "@/lib/supabase";
 
-export default function CraftPage() {
+export const revalidate = 60;
+
+export default async function CraftPage() {
+    const { data: assetsData } = await supabase.from("site_assets").select("*");
+    const siteAssets = (assetsData || []).reduce((acc: any, asset: any) => {
+        acc[asset.section_key] = asset;
+        return acc;
+    }, {});
+
     return (
         <div className="flex flex-col md:flex-row min-h-screen bg-white">
             {/* Sticky Text Side */}
@@ -32,24 +41,24 @@ export default function CraftPage() {
             <div className="w-full md:w-7/12 flex flex-col">
                 <div className="relative h-[60vh] md:h-[80vh] w-full bg-creme">
                     <Image
-                        src="https://images.unsplash.com/photo-1610963197825-f71e98950d87?q=80&w=1000&auto=format&fit=crop"
-                        alt="Badu Ghanaian Leather Footwear - Leather Craft and Stitching"
+                        src={siteAssets['craft_img_1']?.image_url || "https://images.unsplash.com/photo-1610963197825-f71e98950d87?q=80&w=1000&auto=format&fit=crop"}
+                        alt={siteAssets['craft_img_1']?.alt_text || "Badu Ghanaian Leather Footwear - Leather Craft and Stitching"}
                         fill
                         className="object-cover object-center"
                     />
                 </div>
                 <div className="relative h-[60vh] md:h-[80vh] w-full bg-neutral-100">
                     <Image
-                        src="https://images.unsplash.com/photo-1481277542470-605612bd2d61?q=80&w=1000&auto=format&fit=crop"
-                        alt="Badu Ghanaian Leather Footwear - Macro Leather Texture"
+                        src={siteAssets['craft_img_2']?.image_url || "https://images.unsplash.com/photo-1481277542470-605612bd2d61?q=80&w=1000&auto=format&fit=crop"}
+                        alt={siteAssets['craft_img_2']?.alt_text || "Badu Ghanaian Leather Footwear - Macro Leather Texture"}
                         fill
                         className="object-cover object-center"
                     />
                 </div>
                 <div className="relative h-[60vh] md:h-[80vh] w-full bg-creme">
                     <Image
-                        src="https://images.unsplash.com/photo-1531604250646-2f0e818c4f06?q=80&w=1000&auto=format&fit=crop"
-                        alt="Badu Ghanaian Leather Footwear - Minimalist Architecture Space"
+                        src={siteAssets['craft_img_3']?.image_url || "https://images.unsplash.com/photo-1531604250646-2f0e818c4f06?q=80&w=1000&auto=format&fit=crop"}
+                        alt={siteAssets['craft_img_3']?.alt_text || "Badu Ghanaian Leather Footwear - Minimalist Architecture Space"}
                         fill
                         className="object-cover object-center"
                     />

@@ -49,15 +49,15 @@ export default async function CatalogProductsPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-12 h-12 bg-neutral-100 relative overflow-hidden flex-shrink-0">
-                                                    {product.image_url ? (
-                                                        <img src={product.image_url} alt={product.name} className="object-cover w-full h-full" />
+                                                    {product.image_urls?.[0] ? (
+                                                        <img src={product.image_urls[0]} alt={product.name} className="object-cover w-full h-full" />
                                                     ) : (
                                                         <div className="w-full h-full bg-neutral-200" />
                                                     )}
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-neutral-900">{product.name}</p>
-                                                    <p className="text-xs text-neutral-500 mt-1">{product.category}</p>
+                                                    <p className="text-xs text-neutral-500 mt-1">{product.category_type}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -77,7 +77,7 @@ export default async function CatalogProductsPage() {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right font-medium">
-                                            GH₵ {product.price}
+                                            GH₵ {product.price_ghs}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <button className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black transition-colors border-b border-transparent hover:border-black">

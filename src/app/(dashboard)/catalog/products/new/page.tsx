@@ -11,11 +11,11 @@ export default function NewProductPage() {
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
-        price: 300,
+        price_ghs: 300,
         inventory_count: 10,
         description: "",
-        category: "Footwear",
-        image_url: "", // In a real app, this would handle actual file uploads to Supabase Storage
+        category_type: "footwear",
+        image_url: "",
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -40,11 +40,11 @@ export default function NewProductPage() {
                 {
                     name: formData.name,
                     slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
-                    price: Number(formData.price),
+                    price_ghs: Number(formData.price_ghs),
                     inventory_count: Number(formData.inventory_count),
                     description: formData.description,
-                    category: formData.category,
-                    image_url: formData.image_url,
+                    category_type: formData.category_type,
+                    image_urls: formData.image_url ? [formData.image_url] : [],
                     is_active: true,
                 }
             ]);
@@ -107,16 +107,16 @@ export default function NewProductPage() {
                             />
                         </div>
                         <div>
-                            <label htmlFor="category" className="block text-xs uppercase tracking-widest font-semibold mb-3">Category</label>
+                            <label htmlFor="category_type" className="block text-xs uppercase tracking-widest font-semibold mb-3">Category</label>
                             <select
-                                id="category"
-                                value={formData.category}
+                                id="category_type"
+                                value={formData.category_type}
                                 onChange={handleChange}
                                 className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
                             >
-                                <option value="Footwear">Footwear</option>
-                                <option value="Accessories">Accessories</option>
-                                <option value="Bespoke">Bespoke</option>
+                                <option value="footwear">Footwear</option>
+                                <option value="accessories">Accessories</option>
+                                <option value="bespoke">Bespoke</option>
                             </select>
                         </div>
                     </div>
@@ -140,11 +140,11 @@ export default function NewProductPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
-                            <label htmlFor="price" className="block text-xs uppercase tracking-widest font-semibold mb-3">Price (GHS)</label>
+                            <label htmlFor="price_ghs" className="block text-xs uppercase tracking-widest font-semibold mb-3">Price (GHS)</label>
                             <input
                                 type="number"
-                                id="price"
-                                value={formData.price}
+                                id="price_ghs"
+                                value={formData.price_ghs}
                                 onChange={handleChange}
                                 min="0"
                                 step="0.01"

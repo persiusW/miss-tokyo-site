@@ -1,28 +1,21 @@
 import { supabase } from "@/lib/supabase";
 
 export default async function DashboardOverviewPage() {
-    // Fetch pending orders (simulated with a simple query if you have an orders table, 
-    // but we'll fallback to 0 if it doesn't exist for now or isn't populated).
-    const { count: pendingOrdersData, error: pendingError } = await supabase
-        .from("orders")
-        .select("*", { count: 'exact', head: true })
-        .eq("status", "pending");
+    const [
+        { count: pendingOrdersData, error: pendingError },
+        { count: activeCustomRequestsData, error: customRequestsError },
+        { data: revenueData },
+        { data: recentRequests },
+    ] = await Promise.all([
+        supabase.from("orders").select("*", { count: 'exact', head: true }).eq("status", "pending"),
+        supabase.from("custom_requests").select("*", { count: 'exact', head: true }).in("status", ["inquiry", "material_confirmation", "production"]),
+        supabase.from("orders").select("total_amount").eq("status", "paid"),
+        supabase.from("custom_requests").select("id, customer_name, customer_email, status, created_at").order("created_at", { ascending: false }).limit(5),
+    ]);
 
     const pendingOrdersCount = pendingError ? 0 : pendingOrdersData;
-
-    const { count: activeCustomRequestsData, error: customRequestsError } = await supabase
-        .from("custom_requests")
-        .select("*", { count: 'exact', head: true })
-        .in("status", ["inquiry", "material_confirmation", "production"]);
-
     const activeCustomRequestsCount = customRequestsError ? 0 : activeCustomRequestsData;
-
-    // Recent activity: fetch 5 most recent custom requests as an example of activity
-    const { data: recentRequests } = await supabase
-        .from("custom_requests")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5);
+    const totalRevenue = (revenueData || []).reduce((sum: number, o: any) => sum + Number(o.total_amount), 0);
 
     return (
         <div className="space-y-12">
@@ -35,7 +28,7 @@ export default async function DashboardOverviewPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white border border-neutral-200 p-6 flex flex-col justify-between">
                     <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Total Revenue (GHS)</span>
-                    <span className="text-3xl font-serif">GH₵ 0.00</span>
+                    <span className="text-3xl font-serif">GH₵ {totalRevenue.toFixed(2)}</span>
                     <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">LIFETIME SALES</span>
                 </div>
 
@@ -130,9 +123,8 @@ export default async function DashboardOverviewPage() {
                             <li key={req.id} className="px-6 py-4 flex items-center justify-between hover:bg-neutral-50 transition-colors">
                                 <div>
                                     <p className="text-sm text-neutral-900 mb-1">
-                                        <span className="font-medium">{req.first_name} {req.last_name}</span> submitted a custom request.
+                                        <span className="font-medium">{req.customer_name || req.customer_email || "A client"}</span> submitted a custom request.
                                     </p>
-                                    <p className="text-xs text-neutral-500 capitalize">{req.request_type}</p>
                                 </div>
                                 <div className="text-right">
                                     <span className="text-[10px] uppercase tracking-widest bg-neutral-100 text-neutral-600 px-2 py-1 rounded">
