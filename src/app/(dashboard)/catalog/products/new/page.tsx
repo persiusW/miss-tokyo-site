@@ -4,10 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 
 export default function NewProductPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
@@ -15,7 +17,6 @@ export default function NewProductPage() {
         inventory_count: 10,
         description: "",
         category_type: "footwear",
-        image_url: "",
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -44,7 +45,7 @@ export default function NewProductPage() {
                     inventory_count: Number(formData.inventory_count),
                     description: formData.description,
                     category_type: formData.category_type,
-                    image_urls: formData.image_url ? [formData.image_url] : [],
+                    image_urls: uploadedImageUrl ? [uploadedImageUrl] : [],
                     is_active: true,
                 }
             ]);
@@ -130,7 +131,7 @@ export default function NewProductPage() {
                             onChange={handleChange}
                             className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black transition-colors resize-y"
                             placeholder="Describe the materials and craftsmanship..."
-                        ></textarea>
+                        />
                     </div>
                 </div>
 
@@ -168,21 +169,21 @@ export default function NewProductPage() {
                 </div>
 
                 {/* Media */}
-                <div className="bg-white p-8 border border-neutral-200 space-y-8">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Media</h2>
-
-                    <div>
-                        <label htmlFor="image_url" className="block text-xs uppercase tracking-widest font-semibold mb-3">Image URL</label>
-                        <p className="text-xs text-neutral-500 mb-3">Provide a direct link to the product image (integration with Supabase Storage can be added later).</p>
-                        <input
-                            type="url"
-                            id="image_url"
-                            value={formData.image_url}
-                            onChange={handleChange}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                            placeholder="https://..."
-                        />
-                    </div>
+                <div className="bg-white p-8 border border-neutral-200 space-y-6">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Image</h2>
+                    <ImageUploader
+                        bucket="product-images"
+                        folder="products"
+                        currentUrl={null}
+                        onUpload={setUploadedImageUrl}
+                        aspectRatio="video"
+                        label="Primary Product Photo"
+                    />
+                    {!uploadedImageUrl && (
+                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
+                            Upload a product image to display in the shop and on the product page.
+                        </p>
+                    )}
                 </div>
 
                 <div className="pt-4 flex justify-end gap-4">

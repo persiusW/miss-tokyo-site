@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 
 type SiteMetadata = {
     id?: string;
@@ -152,15 +153,13 @@ export default function SEOMangementPage() {
                         </div>
 
                         <div>
-                            <label htmlFor="og_image_url" className="block text-xs uppercase tracking-widest font-semibold mb-3">Social Share Image (URL)</label>
-                            <input
-                                type="url"
-                                id="og_image_url"
-                                name="og_image_url"
-                                value={formData.og_image_url}
-                                onChange={handleChange}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                                placeholder="https://..."
+                            <ImageUploader
+                                bucket="site-assets"
+                                folder="og-images"
+                                currentUrl={formData.og_image_url || null}
+                                onUpload={(url) => setFormData(prev => ({ ...prev, og_image_url: url }))}
+                                aspectRatio="og"
+                                label="Social Share Image"
                             />
                         </div>
 

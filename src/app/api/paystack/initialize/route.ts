@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 export async function POST(request: Request) {
     try {
-        const { productId, email } = await request.json();
+        const { productId, email, amount: customAmount } = await request.json();
 
         if (!email) {
             return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -11,7 +11,10 @@ export async function POST(request: Request) {
 
         let amountInGHS = 300; // default
 
-        if (productId) {
+        if (customAmount && Number(customAmount) > 0) {
+            // Direct custom amount (used by Pay Links)
+            amountInGHS = Number(customAmount);
+        } else if (productId) {
             const { data: product } = await supabase
                 .from("products")
                 .select("price_ghs")
