@@ -58,7 +58,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-3 px-4">Getting Paid</h3>
                         <ul className="space-y-1 text-sm text-neutral-600">
                             <li>
-                                <span className="block px-4 py-2 opacity-50 cursor-not-allowed">Invoices</span>
+                                <Link href="/finance" className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors">
+                                    Invoices & Pay Links
+                                </Link>
                             </li>
                         </ul>
                     </div>
@@ -67,11 +69,29 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-3 px-4">Customers</h3>
                         <ul className="space-y-1 text-sm text-neutral-600">
                             <li>
-                                <span className="block px-4 py-2 opacity-50 cursor-not-allowed">Contact List</span>
+                                <Link href="/customers" className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors">
+                                    Contact List
+                                </Link>
                             </li>
                             <li>
                                 <Link href="/customers/requests" className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors">
                                     Custom Requests
+                                </Link>
+                            </li>
+                            <li>
+                                <Link href="/customers/forms" className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors">
+                                    Form Submissions
+                                </Link>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-3 px-4">Brand & Growth</h3>
+                        <ul className="space-y-1 text-sm text-neutral-600">
+                            <li>
+                                <Link href="/seo" className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors">
+                                    SEO Management
                                 </Link>
                             </li>
                         </ul>

@@ -5,7 +5,30 @@ import { AnimatedProductView } from "@/components/ui/badu/AnimatedProductView";
 import { ProductCheckoutForm } from "@/components/ui/badu/ProductCheckoutForm";
 import { notFound } from "next/navigation";
 
+import { Metadata } from "next";
+
 export const revalidate = 60;
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+    const { slug } = await params;
+    const { data: product } = await supabase
+        .from("products")
+        .select("name, description, image_url")
+        .eq("slug", slug)
+        .single();
+
+    if (product) {
+        return {
+            title: `${product.name} | Badu`,
+            description: product.description || `Our signature piece. Minimalist design featuring premium Ghanaian leather. Discover the ${product.name}.`,
+            openGraph: {
+                images: product.image_url ? [{ url: product.image_url }] : [],
+            }
+        };
+    }
+
+    return { title: "Product | Badu" };
+}
 
 export default async function ProductPage({ params }: { params: { slug: string } }) {
     const { slug } = await params;

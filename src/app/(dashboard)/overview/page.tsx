@@ -3,17 +3,19 @@ import { supabase } from "@/lib/supabase";
 export default async function DashboardOverviewPage() {
     // Fetch pending orders (simulated with a simple query if you have an orders table, 
     // but we'll fallback to 0 if it doesn't exist for now or isn't populated).
-    const { count: pendingOrdersCount } = await supabase
+    const { count: pendingOrdersData, error: pendingError } = await supabase
         .from("orders")
         .select("*", { count: 'exact', head: true })
-        .eq("status", "pending")
-        .catch(() => ({ count: 0 }));
+        .eq("status", "pending");
 
-    const { count: activeCustomRequestsCount } = await supabase
+    const pendingOrdersCount = pendingError ? 0 : pendingOrdersData;
+
+    const { count: activeCustomRequestsData, error: customRequestsError } = await supabase
         .from("custom_requests")
         .select("*", { count: 'exact', head: true })
-        .in("status", ["inquiry", "material_confirmation", "production"])
-        .catch(() => ({ count: 0 }));
+        .in("status", ["inquiry", "material_confirmation", "production"]);
+
+    const activeCustomRequestsCount = customRequestsError ? 0 : activeCustomRequestsData;
 
     // Recent activity: fetch 5 most recent custom requests as an example of activity
     const { data: recentRequests } = await supabase
@@ -47,6 +49,68 @@ export default async function DashboardOverviewPage() {
                     <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Active Custom Requests</span>
                     <span className="text-3xl font-serif">{activeCustomRequestsCount || 0}</span>
                     <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">NEEDS ATTENTION</span>
+                </div>
+            </div>
+
+            {/* Analytics Visualizations */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Sales by Category Chart */}
+                <div className="bg-white border border-neutral-200 p-6">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest mb-6">Sales by Category</h2>
+                    <div className="space-y-4">
+                        <div>
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-neutral-600">Footwear</span>
+                                <span className="font-medium">65%</span>
+                            </div>
+                            <div className="w-full bg-neutral-100 h-2">
+                                <div className="bg-black h-2" style={{ width: '65%' }}></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-neutral-600">Future Apparel</span>
+                                <span className="font-medium">25%</span>
+                            </div>
+                            <div className="w-full bg-neutral-100 h-2">
+                                <div className="bg-neutral-600 h-2" style={{ width: '25%' }}></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-neutral-600">Accessories</span>
+                                <span className="font-medium">10%</span>
+                            </div>
+                            <div className="w-full bg-neutral-100 h-2">
+                                <div className="bg-neutral-400 h-2" style={{ width: '10%' }}></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Conversion Funnel */}
+                <div className="bg-white border border-neutral-200 p-6">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest mb-6">Conversion Funnel</h2>
+                    <div className="flex h-32 items-end space-x-2">
+                        <div className="w-1/3 group relative">
+                            <div className="bg-neutral-200 h-full w-full transition-colors group-hover:bg-neutral-300"></div>
+                            <span className="text-[10px] uppercase tracking-widest text-neutral-500 absolute -bottom-6 left-0 right-0 text-center">Visitors</span>
+                            <span className="text-xs font-bold absolute -top-6 left-0 right-0 text-center">3.2k</span>
+                        </div>
+                        <div className="w-1/3 group relative">
+                            <div className="bg-neutral-400 h-3/5 w-full transition-colors group-hover:bg-neutral-500"></div>
+                            <span className="text-[10px] uppercase tracking-widest text-neutral-500 absolute -bottom-6 left-0 right-0 text-center">Added Space</span>
+                            <span className="text-xs font-bold absolute -top-6 left-0 right-0 text-center">450</span>
+                        </div>
+                        <div className="w-1/3 group relative">
+                            <div className="bg-black h-1/5 w-full transition-colors group-hover:bg-neutral-800"></div>
+                            <span className="text-[10px] uppercase tracking-widest text-neutral-500 absolute -bottom-6 left-0 right-0 text-center">Purchased</span>
+                            <span className="text-xs font-bold absolute -top-6 left-0 right-0 text-center">85</span>
+                        </div>
+                    </div>
+                    <div className="mt-10 text-center border-t border-neutral-100 pt-4">
+                        <span className="text-xs text-neutral-500 tracking-wider">Overall Conversion Rate: <strong className="text-black text-sm">2.65%</strong></span>
+                    </div>
                 </div>
             </div>
 
