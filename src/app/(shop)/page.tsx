@@ -1,38 +1,25 @@
 import { Hero } from "@/components/ui/badu/Hero";
-import { ProductCard } from "@/components/ui/badu/ProductCard";
+import { AnimatedProductGrid } from "@/components/ui/badu/AnimatedProductGrid";
+import { supabase } from "@/lib/supabase";
 
-const MOCK_PRODUCTS = [
-    {
-        slug: "badu-slide-01",
-        name: "Badu Slide 01",
-        price: "300 GHS",
-        imageUrl: "https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&q=80&w=1000",
-        category: "Mens",
-    },
-    {
-        slug: "badu-slide-02",
-        name: "Classic Loafer",
-        price: "450 GHS",
-        imageUrl: "https://images.unsplash.com/photo-1620809311313-059ad8a38ae1?auto=format&fit=crop&q=80&w=1000",
-        category: "Unisex",
-    },
-    {
-        slug: "badu-slide-03",
-        name: "Woven Sandal",
-        price: "350 GHS",
-        imageUrl: "https://images.unsplash.com/photo-1603808033192-082d6919d3e1?auto=format&fit=crop&q=80&w=1000",
-        category: "Womens",
-    },
-    {
-        slug: "badu-slide-04",
-        name: "Leather Mule",
-        price: "400 GHS",
-        imageUrl: "https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&q=80&w=1000",
-        category: "Womens",
-    },
-];
+export const revalidate = 60; // Revalidate every minute
 
-export default function HomePage() {
+export default async function HomePage() {
+    // Fetch top 4 active products
+    const { data: products } = await supabase
+        .from("products")
+        .select("*")
+        .eq("is_active", true)
+        .limit(4);
+
+    const formattedProducts = (products || []).map((p: any) => ({
+        slug: p.slug || p.id,
+        name: p.name,
+        price: `${p.price} GHS`,
+        imageUrl: p.image_url || "https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&q=80&w=1000",
+        category: p.category || "Collection",
+    }));
+
     return (
         <>
             <Hero
@@ -58,11 +45,13 @@ export default function HomePage() {
                         </a>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {MOCK_PRODUCTS.map((product) => (
-                            <ProductCard key={product.slug} {...product} />
-                        ))}
-                    </div>
+                    {formattedProducts.length > 0 ? (
+                        <AnimatedProductGrid products={formattedProducts} />
+                    ) : (
+                        <div className="text-center py-12 text-neutral-500 tracking-widest uppercase text-sm">
+                            Collection is currently being updated.
+                        </div>
+                    )}
                 </div>
             </section>
 
