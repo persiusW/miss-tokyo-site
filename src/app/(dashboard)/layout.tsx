@@ -53,7 +53,6 @@ const NAV: NavSection[] = [
         title: "Settings",
         items: [
             { label: "Site Settings", href: "/settings" },
-            { label: "SEO & Metadata", href: "/settings/seo" },
         ],
     },
 ];
@@ -61,54 +60,54 @@ const NAV: NavSection[] = [
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     return (
         <>
-        <div className="min-h-screen bg-creme font-sans flex text-neutral-900">
-            {/* Sidebar */}
-            <aside className="w-64 border-r border-neutral-200 hidden md:flex flex-col h-screen sticky top-0 bg-white">
-                <div className="p-8 border-b border-neutral-200">
-                    <Link href="/overview" className="font-serif text-2xl tracking-widest uppercase block">
-                        Badu
-                    </Link>
-                    <span className="text-[10px] uppercase tracking-widest text-neutral-400 mt-2 block">Atelier Console</span>
-                </div>
+            <div className="min-h-screen bg-creme font-sans flex text-neutral-900">
+                {/* Sidebar */}
+                <aside className="w-64 border-r border-neutral-200 hidden md:flex flex-col h-screen sticky top-0 bg-white">
+                    <div className="p-8 border-b border-neutral-200">
+                        <Link href="/overview" className="font-serif text-2xl tracking-widest uppercase block">
+                            Badu
+                        </Link>
+                        <span className="text-[10px] uppercase tracking-widest text-neutral-400 mt-2 block">Atelier Console</span>
+                    </div>
 
-                <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
-                    {NAV.map((section) => (
-                        <div key={section.title}>
-                            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-3 px-4">
-                                {section.title}
-                            </h3>
-                            <ul className="space-y-1 text-sm text-neutral-600">
-                                {section.items.map((item) => (
-                                    <li key={item.href}>
-                                        <Link
-                                            href={item.href}
-                                            className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors"
-                                        >
-                                            {item.label}
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    ))}
-                </nav>
+                    <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
+                        {NAV.map((section) => (
+                            <div key={section.title}>
+                                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-3 px-4">
+                                    {section.title}
+                                </h3>
+                                <ul className="space-y-1 text-sm text-neutral-600">
+                                    {section.items.map((item) => (
+                                        <li key={item.href}>
+                                            <Link
+                                                href={item.href}
+                                                className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors"
+                                            >
+                                                {item.label}
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </nav>
 
-                <div className="p-4 border-t border-neutral-200 space-y-1">
-                    <Link href="/" className="block px-4 py-2 text-sm text-neutral-500 hover:text-black transition-colors">
-                        &larr; Return to Storefront
-                    </Link>
-                    <LogoutButton />
-                </div>
-            </aside>
+                    <div className="p-4 border-t border-neutral-200 space-y-1">
+                        <Link href="/" className="block px-4 py-2 text-sm text-neutral-500 hover:text-black transition-colors">
+                            &larr; Return to Storefront
+                        </Link>
+                        <LogoutButton />
+                    </div>
+                </aside>
 
-            {/* Main */}
-            <main className="flex-1 min-w-0 overflow-y-auto w-full md:w-auto p-6 md:p-12">
-                <div className="max-w-6xl mx-auto">
-                    {children}
-                </div>
-            </main>
-        </div>
-        <Toaster />
+                {/* Main */}
+                <main className="flex-1 min-w-0 overflow-y-auto w-full md:w-auto p-6 md:p-12">
+                    <div className="max-w-6xl mx-auto">
+                        {children}
+                    </div>
+                </main>
+            </div>
+            <Toaster />
         </>
     );
 }
