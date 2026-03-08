@@ -1,14 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { toast } from "@/lib/toast";
+
+type LineItem = { description: string; qty: number; unit_price: number };
+
+type DocForm = {
+    type: "invoice" | "quotation";
+    customer_name: string;
+    customer_email: string;
+    notes: string;
+    tax_rate: number;
+    line_items: LineItem[];
+};
 
 type Document = {
     id: string;
     type: "invoice" | "quotation";
     amount: number;
     status: "pending" | "paid" | "draft" | "cancelled";
-    customer_id?: string;
+    customer_name: string | null;
+    customer_email: string | null;
+    line_items: LineItem[] | null;
+    tax_rate: number | null;
+    notes: string | null;
     created_at: string;
 };
 
@@ -19,13 +36,22 @@ const STATUS_STYLES: Record<string, string> = {
     cancelled: "bg-red-50 text-red-600",
 };
 
+const EMPTY_LINE: LineItem = { description: "", qty: 1, unit_price: 0 };
+
 export default function InvoicesPage() {
     const [documents, setDocuments] = useState<Document[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
-    const [amount, setAmount] = useState<number | "">("");
-    const [docType, setDocType] = useState<"invoice" | "quotation">("invoice");
     const [saving, setSaving] = useState(false);
+    const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+    const [form, setForm] = useState<DocForm>({
+        type: "invoice",
+        customer_name: "",
+        customer_email: "",
+        notes: "",
+        tax_rate: 0,
+        line_items: [{ ...EMPTY_LINE }],
+    });
 
     const fetchDocuments = async () => {
         setLoading(true);
@@ -38,19 +64,73 @@ export default function InvoicesPage() {
         setLoading(false);
     };
 
-    useEffect(() => { fetchDocuments(); }, []);
+    useEffect(() => {
+        fetchDocuments();
+        supabase
+            .from("business_settings")
+            .select("tax_rate")
+            .eq("id", "default")
+            .single()
+            .then(({ data }) => {
+                if (data?.tax_rate) {
+                    const rate = Number(data.tax_rate);
+                    setDefaultTaxRate(rate);
+                    setForm(prev => ({ ...prev, tax_rate: rate }));
+                }
+            });
+    }, []);
+
+    const openCreate = () => {
+        setForm({
+            type: "invoice",
+            customer_name: "",
+            customer_email: "",
+            notes: "",
+            tax_rate: defaultTaxRate,
+            line_items: [{ ...EMPTY_LINE }],
+        });
+        setIsCreating(true);
+    };
+
+    const subtotal = form.line_items.reduce((s, l) => s + l.qty * l.unit_price, 0);
+    const taxAmount = subtotal * (form.tax_rate / 100);
+    const total = subtotal + taxAmount;
+
+    const updateLine = (i: number, field: keyof LineItem, value: string | number) => {
+        setForm(prev => {
+            const lines = [...prev.line_items];
+            lines[i] = { ...lines[i], [field]: field === "description" ? value : Number(value) };
+            return { ...prev, line_items: lines };
+        });
+    };
+
+    const addLine = () =>
+        setForm(prev => ({ ...prev, line_items: [...prev.line_items, { ...EMPTY_LINE }] }));
+
+    const removeLine = (i: number) =>
+        setForm(prev => ({ ...prev, line_items: prev.line_items.filter((_, idx) => idx !== i) }));
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!amount) return;
+        const hasItems = form.line_items.some(l => l.description.trim());
+        if (!hasItems) return;
         setSaving(true);
-        const { error } = await supabase.from("documents").insert([{ type: docType, amount: Number(amount), status: "pending" }]);
+        const { error } = await supabase.from("documents").insert([{
+            type: form.type,
+            amount: total,
+            status: "draft",
+            customer_name: form.customer_name || null,
+            customer_email: form.customer_email || null,
+            line_items: form.line_items,
+            tax_rate: form.tax_rate,
+            notes: form.notes || null,
+        }]);
         if (!error) {
-            setAmount("");
             setIsCreating(false);
             await fetchDocuments();
+            toast.success("Document saved.");
         } else {
-            alert("Failed to create document.");
+            toast.error("Failed to save document.");
         }
         setSaving(false);
     };
@@ -63,13 +143,13 @@ export default function InvoicesPage() {
     const copyPayLink = (docId: string, docAmount: number) => {
         const link = `${window.location.origin}/checkout/direct?ref=${docId}&amt=${docAmount}`;
         navigator.clipboard.writeText(link);
-        alert("Pay link copied to clipboard.");
+        toast.info("Pay link copied.");
     };
 
     const invoices = documents.filter(d => d.type === "invoice");
     const quotations = documents.filter(d => d.type === "quotation");
-    const totalPaid = invoices.filter(d => d.status === "paid").reduce((s, d) => s + d.amount, 0);
-    const totalPending = invoices.filter(d => d.status === "pending").reduce((s, d) => s + d.amount, 0);
+    const totalPaid = invoices.filter(d => d.status === "paid").reduce((s, d) => s + Number(d.amount), 0);
+    const totalPending = invoices.filter(d => d.status === "pending").reduce((s, d) => s + Number(d.amount), 0);
 
     return (
         <div className="space-y-12">
@@ -79,13 +159,14 @@ export default function InvoicesPage() {
                     <p className="text-neutral-500">Issue and track invoices and quotations.</p>
                 </div>
                 <button
-                    onClick={() => setIsCreating(!isCreating)}
+                    onClick={isCreating ? () => setIsCreating(false) : openCreate}
                     className="bg-black text-white px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
                 >
                     {isCreating ? "Cancel" : "New Document"}
                 </button>
             </header>
 
+            {/* Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white border border-neutral-200 p-6">
                     <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Paid Invoices</span>
@@ -101,48 +182,176 @@ export default function InvoicesPage() {
                 </div>
             </div>
 
+            {/* Professional Builder */}
             {isCreating && (
-                <div className="bg-white border border-neutral-200 p-8">
-                    <h2 className="text-xs uppercase tracking-widest font-semibold mb-6 border-b border-neutral-100 pb-4">Create Document</h2>
-                    <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-                        <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Type</label>
-                            <select
-                                value={docType}
-                                onChange={e => setDocType(e.target.value as "invoice" | "quotation")}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors appearance-none"
-                            >
-                                <option value="invoice">Invoice</option>
-                                <option value="quotation">Quotation</option>
-                            </select>
+                <form onSubmit={handleCreate} className="bg-white border border-neutral-200">
+                    {/* Header row */}
+                    <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
+                        <h2 className="text-xs uppercase tracking-widest font-semibold">New Document</h2>
+                        <select
+                            value={form.type}
+                            onChange={e => setForm(p => ({ ...p, type: e.target.value as "invoice" | "quotation" }))}
+                            className="text-xs uppercase tracking-widest border border-neutral-200 bg-transparent px-3 py-1.5 outline-none focus:border-black transition-colors appearance-none"
+                        >
+                            <option value="invoice">Invoice</option>
+                            <option value="quotation">Quotation</option>
+                        </select>
+                    </div>
+
+                    {/* Bill To */}
+                    <div className="px-8 py-6 border-b border-neutral-100">
+                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-4">Bill To</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Customer Name</label>
+                                <input
+                                    type="text"
+                                    value={form.customer_name}
+                                    onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
+                                    placeholder="e.g. Kwame Mensah"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Customer Email</label>
+                                <input
+                                    type="email"
+                                    value={form.customer_email}
+                                    onChange={e => setForm(p => ({ ...p, customer_email: e.target.value }))}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
+                                    placeholder="client@email.com"
+                                />
+                            </div>
                         </div>
+                    </div>
+
+                    {/* Line Items */}
+                    <div className="px-8 py-6 border-b border-neutral-100">
+                        <div className="flex items-center justify-between mb-4">
+                            <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Line Items</p>
+                            <button
+                                type="button" onClick={addLine}
+                                className="text-[10px] uppercase tracking-widest text-black border-b border-black hover:text-neutral-600 transition-colors"
+                            >
+                                + Add Line
+                            </button>
+                        </div>
+
+                        {/* Column headers */}
+                        <div className="grid grid-cols-12 gap-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold pb-2 border-b border-neutral-100 mb-3">
+                            <div className="col-span-6">Description</div>
+                            <div className="col-span-2 text-center">Qty</div>
+                            <div className="col-span-3 text-right">Unit Price (GHS)</div>
+                            <div className="col-span-1 text-right">Total</div>
+                        </div>
+
+                        <div className="space-y-2">
+                            {form.line_items.map((line, i) => (
+                                <div key={i} className="grid grid-cols-12 gap-3 items-center group">
+                                    <div className="col-span-6">
+                                        <input
+                                            type="text"
+                                            value={line.description}
+                                            onChange={e => updateLine(i, "description", e.target.value)}
+                                            className="w-full border-b border-neutral-200 bg-transparent py-1.5 outline-none focus:border-black transition-colors text-sm"
+                                            placeholder="Item description"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <input
+                                            type="number" min="1" step="1"
+                                            value={line.qty}
+                                            onChange={e => updateLine(i, "qty", e.target.value)}
+                                            className="w-full border-b border-neutral-200 bg-transparent py-1.5 outline-none focus:border-black transition-colors text-sm text-center"
+                                        />
+                                    </div>
+                                    <div className="col-span-3">
+                                        <input
+                                            type="number" min="0" step="0.01"
+                                            value={line.unit_price}
+                                            onChange={e => updateLine(i, "unit_price", e.target.value)}
+                                            className="w-full border-b border-neutral-200 bg-transparent py-1.5 outline-none focus:border-black transition-colors text-sm text-right"
+                                        />
+                                    </div>
+                                    <div className="col-span-1 text-right flex items-center justify-end gap-1">
+                                        <span className="text-xs text-neutral-500">
+                                            {(line.qty * line.unit_price).toFixed(0)}
+                                        </span>
+                                        {form.line_items.length > 1 && (
+                                            <button
+                                                type="button" onClick={() => removeLine(i)}
+                                                className="text-neutral-300 hover:text-red-500 transition-colors text-base leading-none ml-1 opacity-0 group-hover:opacity-100"
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Totals */}
+                        <div className="mt-8 flex justify-end">
+                            <div className="w-72 space-y-3 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-neutral-500">Subtotal</span>
+                                    <span>GH₵ {subtotal.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-neutral-500">Tax</span>
+                                        <input
+                                            type="number" min="0" max="100" step="0.1"
+                                            value={form.tax_rate}
+                                            onChange={e => setForm(p => ({ ...p, tax_rate: Number(e.target.value) }))}
+                                            className="w-14 border-b border-neutral-300 bg-transparent py-0.5 outline-none focus:border-black text-sm text-center transition-colors"
+                                        />
+                                        <span className="text-neutral-400 text-xs">%</span>
+                                    </div>
+                                    <span>GH₵ {taxAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between font-semibold text-base border-t border-neutral-200 pt-3">
+                                    <span>Total</span>
+                                    <span>GH₵ {total.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Notes + Submit */}
+                    <div className="px-8 py-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Amount (GHS)</label>
-                            <input
-                                type="number" min="0" step="0.01" required
-                                value={amount}
-                                onChange={e => setAmount(Number(e.target.value))}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                                placeholder="0.00"
+                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-2">Notes (Optional)</label>
+                            <textarea
+                                value={form.notes}
+                                onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                                rows={2}
+                                className="w-full border border-neutral-200 p-3 bg-transparent outline-none focus:border-black transition-colors resize-none text-sm"
+                                placeholder="Payment terms, bank details, thank-you note..."
                             />
                         </div>
-                        <button
-                            type="submit" disabled={saving}
-                            className="border border-black px-6 py-2 text-xs uppercase tracking-widest hover:bg-black hover:text-white transition-colors disabled:opacity-50"
-                        >
-                            {saving ? "Generating..." : "Generate"}
-                        </button>
-                    </form>
-                </div>
+                        <div className="flex justify-end">
+                            <button
+                                type="submit" disabled={saving}
+                                className="px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                            >
+                                {saving ? "Saving..." : `Save ${form.type === "invoice" ? "Invoice" : "Quotation"}`}
+                            </button>
+                        </div>
+                    </div>
+                </form>
             )}
 
+            {/* Documents Table */}
             <div className="bg-white border border-neutral-200 overflow-x-auto">
                 <table className="w-full text-left text-sm whitespace-nowrap">
                     <thead className="bg-neutral-50 border-b border-neutral-200">
                         <tr>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">ID</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Type</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Amount</th>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Client</th>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Total</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Date</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Actions</th>
@@ -150,32 +359,48 @@ export default function InvoicesPage() {
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
                         {loading ? (
-                            <tr><td colSpan={6} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td></tr>
+                            <tr><td colSpan={7} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td></tr>
                         ) : documents.length === 0 ? (
-                            <tr><td colSpan={6} className="px-6 py-16 text-center text-neutral-500 italic font-serif">No documents yet. Click 'New Document' to issue one.</td></tr>
+                            <tr><td colSpan={7} className="px-6 py-16 text-center text-neutral-500 italic font-serif">No documents yet. Click &apos;New Document&apos; to issue one.</td></tr>
                         ) : documents.map((doc) => (
                             <tr key={doc.id} className="hover:bg-neutral-50 transition-colors">
-                                <td className="px-6 py-4"><span className="font-mono text-xs text-neutral-600">{doc.id.substring(0, 8).toUpperCase()}</span></td>
+                                <td className="px-6 py-4">
+                                    <span className="font-mono text-xs text-neutral-600">{doc.id.substring(0, 8).toUpperCase()}</span>
+                                </td>
                                 <td className="px-6 py-4 capitalize">{doc.type}</td>
-                                <td className="px-6 py-4 text-right font-medium">GH₵ {doc.amount.toFixed(2)}</td>
+                                <td className="px-6 py-4">
+                                    <div className="text-neutral-900 font-medium">{doc.customer_name || "—"}</div>
+                                    {doc.customer_email && (
+                                        <div className="text-xs text-neutral-400">{doc.customer_email}</div>
+                                    )}
+                                </td>
+                                <td className="px-6 py-4 text-right font-medium">GH₵ {Number(doc.amount).toFixed(2)}</td>
                                 <td className="px-6 py-4">
                                     <select
                                         value={doc.status}
                                         onChange={e => updateStatus(doc.id, e.target.value)}
                                         className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded border-0 cursor-pointer outline-none appearance-none ${STATUS_STYLES[doc.status]}`}
                                     >
-                                        {["pending", "paid", "draft", "cancelled"].map(s => (
+                                        {["draft", "pending", "paid", "cancelled"].map(s => (
                                             <option key={s} value={s}>{s}</option>
                                         ))}
                                     </select>
                                 </td>
-                                <td className="px-6 py-4 text-neutral-500 text-xs">{new Date(doc.created_at).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 text-right">
+                                <td className="px-6 py-4 text-neutral-500 text-xs">
+                                    {new Date(doc.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-6 py-4 text-right flex items-center justify-end gap-4">
+                                    <Link
+                                        href={`/finance/invoices/${doc.id}`}
+                                        className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black transition-colors"
+                                    >
+                                        View
+                                    </Link>
                                     <button
                                         onClick={() => copyPayLink(doc.id, doc.amount)}
                                         className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black transition-colors"
                                     >
-                                        Copy Pay Link
+                                        Pay Link
                                     </button>
                                 </td>
                             </tr>

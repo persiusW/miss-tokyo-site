@@ -1,5 +1,6 @@
 import { NavBar } from "@/components/ui/badu/NavBar";
 import { Footer } from "@/components/ui/badu/Footer";
+import { Toaster } from "@/components/ui/badu/Toaster";
 
 export default function ShopLayout({
     children,
@@ -13,6 +14,7 @@ export default function ShopLayout({
                 {children}
             </main>
             <Footer />
+            <Toaster />
         </div>
     );
 }

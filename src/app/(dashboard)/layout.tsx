@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { LogoutButton } from "@/components/ui/badu/LogoutButton";
+import { Toaster } from "@/components/ui/badu/Toaster";
 
 type NavItem = { label: string; href: string };
 type NavSection = { title: string; items: NavItem[] };
@@ -49,10 +50,17 @@ const NAV: NavSection[] = [
             { label: "Site Assets", href: "/assets" },
         ],
     },
+    {
+        title: "System",
+        items: [
+            { label: "Settings", href: "/settings" },
+        ],
+    },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     return (
+        <>
         <div className="min-h-screen bg-creme font-sans flex text-neutral-900">
             {/* Sidebar */}
             <aside className="w-64 border-r border-neutral-200 hidden md:flex flex-col h-screen sticky top-0 bg-white">
@@ -100,5 +108,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </div>
             </main>
         </div>
+        <Toaster />
+        </>
     );
 }

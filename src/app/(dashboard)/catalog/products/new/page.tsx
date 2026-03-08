@@ -1,23 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { ImageUploader } from "@/components/ui/badu/ImageUploader";
+import { toast } from "@/lib/toast";
+
+type Category = { id: string; name: string; slug: string };
 
 export default function NewProductPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+    const [categories, setCategories] = useState<Category[]>([]);
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
         price_ghs: 300,
         inventory_count: 10,
         description: "",
-        category_type: "footwear",
+        category_type: "",
     });
+
+    useEffect(() => {
+        supabase
+            .from("categories")
+            .select("id, name, slug")
+            .eq("is_active", true)
+            .order("name")
+            .then(({ data }) => {
+                if (data && data.length > 0) {
+                    setCategories(data);
+                    setFormData(prev => ({ ...prev, category_type: data[0].slug }));
+                }
+            });
+    }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
@@ -55,7 +73,7 @@ export default function NewProductPage() {
             router.refresh();
         } catch (err) {
             console.error(err);
-            alert("Failed to create product.");
+            toast.error("Failed to create product.");
         } finally {
             setLoading(false);
         }
@@ -109,16 +127,23 @@ export default function NewProductPage() {
                         </div>
                         <div>
                             <label htmlFor="category_type" className="block text-xs uppercase tracking-widest font-semibold mb-3">Category</label>
-                            <select
-                                id="category_type"
-                                value={formData.category_type}
-                                onChange={handleChange}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
-                            >
-                                <option value="footwear">Footwear</option>
-                                <option value="accessories">Accessories</option>
-                                <option value="bespoke">Bespoke</option>
-                            </select>
+                            {categories.length === 0 ? (
+                                <div className="border-b border-neutral-200 py-2">
+                                    <span className="text-sm text-neutral-400 italic">No categories yet — </span>
+                                    <Link href="/catalog/categories" className="text-sm text-black underline">add one first</Link>
+                                </div>
+                            ) : (
+                                <select
+                                    id="category_type"
+                                    value={formData.category_type}
+                                    onChange={handleChange}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
+                                >
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
                     </div>
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -62,7 +63,9 @@ export default async function OrdersPage() {
                             orders.map((order) => (
                                 <tr key={order.id} className="hover:bg-neutral-50 transition-colors">
                                     <td className="px-6 py-4">
-                                        <span className="font-mono text-xs text-neutral-600">{order.id.substring(0, 8).toUpperCase()}</span>
+                                        <Link href={`/sales/orders/${order.id}`} className="font-mono text-xs text-neutral-600 hover:text-black hover:underline">
+                                            {order.id.substring(0, 8).toUpperCase()}
+                                        </Link>
                                     </td>
                                     <td className="px-6 py-4">
                                         <a href={`mailto:${order.customer_email}`} className="text-neutral-700 hover:text-black hover:underline">

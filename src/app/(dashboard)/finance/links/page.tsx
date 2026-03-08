@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { toast } from "@/lib/toast";
 
 type PayLink = {
     id: string;
@@ -27,7 +28,20 @@ export default function PayLinksPage() {
         setLoading(false);
     };
 
-    useEffect(() => { fetchLinks(); }, []);
+    useEffect(() => {
+        fetchLinks();
+        // Pre-fill business email from settings
+        supabase
+            .from("business_settings")
+            .select("email")
+            .eq("id", "default")
+            .single()
+            .then(({ data }) => {
+                if (data?.email) {
+                    setForm(prev => ({ ...prev, email: prev.email || data.email }));
+                }
+            });
+    }, []);
 
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,7 +60,6 @@ export default function PayLinksPage() {
             if (data.authorizationUrl) {
                 setGeneratedUrl(data.authorizationUrl);
 
-                // Save to pay_links table
                 await supabase.from("pay_links").insert([{
                     email: form.email,
                     amount: Number(form.amount),
@@ -56,11 +69,12 @@ export default function PayLinksPage() {
                 }]);
 
                 await fetchLinks();
+                toast.success("Pay link generated.");
             } else {
-                alert("Failed to generate pay link. Check Paystack configuration.");
+                toast.error("Failed to generate pay link. Check Paystack configuration.");
             }
         } catch {
-            alert("An error occurred.");
+            toast.error("An error occurred.");
         } finally {
             setGenerating(false);
         }
@@ -68,7 +82,7 @@ export default function PayLinksPage() {
 
     const copyToClipboard = (url: string) => {
         navigator.clipboard.writeText(url);
-        alert("Link copied to clipboard.");
+        toast.info("Link copied to clipboard.");
     };
 
     return (

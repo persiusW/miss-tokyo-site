@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/badu/ImageUploader";
+import { toast } from "@/lib/toast";
 
 type SiteMetadata = {
     id?: string;
@@ -67,10 +68,10 @@ export default function SEOMangementPage() {
                 { onConflict: "page_path" }
             );
             await fetchMetadata();
-            alert("SEO metadata saved successfully.");
+            toast.success("SEO metadata saved.");
         } catch (err) {
             console.error(err);
-            alert("Failed to save SEO metadata.");
+            toast.error("Failed to save SEO metadata.");
         } finally {
             setSaving(false);
         }
