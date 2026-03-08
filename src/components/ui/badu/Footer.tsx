@@ -15,7 +15,7 @@ export function Footer() {
                     <h4 className="text-xs uppercase tracking-widest font-semibold mb-6">Explore</h4>
                     <ul className="space-y-4 text-sm text-neutral-600">
                         <li><Link href="/shop" className="hover:text-black transition-colors">The Collection</Link></li>
-                        <li><Link href="/custom" className="hover:text-black transition-colors">Custom Orders</Link></li>
+                        <li><Link href="/whitelabel" className="hover:text-black transition-colors">White Labelling</Link></li>
                         <li><Link href="/craft" className="hover:text-black transition-colors">The Craft</Link></li>
                     </ul>
                 </div>

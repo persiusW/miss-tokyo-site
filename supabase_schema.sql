@@ -51,9 +51,14 @@ CREATE TABLE IF NOT EXISTS public.custom_requests (
   stitch_refinement text,
   status text DEFAULT 'inquiry'::text,
   request_type text DEFAULT 'bespoke',
+  details text,
+  reference_product text,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT custom_requests_pkey PRIMARY KEY (id)
 );
+
+ALTER TABLE public.custom_requests ADD COLUMN IF NOT EXISTS details text;
+ALTER TABLE public.custom_requests ADD COLUMN IF NOT EXISTS reference_product text;
 
 ---------------------------------------------------
 -- 4. FINANCE (Invoices & Pay Links)
@@ -138,18 +143,27 @@ ON CONFLICT (section_key) DO NOTHING;
 ---------------------------------------------------
 
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS available_sizes text[];
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS available_colors text[];
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS available_stitching text[];
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS sort_order integer DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS public.store_settings (
   id text NOT NULL DEFAULT 'default',
   global_sizes text[] DEFAULT ARRAY['39', '40', '41', '42', '43', '44', '45']::text[],
+  global_colors text[] DEFAULT ARRAY['Noir', 'Cognac', 'Sand']::text[],
+  global_stitching text[] DEFAULT ARRAY['Tonal', 'Contrast White']::text[],
   enable_store_pickup boolean DEFAULT false,
+  maintenance_mode boolean DEFAULT false,
   CONSTRAINT store_settings_pkey PRIMARY KEY (id)
 );
 
-INSERT INTO public.store_settings (id, global_sizes, enable_store_pickup)
-VALUES ('default', ARRAY['39', '40', '41', '42', '43', '44', '45']::text[], false)
+INSERT INTO public.store_settings (id, global_sizes, global_colors, global_stitching, enable_store_pickup)
+VALUES ('default', ARRAY['39', '40', '41', '42', '43', '44', '45']::text[], ARRAY['Noir', 'Cognac', 'Sand']::text[], ARRAY['Tonal', 'Contrast White']::text[], false)
 ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS global_colors text[] DEFAULT ARRAY['Noir', 'Cognac', 'Sand']::text[];
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS global_stitching text[] DEFAULT ARRAY['Tonal', 'Contrast White']::text[];
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS maintenance_mode boolean DEFAULT false;
 
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_name text;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_phone text;

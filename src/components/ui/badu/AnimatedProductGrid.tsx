@@ -8,6 +8,7 @@ interface Product {
     name: string;
     price: string;
     imageUrl: string;
+    hoverImageUrl?: string;
     category?: string;
 }
 
@@ -42,6 +43,7 @@ export function AnimatedProductGrid({ products }: { products: Product[] }) {
                         name={product.name}
                         price={product.price}
                         imageUrl={product.imageUrl}
+                        hoverImageUrl={product.hoverImageUrl}
                         category={product.category}
                     />
                 </motion.div>

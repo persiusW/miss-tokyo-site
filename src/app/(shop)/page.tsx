@@ -23,6 +23,7 @@ export default async function HomePage() {
         name: p.name,
         price: `${p.price_ghs} GHS`,
         imageUrl: p.image_urls?.[0] || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f5f5f5'/%3E%3C/svg%3E", // fallback to empty if missing
+        hoverImageUrl: p.image_urls?.[1],
         category: p.category_type || "Collection",
     }));
 

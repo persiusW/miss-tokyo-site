@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSearchParams } from "next/navigation";
+import Image from "next/image";
+
+type RefProduct = { name: string; slug: string; image_urls: string[] | null };
 
 export function CustomOrderForm() {
+    const searchParams = useSearchParams();
+    const refSlug = searchParams.get("ref");
+
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [refProduct, setRefProduct] = useState<RefProduct | null>(null);
 
     const [formData, setFormData] = useState({
         firstName: "",
@@ -15,7 +23,20 @@ export function CustomOrderForm() {
         stitchColor: "",
         soleTone: "",
         details: "",
+        referenceProduct: "",
     });
+
+    useEffect(() => {
+        if (refSlug) {
+            supabase.from("products").select("name, slug, image_urls").eq("slug", refSlug).single()
+                .then(({ data }) => {
+                    if (data) {
+                        setRefProduct(data);
+                        setFormData(prev => ({ ...prev, referenceProduct: data.name, requestType: "modification" }));
+                    }
+                });
+        }
+    }, [refSlug]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
@@ -28,10 +49,14 @@ export function CustomOrderForm() {
         try {
             const { error } = await supabase.from("custom_requests").insert([
                 {
-                    customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
-                    customer_email: formData.email,
+                    first_name: formData.firstName,
+                    last_name: formData.lastName,
+                    email: formData.email,
                     stitch_refinement: formData.stitchColor || null,
                     sole_tone: formData.soleTone || null,
+                    reference_product: formData.referenceProduct || null,
+                    request_type: formData.requestType,
+                    details: formData.details || null,
                     status: "inquiry",
                 }
             ]);
@@ -110,6 +135,22 @@ export function CustomOrderForm() {
                     <option value="other">Other inquiry</option>
                 </select>
             </div>
+
+            {refProduct && (
+                <div className="flex gap-6 items-center p-4 bg-neutral-50/50 border border-neutral-100">
+                    <div className="w-20 h-20 relative bg-neutral-100 flex-shrink-0">
+                        {refProduct.image_urls?.[0] ? (
+                            <Image src={refProduct.image_urls[0]} alt={refProduct.name} fill className="object-cover" />
+                        ) : (
+                            <span className="text-[8px] uppercase tracking-widest text-neutral-400 absolute inset-0 flex items-center justify-center">No Img</span>
+                        )}
+                    </div>
+                    <div>
+                        <p className="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">Based on</p>
+                        <p className="text-sm font-semibold">{refProduct.name}</p>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>

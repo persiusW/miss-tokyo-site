@@ -45,8 +45,8 @@ export default async function ProductPage({ params }: { params: { slug: string }
     }
 
     // Default mock lists for variants if not in db
-    const colors = product.colors || ["Noir", "Cognac", "Sand"];
-    const stitching = product.stitching || ["Tonal", "Contrast White"];
+    const colors = product.available_colors || ["Noir", "Cognac", "Sand"];
+    const stitching = product.available_stitching || ["Tonal", "Contrast White"];
     const availableSizes = product.available_sizes || null;
     const imageUrl = product.image_urls?.[0] || "";
     const priceStr = `${product.price_ghs || 300} GHS`;
@@ -109,9 +109,9 @@ export default async function ProductPage({ params }: { params: { slug: string }
                     />
 
                     <div className="border-t border-neutral-200 pt-8 mt-12 pb-8">
-                        <Link href="/custom" className="flex justify-between items-center group">
+                        <Link href={`/whitelabel?ref=${product.slug}`} className="flex justify-between items-center group">
                             <span className="text-sm uppercase tracking-widest font-semibold group-hover:text-neutral-500 transition-colors">
-                                Request Custom Version
+                                Request White Label Version
                             </span>
                             <span className="text-xl group-hover:-translate-x-1 transition-transform">→</span>
                         </Link>

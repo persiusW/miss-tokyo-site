@@ -12,8 +12,14 @@ type BusinessSettings = {
     address: string;
     logo_url: string | null;
     tax_rate: number;
+};
+
+type StoreSettings = {
     global_sizes: string[];
+    global_colors: string[];
+    global_stitching: string[];
     enable_store_pickup: boolean;
+    maintenance_mode: boolean;
 };
 
 const DEFAULT_BUSINESS: BusinessSettings = {
@@ -23,8 +29,14 @@ const DEFAULT_BUSINESS: BusinessSettings = {
     address: "",
     logo_url: null,
     tax_rate: 0,
-    global_sizes: [],
+};
+
+const DEFAULT_STORE: StoreSettings = {
+    global_sizes: ["39", "40", "41", "42", "43", "44", "45"],
+    global_colors: ["Noir", "Cognac", "Sand"],
+    global_stitching: ["Tonal", "Contrast White"],
     enable_store_pickup: false,
+    maintenance_mode: false,
 };
 
 type SiteMetadata = {
@@ -37,7 +49,7 @@ type SiteMetadata = {
 };
 
 export default function SettingsPage() {
-    const [activeTab, setActiveTab] = useState<"business" | "seo">("business");
+    const [activeTab, setActiveTab] = useState<"business" | "store" | "seo">("business");
 
     return (
         <div className="space-y-12 max-w-6xl">
@@ -55,6 +67,13 @@ export default function SettingsPage() {
                         Business Details
                     </button>
                     <button
+                        onClick={() => setActiveTab("store")}
+                        className={`pb-4 border-b-2 transition-colors ${activeTab === "store" ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"}`}
+                        style={{ marginBottom: "-17px" }}
+                    >
+                        Store Settings
+                    </button>
+                    <button
                         onClick={() => setActiveTab("seo")}
                         className={`pb-4 border-b-2 transition-colors ${activeTab === "seo" ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"}`}
                         style={{ marginBottom: "-17px" }}
@@ -64,7 +83,9 @@ export default function SettingsPage() {
                 </div>
             </header>
 
-            {activeTab === "business" ? <BusinessTab /> : <SEOTab />}
+            {activeTab === "business" && <BusinessTab />}
+            {activeTab === "store" && <StoreTab />}
+            {activeTab === "seo" && <SEOTab />}
         </div>
     );
 }
@@ -76,22 +97,18 @@ function BusinessTab() {
     const [saved, setSaved] = useState(false);
 
     useEffect(() => {
-        Promise.all([
-            supabase.from("business_settings").select("*").eq("id", "default").single(),
-            supabase.from("store_settings").select("*").eq("id", "default").single()
-        ]).then(([{ data: bData }, { data: sData }]) => {
-            setForm({
-                business_name: bData?.business_name || "",
-                email: bData?.email || "",
-                contact: bData?.contact || "",
-                address: bData?.address || "",
-                logo_url: bData?.logo_url || null,
-                tax_rate: Number(bData?.tax_rate) || 0,
-                global_sizes: sData?.global_sizes || ["39", "40", "41", "42", "43", "44", "45"],
-                enable_store_pickup: sData?.enable_store_pickup || false,
+        supabase.from("business_settings").select("*").eq("id", "default").single()
+            .then(({ data: bData }) => {
+                setForm({
+                    business_name: bData?.business_name || "",
+                    email: bData?.email || "",
+                    contact: bData?.contact || "",
+                    address: bData?.address || "",
+                    logo_url: bData?.logo_url || null,
+                    tax_rate: Number(bData?.tax_rate) || 0,
+                });
+                setLoading(false);
             });
-            setLoading(false);
-        });
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -101,18 +118,10 @@ function BusinessTab() {
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        const { global_sizes, enable_store_pickup, ...businessData } = form;
-
-        await Promise.all([
-            supabase.from("business_settings").upsert(
-                { id: "default", ...businessData, tax_rate: Number(businessData.tax_rate), updated_at: new Date().toISOString() },
-                { onConflict: "id" }
-            ),
-            supabase.from("store_settings").upsert(
-                { id: "default", global_sizes, enable_store_pickup },
-                { onConflict: "id" }
-            )
-        ]);
+        await supabase.from("business_settings").upsert(
+            { id: "default", ...form, tax_rate: Number(form.tax_rate), updated_at: new Date().toISOString() },
+            { onConflict: "id" }
+        );
         setSaving(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
@@ -187,6 +196,50 @@ function BusinessTab() {
                 </div>
             </div>
 
+        </form>
+    );
+}
+
+function StoreTab() {
+    const [form, setForm] = useState<StoreSettings>(DEFAULT_STORE);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+
+    useEffect(() => {
+        supabase.from("store_settings").select("*").eq("id", "default").single()
+            .then(({ data: sData }) => {
+                if (sData) {
+                    setForm({
+                        global_sizes: sData.global_sizes || DEFAULT_STORE.global_sizes,
+                        global_colors: sData.global_colors || DEFAULT_STORE.global_colors,
+                        global_stitching: sData.global_stitching || DEFAULT_STORE.global_stitching,
+                        enable_store_pickup: sData.enable_store_pickup || false,
+                        maintenance_mode: sData.maintenance_mode || false,
+                    });
+                }
+                setLoading(false);
+            });
+    }, []);
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        await supabase.from("store_settings").upsert(
+            { id: "default", ...form },
+            { onConflict: "id" }
+        );
+        setSaving(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+    };
+
+    if (loading) {
+        return <p className="text-neutral-400 italic font-serif">Loading...</p>;
+    }
+
+    return (
+        <form onSubmit={handleSave} className="space-y-8 max-w-2xl">
             {/* Store Configuration */}
             <div className="bg-white border border-neutral-200 p-8 space-y-6">
                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Store Configuration</h2>
@@ -204,16 +257,55 @@ function BusinessTab() {
                     <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Allow customers to pick up orders directly from the atelier.</p>
                 </div>
 
-                <div className="pt-4">
-                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Shoe Sizes</label>
-                    <input
-                        type="text"
-                        value={form.global_sizes.join(", ")}
-                        onChange={(e) => setForm(p => ({ ...p, global_sizes: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }))}
-                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                        placeholder="39, 40, 41, 42, 43, 44, 45, 46"
-                    />
-                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Comma-separated list of globally available sizes to choose from.</p>
+                <div className="pt-4 border-t border-neutral-100">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.maintenance_mode}
+                            onChange={(e) => setForm(p => ({ ...p, maintenance_mode: e.target.checked }))}
+                            className="w-4 h-4 accent-black"
+                        />
+                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Coming Soon / Maintenance Mode</span>
+                    </label>
+                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Restrict access to the shop and show a coming soon placeholder.</p>
+                </div>
+
+                <div className="pt-4 border-t border-neutral-100 mt-6 grid grid-cols-1 gap-6">
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Shoe Sizes</label>
+                        <input
+                            type="text"
+                            value={form.global_sizes.join(", ")}
+                            onChange={(e) => setForm(p => ({ ...p, global_sizes: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }))}
+                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                            placeholder="39, 40, 41, 42, 43, 44, 45, 46"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Comma-separated list of globally available sizes.</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Colors</label>
+                        <input
+                            type="text"
+                            value={form.global_colors.join(", ")}
+                            onChange={(e) => setForm(p => ({ ...p, global_colors: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }))}
+                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                            placeholder="Noir, Cognac, Sand"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Comma-separated list of colors available globally.</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Stitching Options</label>
+                        <input
+                            type="text"
+                            value={form.global_stitching.join(", ")}
+                            onChange={(e) => setForm(p => ({ ...p, global_stitching: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }))}
+                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                            placeholder="Tonal, Contrast White"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Comma-separated list of stitching styles.</p>
+                    </div>
                 </div>
             </div>
 
@@ -223,7 +315,7 @@ function BusinessTab() {
                     type="submit" disabled={saving}
                     className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
                 >
-                    {saving ? "Saving..." : "Save Settings"}
+                    {saving ? "Saving..." : "Save Store Settings"}
                 </button>
             </div>
         </form>

@@ -16,6 +16,10 @@ export default function NewProductPage() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [globalSizes, setGlobalSizes] = useState<string[]>([]);
     const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+    const [globalColors, setGlobalColors] = useState<string[]>([]);
+    const [selectedColors, setSelectedColors] = useState<string[]>([]);
+    const [globalStitching, setGlobalStitching] = useState<string[]>([]);
+    const [selectedStitching, setSelectedStitching] = useState<string[]>([]);
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
@@ -28,15 +32,25 @@ export default function NewProductPage() {
     useEffect(() => {
         Promise.all([
             supabase.from("categories").select("id, name, slug").eq("is_active", true).order("name"),
-            supabase.from("store_settings").select("global_sizes").eq("id", "default").single()
+            supabase.from("store_settings").select("global_sizes, global_colors, global_stitching").eq("id", "default").single()
         ]).then(([{ data: catData }, { data: storeData }]) => {
             if (catData && catData.length > 0) {
                 setCategories(catData);
                 setFormData(prev => ({ ...prev, category_type: catData[0].slug }));
             }
-            if (storeData && storeData.global_sizes) {
-                setGlobalSizes(storeData.global_sizes);
-                setSelectedSizes(storeData.global_sizes); // Select all by default
+            if (storeData) {
+                if (storeData.global_sizes) {
+                    setGlobalSizes(storeData.global_sizes);
+                    setSelectedSizes(storeData.global_sizes);
+                }
+                if (storeData.global_colors) {
+                    setGlobalColors(storeData.global_colors);
+                    setSelectedColors(storeData.global_colors);
+                }
+                if (storeData.global_stitching) {
+                    setGlobalStitching(storeData.global_stitching);
+                    setSelectedStitching(storeData.global_stitching);
+                }
             }
         });
     }, []);
@@ -62,10 +76,24 @@ export default function NewProductPage() {
         });
     };
 
+    const handleImageRemove = (index: number) => {
+        setImageUrls(prev => {
+            const next = [...prev];
+            next[index] = null;
+            return next;
+        });
+    };
+
     const toggleSize = (size: string) => {
-        setSelectedSizes(prev =>
-            prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
-        );
+        setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]);
+    };
+
+    const toggleColor = (col: string) => {
+        setSelectedColors(prev => prev.includes(col) ? prev.filter(s => s !== col) : [...prev, col]);
+    };
+
+    const toggleStitching = (stitch: string) => {
+        setSelectedStitching(prev => prev.includes(stitch) ? prev.filter(s => s !== stitch) : [...prev, stitch]);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -84,6 +112,8 @@ export default function NewProductPage() {
                     category_type: formData.category_type,
                     image_urls: uploadedUrls,
                     available_sizes: selectedSizes,
+                    available_colors: selectedColors,
+                    available_stitching: selectedStitching,
                     is_active: true,
                 }
             ]);
@@ -233,6 +263,50 @@ export default function NewProductPage() {
                         )}
                         <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Select the sizes available for this specific product.</p>
                     </div>
+
+                    <div className="pt-8 border-t border-neutral-100">
+                        <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Colors</label>
+                        {globalColors.length === 0 ? (
+                            <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading colors from store settings...</p>
+                        ) : (
+                            <div className="flex flex-wrap gap-4">
+                                {globalColors.map(col => (
+                                    <label key={col} className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedColors.includes(col)}
+                                            onChange={() => toggleColor(col)}
+                                            className="w-4 h-4 accent-black"
+                                        />
+                                        <span className="text-sm font-medium">{col}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Select the colors available for this specific product.</p>
+                    </div>
+
+                    <div className="pt-8 border-t border-neutral-100">
+                        <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Stitching</label>
+                        {globalStitching.length === 0 ? (
+                            <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading stitching from store settings...</p>
+                        ) : (
+                            <div className="flex flex-wrap gap-4">
+                                {globalStitching.map(stitch => (
+                                    <label key={stitch} className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedStitching.includes(stitch)}
+                                            onChange={() => toggleStitching(stitch)}
+                                            className="w-4 h-4 accent-black"
+                                        />
+                                        <span className="text-sm font-medium">{stitch}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Select the stitching options available for this specific product.</p>
+                    </div>
                 </div>
 
                 {/* Media — up to 4 images */}
@@ -249,6 +323,7 @@ export default function NewProductPage() {
                                     folder="products"
                                     currentUrl={imageUrls[i]}
                                     onUpload={(url) => handleImageUpload(i, url)}
+                                    onRemove={() => handleImageRemove(i)}
                                     aspectRatio="video"
                                     label={i === 0 ? "Primary Image" : `Image ${i + 1}`}
                                 />

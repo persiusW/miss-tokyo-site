@@ -16,6 +16,7 @@ export default async function ShopPage() {
         name: p.name,
         price: `${p.price_ghs} GHS`,
         imageUrl: p.image_urls?.[0] || FALLBACK_IMAGE,
+        hoverImageUrl: p.image_urls?.[1],
         category: p.category_type || "",
     }));
 

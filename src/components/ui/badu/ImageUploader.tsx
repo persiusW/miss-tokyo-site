@@ -8,6 +8,7 @@ interface ImageUploaderProps {
     folder?: string;
     currentUrl?: string | null;
     onUpload: (url: string) => void;
+    onRemove?: () => void;
     aspectRatio?: "square" | "video" | "banner" | "og";
     label?: string;
 }
@@ -27,6 +28,7 @@ export function ImageUploader({
     folder = "",
     currentUrl,
     onUpload,
+    onRemove,
     aspectRatio = "video",
     label,
 }: ImageUploaderProps) {
@@ -77,9 +79,24 @@ export function ImageUploader({
     return (
         <div className="space-y-2">
             {label && (
-                <label className="block text-xs uppercase tracking-widest font-semibold text-neutral-700">
-                    {label}
-                </label>
+                <div className="flex items-center justify-between">
+                    <label className="block text-xs uppercase tracking-widest font-semibold text-neutral-700">
+                        {label}
+                    </label>
+                    {preview && onRemove && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setPreview(null);
+                                onRemove();
+                            }}
+                            className="text-[10px] text-red-500 hover:text-red-700 tracking-widest uppercase font-semibold transition-colors"
+                        >
+                            Remove
+                        </button>
+                    )}
+                </div>
             )}
 
             <div

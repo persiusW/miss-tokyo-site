@@ -15,6 +15,7 @@ interface Product {
     name: string;
     price: string;
     imageUrl: string;
+    hoverImageUrl?: string;
     category: string;
 }
 
@@ -37,11 +38,10 @@ export function ShopClient({ products, categories }: ShopClientProps) {
                 <div className="flex items-center gap-3 mb-16 overflow-x-auto pb-2 scrollbar-hide">
                     <button
                         onClick={() => setActive(null)}
-                        className={`flex-shrink-0 px-5 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${
-                            active === null
+                        className={`flex-shrink-0 px-5 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${active === null
                                 ? "bg-black text-white"
                                 : "bg-transparent text-neutral-500 hover:text-black border border-neutral-200 hover:border-black"
-                        }`}
+                            }`}
                     >
                         All
                     </button>
@@ -49,11 +49,10 @@ export function ShopClient({ products, categories }: ShopClientProps) {
                         <button
                             key={cat.id}
                             onClick={() => setActive(cat.slug)}
-                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${
-                                active === cat.slug
+                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${active === cat.slug
                                     ? "bg-black text-white"
                                     : "bg-transparent text-neutral-500 hover:text-black border border-neutral-200 hover:border-black"
-                            }`}
+                                }`}
                         >
                             {cat.image_url && (
                                 <img
