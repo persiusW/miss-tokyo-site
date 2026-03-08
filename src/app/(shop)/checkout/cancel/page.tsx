@@ -1,6 +1,25 @@
-import Link from "next/link";
+"use client";
 
-export default function CheckoutCancelPage() {
+import Link from "next/link";
+import { useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCart } from "@/store/useCart";
+
+function CancelContent() {
+    const searchParams = useSearchParams();
+    const trxref = searchParams.get("trxref");
+    const ref = searchParams.get("reference");
+    const reference = ref || trxref;
+    const { clearCart } = useCart();
+
+    useEffect(() => {
+        clearCart();
+        // Capture the transaction even if failed/abandoned — so it shows in the dashboard
+        if (reference) {
+            fetch(`/api/paystack/verify?reference=${reference}`).catch(() => {});
+        }
+    }, [reference, clearCart]);
+
     return (
         <div className="min-h-[80vh] flex flex-col items-center justify-center px-6 text-center">
             <div className="max-w-xl mx-auto space-y-8">
@@ -29,5 +48,13 @@ export default function CheckoutCancelPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function CheckoutCancelPage() {
+    return (
+        <Suspense fallback={<div className="min-h-[80vh]" />}>
+            <CancelContent />
+        </Suspense>
     );
 }

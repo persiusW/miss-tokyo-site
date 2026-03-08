@@ -5,8 +5,8 @@ import { supabase } from "@/lib/supabase";
 
 type CustomRequest = {
     id: string;
-    customer_name: string;
-    customer_email: string;
+    customer_name: string | null;
+    customer_email: string | null;
     strap_color: string | null;
     sole_tone: string | null;
     stitch_refinement: string | null;
@@ -95,7 +95,7 @@ export default function CustomRequestsPage() {
                                         <div className="flex flex-col">
                                             <span className="font-medium text-neutral-900">{req.customer_name || "—"}</span>
                                             <a href={`mailto:${req.customer_email}`} className="text-xs text-neutral-500 border-b border-transparent hover:border-neutral-500 transition-colors self-start mt-1">
-                                                {req.customer_email}
+                                                {req.customer_email || "—"}
                                             </a>
                                         </div>
                                     </td>

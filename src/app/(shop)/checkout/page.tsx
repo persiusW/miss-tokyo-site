@@ -22,6 +22,9 @@ export default function CheckoutPage() {
         deliveryMethod: "delivery" // 'delivery' or 'pickup'
     });
 
+    // Validation errors
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
     useEffect(() => {
         setMounted(true);
         supabase.from("store_settings").select("enable_store_pickup").eq("id", "default").single()
@@ -31,11 +34,38 @@ export default function CheckoutPage() {
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+        const { name, value } = e.target;
+        setForm(p => ({ ...p, [name]: value }));
+        // Clear error on change
+        if (errors[name]) setErrors(p => ({ ...p, [name]: "" }));
+    };
+
+    const validate = () => {
+        const newErrors: Record<string, string> = {};
+        if (!form.fullName.trim()) newErrors.fullName = "Full name is required.";
+        if (!form.email.trim()) {
+            newErrors.email = "Email address is required.";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+            newErrors.email = "Please enter a valid email address.";
+        }
+        if (!form.phone.trim()) {
+            newErrors.phone = "Phone number is required.";
+        } else if (form.phone.trim().length < 7) {
+            newErrors.phone = "Please enter a valid phone number.";
+        }
+        if (form.deliveryMethod === "delivery" && !form.address.trim()) {
+            newErrors.address = "Shipping address is required for delivery.";
+        }
+        return newErrors;
     };
 
     const handleCheckout = async (e: React.FormEvent) => {
         e.preventDefault();
+        const validationErrors = validate();
+        if (Object.keys(validationErrors).length > 0) {
+            setErrors(validationErrors);
+            return;
+        }
         setLoading(true);
         try {
             const payload = {
@@ -59,11 +89,11 @@ export default function CheckoutPage() {
             if (data.authorizationUrl) {
                 window.location.href = data.authorizationUrl;
             } else {
-                toast.error("Failed to initialize checkout.");
+                toast.error(data.error || "Failed to initialize checkout. Please try again.");
             }
         } catch (err) {
             console.error(err);
-            toast.error("An error occurred during checkout.");
+            toast.error("A network error occurred. Please check your connection and try again.");
         } finally {
             setLoading(false);
         }
@@ -94,28 +124,31 @@ export default function CheckoutPage() {
                         <div>
                             <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Full Name</label>
                             <input
-                                required type="text" name="fullName" value={form.fullName} onChange={handleChange}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                type="text" name="fullName" value={form.fullName} onChange={handleChange}
+                                className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.fullName ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
                                 placeholder="Abena Mensah"
                             />
+                            {errors.fullName && <p className="mt-1 text-[11px] text-red-500">{errors.fullName}</p>}
                         </div>
                         <div>
                             <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Email</label>
                             <input
-                                required type="email" name="email" value={form.email} onChange={handleChange}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                type="email" name="email" value={form.email} onChange={handleChange}
+                                className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.email ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
                                 placeholder="abena@example.com"
                             />
+                            {errors.email && <p className="mt-1 text-[11px] text-red-500">{errors.email}</p>}
                         </div>
                     </div>
 
                     <div>
                         <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Phone Number</label>
                         <input
-                            required type="tel" name="phone" value={form.phone} onChange={handleChange}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                            type="tel" name="phone" value={form.phone} onChange={handleChange}
+                            className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.phone ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
                             placeholder="+233 ..."
                         />
+                        {errors.phone && <p className="mt-1 text-[11px] text-red-500">{errors.phone}</p>}
                     </div>
 
                     <div>
@@ -142,10 +175,11 @@ export default function CheckoutPage() {
                         <div>
                             <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Shipping Address</label>
                             <input
-                                required type="text" name="address" value={form.address} onChange={handleChange}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                type="text" name="address" value={form.address} onChange={handleChange}
+                                className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.address ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
                                 placeholder="123 Osu, Accra, Ghana"
                             />
+                            {errors.address && <p className="mt-1 text-[11px] text-red-500">{errors.address}</p>}
                         </div>
                     )}
 

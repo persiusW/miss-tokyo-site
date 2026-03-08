@@ -2,12 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type CartItem = {
-    id: string; // usually productId + "-" + size
+    id: string; // productId + "-" + size + "-" + color
     productId: string;
     name: string;
     slug: string;
     price: number;
     size: string;
+    color?: string;
+    stitching?: string;
     quantity: number;
     imageUrl: string;
 };

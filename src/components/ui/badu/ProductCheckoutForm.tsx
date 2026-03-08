@@ -13,9 +13,10 @@ interface ProductCheckoutFormProps {
     colors: string[];
     stitching: string[];
     availableSizes: string[] | null;
+    onAddedToCart?: () => void;
 }
 
-export function ProductCheckoutForm({ productId, productName, productSlug, productImageUrl, priceNum, price, colors, stitching, availableSizes }: ProductCheckoutFormProps) {
+export function ProductCheckoutForm({ productId, productName, productSlug, productImageUrl, priceNum, price, colors, stitching, availableSizes, onAddedToCart }: ProductCheckoutFormProps) {
     const { addItem } = useCart();
 
     // Default to the provided sizes or a fallback array
@@ -29,20 +30,29 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
 
     const handleAddToCart = () => {
         if (!selectedSize) {
-            alert("Please select a size to add to cart.");
+            // Flash the size section briefly instead of alert
+            const sizeSection = document.getElementById(`size-section-${productId}`);
+            if (sizeSection) {
+                sizeSection.classList.add("ring-1", "ring-red-400");
+                setTimeout(() => sizeSection.classList.remove("ring-1", "ring-red-400"), 1500);
+            }
             return;
         }
 
         addItem({
-            id: `${productId}-${selectedSize}`,
+            id: `${productId}-${selectedSize}-${selectedColor}`,
             productId,
             name: productName,
             slug: productSlug,
             price: priceNum,
             size: selectedSize,
+            color: selectedColor,
+            stitching: selectedStitching,
             quantity: 1,
-            imageUrl: productImageUrl
+            imageUrl: productImageUrl,
         });
+
+        onAddedToCart?.();
     };
 
     return (
@@ -90,7 +100,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
             </div>
 
             {/* Size Selection */}
-            <div>
+            <div id={`size-section-${productId}`} className="transition-all duration-300">
                 <div className="flex justify-between items-center mb-4">
                     <span className="block text-xs uppercase tracking-widest font-semibold">Size (EU)</span>
                     <button type="button" className="text-xs uppercase tracking-widest text-neutral-500 underline">Size Guide</button>

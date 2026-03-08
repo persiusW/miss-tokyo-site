@@ -13,6 +13,7 @@ export function CustomOrderForm() {
 
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [submitError, setSubmitError] = useState("");
     const [refProduct, setRefProduct] = useState<RefProduct | null>(null);
 
     const [formData, setFormData] = useState({
@@ -44,18 +45,17 @@ export function CustomOrderForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setSubmitError("");
         setLoading(true);
 
         try {
             const { error } = await supabase.from("custom_requests").insert([
                 {
-                    first_name: formData.firstName,
-                    last_name: formData.lastName,
-                    email: formData.email,
+                    customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
+                    customer_email: formData.email,
                     stitch_refinement: formData.stitchColor || null,
                     sole_tone: formData.soleTone || null,
                     reference_product: formData.referenceProduct || null,
-                    request_type: formData.requestType,
                     details: formData.details || null,
                     status: "inquiry",
                 }
@@ -65,7 +65,7 @@ export function CustomOrderForm() {
             setSuccess(true);
         } catch (err) {
             console.error(err);
-            alert("An error occurred while submitting your inquiry.");
+            setSubmitError("An error occurred while submitting your inquiry. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -189,6 +189,10 @@ export function CustomOrderForm() {
                     placeholder="Describe your vision, preferred materials, and any other relevant details..."
                 ></textarea>
             </div>
+
+            {submitError && (
+                <p className="text-sm text-red-600 border border-red-200 bg-red-50 px-4 py-3">{submitError}</p>
+            )}
 
             <button
                 type="submit"

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
   status text DEFAULT 'pending'::text,
   paystack_reference text UNIQUE,
   shipping_address jsonb,
+  items jsonb DEFAULT '[]'::jsonb,
   is_custom_order boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT orders_pkey PRIMARY KEY (id)
@@ -168,5 +169,6 @@ ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS maintenance_mode bool
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_name text;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_phone text;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_method text;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS items jsonb DEFAULT '[]'::jsonb;
 -- Note: shipping_address already exists on orders as JSONB.
 

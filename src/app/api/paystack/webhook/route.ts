@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { Resend } from "resend";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
+
+function parseItems(cartItems: unknown): any[] {
+    if (!cartItems) return [];
+    try {
+        return typeof cartItems === "string" ? JSON.parse(cartItems) : (cartItems as any[]);
+    } catch {
+        return [];
+    }
+}
 
 async function sendOrderConfirmation(
     customerEmail: string,
@@ -25,11 +34,9 @@ async function sendOrderConfirmation(
   <div style="max-width: 560px; margin: 0 auto; background: white; border: 1px solid #e5e5e5; padding: 48px;">
     <h1 style="font-size: 24px; letter-spacing: 0.15em; text-transform: uppercase; margin: 0 0 8px;">${bizName}</h1>
     <p style="color: #737373; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; margin: 0 0 40px;">Order Confirmed</p>
-
     <h2 style="font-size: 16px; font-weight: normal; color: #171717; margin: 0 0 24px; letter-spacing: 0.05em;">
       Thank you. Your order has been received.
     </h2>
-
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 32px;">
       <tr style="border-bottom: 1px solid #f5f5f5;">
         <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Order Reference</td>
@@ -44,11 +51,9 @@ async function sendOrderConfirmation(
         <td style="padding: 12px 0; font-size: 13px; text-align: right; color: #15803d; font-weight: 600;">Confirmed</td>
       </tr>
     </table>
-
     <p style="font-size: 13px; color: #525252; line-height: 1.8; margin: 0 0 32px;">
       Your piece is now being prepared with care. We will notify you once it has been dispatched. Questions? Reply to this email.
     </p>
-
     <div style="border-top: 1px solid #e5e5e5; padding-top: 24px; margin-top: 24px;">
       <p style="font-size: 11px; color: #a3a3a3; text-transform: uppercase; letter-spacing: 0.15em; margin: 0;">
         ${bizName}${bizAddress ? ` · ${bizAddress.replace(/\n/g, ", ")}` : ""}
@@ -85,13 +90,12 @@ export async function POST(req: Request) {
             console.log("Paystack Charge Success Event Received");
             const data = event.data;
             const metadata = data.metadata || {};
-            const { productId, requestId, fullName, phone, address, deliveryMethod, cartItems } = metadata;
+            const { orderId, requestId, productId, fullName, phone, address, deliveryMethod, cartItems } = metadata;
             const customerEmail: string = data.customer?.email || "";
             const amountGHS = Number(data.amount) / 100;
             const paystackRef: string = data.reference || "";
 
-            // Fetch business settings for email
-            const { data: biz } = await supabase
+            const { data: biz } = await supabaseAdmin
                 .from("business_settings")
                 .select("business_name, address")
                 .eq("id", "default")
@@ -101,110 +105,95 @@ export async function POST(req: Request) {
             const bizAddress = biz?.address || "";
 
             if (requestId) {
-                await supabase
+                await supabaseAdmin
                     .from("custom_requests")
                     .update({ status: "confirmed" })
                     .eq("id", requestId);
             }
 
-            // Process Cart Items
-            let parsedItems: any[] = [];
-            if (cartItems) {
-                try {
-                    parsedItems = JSON.parse(cartItems);
-                    for (const item of parsedItems) {
-                        const { data: product } = await supabase
-                            .from("products")
-                            .select("inventory_count")
-                            .eq("id", item.productId)
-                            .single();
+            const parsedItems = parseItems(cartItems);
 
-                        if (product && typeof product.inventory_count === "number" && product.inventory_count >= item.quantity) {
-                            await supabase
-                                .from("products")
-                                .update({ inventory_count: product.inventory_count - item.quantity })
-                                .eq("id", item.productId);
-                        } else {
-                            console.error(`Not enough inventory for ${item.productId}`);
-                        }
-                    }
-                } catch (err) {
-                    console.error("Failed to parse cartItems", err);
+            // Decrement inventory for each cart item
+            for (const item of parsedItems) {
+                if (!item.productId) continue;
+                const { data: product } = await supabaseAdmin
+                    .from("products")
+                    .select("inventory_count")
+                    .eq("id", item.productId)
+                    .single();
+                if (product && typeof product.inventory_count === "number" && product.inventory_count >= item.quantity) {
+                    await supabaseAdmin
+                        .from("products")
+                        .update({ inventory_count: product.inventory_count - item.quantity })
+                        .eq("id", item.productId);
                 }
-            } else if (productId) {
-                // Legacy Single Item Flow
-                const { data: product } = await supabase
+            }
+
+            // Legacy single-product flow
+            if (!parsedItems.length && productId) {
+                const { data: product } = await supabaseAdmin
                     .from("products")
                     .select("inventory_count")
                     .eq("id", productId)
                     .single();
-
-                if (product && typeof product.inventory_count === "number" && product.inventory_count > 0) {
-                    await supabase
+                if (product && product.inventory_count > 0) {
+                    await supabaseAdmin
                         .from("products")
                         .update({ inventory_count: product.inventory_count - 1 })
                         .eq("id", productId);
                 }
-
-                if (metadata.orderId) {
-                    await supabase
-                        .from("orders")
-                        .update({ status: "paid" })
-                        .eq("id", metadata.orderId);
-                }
             }
 
-            // Create order record if none exists and we have a customer email
-            if (customerEmail && !metadata.orderId) {
-                const { data: newOrder, error } = await supabase
-                    .from("orders")
-                    .insert([{
-                        email: customerEmail,
-                        customer_name: fullName,
-                        customer_phone: phone,
-                        shipping_address: address ? { text: address } : null,
-                        delivery_method: deliveryMethod,
-                        total_amount: amountGHS,
-                        status: "paid",
-                        paystack_reference: paystackRef,
-                    }])
-                    .select("id")
-                    .single();
-
-                if (error) {
-                    console.error("Failed to insert new order:", error);
-                } else if (newOrder) {
-                    await sendOrderConfirmation(
-                        customerEmail,
-                        newOrder.id.substring(0, 8).toUpperCase(),
-                        amountGHS,
-                        bizName,
-                        bizAddress,
-                    );
-                }
-            } else if (customerEmail && metadata.orderId) {
-                // If order mapping exists
-                const { error } = await supabase
+            if (orderId) {
+                // Order was pre-created at initialization — update it to paid
+                const { error } = await supabaseAdmin
                     .from("orders")
                     .update({
-                        customer_name: fullName,
-                        customer_phone: phone,
+                        status: "paid",
+                        paystack_reference: paystackRef,
+                        customer_name: fullName || null,
+                        customer_phone: phone || null,
                         shipping_address: address ? { text: address } : null,
-                        delivery_method: deliveryMethod,
+                        delivery_method: deliveryMethod || null,
                     })
-                    .eq("id", metadata.orderId);
+                    .eq("id", orderId);
 
                 if (error) {
-                    console.error("Failed to update existing order:", error);
+                    console.error("Webhook: Failed to update order:", error);
+                } else {
+                    await sendOrderConfirmation(customerEmail, orderId.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress);
                 }
+            } else if (customerEmail) {
+                // Fallback: create a new order if no pre-created one exists
+                const { data: existing } = await supabaseAdmin
+                    .from("orders")
+                    .select("id")
+                    .eq("paystack_reference", paystackRef)
+                    .single();
 
-                await sendOrderConfirmation(
-                    customerEmail,
-                    metadata.orderId.substring(0, 8).toUpperCase(),
-                    amountGHS,
-                    bizName,
-                    bizAddress,
-                );
+                if (!existing) {
+                    const { data: newOrder, error } = await supabaseAdmin
+                        .from("orders")
+                        .insert([{
+                            customer_email: customerEmail,
+                            customer_name: fullName || null,
+                            customer_phone: phone || null,
+                            shipping_address: address ? { text: address } : null,
+                            delivery_method: deliveryMethod || null,
+                            total_amount: amountGHS,
+                            status: "paid",
+                            paystack_reference: paystackRef,
+                            items: parsedItems,
+                        }])
+                        .select("id")
+                        .single();
+
+                    if (error) {
+                        console.error("Webhook: Failed to create order:", error);
+                    } else if (newOrder) {
+                        await sendOrderConfirmation(customerEmail, newOrder.id.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress);
+                    }
+                }
             }
         }
 

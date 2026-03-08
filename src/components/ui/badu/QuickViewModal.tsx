@@ -59,7 +59,7 @@ export function QuickViewModal({ slug, onClose }: { slug: string; onClose: () =>
                             <h2 className="font-serif text-3xl tracking-widest uppercase mb-2">{product.name}</h2>
                             <p className="text-sm tracking-wider text-neutral-500 mb-8">{product.price_ghs} GHS</p>
                             
-                            <ProductCheckoutForm 
+                            <ProductCheckoutForm
                                 productId={product.id}
                                 productName={product.name}
                                 productSlug={product.slug}
@@ -69,6 +69,7 @@ export function QuickViewModal({ slug, onClose }: { slug: string; onClose: () =>
                                 colors={product.available_colors || ["Noir", "Cognac", "Sand"]}
                                 stitching={product.available_stitching || ["Tonal", "Contrast White"]}
                                 availableSizes={product.available_sizes || null}
+                                onAddedToCart={onClose}
                             />
                         </div>
                     </>

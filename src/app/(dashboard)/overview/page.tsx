@@ -1,10 +1,15 @@
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function DashboardOverviewPage() {
     const [
         { count: pendingOrdersCount },
         { count: totalOrdersCount },
         { count: totalCustomRequests },
+        { count: fulfilledCount },
+        { count: unfulfilledCount },
         { data: revenueData },
         { data: recentRequests },
         { data: productRows },
@@ -14,7 +19,9 @@ export default async function DashboardOverviewPage() {
         supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("orders").select("*", { count: "exact", head: true }),
         supabase.from("custom_requests").select("*", { count: "exact", head: true }),
-        supabase.from("orders").select("total_amount").eq("status", "paid"),
+        supabase.from("orders").select("*", { count: "exact", head: true }).in("status", ["fulfilled", "delivered"]),
+        supabase.from("orders").select("*", { count: "exact", head: true }).in("status", ["paid", "processing"]),
+        supabase.from("orders").select("total_amount, status"),
         supabase.from("custom_requests")
             .select("id, customer_name, customer_email, status, created_at")
             .order("created_at", { ascending: false })
@@ -24,8 +31,10 @@ export default async function DashboardOverviewPage() {
         supabase.from("products").select("id, name, inventory_count").eq("is_active", true).lt("inventory_count", 5).order("inventory_count"),
     ]);
 
-    const totalRevenue = (revenueData || []).reduce((sum: number, o: { total_amount: string | number }) => sum + Number(o.total_amount), 0);
-    const paidCount = revenueData?.length || 0;
+    const totalRevenue = (revenueData || [])
+        .filter((o: { total_amount: string | number; status: string }) => !["cancelled", "refunded"].includes(o.status))
+        .reduce((sum: number, o: { total_amount: string | number; status: string }) => sum + Number(o.total_amount), 0);
+    const paidCount = (revenueData || []).filter((o: { status: string }) => ["paid", "processing", "fulfilled", "delivered"].includes(o.status)).length;
     const total = totalOrdersCount || 0;
     const inquiries = (totalCustomRequests || 0) + total;
 
@@ -61,19 +70,24 @@ export default async function DashboardOverviewPage() {
             </header>
 
             {/* Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div className="bg-white border border-neutral-200 p-6 flex flex-col justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Total Revenue (GHS)</span>
+                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Total Revenue</span>
                     <span className="text-3xl font-serif">GH₵ {totalRevenue.toFixed(2)}</span>
                     <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">LIFETIME SALES</span>
                 </div>
                 <div className="bg-white border border-neutral-200 p-6 flex flex-col justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Pending Orders</span>
-                    <span className="text-3xl font-serif">{pendingOrdersCount || 0}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">AWAITING FULFILLMENT</span>
+                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Unfulfilled</span>
+                    <span className="text-3xl font-serif text-amber-600">{unfulfilledCount || 0}</span>
+                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">PAID · AWAITING SHIP</span>
                 </div>
                 <div className="bg-white border border-neutral-200 p-6 flex flex-col justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Active Custom Requests</span>
+                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Fulfilled</span>
+                    <span className="text-3xl font-serif text-green-700">{fulfilledCount || 0}</span>
+                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">SHIPPED · DELIVERED</span>
+                </div>
+                <div className="bg-white border border-neutral-200 p-6 flex flex-col justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Custom Requests</span>
                     <span className="text-3xl font-serif">{totalCustomRequests || 0}</span>
                     <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">NEEDS ATTENTION</span>
                 </div>
