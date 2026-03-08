@@ -39,29 +39,35 @@ export default async function CraftPage() {
 
             {/* Scrolling Imagery Side */}
             <div className="w-full md:w-7/12 flex flex-col">
-                <div className="relative h-[60vh] md:h-[80vh] w-full bg-creme">
-                    <Image
-                        src={siteAssets['craft_img_1']?.image_url || "https://images.unsplash.com/photo-1610963197825-f71e98950d87?q=80&w=1000&auto=format&fit=crop"}
-                        alt={siteAssets['craft_img_1']?.alt_text || "Badu Ghanaian Leather Footwear - Leather Craft and Stitching"}
-                        fill
-                        className="object-cover object-center"
-                    />
+                <div className="relative h-[60vh] md:h-[80vh] w-full bg-neutral-100 flex items-center justify-center">
+                    {siteAssets['craft_img_1']?.image_url ? (
+                        <Image
+                            src={siteAssets['craft_img_1'].image_url}
+                            alt={siteAssets['craft_img_1']?.alt_text || "Badu Ghanaian Leather Footwear"}
+                            fill
+                            className="object-cover object-center"
+                        />
+                    ) : <span className="text-neutral-400 text-xs tracking-widest uppercase">Image 1</span>}
                 </div>
-                <div className="relative h-[60vh] md:h-[80vh] w-full bg-neutral-100">
-                    <Image
-                        src={siteAssets['craft_img_2']?.image_url || "https://images.unsplash.com/photo-1481277542470-605612bd2d61?q=80&w=1000&auto=format&fit=crop"}
-                        alt={siteAssets['craft_img_2']?.alt_text || "Badu Ghanaian Leather Footwear - Macro Leather Texture"}
-                        fill
-                        className="object-cover object-center"
-                    />
+                <div className="relative h-[60vh] md:h-[80vh] w-full bg-neutral-50 flex items-center justify-center">
+                    {siteAssets['craft_img_2']?.image_url ? (
+                        <Image
+                            src={siteAssets['craft_img_2'].image_url}
+                            alt={siteAssets['craft_img_2']?.alt_text || "Badu Craftsmanship"}
+                            fill
+                            className="object-cover object-center"
+                        />
+                    ) : <span className="text-neutral-400 text-xs tracking-widest uppercase">Image 2</span>}
                 </div>
-                <div className="relative h-[60vh] md:h-[80vh] w-full bg-creme">
-                    <Image
-                        src={siteAssets['craft_img_3']?.image_url || "https://images.unsplash.com/photo-1531604250646-2f0e818c4f06?q=80&w=1000&auto=format&fit=crop"}
-                        alt={siteAssets['craft_img_3']?.alt_text || "Badu Ghanaian Leather Footwear - Minimalist Architecture Space"}
-                        fill
-                        className="object-cover object-center"
-                    />
+                <div className="relative h-[60vh] md:h-[80vh] w-full bg-neutral-100 flex items-center justify-center">
+                    {siteAssets['craft_img_3']?.image_url ? (
+                        <Image
+                            src={siteAssets['craft_img_3'].image_url}
+                            alt={siteAssets['craft_img_3']?.alt_text || "Badu Atelier Details"}
+                            fill
+                            className="object-cover object-center"
+                        />
+                    ) : <span className="text-neutral-400 text-xs tracking-widest uppercase">Image 3</span>}
                 </div>
             </div>
         </div>

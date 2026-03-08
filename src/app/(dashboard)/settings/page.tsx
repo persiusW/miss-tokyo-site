@@ -12,6 +12,8 @@ type BusinessSettings = {
     address: string;
     logo_url: string | null;
     tax_rate: number;
+    global_sizes: string[];
+    enable_store_pickup: boolean;
 };
 
 const DEFAULT_BUSINESS: BusinessSettings = {
@@ -21,6 +23,8 @@ const DEFAULT_BUSINESS: BusinessSettings = {
     address: "",
     logo_url: null,
     tax_rate: 0,
+    global_sizes: [],
+    enable_store_pickup: false,
 };
 
 type SiteMetadata = {
@@ -72,24 +76,22 @@ function BusinessTab() {
     const [saved, setSaved] = useState(false);
 
     useEffect(() => {
-        supabase
-            .from("business_settings")
-            .select("*")
-            .eq("id", "default")
-            .single()
-            .then(({ data }) => {
-                if (data) {
-                    setForm({
-                        business_name: data.business_name || "",
-                        email: data.email || "",
-                        contact: data.contact || "",
-                        address: data.address || "",
-                        logo_url: data.logo_url || null,
-                        tax_rate: Number(data.tax_rate) || 0,
-                    });
-                }
-                setLoading(false);
+        Promise.all([
+            supabase.from("business_settings").select("*").eq("id", "default").single(),
+            supabase.from("store_settings").select("*").eq("id", "default").single()
+        ]).then(([{ data: bData }, { data: sData }]) => {
+            setForm({
+                business_name: bData?.business_name || "",
+                email: bData?.email || "",
+                contact: bData?.contact || "",
+                address: bData?.address || "",
+                logo_url: bData?.logo_url || null,
+                tax_rate: Number(bData?.tax_rate) || 0,
+                global_sizes: sData?.global_sizes || ["39", "40", "41", "42", "43", "44", "45"],
+                enable_store_pickup: sData?.enable_store_pickup || false,
             });
+            setLoading(false);
+        });
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -99,10 +101,18 @@ function BusinessTab() {
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        await supabase.from("business_settings").upsert(
-            { id: "default", ...form, tax_rate: Number(form.tax_rate), updated_at: new Date().toISOString() },
-            { onConflict: "id" }
-        );
+        const { global_sizes, enable_store_pickup, ...businessData } = form;
+
+        await Promise.all([
+            supabase.from("business_settings").upsert(
+                { id: "default", ...businessData, tax_rate: Number(businessData.tax_rate), updated_at: new Date().toISOString() },
+                { onConflict: "id" }
+            ),
+            supabase.from("store_settings").upsert(
+                { id: "default", global_sizes, enable_store_pickup },
+                { onConflict: "id" }
+            )
+        ]);
         setSaving(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
@@ -177,19 +187,33 @@ function BusinessTab() {
                 </div>
             </div>
 
-            {/* Finance */}
+            {/* Store Configuration */}
             <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Finance Defaults</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Store Configuration</h2>
+
                 <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Default Tax Rate (%)</label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.enable_store_pickup}
+                            onChange={(e) => setForm(p => ({ ...p, enable_store_pickup: e.target.checked }))}
+                            className="w-4 h-4 accent-black"
+                        />
+                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Store Pickup</span>
+                    </label>
+                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Allow customers to pick up orders directly from the atelier.</p>
+                </div>
+
+                <div className="pt-4">
+                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Shoe Sizes</label>
                     <input
-                        type="number" name="tax_rate" min="0" max="100" step="0.1"
-                        value={form.tax_rate}
-                        onChange={handleChange}
-                        className="w-40 border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                        placeholder="0"
+                        type="text"
+                        value={form.global_sizes.join(", ")}
+                        onChange={(e) => setForm(p => ({ ...p, global_sizes: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }))}
+                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                        placeholder="39, 40, 41, 42, 43, 44, 45, 46"
                     />
-                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Pre-filled when creating new invoices and quotations.</p>
+                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Comma-separated list of globally available sizes to choose from.</p>
                 </div>
             </div>
 

@@ -3,12 +3,7 @@ import { ShopClient } from "@/components/ui/badu/ShopClient";
 
 export const revalidate = 60;
 
-const FALLBACK_IMAGES = [
-    "https://images.unsplash.com/photo-1603487742131-4160ec999306?q=80&w=1000&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=1000&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1560343090-f0409e92791a?q=80&w=1000&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1514989940723-e8e51635b782?q=80&w=1000&auto=format&fit=crop",
-];
+const FALLBACK_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f5f5f5'/%3E%3C/svg%3E";
 
 export default async function ShopPage() {
     const [{ data: products }, { data: categories }] = await Promise.all([
@@ -20,7 +15,7 @@ export default async function ShopPage() {
         slug: p.slug || p.id,
         name: p.name,
         price: `${p.price_ghs} GHS`,
-        imageUrl: p.image_urls?.[0] || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length],
+        imageUrl: p.image_urls?.[0] || FALLBACK_IMAGE,
         category: p.category_type || "",
     }));
 

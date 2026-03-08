@@ -6,16 +6,63 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 import { toast } from "@/lib/toast";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from "lucide-react";
 
 type Category = { id: string; name: string; slug: string };
+
+function SortableImageItem({ id, url, index, onUpload }: { id: string, url: string | null, index: number, onUpload: (id: string, url: string) => void }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 50 : 1,
+        position: (isDragging ? "relative" : "static") as any,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className={`relative bg-neutral-50 border border-neutral-200 transition-shadow ${isDragging ? "shadow-2xl opacity-90 scale-105" : ""}`}>
+            <div className="absolute top-2 left-2 z-10 cursor-grab active:cursor-grabbing p-2 bg-white border border-neutral-200 shadow-sm rounded-md" {...attributes} {...listeners}>
+                <GripVertical size={16} className="text-neutral-500 hover:text-black transition-colors" />
+            </div>
+            <div className="p-4 pt-12">
+                <ImageUploader
+                    bucket="product-images"
+                    folder="products"
+                    currentUrl={url}
+                    onUpload={(newUrl) => onUpload(id, newUrl)}
+                    aspectRatio="video"
+                    label={index === 0 ? "Primary Image" : `Image ${index + 1}`}
+                />
+            </div>
+        </div>
+    );
+}
 
 export default function EditProductPage() {
     const { id } = useParams<{ id: string }>();
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [imageUrls, setImageUrls] = useState<(string | null)[]>([null, null, null, null]);
+    const [imageSlots, setImageSlots] = useState<{ id: string, url: string | null }[]>([
+        { id: 'slot-0', url: null },
+        { id: 'slot-1', url: null },
+        { id: 'slot-2', url: null },
+        { id: 'slot-3', url: null },
+    ]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [globalSizes, setGlobalSizes] = useState<string[]>([]);
+    const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
@@ -27,9 +74,10 @@ export default function EditProductPage() {
     });
 
     const fetchProduct = useCallback(async () => {
-        const [{ data: product }, { data: cats }] = await Promise.all([
+        const [{ data: product }, { data: cats }, { data: storeData }] = await Promise.all([
             supabase.from("products").select("*").eq("id", id).single(),
             supabase.from("categories").select("id, name, slug").eq("is_active", true).order("name"),
+            supabase.from("store_settings").select("global_sizes").eq("id", "default").single()
         ]);
 
         if (!product) {
@@ -50,13 +98,25 @@ export default function EditProductPage() {
             is_active: product.is_active ?? true,
         });
 
-        const urls: (string | null)[] = [null, null, null, null];
+        const slots = [
+            { id: 'slot-0', url: null as string | null },
+            { id: 'slot-1', url: null as string | null },
+            { id: 'slot-2', url: null as string | null },
+            { id: 'slot-3', url: null as string | null },
+        ];
         if (product.image_urls) {
             product.image_urls.forEach((url: string, i: number) => {
-                if (i < 4) urls[i] = url;
+                if (i < 4) slots[i].url = url;
             });
         }
-        setImageUrls(urls);
+        setImageSlots(slots);
+
+        if (storeData && storeData.global_sizes) {
+            setGlobalSizes(storeData.global_sizes);
+            // If product has available_sizes, use them. Otherwise, default to all global sizes or none.
+            setSelectedSizes(product.available_sizes || storeData.global_sizes);
+        }
+
         setLoading(false);
     }, [id, router]);
 
@@ -70,12 +130,31 @@ export default function EditProductPage() {
         }));
     };
 
-    const handleImageUpload = (index: number, url: string) => {
-        setImageUrls(prev => {
-            const next = [...prev];
-            next[index] = url;
-            return next;
-        });
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleImageUpload = (id: string, url: string) => {
+        setImageSlots(prev => prev.map(slot => slot.id === id ? { ...slot, url } : slot));
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (active.id !== over?.id && over) {
+            setImageSlots((items) => {
+                const oldIndex = items.findIndex(item => item.id === active.id);
+                const newIndex = items.findIndex(item => item.id === over.id);
+                return arrayMove(items, oldIndex, newIndex);
+            });
+        }
+    };
+
+    const toggleSize = (size: string) => {
+        setSelectedSizes(prev =>
+            prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+        );
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -83,7 +162,7 @@ export default function EditProductPage() {
         setSaving(true);
 
         try {
-            const uploadedUrls = imageUrls.filter((u): u is string => !!u);
+            const uploadedUrls = imageSlots.map(s => s.url).filter((u): u is string => !!u);
             const { error } = await supabase.from("products").update({
                 name: formData.name,
                 slug: formData.slug,
@@ -92,6 +171,7 @@ export default function EditProductPage() {
                 description: formData.description,
                 category_type: formData.category_type,
                 image_urls: uploadedUrls,
+                available_sizes: selectedSizes,
                 is_active: formData.is_active,
             }).eq("id", id);
 
@@ -199,6 +279,28 @@ export default function EditProductPage() {
                         />
                         <label htmlFor="is_active" className="text-xs uppercase tracking-widest font-semibold">Active (visible in shop)</label>
                     </div>
+
+                    <div className="pt-8 border-t border-neutral-100">
+                        <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Sizes</label>
+                        {globalSizes.length === 0 ? (
+                            <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading sizes from store settings...</p>
+                        ) : (
+                            <div className="flex flex-wrap gap-4">
+                                {globalSizes.map(size => (
+                                    <label key={size} className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedSizes.includes(size)}
+                                            onChange={() => toggleSize(size)}
+                                            className="w-4 h-4 accent-black"
+                                        />
+                                        <span className="text-sm font-medium">{size}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Select the sizes available for this specific product.</p>
+                    </div>
                 </div>
 
                 {/* Pricing & Inventory */}
@@ -238,22 +340,31 @@ export default function EditProductPage() {
                 <div className="bg-white p-8 border border-neutral-200 space-y-6">
                     <div>
                         <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Images</h2>
-                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Upload up to 4 images. The first image is the primary display photo.</p>
+                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4 block">Upload up to 4 images. The first image is the primary display photo. Drag by the icon to reorder.</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-6">
-                        {[0, 1, 2, 3].map((i) => (
-                            <div key={i}>
-                                <ImageUploader
-                                    bucket="product-images"
-                                    folder="products"
-                                    currentUrl={imageUrls[i]}
-                                    onUpload={(url) => handleImageUpload(i, url)}
-                                    aspectRatio="video"
-                                    label={i === 0 ? "Primary Image" : `Image ${i + 1}`}
-                                />
+
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext
+                            items={imageSlots.map(s => s.id)}
+                            strategy={rectSortingStrategy}
+                        >
+                            <div className="grid grid-cols-2 gap-6">
+                                {imageSlots.map((slot, index) => (
+                                    <SortableImageItem
+                                        key={slot.id}
+                                        id={slot.id}
+                                        url={slot.url}
+                                        index={index}
+                                        onUpload={handleImageUpload}
+                                    />
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                        </SortableContext>
+                    </DndContext>
                 </div>
 
                 <div className="pt-4 flex justify-end gap-4">

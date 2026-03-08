@@ -18,18 +18,11 @@ export default async function HomePage() {
         return acc;
     }, {});
 
-    const productImages = [
-        "https://images.unsplash.com/photo-1603487742131-4160ec999306?q=80&w=1000&auto=format&fit=crop", // Black Slide
-        "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?q=80&w=1000&auto=format&fit=crop",  // Brown Slide
-        "https://images.unsplash.com/photo-1560343090-f0409e92791a?q=80&w=1000&auto=format&fit=crop",  // Textured Neutral
-        "https://images.unsplash.com/photo-1514989940723-e8e51635b782?q=80&w=1000&auto=format&fit=crop"   // Classic Leather
-    ];
-
-    const formattedProducts = (products || []).map((p: any, idx: number) => ({
+    const formattedProducts = (products || []).map((p: any) => ({
         slug: p.slug || p.id,
         name: p.name,
         price: `${p.price_ghs} GHS`,
-        imageUrl: p.image_urls?.[0] || productImages[idx % productImages.length],
+        imageUrl: p.image_urls?.[0] || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f5f5f5'/%3E%3C/svg%3E", // fallback to empty if missing
         category: p.category_type || "Collection",
     }));
 
@@ -38,7 +31,7 @@ export default async function HomePage() {
             <Hero
                 title="Crafted in Ghana. Designed for Everywhere."
                 subtitle="Visual Silence. Uncompromised Quality."
-                imageUrl={siteAssets['home_hero']?.image_url || "https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?q=80&w=2560&auto=format&fit=crop"}
+                imageUrl={siteAssets['home_hero']?.image_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f5f5f5'/%3E%3C/svg%3E"}
                 ctaText="Shop the Collection"
                 ctaLink="/shop"
             />
@@ -51,7 +44,7 @@ export default async function HomePage() {
                 </p>
             </section>
 
-            <section className="py-24 bg-creme px-6 md:px-12">
+            <section className="py-24 bg-white px-6 md:px-12">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex justify-between items-end mb-16">
                         <h2 className="font-serif text-4xl tracking-widest uppercase">The Collection</h2>

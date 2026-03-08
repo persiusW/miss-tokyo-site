@@ -10,28 +10,30 @@ export default async function GalleryPage() {
         return acc;
     }, {});
 
-    const images = [
+    const rawImages = [
         {
-            src: siteAssets['gallery_img_1']?.image_url || "https://images.unsplash.com/photo-1610963197825-f71e98950d87?q=80&w=1000&auto=format&fit=crop",
+            src: siteAssets['gallery_img_1']?.image_url,
             alt: siteAssets['gallery_img_1']?.alt_text || "Badu Ghanaian Leather Footwear - Leather Craft and Stitching",
             aspectRatio: "aspect-[3/4]",
         },
         {
-            src: siteAssets['gallery_img_2']?.image_url || "https://images.unsplash.com/photo-1481277542470-605612bd2d61?q=80&w=1000&auto=format&fit=crop",
+            src: siteAssets['gallery_img_2']?.image_url,
             alt: siteAssets['gallery_img_2']?.alt_text || "Badu Ghanaian Leather Footwear - Macro Leather Texture",
             aspectRatio: "aspect-[4/3]",
         },
         {
-            src: siteAssets['gallery_img_3']?.image_url || "https://images.unsplash.com/photo-1531604250646-2f0e818c4f06?q=80&w=1000&auto=format&fit=crop",
+            src: siteAssets['gallery_img_3']?.image_url,
             alt: siteAssets['gallery_img_3']?.alt_text || "Badu Ghanaian Leather Footwear - Minimalist Architecture Space",
             aspectRatio: "aspect-square",
         },
         {
-            src: siteAssets['gallery_img_4']?.image_url || "https://images.unsplash.com/photo-1618220179428-22790b46a0eb?q=80&w=1000&auto=format&fit=crop",
+            src: siteAssets['gallery_img_4']?.image_url,
             alt: siteAssets['gallery_img_4']?.alt_text || "Badu Ghanaian Leather Footwear - Warm Tones and Abstract Design",
             aspectRatio: "aspect-[3/4]",
         }
     ];
+
+    const images = rawImages.filter(img => !!img.src);
 
     return (
         <div className="pt-32 pb-24 px-6 md:px-12 max-w-[1600px] mx-auto min-h-screen">
@@ -41,8 +43,8 @@ export default async function GalleryPage() {
             </header>
 
             <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-                {images.map((img, idx) => (
-                    <div key={idx} className={`relative w-full overflow-hidden ${img.aspectRatio} bg-creme break-inside-avoid group`}>
+                {images.length > 0 ? images.map((img, idx) => (
+                    <div key={idx} className={`relative w-full overflow-hidden ${img.aspectRatio} bg-neutral-100 break-inside-avoid group`}>
                         <Image
                             src={img.src}
                             alt={img.alt}
@@ -50,7 +52,11 @@ export default async function GalleryPage() {
                             className="object-cover object-center grayscale hover:grayscale-0 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-[1.03]"
                         />
                     </div>
-                ))}
+                )) : (
+                    <div className="col-span-full py-24 text-center">
+                        <span className="text-neutral-400 text-xs tracking-widest uppercase">No images in gallery yet</span>
+                    </div>
+                )}
             </div>
         </div>
     );

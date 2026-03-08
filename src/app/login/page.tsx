@@ -36,7 +36,7 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-creme">
+        <div className="min-h-screen flex items-center justify-center bg-white">
             <div className="w-full max-w-sm px-6">
                 <div className="text-center mb-12">
                     <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Badu</h1>

@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 export async function POST(request: Request) {
     try {
-        const { productId, email, amount: customAmount } = await request.json();
+        const { productId, email, amount: customAmount, cartItems, metadata: clientMetadata } = await request.json();
 
         if (!email) {
             return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -14,6 +14,8 @@ export async function POST(request: Request) {
         if (customAmount && Number(customAmount) > 0) {
             // Direct custom amount (used by Pay Links)
             amountInGHS = Number(customAmount);
+        } else if (cartItems && cartItems.length > 0) {
+            amountInGHS = cartItems.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
         } else if (productId) {
             const { data: product } = await supabase
                 .from("products")
@@ -49,7 +51,9 @@ export async function POST(request: Request) {
                 currency: "GHS",
                 callback_url: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/checkout/success`,
                 metadata: {
+                    ...clientMetadata,
                     productId,
+                    cartItems: cartItems ? JSON.stringify(cartItems) : undefined,
                 }
             }),
         });

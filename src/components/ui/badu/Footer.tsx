@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function Footer() {
     return (
-        <footer className="w-full bg-creme px-6 py-16 md:px-12 md:py-24 mt-24">
+        <footer className="w-full bg-white px-6 py-16 md:px-12 md:py-24 mt-24">
             <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
                 <div className="col-span-1 md:col-span-2">
                     <h3 className="font-serif text-3xl tracking-widest uppercase mb-6">BADU</h3>

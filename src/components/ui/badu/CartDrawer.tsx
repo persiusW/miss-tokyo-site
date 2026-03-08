@@ -1,0 +1,112 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useCart } from "@/store/useCart";
+import { X, Trash2, Plus, Minus } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+export function CartDrawer() {
+    const { isOpen, setIsOpen, items, removeItem, updateQuantity, totalAmount } = useCart();
+    const [mounted, setMounted] = useState(false);
+    const router = useRouter();
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) return null;
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-\[60\] flex justify-end">
+            <div
+                className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
+                onClick={() => setIsOpen(false)}
+            />
+
+            <div className="relative w-full max-w-md bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+                <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
+                    <h2 className="text-xl font-serif tracking-widest uppercase">Your Cart</h2>
+                    <button onClick={() => setIsOpen(false)} className="text-neutral-500 hover:text-black">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {items.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-neutral-400 space-y-4">
+                            <p className="font-serif italic">Your cart is empty</p>
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="text-xs uppercase tracking-widest border-b border-black text-black pb-1 hover:text-neutral-600 transition-colors"
+                            >
+                                Continue Shopping
+                            </button>
+                        </div>
+                    ) : (
+                        items.map((item) => (
+                            <div key={item.id} className="flex gap-4 border-b border-neutral-100 pb-6">
+                                <div className="w-24 h-24 bg-neutral-50 flex-shrink-0">
+                                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="flex-1 flex flex-col pt-1">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>
+                                        <button
+                                            onClick={() => removeItem(item.id)}
+                                            className="text-neutral-400 hover:text-red-500 transition-colors"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-neutral-500 uppercase tracking-widest mb-3">Size: {item.size}</p>
+
+                                    <div className="flex items-center justify-between mt-auto">
+                                        <div className="flex items-center border border-neutral-200">
+                                            <button
+                                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                                className="px-2 py-1 text-neutral-500 hover:text-black hover:bg-neutral-50"
+                                            >
+                                                <Minus size={12} />
+                                            </button>
+                                            <span className="px-3 text-xs w-8 text-center">{item.quantity}</span>
+                                            <button
+                                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                className="px-2 py-1 text-neutral-500 hover:text-black hover:bg-neutral-50"
+                                            >
+                                                <Plus size={12} />
+                                            </button>
+                                        </div>
+                                        <p className="font-medium text-sm">GHS {item.price * item.quantity}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                {items.length > 0 && (
+                    <div className="p-6 border-t border-neutral-100 bg-white space-y-4">
+                        <div className="flex justify-between items-center text-lg">
+                            <span className="font-serif tracking-widest uppercase">Total</span>
+                            <span className="font-medium">GHS {totalAmount()}</span>
+                        </div>
+                        <p className="text-[10px] text-neutral-400 uppercase tracking-widest text-center">Shipping and taxes calculated at checkout.</p>
+
+                        <button
+                            onClick={() => {
+                                setIsOpen(false);
+                                router.push("/checkout");
+                            }}
+                            className="w-full py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
+                        >
+                            Checkout
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

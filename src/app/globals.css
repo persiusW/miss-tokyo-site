@@ -3,7 +3,7 @@
 @theme {
   --color-background: #ffffff;
   --color-foreground: #171717;
-  --color-creme: #FCFAF7;
+  --color-foreground: #171717;
   --font-sans: var(--font-geist-sans);
   --font-serif: var(--font-playfair-display);
 }
@@ -16,14 +16,34 @@ body {
 
 /* Toast animation */
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.toast-enter { animation: toast-in 0.22s ease-out forwards; }
+
+.toast-enter {
+  animation: toast-in 0.22s ease-out forwards;
+}
 
 /* Print: hide sidebar and non-content elements */
 @media print {
-  aside, .no-print { display: none !important; }
-  main { padding: 0 !important; }
-  body { background: white !important; }
+
+  aside,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  body {
+    background: white !important;
+  }
 }

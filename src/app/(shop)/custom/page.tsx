@@ -5,14 +5,8 @@ export default function CustomOrderPage() {
     return (
         <div className="pt-24 pb-32 px-6 md:px-12 max-w-7xl mx-auto flex flex-col md:flex-row gap-16 md:gap-24">
             {/* Editorial Image */}
-            <div className="w-full md:w-5/12 hidden md:block relative h-[80vh] bg-creme">
-                <Image
-                    src="https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&q=80&w=1000"
-                    alt="Artisanal leathercraft tools"
-                    fill
-                    className="object-cover object-center"
-                    priority
-                />
+            <div className="w-full md:w-5/12 hidden md:block relative h-[80vh] bg-neutral-100 flex items-center justify-center">
+                <span className="text-neutral-400 text-sm tracking-widest uppercase">Custom Orders</span>
             </div>
 
             {/* Form Content */}

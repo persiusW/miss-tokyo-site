@@ -61,7 +61,7 @@ export default function ContactPage() {
             {/* Form Side */}
             <div className="w-full md:w-2/3 flex flex-col justify-center">
                 {status === "success" ? (
-                    <div className="bg-creme p-12 text-center border border-neutral-100">
+                    <div className="bg-white p-12 text-center border border-neutral-100">
                         <h3 className="font-serif text-2xl tracking-widest uppercase mb-4">Message Received</h3>
                         <p className="text-neutral-600">We will review your inquiry and respond shortly.</p>
                         <button

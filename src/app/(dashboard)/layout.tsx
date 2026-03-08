@@ -60,7 +60,7 @@ const NAV: NavSection[] = [
 export default function DashboardLayout({ children }: { children: ReactNode }) {
     return (
         <>
-            <div className="min-h-screen bg-creme font-sans flex text-neutral-900">
+            <div className="min-h-screen bg-white font-sans flex text-neutral-900">
                 {/* Sidebar */}
                 <aside className="w-64 border-r border-neutral-200 hidden md:flex flex-col h-screen sticky top-0 bg-white">
                     <div className="p-8 border-b border-neutral-200">

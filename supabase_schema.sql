@@ -114,14 +114,14 @@ CREATE TABLE IF NOT EXISTS public.site_assets (
 
 -- Insert initial placeholder data for the CMS
 INSERT INTO public.site_assets (section_key, image_url, alt_text) VALUES
-('home_hero', 'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?q=80&w=2560&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Hero Image'),
-('gallery_img_1', 'https://images.unsplash.com/photo-1610963197825-f71e98950d87?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Leather Craft and Stitching'),
-('gallery_img_2', 'https://images.unsplash.com/photo-1481277542470-605612bd2d61?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Macro Leather Texture'),
-('gallery_img_3', 'https://images.unsplash.com/photo-1531604250646-2f0e818c4f06?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Minimalist Architecture Space'),
-('gallery_img_4', 'https://images.unsplash.com/photo-1618220179428-22790b46a0eb?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Warm Tones and Abstract Design'),
-('craft_img_1', 'https://images.unsplash.com/photo-1610963197825-f71e98950d87?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Leather Craft and Stitching'),
-('craft_img_2', 'https://images.unsplash.com/photo-1481277542470-605612bd2d61?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Macro Leather Texture'),
-('craft_img_3', 'https://images.unsplash.com/photo-1531604250646-2f0e818c4f06?q=80&w=1000&auto=format&fit=crop', 'Badu Ghanaian Leather Footwear - Minimalist Architecture Space')
+('home_hero', '', 'Badu Ghanaian Leather Footwear - Hero Image'),
+('gallery_img_1', '', 'Badu Ghanaian Leather Footwear - Leather Craft and Stitching'),
+('gallery_img_2', '', 'Badu Ghanaian Leather Footwear - Macro Leather Texture'),
+('gallery_img_3', '', 'Badu Ghanaian Leather Footwear - Minimalist Architecture Space'),
+('gallery_img_4', '', 'Badu Ghanaian Leather Footwear - Warm Tones and Abstract Design'),
+('craft_img_1', '', 'Badu Ghanaian Leather Footwear - Leather Craft and Stitching'),
+('craft_img_2', '', 'Badu Ghanaian Leather Footwear - Macro Leather Texture'),
+('craft_img_3', '', 'Badu Ghanaian Leather Footwear - Minimalist Architecture Space')
 ON CONFLICT (section_key) DO NOTHING;
 
 ---------------------------------------------------
@@ -131,5 +131,28 @@ ON CONFLICT (section_key) DO NOTHING;
 -- 2. Click "New Bucket" and name it strictly: site-assets
 -- 3. Mark the bucket as "Public" during creation.
 -- 4. Under "Policies" for the site-assets bucket, click "New Policy".
--- 5. Create a policy for "SELECT": Allow anyone (anon) to select (read) files.
 -- 6. Create a policy for "INSERT" & "UPDATE": Allow authenticated users to upload/update files.
+
+---------------------------------------------------
+-- 9. STORE SETTINGS & SCHEMA UPDATES (GROUP 1)
+---------------------------------------------------
+
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS available_sizes text[];
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS sort_order integer DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS public.store_settings (
+  id text NOT NULL DEFAULT 'default',
+  global_sizes text[] DEFAULT ARRAY['39', '40', '41', '42', '43', '44', '45']::text[],
+  enable_store_pickup boolean DEFAULT false,
+  CONSTRAINT store_settings_pkey PRIMARY KEY (id)
+);
+
+INSERT INTO public.store_settings (id, global_sizes, enable_store_pickup)
+VALUES ('default', ARRAY['39', '40', '41', '42', '43', '44', '45']::text[], false)
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_name text;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_phone text;
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS delivery_method text;
+-- Note: shipping_address already exists on orders as JSONB.
+

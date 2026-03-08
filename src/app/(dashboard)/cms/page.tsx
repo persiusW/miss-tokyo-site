@@ -169,7 +169,7 @@ export default function CMSPage() {
                                             <p className="text-[10px] tracking-widest uppercase text-neutral-400 mb-4 font-mono">
                                                 KEY: {asset.section_key}
                                             </p>
-                                            <div className="relative aspect-video bg-creme w-full overflow-hidden border border-neutral-100 group">
+                                            <div className="relative aspect-video bg-white w-full overflow-hidden border border-neutral-100 group">
                                                 {asset.image_url ? (
                                                     <img
                                                         src={asset.image_url}

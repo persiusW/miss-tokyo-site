@@ -47,8 +47,8 @@ export default async function ProductPage({ params }: { params: { slug: string }
     // Default mock lists for variants if not in db
     const colors = product.colors || ["Noir", "Cognac", "Sand"];
     const stitching = product.stitching || ["Tonal", "Contrast White"];
-    const sizes = product.sizes || ["39", "40", "41", "42", "43", "44", "45", "46"];
-    const imageUrl = product.image_urls?.[0] || "https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&q=80&w=1000";
+    const availableSizes = product.available_sizes || null;
+    const imageUrl = product.image_urls?.[0] || "";
     const priceStr = `${product.price_ghs || 300} GHS`;
 
     return (
@@ -56,33 +56,35 @@ export default async function ProductPage({ params }: { params: { slug: string }
             <AnimatedProductView>
                 {/* Product Images */}
                 <div className="w-full md:w-1/2 flex flex-col gap-6">
-                    <div className="relative aspect-[4/5] w-full bg-creme">
-                        <Image
-                            src={imageUrl}
-                            alt={product.name}
-                            fill
-                            className="object-cover object-center"
-                            priority
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="relative aspect-square bg-creme">
+                    <div className="relative aspect-[4/5] w-full bg-neutral-100 flex-shrink-0">
+                        {imageUrl ? (
                             <Image
-                                src="https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=600"
-                                alt={`${product.name} detail`}
+                                src={imageUrl}
+                                alt={product.name}
                                 fill
                                 className="object-cover object-center"
+                                priority
                             />
-                        </div>
-                        <div className="relative aspect-square bg-creme">
-                            <Image
-                                src="https://images.unsplash.com/photo-1608256246200-53e635b5b65f?auto=format&fit=crop&q=80&w=600"
-                                alt={`${product.name} alternate angle`}
-                                fill
-                                className="object-cover object-center"
-                            />
-                        </div>
+                        ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400">
+                                <span className="text-xs uppercase tracking-widest">No Image</span>
+                            </div>
+                        )}
                     </div>
+                    {product.image_urls && product.image_urls.length > 1 && (
+                        <div className="grid grid-cols-2 gap-6">
+                            {product.image_urls.slice(1, 4).map((url: string, i: number) => (
+                                <div key={i} className="relative aspect-square bg-neutral-100">
+                                    <Image
+                                        src={url}
+                                        alt={`${product.name} detail ${i + 1}`}
+                                        fill
+                                        className="object-cover object-center"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Product Info */}
@@ -96,10 +98,14 @@ export default async function ProductPage({ params }: { params: { slug: string }
 
                     <ProductCheckoutForm
                         productId={product.id}
+                        productName={product.name}
+                        productSlug={product.slug}
+                        productImageUrl={imageUrl}
+                        priceNum={product.price_ghs || 300}
                         price={priceStr}
                         colors={colors}
                         stitching={stitching}
-                        sizes={sizes}
+                        availableSizes={availableSizes}
                     />
 
                     <div className="border-t border-neutral-200 pt-8 mt-12 pb-8">

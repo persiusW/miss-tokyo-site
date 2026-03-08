@@ -82,9 +82,10 @@ export async function POST(req: Request) {
         const event = JSON.parse(rawBody);
 
         if (event.event === "charge.success") {
+            console.log("Paystack Charge Success Event Received");
             const data = event.data;
             const metadata = data.metadata || {};
-            const { productId, requestId } = metadata;
+            const { productId, requestId, fullName, phone, address, deliveryMethod, cartItems } = metadata;
             const customerEmail: string = data.customer?.email || "";
             const amountGHS = Number(data.amount) / 100;
             const paystackRef: string = data.reference || "";
@@ -106,7 +107,32 @@ export async function POST(req: Request) {
                     .eq("id", requestId);
             }
 
-            if (productId) {
+            // Process Cart Items
+            let parsedItems: any[] = [];
+            if (cartItems) {
+                try {
+                    parsedItems = JSON.parse(cartItems);
+                    for (const item of parsedItems) {
+                        const { data: product } = await supabase
+                            .from("products")
+                            .select("inventory_count")
+                            .eq("id", item.productId)
+                            .single();
+
+                        if (product && typeof product.inventory_count === "number" && product.inventory_count >= item.quantity) {
+                            await supabase
+                                .from("products")
+                                .update({ inventory_count: product.inventory_count - item.quantity })
+                                .eq("id", item.productId);
+                        } else {
+                            console.error(`Not enough inventory for ${item.productId}`);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Failed to parse cartItems", err);
+                }
+            } else if (productId) {
+                // Legacy Single Item Flow
                 const { data: product } = await supabase
                     .from("products")
                     .select("inventory_count")
@@ -130,10 +156,14 @@ export async function POST(req: Request) {
 
             // Create order record if none exists and we have a customer email
             if (customerEmail && !metadata.orderId) {
-                const { data: newOrder } = await supabase
+                const { data: newOrder, error } = await supabase
                     .from("orders")
                     .insert([{
-                        customer_email: customerEmail,
+                        email: customerEmail,
+                        customer_name: fullName,
+                        customer_phone: phone,
+                        shipping_address: address ? { text: address } : null,
+                        delivery_method: deliveryMethod,
                         total_amount: amountGHS,
                         status: "paid",
                         paystack_reference: paystackRef,
@@ -141,7 +171,9 @@ export async function POST(req: Request) {
                     .select("id")
                     .single();
 
-                if (newOrder) {
+                if (error) {
+                    console.error("Failed to insert new order:", error);
+                } else if (newOrder) {
                     await sendOrderConfirmation(
                         customerEmail,
                         newOrder.id.substring(0, 8).toUpperCase(),
@@ -151,6 +183,21 @@ export async function POST(req: Request) {
                     );
                 }
             } else if (customerEmail && metadata.orderId) {
+                // If order mapping exists
+                const { error } = await supabase
+                    .from("orders")
+                    .update({
+                        customer_name: fullName,
+                        customer_phone: phone,
+                        shipping_address: address ? { text: address } : null,
+                        delivery_method: deliveryMethod,
+                    })
+                    .eq("id", metadata.orderId);
+
+                if (error) {
+                    console.error("Failed to update existing order:", error);
+                }
+
                 await sendOrderConfirmation(
                     customerEmail,
                     metadata.orderId.substring(0, 8).toUpperCase(),

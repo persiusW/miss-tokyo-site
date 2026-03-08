@@ -1,68 +1,65 @@
 "use client";
 
 import { useState } from "react";
+import { useCart } from "@/store/useCart";
 
 interface ProductCheckoutFormProps {
     productId: string;
+    productName: string;
+    productSlug: string;
+    productImageUrl: string;
+    priceNum: number;
     price: string;
     colors: string[];
     stitching: string[];
-    sizes: string[];
+    availableSizes: string[] | null;
 }
 
-export function ProductCheckoutForm({ productId, price, colors, stitching, sizes }: ProductCheckoutFormProps) {
-    const [loading, setLoading] = useState(false);
-    const [email, setEmail] = useState("");
+export function ProductCheckoutForm({ productId, productName, productSlug, productImageUrl, priceNum, price, colors, stitching, availableSizes }: ProductCheckoutFormProps) {
+    const { addItem } = useCart();
 
-    const handleCheckout = async () => {
-        if (!email) {
-            alert("Please enter your email to proceed to checkout.");
+    // Default to the provided sizes or a fallback array
+    const sizesToRender = (availableSizes && availableSizes.length > 0) ? availableSizes : ["39", "40", "41", "42", "43", "44", "45", "46"];
+
+    const [selectedSize, setSelectedSize] = useState<string>("");
+
+    // We can also have state for color and stitching if we want to store them in cart, but avoiding bloat for now
+    const [selectedColor, setSelectedColor] = useState<string>(colors[0] || "");
+    const [selectedStitching, setSelectedStitching] = useState<string>(stitching[0] || "");
+
+    const handleAddToCart = () => {
+        if (!selectedSize) {
+            alert("Please select a size to add to cart.");
             return;
         }
-        setLoading(true);
-        try {
-            const res = await fetch("/api/paystack/initialize", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ productId, email }),
-            });
-            const data = await res.json();
-            if (data.authorizationUrl) {
-                window.location.href = data.authorizationUrl;
-            } else {
-                alert("Failed to initialize checkout.");
-            }
-        } catch (err) {
-            console.error(err);
-            alert("An error occurred during checkout.");
-        } finally {
-            setLoading(false);
-        }
+
+        addItem({
+            id: `${productId}-${selectedSize}`,
+            productId,
+            name: productName,
+            slug: productSlug,
+            price: priceNum,
+            size: selectedSize,
+            quantity: 1,
+            imageUrl: productImageUrl
+        });
     };
 
     return (
         <div className="space-y-8 mb-12">
-            {/* Email Input */}
-            <div>
-                <label htmlFor="checkout-email" className="block text-xs uppercase tracking-widest font-semibold mb-3">Email</label>
-                <input
-                    type="email"
-                    id="checkout-email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors rounded-none mb-4"
-                    required
-                />
-            </div>
-
             {/* Color Selection */}
             <div>
                 <span className="block text-xs uppercase tracking-widest font-semibold mb-4">Color</span>
                 <div className="flex gap-4 flex-wrap">
                     {colors.map(color => (
                         <label key={color} className="cursor-pointer">
-                            <input type="radio" name="color" className="sr-only peer" defaultChecked={color === colors[0]} />
+                            <input
+                                type="radio"
+                                name="color"
+                                className="sr-only peer"
+                                checked={selectedColor === color}
+                                onChange={() => setSelectedColor(color)}
+                            />
                             <span className="block px-4 py-2 text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
                                 {color}
                             </span>
@@ -77,7 +74,13 @@ export function ProductCheckoutForm({ productId, price, colors, stitching, sizes
                 <div className="flex gap-4 flex-wrap">
                     {stitching.map(style => (
                         <label key={style} className="cursor-pointer">
-                            <input type="radio" name="stitching" className="sr-only peer" defaultChecked={style === stitching[0]} />
+                            <input
+                                type="radio"
+                                name="stitching"
+                                className="sr-only peer"
+                                checked={selectedStitching === style}
+                                onChange={() => setSelectedStitching(style)}
+                            />
                             <span className="block px-4 py-2 text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
                                 {style}
                             </span>
@@ -93,9 +96,15 @@ export function ProductCheckoutForm({ productId, price, colors, stitching, sizes
                     <button type="button" className="text-xs uppercase tracking-widest text-neutral-500 underline">Size Guide</button>
                 </div>
                 <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
-                    {sizes.map(size => (
+                    {sizesToRender.map(size => (
                         <label key={size} className="cursor-pointer">
-                            <input type="radio" name="size" className="sr-only peer" defaultChecked={size === sizes[0]} />
+                            <input
+                                type="radio"
+                                name="size"
+                                className="sr-only peer"
+                                checked={selectedSize === size}
+                                onChange={() => setSelectedSize(size)}
+                            />
                             <span className="block py-3 text-center text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
                                 {size}
                             </span>
@@ -106,11 +115,10 @@ export function ProductCheckoutForm({ productId, price, colors, stitching, sizes
 
             <button
                 type="button"
-                onClick={handleCheckout}
-                disabled={loading}
-                className="w-full py-5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors mt-8 disabled:opacity-50"
+                onClick={handleAddToCart}
+                className={`w-full py-5 bg-black text-white text-xs uppercase tracking-widest transition-colors mt-8 ${!selectedSize ? 'opacity-50 cursor-not-allowed hover:bg-black' : 'hover:bg-neutral-800'}`}
             >
-                {loading ? "Processing..." : `Buy Now — ${price}`}
+                Add to Cart — {price}
             </button>
         </div>
     );

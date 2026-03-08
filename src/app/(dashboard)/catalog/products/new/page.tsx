@@ -14,6 +14,8 @@ export default function NewProductPage() {
     const [loading, setLoading] = useState(false);
     const [imageUrls, setImageUrls] = useState<(string | null)[]>([null, null, null, null]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [globalSizes, setGlobalSizes] = useState<string[]>([]);
+    const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
@@ -24,17 +26,19 @@ export default function NewProductPage() {
     });
 
     useEffect(() => {
-        supabase
-            .from("categories")
-            .select("id, name, slug")
-            .eq("is_active", true)
-            .order("name")
-            .then(({ data }) => {
-                if (data && data.length > 0) {
-                    setCategories(data);
-                    setFormData(prev => ({ ...prev, category_type: data[0].slug }));
-                }
-            });
+        Promise.all([
+            supabase.from("categories").select("id, name, slug").eq("is_active", true).order("name"),
+            supabase.from("store_settings").select("global_sizes").eq("id", "default").single()
+        ]).then(([{ data: catData }, { data: storeData }]) => {
+            if (catData && catData.length > 0) {
+                setCategories(catData);
+                setFormData(prev => ({ ...prev, category_type: catData[0].slug }));
+            }
+            if (storeData && storeData.global_sizes) {
+                setGlobalSizes(storeData.global_sizes);
+                setSelectedSizes(storeData.global_sizes); // Select all by default
+            }
+        });
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -58,6 +62,12 @@ export default function NewProductPage() {
         });
     };
 
+    const toggleSize = (size: string) => {
+        setSelectedSizes(prev =>
+            prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+        );
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -73,6 +83,7 @@ export default function NewProductPage() {
                     description: formData.description,
                     category_type: formData.category_type,
                     image_urls: uploadedUrls,
+                    available_sizes: selectedSizes,
                     is_active: true,
                 }
             ]);
@@ -199,6 +210,28 @@ export default function NewProductPage() {
                                 className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
                             />
                         </div>
+                    </div>
+
+                    <div className="pt-8 border-t border-neutral-100">
+                        <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Sizes</label>
+                        {globalSizes.length === 0 ? (
+                            <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading sizes from store settings...</p>
+                        ) : (
+                            <div className="flex flex-wrap gap-4">
+                                {globalSizes.map(size => (
+                                    <label key={size} className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedSizes.includes(size)}
+                                            onChange={() => toggleSize(size)}
+                                            className="w-4 h-4 accent-black"
+                                        />
+                                        <span className="text-sm font-medium">{size}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Select the sizes available for this specific product.</p>
                     </div>
                 </div>
 
