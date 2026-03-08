@@ -26,7 +26,7 @@ export function Footer() {
     };
 
     return (
-        <footer className="w-full bg-white px-6 py-16 md:px-12 md:py-24 mt-24">
+        <footer className="w-full bg-white px-6 py-16 md:px-12 md:py-24 mt-16 md:mt-24">
             <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
                 <div className="col-span-1 md:col-span-2">
                     <h3 className="font-serif text-3xl tracking-widest uppercase mb-6">BADU</h3>
@@ -50,12 +50,12 @@ export function Footer() {
                                     onChange={e => setEmail(e.target.value)}
                                     placeholder="your@email.com"
                                     disabled={status === "submitting"}
-                                    className="flex-1 border-b border-neutral-300 bg-transparent py-2 text-sm outline-none focus:border-black transition-colors placeholder:text-neutral-400 disabled:opacity-50"
+                                    className="flex-1 border-b border-neutral-300 bg-transparent py-3 text-[16px] outline-none focus:border-black transition-colors placeholder:text-neutral-400 disabled:opacity-50 min-h-[44px]"
                                 />
                                 <button
                                     type="submit"
                                     disabled={status === "submitting"}
-                                    className="text-xs uppercase tracking-widest font-semibold border-b border-black pb-2 hover:text-neutral-500 hover:border-neutral-500 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                    className="min-h-[44px] px-2 text-xs uppercase tracking-widest font-semibold border-b border-black hover:text-neutral-500 hover:border-neutral-500 transition-colors disabled:opacity-50 whitespace-nowrap"
                                 >
                                     {status === "submitting" ? "..." : "Subscribe"}
                                 </button>
@@ -69,19 +69,19 @@ export function Footer() {
 
                 <div>
                     <h4 className="text-xs uppercase tracking-widest font-semibold mb-6">Explore</h4>
-                    <ul className="space-y-4 text-sm text-neutral-600">
-                        <li><Link href="/shop" className="hover:text-black transition-colors">The Collection</Link></li>
-                        <li><Link href="/whitelabel" className="hover:text-black transition-colors">White Labelling</Link></li>
-                        <li><Link href="/craft" className="hover:text-black transition-colors">The Craft</Link></li>
+                    <ul className="space-y-2 text-sm text-neutral-600">
+                        <li><Link href="/shop" className="inline-block py-2 hover:text-black transition-colors">The Collection</Link></li>
+                        <li><Link href="/whitelabel" className="inline-block py-2 hover:text-black transition-colors">White Labelling</Link></li>
+                        <li><Link href="/craft" className="inline-block py-2 hover:text-black transition-colors">The Craft</Link></li>
                     </ul>
                 </div>
 
                 <div>
                     <h4 className="text-xs uppercase tracking-widest font-semibold mb-6">Support</h4>
-                    <ul className="space-y-4 text-sm text-neutral-600">
-                        <li><Link href="/faq" className="hover:text-black transition-colors">FAQ</Link></li>
-                        <li><Link href="/shipping" className="hover:text-black transition-colors">Shipping & Returns</Link></li>
-                        <li><Link href="/contact" className="hover:text-black transition-colors">Contact Us</Link></li>
+                    <ul className="space-y-2 text-sm text-neutral-600">
+                        <li><Link href="/faq" className="inline-block py-2 hover:text-black transition-colors">FAQ</Link></li>
+                        <li><Link href="/shipping" className="inline-block py-2 hover:text-black transition-colors">Shipping & Returns</Link></li>
+                        <li><Link href="/contact" className="inline-block py-2 hover:text-black transition-colors">Contact Us</Link></li>
                     </ul>
                 </div>
             </div>

@@ -10,7 +10,7 @@ interface HeroProps {
 
 export function Hero({ title, subtitle, imageUrl, ctaText, ctaLink }: HeroProps) {
     return (
-        <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
+        <section className="relative min-h-[70vh] h-screen w-full flex items-center justify-center overflow-hidden">
             <div className="absolute inset-0 z-0">
                 <Image
                     src={imageUrl}
@@ -23,7 +23,7 @@ export function Hero({ title, subtitle, imageUrl, ctaText, ctaLink }: HeroProps)
             </div>
 
             <div className="relative z-10 text-center text-white px-6">
-                <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl tracking-widest uppercase mb-6 drop-shadow-sm">
+                <h1 className="font-serif text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-widest uppercase mb-6 drop-shadow-sm">
                     {title}
                 </h1>
                 {subtitle && (

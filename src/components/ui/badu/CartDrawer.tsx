@@ -20,16 +20,20 @@ export function CartDrawer() {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-\[60\] flex justify-end">
+        <div className="fixed inset-0 z-[60] flex justify-end">
             <div
                 className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
                 onClick={() => setIsOpen(false)}
             />
 
-            <div className="relative w-full max-w-md bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+            <div className="relative w-full md:w-96 md:max-w-md bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
                 <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
                     <h2 className="text-xl font-serif tracking-widest uppercase">Your Cart</h2>
-                    <button onClick={() => setIsOpen(false)} className="text-neutral-500 hover:text-black">
+                    <button
+                        onClick={() => setIsOpen(false)}
+                        aria-label="Close cart"
+                        className="flex items-center justify-center w-10 h-10 -mr-2 text-neutral-500 hover:text-black transition-colors"
+                    >
                         <X size={24} />
                     </button>
                 </div>
@@ -67,14 +71,16 @@ export function CartDrawer() {
                                         <div className="flex items-center border border-neutral-200">
                                             <button
                                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                                className="px-2 py-1 text-neutral-500 hover:text-black hover:bg-neutral-50"
+                                                aria-label="Decrease quantity"
+                                                className="flex items-center justify-center w-10 h-10 text-neutral-500 hover:text-black hover:bg-neutral-50"
                                             >
                                                 <Minus size={12} />
                                             </button>
-                                            <span className="px-3 text-xs w-8 text-center">{item.quantity}</span>
+                                            <span className="px-2 text-xs w-8 text-center">{item.quantity}</span>
                                             <button
                                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                                className="px-2 py-1 text-neutral-500 hover:text-black hover:bg-neutral-50"
+                                                aria-label="Increase quantity"
+                                                className="flex items-center justify-center w-10 h-10 text-neutral-500 hover:text-black hover:bg-neutral-50"
                                             >
                                                 <Plus size={12} />
                                             </button>

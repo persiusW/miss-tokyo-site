@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { compressToWebP } from "@/lib/utils/imageCompression";
 
 interface ImageUploaderProps {
     bucket: string;
@@ -20,8 +21,8 @@ const ASPECT_CLASSES = {
     og: "aspect-[1200/630]",
 };
 
-const MAX_SIZE_MB = 5;
-const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
+const MAX_SIZE_MB = 10;
+const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 export function ImageUploader({
     bucket,
@@ -37,28 +38,35 @@ export function ImageUploader({
     const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const upload = async (file: File) => {
+    const upload = async (rawFile: File) => {
         setError(null);
 
-        if (!ACCEPTED.includes(file.type)) {
-            setError("Please upload a JPEG, PNG, or WebP image.");
+        if (!ACCEPTED.includes(rawFile.type)) {
+            setError("Please upload a JPEG, PNG, WebP, or GIF image.");
             return;
         }
-        if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        if (rawFile.size > MAX_SIZE_MB * 1024 * 1024) {
             setError(`File must be under ${MAX_SIZE_MB}MB.`);
             return;
         }
 
-        // Instant local preview
-        setPreview(URL.createObjectURL(file));
+        // Instant local preview from original
+        setPreview(URL.createObjectURL(rawFile));
         setUploading(true);
 
-        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-        const name = `${folder ? folder + "/" : ""}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        // Compress + convert to WebP
+        let file: File;
+        try {
+            file = await compressToWebP(rawFile);
+        } catch {
+            file = rawFile; // fallback to original if compression fails
+        }
+
+        const name = `${folder ? folder + "/" : ""}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
 
         const { data, error: uploadErr } = await supabase.storage
             .from(bucket)
-            .upload(name, file, { contentType: file.type, upsert: false });
+            .upload(name, file, { contentType: "image/webp", upsert: false });
 
         if (uploadErr || !data) {
             setError(uploadErr?.message || "Upload failed.");
@@ -131,7 +139,7 @@ export function ImageUploader({
                             <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">
                                 {uploading ? "Uploading..." : "Click or drag to upload"}
                             </p>
-                            <p className="text-[10px] text-neutral-400 mt-1">JPEG · PNG · WebP — max {MAX_SIZE_MB}MB</p>
+                            <p className="text-[10px] text-neutral-400 mt-1">JPEG · PNG · WebP — auto-converted to WebP · max {MAX_SIZE_MB}MB</p>
                         </div>
                     </div>
                 )}

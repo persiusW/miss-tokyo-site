@@ -10,6 +10,12 @@ export default async function CraftPage() {
         return acc;
     }, {});
 
+    const { data: copyData } = await supabase.from("site_copy").select("copy_key, value").eq("page_group", "craft");
+    const copy = (copyData || []).reduce((acc: any, row: any) => {
+        acc[row.copy_key] = row.value;
+        return acc;
+    }, {});
+
     return (
         <div className="flex flex-col md:flex-row min-h-screen bg-white">
             {/* Sticky Text Side */}
@@ -19,19 +25,21 @@ export default async function CraftPage() {
                 <div className="space-y-12">
                     <div>
                         <h2 className="text-xs font-semibold tracking-widest uppercase text-neutral-400 mb-4">01. Heritage</h2>
-                        <h3 className="font-serif text-2xl tracking-widest uppercase mb-4 text-neutral-900">The Name Is Personal</h3>
+                        <h3 className="font-serif text-2xl tracking-widest uppercase mb-4 text-neutral-900">
+                            {copy['craft_heritage_heading'] || "The Name Is Personal"}
+                        </h3>
                         <p className="text-neutral-600 leading-relaxed text-sm md:text-base">
-                            BADU is more than a label; it is a lineage. Born in Accra, our atelier honors the artisanal legacy of Ghana
-                            by refusing the shortcuts of mass production. Every stitch is a deliberate act of preservation.
+                            {copy['craft_heritage_body'] || "BADU is more than a label; it is a lineage. Born in Accra, our atelier honors the artisanal legacy of Ghana by refusing the shortcuts of mass production. Every stitch is a deliberate act of preservation."}
                         </p>
                     </div>
 
                     <div>
                         <h2 className="text-xs font-semibold tracking-widest uppercase text-neutral-400 mb-4">02. Philosophy</h2>
-                        <h3 className="font-serif text-2xl tracking-widest uppercase mb-4 text-neutral-900">Visual Silence</h3>
+                        <h3 className="font-serif text-2xl tracking-widest uppercase mb-4 text-neutral-900">
+                            {copy['craft_philosophy_heading'] || "Visual Silence"}
+                        </h3>
                         <p className="text-neutral-600 leading-relaxed text-sm md:text-base">
-                            We strip away the extraneous to leave only the essential structure. True luxury is found in the quiet details:
-                            unbranded surfaces, perfectly skived edges, and leathers selected to age alongside you. Elegance is refusal.
+                            {copy['craft_philosophy_body'] || "We strip away the extraneous to leave only the essential structure. True luxury is found in the quiet details: unbranded surfaces, perfectly skived edges, and leathers selected to age alongside you. Elegance is refusal."}
                         </p>
                     </div>
                 </div>

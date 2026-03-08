@@ -95,7 +95,7 @@ export function CustomOrderForm() {
                         value={formData.firstName}
                         onChange={handleChange}
                         required
-                        className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors rounded-none"
+                        className="w-full border-b border-black bg-transparent py-3 min-h-[44px] text-[16px] outline-none focus:border-neutral-400 transition-colors rounded-none"
                     />
                 </div>
                 <div>
@@ -106,7 +106,7 @@ export function CustomOrderForm() {
                         value={formData.lastName}
                         onChange={handleChange}
                         required
-                        className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors rounded-none"
+                        className="w-full border-b border-black bg-transparent py-3 min-h-[44px] text-[16px] outline-none focus:border-neutral-400 transition-colors rounded-none"
                     />
                 </div>
             </div>
@@ -119,7 +119,7 @@ export function CustomOrderForm() {
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors rounded-none"
+                    className="w-full border-b border-black bg-transparent py-3 min-h-[44px] text-[16px] outline-none focus:border-neutral-400 transition-colors rounded-none"
                 />
             </div>
 
@@ -129,7 +129,7 @@ export function CustomOrderForm() {
                     id="requestType"
                     value={formData.requestType}
                     onChange={handleChange}
-                    className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors rounded-none appearance-none"
+                    className="w-full border-b border-black bg-transparent py-3 min-h-[44px] text-[16px] outline-none focus:border-neutral-400 transition-colors rounded-none appearance-none"
                 >
                     <option value="modification">Modification to existing design</option>
                     <option value="bespoke">Entirely new bespoke design</option>
@@ -163,7 +163,7 @@ export function CustomOrderForm() {
                         value={formData.strapColor}
                         onChange={handleChange}
                         placeholder="e.g. Cognac"
-                        className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors rounded-none"
+                        className="w-full border-b border-black bg-transparent py-3 min-h-[44px] text-[16px] outline-none focus:border-neutral-400 transition-colors rounded-none"
                     />
                 </div>
                 <div>
@@ -174,7 +174,7 @@ export function CustomOrderForm() {
                         value={formData.stitchColor}
                         onChange={handleChange}
                         placeholder="e.g. Contrast White"
-                        className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors rounded-none"
+                        className="w-full border-b border-black bg-transparent py-3 min-h-[44px] text-[16px] outline-none focus:border-neutral-400 transition-colors rounded-none"
                     />
                 </div>
                 <div>
@@ -185,7 +185,7 @@ export function CustomOrderForm() {
                         value={formData.soleTone}
                         onChange={handleChange}
                         placeholder="e.g. Dark Brown"
-                        className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors rounded-none"
+                        className="w-full border-b border-black bg-transparent py-3 min-h-[44px] text-[16px] outline-none focus:border-neutral-400 transition-colors rounded-none"
                     />
                 </div>
             </div>

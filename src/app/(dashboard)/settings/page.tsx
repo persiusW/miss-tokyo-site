@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 import { toast } from "@/lib/toast";
+import { AssetsTab } from "./AssetsTab";
+import { EmailsTab } from "./EmailsTab";
 
 type BusinessSettings = {
     business_name: string;
@@ -48,44 +50,44 @@ type SiteMetadata = {
     keywords: string;
 };
 
+type TabKey = "business" | "store" | "seo" | "assets" | "emails";
+
+const TABS: { key: TabKey; label: string }[] = [
+    { key: "business", label: "Business" },
+    { key: "store", label: "Store" },
+    { key: "seo", label: "SEO" },
+    { key: "assets", label: "Site Assets" },
+    { key: "emails", label: "Emails" },
+];
+
 export default function SettingsPage() {
-    const [activeTab, setActiveTab] = useState<"business" | "store" | "seo">("business");
+    const [activeTab, setActiveTab] = useState<TabKey>("business");
 
     return (
-        <div className="space-y-12 max-w-6xl">
-            <header className="flex items-end justify-between border-b border-neutral-200 pb-4">
-                <div>
+        <div className="space-y-10 max-w-6xl">
+            <header className="border-b border-neutral-200 pb-0">
+                <div className="mb-6">
                     <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Settings</h1>
-                    <p className="text-neutral-500">Manage your atelier's core details and search engine presence.</p>
+                    <p className="text-neutral-500">Manage your atelier's business details, store configuration, SEO, site assets, and email templates.</p>
                 </div>
-                <div className="flex gap-8 text-xs font-semibold uppercase tracking-widest">
-                    <button
-                        onClick={() => setActiveTab("business")}
-                        className={`pb-4 border-b-2 transition-colors ${activeTab === "business" ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"}`}
-                        style={{ marginBottom: "-17px" }}
-                    >
-                        Business Details
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("store")}
-                        className={`pb-4 border-b-2 transition-colors ${activeTab === "store" ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"}`}
-                        style={{ marginBottom: "-17px" }}
-                    >
-                        Store Settings
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("seo")}
-                        className={`pb-4 border-b-2 transition-colors ${activeTab === "seo" ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"}`}
-                        style={{ marginBottom: "-17px" }}
-                    >
-                        SEO & Metadata
-                    </button>
+                <div className="flex gap-6 text-xs font-semibold uppercase tracking-widest overflow-x-auto scrollbar-hide">
+                    {TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            className={`pb-4 border-b-2 transition-colors whitespace-nowrap -mb-px ${activeTab === tab.key ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"}`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
             </header>
 
             {activeTab === "business" && <BusinessTab />}
             {activeTab === "store" && <StoreTab />}
             {activeTab === "seo" && <SEOTab />}
+            {activeTab === "assets" && <AssetsTab />}
+            {activeTab === "emails" && <EmailsTab />}
         </div>
     );
 }

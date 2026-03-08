@@ -38,13 +38,13 @@ export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, catego
                                 {category}
                             </span>
                         )}
-                        <h3 className="font-serif text-sm md:text-base tracking-wide text-neutral-900 mb-[2px]">{name}</h3>
-                        <p className="text-xs tracking-wider text-neutral-500">{price}</p>
+                        <h3 className="font-serif text-xs md:text-base tracking-wide text-neutral-900 mb-[2px] leading-snug">{name}</h3>
+                        <p className="text-[10px] md:text-xs tracking-wider text-neutral-500">{price}</p>
                     </div>
                     {onQuickAdd && (
                         <button
                             onClick={onQuickAdd}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-100 hover:bg-black hover:text-white px-3 py-1.5 text-[10px] uppercase tracking-widest font-semibold"
+                            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-neutral-100 hover:bg-black hover:text-white min-h-[36px] px-3 py-1.5 text-[10px] uppercase tracking-widest font-semibold"
                             aria-label={`Quick add ${name} to cart`}
                         >
                             Quick Add

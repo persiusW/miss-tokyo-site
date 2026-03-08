@@ -60,7 +60,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
             {/* Color Selection */}
             <div>
                 <span className="block text-xs uppercase tracking-widest font-semibold mb-4">Color</span>
-                <div className="flex gap-4 flex-wrap">
+                <div className="flex gap-3 flex-wrap">
                     {colors.map(color => (
                         <label key={color} className="cursor-pointer">
                             <input
@@ -70,7 +70,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
                                 checked={selectedColor === color}
                                 onChange={() => setSelectedColor(color)}
                             />
-                            <span className="block px-4 py-2 text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
+                            <span className="flex items-center min-h-[44px] px-4 text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
                                 {color}
                             </span>
                         </label>
@@ -81,7 +81,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
             {/* Stitching Selection */}
             <div>
                 <span className="block text-xs uppercase tracking-widest font-semibold mb-4">Stitching</span>
-                <div className="flex gap-4 flex-wrap">
+                <div className="flex gap-3 flex-wrap">
                     {stitching.map(style => (
                         <label key={style} className="cursor-pointer">
                             <input
@@ -91,7 +91,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
                                 checked={selectedStitching === style}
                                 onChange={() => setSelectedStitching(style)}
                             />
-                            <span className="block px-4 py-2 text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
+                            <span className="flex items-center min-h-[44px] px-4 text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
                                 {style}
                             </span>
                         </label>
@@ -115,7 +115,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
                                 checked={selectedSize === size}
                                 onChange={() => setSelectedSize(size)}
                             />
-                            <span className="block py-3 text-center text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
+                            <span className="flex items-center justify-center min-h-[44px] text-center text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
                                 {size}
                             </span>
                         </label>
@@ -123,13 +123,25 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
                 </div>
             </div>
 
+            {/* Desktop: inline button */}
             <button
                 type="button"
                 onClick={handleAddToCart}
-                className={`w-full py-5 bg-black text-white text-xs uppercase tracking-widest transition-colors mt-8 ${!selectedSize ? 'opacity-50 cursor-not-allowed hover:bg-black' : 'hover:bg-neutral-800'}`}
+                className={`hidden md:block w-full py-5 bg-black text-white text-xs uppercase tracking-widest transition-colors mt-8 ${!selectedSize ? 'opacity-50 cursor-not-allowed hover:bg-black' : 'hover:bg-neutral-800'}`}
             >
                 Add to Cart — {price}
             </button>
+
+            {/* Mobile: sticky bottom bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-neutral-200 p-4 safe-area-pb">
+                <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    className={`w-full py-4 bg-black text-white text-xs uppercase tracking-widest transition-colors ${!selectedSize ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-800'}`}
+                >
+                    {selectedSize ? `Add to Cart — ${price}` : `Select a Size — ${price}`}
+                </button>
+            </div>
         </div>
     );
 }

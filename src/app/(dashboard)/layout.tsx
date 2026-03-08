@@ -45,12 +45,6 @@ const NAV: NavSection[] = [
         ],
     },
     {
-        title: "Brand & Growth",
-        items: [
-            { label: "Site Assets", href: "/assets" },
-        ],
-    },
-    {
         title: "Settings",
         items: [
             { label: "Site Settings", href: "/settings" },

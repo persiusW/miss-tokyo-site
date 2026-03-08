@@ -22,7 +22,6 @@ export const config = {
         '/customers/:path*',
         '/finance/:path*',
         '/seo/:path*',
-        '/assets/:path*',
         '/settings/:path*',
     ],
 };

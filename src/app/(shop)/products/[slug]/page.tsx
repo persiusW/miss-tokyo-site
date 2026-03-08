@@ -52,7 +52,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
     const priceStr = `${product.price_ghs || 300} GHS`;
 
     return (
-        <div className="pt-24 pb-32 px-6 md:px-12 max-w-7xl mx-auto">
+        <div className="pt-24 pb-32 md:pb-32 px-4 md:px-12 max-w-7xl mx-auto" style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
             <AnimatedProductView>
                 {/* Product Images */}
                 <div className="w-full md:w-1/2 flex flex-col gap-6">
