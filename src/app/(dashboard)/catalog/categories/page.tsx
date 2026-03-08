@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/badu/ImageUploader";
+import { Pencil, Trash2, X, Check } from "lucide-react";
+import { toast } from "@/lib/toast";
 
 type Category = {
     id: string;
@@ -21,6 +23,9 @@ export default function CategoriesPage() {
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({ name: "", slug: "", description: "" });
     const [newImageUrl, setNewImageUrl] = useState<string | null>(null);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState({ name: "", slug: "", description: "", image_url: "" });
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     const fetchCategories = async () => {
         setLoading(true);
@@ -50,7 +55,10 @@ export default function CategoriesPage() {
             is_active: true,
         }]);
 
-        if (!error) {
+        if (error) {
+            toast.error("Failed to add category.");
+        } else {
+            toast.success("Category added.");
             setForm({ name: "", slug: "", description: "" });
             setNewImageUrl(null);
             setIsAdding(false);
@@ -65,9 +73,47 @@ export default function CategoriesPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Delete this category?")) return;
-        await supabase.from("categories").delete().eq("id", id);
-        setCategories(prev => prev.filter(c => c.id !== id));
+        const { error } = await supabase.from("categories").delete().eq("id", id);
+        if (error) {
+            toast.error("Failed to delete category.");
+        } else {
+            toast.success("Category deleted.");
+            setCategories(prev => prev.filter(c => c.id !== id));
+        }
+        setConfirmDeleteId(null);
+    };
+
+    const startEdit = (cat: Category) => {
+        setEditingId(cat.id);
+        setEditForm({
+            name: cat.name,
+            slug: cat.slug,
+            description: cat.description || "",
+            image_url: cat.image_url || "",
+        });
+    };
+
+    const cancelEdit = () => {
+        setEditingId(null);
+    };
+
+    const handleSaveEdit = async (id: string) => {
+        setSaving(true);
+        const { error } = await supabase.from("categories").update({
+            name: editForm.name,
+            slug: editForm.slug,
+            description: editForm.description || null,
+            image_url: editForm.image_url || null,
+        }).eq("id", id);
+
+        if (error) {
+            toast.error("Failed to update category.");
+        } else {
+            toast.success("Category updated.");
+            setEditingId(null);
+            await fetchCategories();
+        }
+        setSaving(false);
     };
 
     return (
@@ -169,36 +215,128 @@ export default function CategoriesPage() {
                         ) : categories.length === 0 ? (
                             <tr><td colSpan={6} className="px-6 py-16 text-center text-neutral-500 italic font-serif">No categories yet. Add your first above.</td></tr>
                         ) : categories.map((cat) => (
-                            <tr key={cat.id} className="hover:bg-neutral-50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <div className="w-12 h-12 bg-neutral-100 overflow-hidden flex-shrink-0">
-                                        {cat.image_url ? (
-                                            <img src={cat.image_url} alt={cat.name} className="w-full h-full object-cover" />
+                            editingId === cat.id ? (
+                                /* Inline edit row */
+                                <tr key={cat.id} className="bg-neutral-50">
+                                    <td className="px-6 py-4">
+                                        <div className="w-20">
+                                            <ImageUploader
+                                                bucket="product-images"
+                                                folder="categories"
+                                                currentUrl={editForm.image_url || null}
+                                                onUpload={(url) => setEditForm(prev => ({ ...prev, image_url: url }))}
+                                                aspectRatio="square"
+                                                label=""
+                                            />
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="text"
+                                            value={editForm.name}
+                                            onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                                            className="w-full border-b border-neutral-300 bg-transparent py-1 outline-none focus:border-black transition-colors"
+                                        />
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="text"
+                                            value={editForm.slug}
+                                            onChange={e => setEditForm(prev => ({ ...prev, slug: e.target.value }))}
+                                            className="w-full border-b border-neutral-300 bg-transparent py-1 outline-none focus:border-black transition-colors font-mono text-xs"
+                                        />
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="text"
+                                            value={editForm.description}
+                                            onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                                            className="w-full border-b border-neutral-300 bg-transparent py-1 outline-none focus:border-black transition-colors"
+                                        />
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="text-xs text-neutral-400 italic">editing</span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3 justify-end">
+                                            <button
+                                                onClick={() => handleSaveEdit(cat.id)}
+                                                disabled={saving}
+                                                className="text-green-600 hover:text-green-800 transition-colors disabled:opacity-50"
+                                                title="Save"
+                                            >
+                                                <Check size={16} />
+                                            </button>
+                                            <button
+                                                onClick={cancelEdit}
+                                                className="text-neutral-400 hover:text-black transition-colors"
+                                                title="Cancel"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                <tr key={cat.id} className="hover:bg-neutral-50 transition-colors">
+                                    <td className="px-6 py-4">
+                                        <div className="w-12 h-12 bg-neutral-100 overflow-hidden flex-shrink-0">
+                                            {cat.image_url ? (
+                                                <img src={cat.image_url} alt={cat.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full bg-neutral-200" />
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 font-medium text-neutral-900">{cat.name}</td>
+                                    <td className="px-6 py-4"><span className="font-mono text-xs text-neutral-500">{cat.slug}</span></td>
+                                    <td className="px-6 py-4 text-neutral-600 max-w-xs truncate">{cat.description || "—"}</td>
+                                    <td className="px-6 py-4">
+                                        <button
+                                            onClick={() => toggleActive(cat.id, cat.is_active)}
+                                            className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${cat.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}
+                                        >
+                                            {cat.is_active ? "Active" : "Inactive"}
+                                        </button>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {confirmDeleteId === cat.id ? (
+                                            <div className="flex items-center gap-3 justify-end">
+                                                <span className="text-xs text-neutral-500">Delete?</span>
+                                                <button
+                                                    onClick={() => handleDelete(cat.id)}
+                                                    className="text-xs uppercase tracking-widest text-red-600 hover:text-red-800 font-semibold"
+                                                >
+                                                    Yes
+                                                </button>
+                                                <button
+                                                    onClick={() => setConfirmDeleteId(null)}
+                                                    className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black"
+                                                >
+                                                    No
+                                                </button>
+                                            </div>
                                         ) : (
-                                            <div className="w-full h-full bg-neutral-200" />
+                                            <div className="flex items-center gap-3 justify-end">
+                                                <button
+                                                    onClick={() => startEdit(cat)}
+                                                    className="text-neutral-400 hover:text-black transition-colors"
+                                                    title="Edit"
+                                                >
+                                                    <Pencil size={15} />
+                                                </button>
+                                                <button
+                                                    onClick={() => setConfirmDeleteId(cat.id)}
+                                                    className="text-neutral-400 hover:text-red-600 transition-colors"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            </div>
                                         )}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 font-medium text-neutral-900">{cat.name}</td>
-                                <td className="px-6 py-4"><span className="font-mono text-xs text-neutral-500">{cat.slug}</span></td>
-                                <td className="px-6 py-4 text-neutral-600 max-w-xs truncate">{cat.description || "—"}</td>
-                                <td className="px-6 py-4">
-                                    <button
-                                        onClick={() => toggleActive(cat.id, cat.is_active)}
-                                        className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${cat.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}
-                                    >
-                                        {cat.is_active ? "Active" : "Inactive"}
-                                    </button>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <button
-                                        onClick={() => handleDelete(cat.id)}
-                                        className="text-xs uppercase tracking-widest text-neutral-400 hover:text-red-600 transition-colors"
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
+                                    </td>
+                                </tr>
+                            )
                         ))}
                     </tbody>
                 </table>

@@ -1,11 +1,48 @@
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+"use client";
 
-export default async function CatalogProductsPage() {
-    const { data: products } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { Pencil, Trash2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { toast } from "@/lib/toast";
+
+type Product = {
+    id: string;
+    name: string;
+    slug: string;
+    category_type: string;
+    price_ghs: number;
+    inventory_count: number;
+    is_active: boolean;
+    image_urls: string[] | null;
+};
+
+export default function CatalogProductsPage() {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+    const fetchProducts = useCallback(async () => {
+        const { data } = await supabase
+            .from("products")
+            .select("id, name, slug, category_type, price_ghs, inventory_count, is_active, image_urls")
+            .order("created_at", { ascending: false });
+        setProducts(data || []);
+        setLoading(false);
+    }, []);
+
+    useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+    const handleDelete = async (id: string) => {
+        const { error } = await supabase.from("products").delete().eq("id", id);
+        if (error) {
+            toast.error("Failed to delete product.");
+        } else {
+            toast.success("Product deleted.");
+            setProducts(prev => prev.filter(p => p.id !== id));
+        }
+        setConfirmDeleteId(null);
+    };
 
     return (
         <div className="space-y-12">
@@ -34,7 +71,11 @@ export default async function CatalogProductsPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                        {(!products || products.length === 0) ? (
+                        {loading ? (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td>
+                            </tr>
+                        ) : (!products || products.length === 0) ? (
                             <tr>
                                 <td colSpan={5} className="px-6 py-12 text-center text-neutral-500 italic font-serif">
                                     No products in the collection yet.
@@ -43,6 +84,7 @@ export default async function CatalogProductsPage() {
                         ) : (
                             products.map((product) => {
                                 const isLowStock = product.inventory_count < 5;
+                                const isConfirming = confirmDeleteId === product.id;
 
                                 return (
                                     <tr key={product.id} className="hover:bg-neutral-50 transition-colors">
@@ -79,10 +121,41 @@ export default async function CatalogProductsPage() {
                                         <td className="px-6 py-4 text-right font-medium">
                                             GH₵ {product.price_ghs}
                                         </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black transition-colors border-b border-transparent hover:border-black">
-                                                Edit
-                                            </button>
+                                        <td className="px-6 py-4">
+                                            {isConfirming ? (
+                                                <div className="flex items-center gap-3 justify-end">
+                                                    <span className="text-xs text-neutral-500">Delete?</span>
+                                                    <button
+                                                        onClick={() => handleDelete(product.id)}
+                                                        className="text-xs uppercase tracking-widest text-red-600 hover:text-red-800 font-semibold"
+                                                    >
+                                                        Yes
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setConfirmDeleteId(null)}
+                                                        className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black"
+                                                    >
+                                                        No
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-3 justify-end">
+                                                    <Link
+                                                        href={`/catalog/products/${product.id}/edit`}
+                                                        className="text-neutral-400 hover:text-black transition-colors"
+                                                        title="Edit"
+                                                    >
+                                                        <Pencil size={15} />
+                                                    </Link>
+                                                    <button
+                                                        onClick={() => setConfirmDeleteId(product.id)}
+                                                        className="text-neutral-400 hover:text-red-600 transition-colors"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 );

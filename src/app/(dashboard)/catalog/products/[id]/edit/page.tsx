@@ -1,53 +1,73 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
 import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 import { toast } from "@/lib/toast";
 
 type Category = { id: string; name: string; slug: string };
 
-export default function NewProductPage() {
+export default function EditProductPage() {
+    const { id } = useParams<{ id: string }>();
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [imageUrls, setImageUrls] = useState<(string | null)[]>([null, null, null, null]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
-        price_ghs: 300,
-        inventory_count: 10,
+        price_ghs: 0,
+        inventory_count: 0,
         description: "",
         category_type: "",
+        is_active: true,
     });
 
-    useEffect(() => {
-        supabase
-            .from("categories")
-            .select("id, name, slug")
-            .eq("is_active", true)
-            .order("name")
-            .then(({ data }) => {
-                if (data && data.length > 0) {
-                    setCategories(data);
-                    setFormData(prev => ({ ...prev, category_type: data[0].slug }));
-                }
+    const fetchProduct = useCallback(async () => {
+        const [{ data: product }, { data: cats }] = await Promise.all([
+            supabase.from("products").select("*").eq("id", id).single(),
+            supabase.from("categories").select("id, name, slug").eq("is_active", true).order("name"),
+        ]);
+
+        if (!product) {
+            toast.error("Product not found.");
+            router.push("/catalog/products");
+            return;
+        }
+
+        if (cats) setCategories(cats);
+
+        setFormData({
+            name: product.name || "",
+            slug: product.slug || "",
+            price_ghs: product.price_ghs || 0,
+            inventory_count: product.inventory_count || 0,
+            description: product.description || "",
+            category_type: product.category_type || "",
+            is_active: product.is_active ?? true,
+        });
+
+        const urls: (string | null)[] = [null, null, null, null];
+        if (product.image_urls) {
+            product.image_urls.forEach((url: string, i: number) => {
+                if (i < 4) urls[i] = url;
             });
-    }, []);
+        }
+        setImageUrls(urls);
+        setLoading(false);
+    }, [id, router]);
+
+    useEffect(() => { fetchProduct(); }, [fetchProduct]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
-    };
-
-    const handleSlugify = () => {
-        if (formData.name) {
-            setFormData(prev => ({
-                ...prev,
-                slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
-            }));
-        }
+        const { id: fieldId, value, type } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [fieldId]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+        }));
     };
 
     const handleImageUpload = (index: number, url: string) => {
@@ -60,46 +80,51 @@ export default function NewProductPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
+        setSaving(true);
 
         try {
             const uploadedUrls = imageUrls.filter((u): u is string => !!u);
-            const { error } = await supabase.from("products").insert([
-                {
-                    name: formData.name,
-                    slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
-                    price_ghs: Number(formData.price_ghs),
-                    inventory_count: Number(formData.inventory_count),
-                    description: formData.description,
-                    category_type: formData.category_type,
-                    image_urls: uploadedUrls,
-                    is_active: true,
-                }
-            ]);
+            const { error } = await supabase.from("products").update({
+                name: formData.name,
+                slug: formData.slug,
+                price_ghs: Number(formData.price_ghs),
+                inventory_count: Number(formData.inventory_count),
+                description: formData.description,
+                category_type: formData.category_type,
+                image_urls: uploadedUrls,
+                is_active: formData.is_active,
+            }).eq("id", id);
 
             if (error) throw error;
+            toast.success("Product updated.");
             router.push("/catalog/products");
             router.refresh();
         } catch (err) {
             console.error(err);
-            toast.error("Failed to create product.");
+            toast.error("Failed to update product.");
         } finally {
-            setLoading(false);
+            setSaving(false);
         }
     };
 
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <p className="text-neutral-500 italic font-serif">Loading product...</p>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-12 max-w-3xl">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <div className="flex items-center gap-2 text-sm text-neutral-500 mb-4">
-                        <Link href="/catalog/products" className="hover:text-black">Products</Link>
-                        <span>/</span>
-                        <span className="text-black">New Product</span>
-                    </div>
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">New Product</h1>
-                    <p className="text-neutral-500">Add a new piece to the collection.</p>
+            <header>
+                <div className="flex items-center gap-2 text-sm text-neutral-500 mb-4">
+                    <Link href="/catalog/products" className="hover:text-black">Products</Link>
+                    <span>/</span>
+                    <span className="text-black">Edit</span>
                 </div>
+                <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Edit Product</h1>
+                <p className="text-neutral-500">{formData.name}</p>
             </header>
 
             <form onSubmit={handleSubmit} className="space-y-8">
@@ -114,10 +139,8 @@ export default function NewProductPage() {
                             id="name"
                             value={formData.name}
                             onChange={handleChange}
-                            onBlur={handleSlugify}
                             required
                             className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                            placeholder="e.g. Badu Slide 02"
                         />
                     </div>
 
@@ -131,14 +154,13 @@ export default function NewProductPage() {
                                 onChange={handleChange}
                                 required
                                 className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                                placeholder="badu-slide-02"
                             />
                         </div>
                         <div>
                             <label htmlFor="category_type" className="block text-xs uppercase tracking-widest font-semibold mb-3">Category</label>
                             {categories.length === 0 ? (
                                 <div className="border-b border-neutral-200 py-2">
-                                    <span className="text-sm text-neutral-400 italic">No categories yet — </span>
+                                    <span className="text-sm text-neutral-400 italic">No categories — </span>
                                     <Link href="/catalog/categories" className="text-sm text-black underline">add one first</Link>
                                 </div>
                             ) : (
@@ -164,8 +186,18 @@ export default function NewProductPage() {
                             value={formData.description}
                             onChange={handleChange}
                             className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black transition-colors resize-y"
-                            placeholder="Describe the materials and craftsmanship..."
                         />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="checkbox"
+                            id="is_active"
+                            checked={formData.is_active}
+                            onChange={handleChange}
+                            className="w-4 h-4 accent-black"
+                        />
+                        <label htmlFor="is_active" className="text-xs uppercase tracking-widest font-semibold">Active (visible in shop)</label>
                     </div>
                 </div>
 
@@ -206,7 +238,7 @@ export default function NewProductPage() {
                 <div className="bg-white p-8 border border-neutral-200 space-y-6">
                     <div>
                         <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Images</h2>
-                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Upload up to 4 images. The first image is used as the primary display photo.</p>
+                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Upload up to 4 images. The first image is the primary display photo.</p>
                     </div>
                     <div className="grid grid-cols-2 gap-6">
                         {[0, 1, 2, 3].map((i) => (
@@ -233,10 +265,10 @@ export default function NewProductPage() {
                     </Link>
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={saving}
                         className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
                     >
-                        {loading ? "Saving..." : "Save Product"}
+                        {saving ? "Saving..." : "Update Product"}
                     </button>
                 </div>
             </form>
