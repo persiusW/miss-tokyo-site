@@ -5,18 +5,25 @@ import { supabase } from "@/lib/supabase";
 export const revalidate = 60; // Revalidate every minute
 
 export default async function HomePage() {
-    // Fetch top 4 active products
+    const [{ data: assetsData }, { data: copyData }, { data: storeSettingsData }] = await Promise.all([
+        supabase.from("site_assets").select("*"),
+        supabase.from("site_copy").select("copy_key, value"),
+        supabase.from("store_settings").select("home_grid_cols, home_product_limit").eq("id", "default").single(),
+    ]);
+
+    const homeGridCols = ([2, 3, 4].includes(storeSettingsData?.home_grid_cols)
+        ? storeSettingsData!.home_grid_cols
+        : 4) as 2 | 3 | 4;
+
+    const homeProductLimit = ([4, 6, 8, 12].includes(storeSettingsData?.home_product_limit)
+        ? storeSettingsData!.home_product_limit
+        : 4) as number;
+
     const { data: products } = await supabase
         .from("products")
         .select("*")
         .eq("is_active", true)
-        .limit(4);
-
-    const [{ data: assetsData }, { data: copyData }, { data: storeSettingsData }] = await Promise.all([
-        supabase.from("site_assets").select("*"),
-        supabase.from("site_copy").select("copy_key, value"),
-        supabase.from("store_settings").select("home_grid_cols").eq("id", "default").single(),
-    ]);
+        .limit(homeProductLimit);
 
     const siteAssets = (assetsData || []).reduce((acc: any, asset: any) => {
         acc[asset.section_key] = asset;
@@ -27,10 +34,6 @@ export default async function HomePage() {
         acc[row.copy_key] = row.value;
         return acc;
     }, {});
-
-    const homeGridCols = ([2, 3, 4].includes(storeSettingsData?.home_grid_cols)
-        ? storeSettingsData!.home_grid_cols
-        : 4) as 2 | 3 | 4;
 
     const formattedProducts = (products || []).map((p: any) => ({
         slug: p.slug || p.id,
