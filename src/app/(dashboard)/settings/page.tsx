@@ -22,6 +22,8 @@ type StoreSettings = {
     global_stitching: string[];
     enable_store_pickup: boolean;
     maintenance_mode: boolean;
+    home_grid_cols: 2 | 3 | 4;
+    shop_grid_cols: 2 | 3 | 4;
 };
 
 const DEFAULT_BUSINESS: BusinessSettings = {
@@ -39,6 +41,8 @@ const DEFAULT_STORE: StoreSettings = {
     global_stitching: ["Tonal", "Contrast White"],
     enable_store_pickup: false,
     maintenance_mode: false,
+    home_grid_cols: 4,
+    shop_grid_cols: 4,
 };
 
 type SiteMetadata = {
@@ -227,6 +231,8 @@ function StoreTab() {
                         global_stitching: sData.global_stitching || DEFAULT_STORE.global_stitching,
                         enable_store_pickup: sData.enable_store_pickup || false,
                         maintenance_mode: sData.maintenance_mode || false,
+                        home_grid_cols: (sData.home_grid_cols as 2 | 3 | 4) || 4,
+                        shop_grid_cols: (sData.shop_grid_cols as 2 | 3 | 4) || 4,
                     });
                 }
                 setLoading(false);
@@ -316,6 +322,50 @@ function StoreTab() {
                             placeholder="Tonal, Contrast White"
                         />
                         <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Comma-separated list of stitching styles.</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Visual Merchandising */}
+            <div className="bg-white border border-neutral-200 p-8 space-y-6">
+                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Visual Merchandising</h2>
+                <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
+                    Control the number of product columns displayed on desktop. Mobile stays 1-column, tablet stays 2-column.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Homepage Grid Columns</label>
+                        <div className="flex gap-3">
+                            {([2, 3, 4] as const).map(n => (
+                                <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, home_grid_cols: n }))}
+                                    className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.home_grid_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                                >
+                                    {n}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Columns on the homepage collection grid.</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page Grid Columns</label>
+                        <div className="flex gap-3">
+                            {([2, 3, 4] as const).map(n => (
+                                <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, shop_grid_cols: n }))}
+                                    className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_grid_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                                >
+                                    {n}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Columns on the full shop listing grid.</p>
                     </div>
                 </div>
             </div>

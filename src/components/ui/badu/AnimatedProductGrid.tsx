@@ -12,7 +12,13 @@ interface Product {
     category?: string;
 }
 
-export function AnimatedProductGrid({ products, onQuickAdd }: { products: Product[], onQuickAdd?: (slug: string) => void }) {
+const GRID_COLS_MAP: Record<2 | 3 | 4, string> = {
+    2: "lg:grid-cols-2",
+    3: "lg:grid-cols-3",
+    4: "lg:grid-cols-4",
+};
+
+export function AnimatedProductGrid({ products, onQuickAdd, gridCols = 4 }: { products: Product[], onQuickAdd?: (slug: string) => void, gridCols?: 2 | 3 | 4 }) {
     const container: Variants = {
         hidden: { opacity: 0 },
         show: {
@@ -30,7 +36,7 @@ export function AnimatedProductGrid({ products, onQuickAdd }: { products: Produc
 
     return (
         <motion.div
-            className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8"
+            className={`grid grid-cols-2 md:grid-cols-2 ${GRID_COLS_MAP[gridCols]} gap-4 md:gap-8`}
             variants={container}
             initial="hidden"
             whileInView="show"

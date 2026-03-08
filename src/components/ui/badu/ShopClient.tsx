@@ -23,9 +23,10 @@ interface Product {
 interface ShopClientProps {
     products: Product[];
     categories: Category[];
+    gridCols?: 2 | 3 | 4;
 }
 
-export function ShopClient({ products, categories }: ShopClientProps) {
+export function ShopClient({ products, categories, gridCols = 4 }: ShopClientProps) {
     const [active, setActive] = useState<string | null>(null);
     const [quickViewSlug, setQuickViewSlug] = useState<string | null>(null);
 
@@ -82,7 +83,7 @@ export function ShopClient({ products, categories }: ShopClientProps) {
             {/* Grid */}
             {filtered.length > 0 ? (
                 <div key={active || "all"}>
-                    <AnimatedProductGrid products={filtered} onQuickAdd={setQuickViewSlug} />
+                    <AnimatedProductGrid products={filtered} onQuickAdd={setQuickViewSlug} gridCols={gridCols} />
                 </div>
             ) : (
                 <div className="text-center py-24 text-neutral-400 tracking-widest uppercase text-sm">

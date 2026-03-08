@@ -6,10 +6,15 @@ export const revalidate = 60;
 const FALLBACK_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f5f5f5'/%3E%3C/svg%3E";
 
 export default async function ShopPage() {
-    const [{ data: products }, { data: categories }] = await Promise.all([
+    const [{ data: products }, { data: categories }, { data: storeSettingsData }] = await Promise.all([
         supabase.from("products").select("*").eq("is_active", true).order("sort_order", { ascending: true }).order("created_at", { ascending: false }),
         supabase.from("categories").select("id, name, slug, image_url").eq("is_active", true).order("name"),
+        supabase.from("store_settings").select("shop_grid_cols").eq("id", "default").single(),
     ]);
+
+    const shopGridCols = ([2, 3, 4].includes(storeSettingsData?.shop_grid_cols)
+        ? storeSettingsData!.shop_grid_cols
+        : 4) as 2 | 3 | 4;
 
     const formattedProducts = (products || []).map((p, idx) => ({
         slug: p.slug || p.id,
@@ -35,6 +40,7 @@ export default async function ShopPage() {
                     slug: c.slug,
                     image_url: c.image_url || null,
                 }))}
+                gridCols={shopGridCols}
             />
         </div>
     );

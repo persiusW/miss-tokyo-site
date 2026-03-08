@@ -12,17 +12,25 @@ export default async function HomePage() {
         .eq("is_active", true)
         .limit(4);
 
-    const { data: assetsData } = await supabase.from("site_assets").select("*");
+    const [{ data: assetsData }, { data: copyData }, { data: storeSettingsData }] = await Promise.all([
+        supabase.from("site_assets").select("*"),
+        supabase.from("site_copy").select("copy_key, value"),
+        supabase.from("store_settings").select("home_grid_cols").eq("id", "default").single(),
+    ]);
+
     const siteAssets = (assetsData || []).reduce((acc: any, asset: any) => {
         acc[asset.section_key] = asset;
         return acc;
     }, {});
 
-    const { data: copyData } = await supabase.from("site_copy").select("copy_key, value");
     const copy = (copyData || []).reduce((acc: any, row: any) => {
         acc[row.copy_key] = row.value;
         return acc;
     }, {});
+
+    const homeGridCols = ([2, 3, 4].includes(storeSettingsData?.home_grid_cols)
+        ? storeSettingsData!.home_grid_cols
+        : 4) as 2 | 3 | 4;
 
     const formattedProducts = (products || []).map((p: any) => ({
         slug: p.slug || p.id,
@@ -62,7 +70,7 @@ export default async function HomePage() {
                     </div>
 
                     {formattedProducts.length > 0 ? (
-                        <HomepageGrid products={formattedProducts} />
+                        <HomepageGrid products={formattedProducts} gridCols={homeGridCols} />
                     ) : (
                         <div className="text-center py-12 text-neutral-500 tracking-widest uppercase text-sm">
                             Collection is currently being updated.
