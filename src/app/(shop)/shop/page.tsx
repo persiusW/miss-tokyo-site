@@ -7,7 +7,7 @@ const FALLBACK_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/
 
 export default async function ShopPage() {
     const [{ data: products }, { data: categories }] = await Promise.all([
-        supabase.from("products").select("*").eq("is_active", true).order("created_at", { ascending: false }),
+        supabase.from("products").select("*").eq("is_active", true).order("sort_order", { ascending: true }).order("created_at", { ascending: false }),
         supabase.from("categories").select("id, name, slug, image_url").eq("is_active", true).order("name"),
     ]);
 

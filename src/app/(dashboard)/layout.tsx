@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ReactNode } from "react";
 import { LogoutButton } from "@/components/ui/badu/LogoutButton";
 import { Toaster } from "@/components/ui/badu/Toaster";
+import { RealtimeStockMonitor } from "@/components/ui/badu/RealtimeStockMonitor";
 
 type NavItem = { label: string; href: string };
 type NavSection = { title: string; items: NavItem[] };
@@ -108,6 +109,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </main>
             </div>
             <Toaster />
+            <RealtimeStockMonitor />
         </>
     );
 }

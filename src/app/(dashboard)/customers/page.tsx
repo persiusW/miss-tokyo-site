@@ -68,6 +68,23 @@ export default function CustomersPage() {
                     <p className="text-neutral-500">A unified view of your clientele across orders, requests, and subscriptions.</p>
                 </div>
                 <button
+                    onClick={() => {
+                        const headers = ["Name", "Email", "Source", "Added On"];
+                        const rows = contacts.map(c => [
+                            c.name || "Unnamed",
+                            c.email,
+                            c.source,
+                            new Date(c.created_at).toLocaleDateString(),
+                        ]);
+                        const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+                        const blob = new Blob([csv], { type: "text/csv" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `badu-contacts-${new Date().toISOString().slice(0, 10)}.csv`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }}
                     className="bg-black text-white px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
                 >
                     Export CSV

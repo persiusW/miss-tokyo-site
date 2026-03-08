@@ -196,6 +196,15 @@ function BusinessTab() {
                 </div>
             </div>
 
+            <div className="flex justify-end items-center gap-6">
+                {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved successfully</span>}
+                <button
+                    type="submit" disabled={saving}
+                    className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                >
+                    {saving ? "Saving..." : "Save Settings"}
+                </button>
+            </div>
         </form>
     );
 }

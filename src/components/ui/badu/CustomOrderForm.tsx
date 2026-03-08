@@ -21,6 +21,7 @@ export function CustomOrderForm() {
         lastName: "",
         email: "",
         requestType: "modification",
+        strapColor: "",
         stitchColor: "",
         soleTone: "",
         details: "",
@@ -53,6 +54,7 @@ export function CustomOrderForm() {
                 {
                     customer_name: `${formData.firstName} ${formData.lastName}`.trim(),
                     customer_email: formData.email,
+                    strap_color: formData.strapColor || null,
                     stitch_refinement: formData.stitchColor || null,
                     sole_tone: formData.soleTone || null,
                     reference_product: formData.referenceProduct || null,
@@ -152,7 +154,18 @@ export function CustomOrderForm() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <label htmlFor="strapColor" className="block text-xs uppercase tracking-widest font-semibold mb-3">Strap Color (Optional)</label>
+                    <input
+                        type="text"
+                        id="strapColor"
+                        value={formData.strapColor}
+                        onChange={handleChange}
+                        placeholder="e.g. Cognac"
+                        className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors rounded-none"
+                    />
+                </div>
                 <div>
                     <label htmlFor="stitchColor" className="block text-xs uppercase tracking-widest font-semibold mb-3">Stitch Color (Optional)</label>
                     <input
