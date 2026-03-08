@@ -21,7 +21,7 @@ export default async function ShopPage() {
     }));
 
     return (
-        <div className="pt-32 pb-24 px-6 md:px-12 max-w-[1400px] mx-auto min-h-screen">
+        <div className="pt-16 pb-24 px-6 md:px-12 max-w-[1400px] mx-auto min-h-screen">
             <header className="mb-16 md:mb-24 text-center">
                 <h1 className="font-serif text-4xl md:text-5xl tracking-widest uppercase mb-6">The Collection</h1>
                 <p className="text-sm tracking-[0.2em] text-neutral-500 uppercase">Enduring Quality. Quiet Aesthetics.</p>

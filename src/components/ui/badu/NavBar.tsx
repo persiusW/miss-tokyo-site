@@ -29,7 +29,7 @@ export function NavBar() {
 
     return (
         <>
-            <header className="h-16 w-full flex items-center justify-between px-6 md:px-12 bg-transparent absolute top-0 z-50">
+            <header className="h-16 w-full flex items-center justify-between px-6 md:px-12 bg-white border-b border-neutral-200 sticky top-0 z-50">
                 <Link href="/" className="font-serif text-2xl tracking-widest uppercase">
                     BADU
                 </Link>

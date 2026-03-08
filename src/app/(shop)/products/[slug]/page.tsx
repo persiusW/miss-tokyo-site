@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { AnimatedProductView } from "@/components/ui/badu/AnimatedProductView";
 import { ProductCheckoutForm } from "@/components/ui/badu/ProductCheckoutForm";
+import { ProductImageCarousel } from "@/components/ui/badu/ProductImageCarousel";
 import { notFound } from "next/navigation";
 
 import { Metadata } from "next";
@@ -52,39 +52,14 @@ export default async function ProductPage({ params }: { params: { slug: string }
     const priceStr = `${product.price_ghs || 300} GHS`;
 
     return (
-        <div className="pt-24 pb-32 md:pb-32 px-4 md:px-12 max-w-7xl mx-auto" style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
+        <div className="pt-10 pb-32 px-4 md:px-12 max-w-7xl mx-auto" style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>
             <AnimatedProductView>
-                {/* Product Images */}
-                <div className="w-full md:w-1/2 flex flex-col gap-6">
-                    <div className="relative aspect-[4/5] w-full bg-neutral-100 flex-shrink-0">
-                        {imageUrl ? (
-                            <Image
-                                src={imageUrl}
-                                alt={product.name}
-                                fill
-                                className="object-cover object-center"
-                                priority
-                            />
-                        ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400">
-                                <span className="text-xs uppercase tracking-widest">No Image</span>
-                            </div>
-                        )}
-                    </div>
-                    {product.image_urls && product.image_urls.length > 1 && (
-                        <div className="grid grid-cols-2 gap-6">
-                            {product.image_urls.slice(1, 4).map((url: string, i: number) => (
-                                <div key={i} className="relative aspect-square bg-neutral-100">
-                                    <Image
-                                        src={url}
-                                        alt={`${product.name} detail ${i + 1}`}
-                                        fill
-                                        className="object-cover object-center"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                {/* Product Images — Carousel */}
+                <div className="w-full md:w-1/2">
+                    <ProductImageCarousel
+                        images={product.image_urls || (imageUrl ? [imageUrl] : [])}
+                        name={product.name}
+                    />
                 </div>
 
                 {/* Product Info */}
