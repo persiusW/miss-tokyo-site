@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AnimatedProductGrid } from "@/components/ui/badu/AnimatedProductGrid";
+import { QuickViewModal } from "@/components/ui/badu/QuickViewModal";
 
 interface Category {
     id: string;
@@ -26,6 +27,17 @@ interface ShopClientProps {
 
 export function ShopClient({ products, categories }: ShopClientProps) {
     const [active, setActive] = useState<string | null>(null);
+    const [quickViewSlug, setQuickViewSlug] = useState<string | null>(null);
+
+    // Lock body scroll when modal is open
+    useEffect(() => {
+        if (quickViewSlug) {
+            document.body.style.overflow = "hidden";
+        } else {
+            document.body.style.overflow = "";
+        }
+        return () => { document.body.style.overflow = ""; };
+    }, [quickViewSlug]);
 
     const filtered = active
         ? products.filter(p => p.category === active)
@@ -39,8 +51,8 @@ export function ShopClient({ products, categories }: ShopClientProps) {
                     <button
                         onClick={() => setActive(null)}
                         className={`flex-shrink-0 px-5 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${active === null
-                                ? "bg-black text-white"
-                                : "bg-transparent text-neutral-500 hover:text-black border border-neutral-200 hover:border-black"
+                            ? "bg-black text-white"
+                            : "bg-transparent text-neutral-500 hover:text-black border border-neutral-200 hover:border-black"
                             }`}
                     >
                         All
@@ -50,8 +62,8 @@ export function ShopClient({ products, categories }: ShopClientProps) {
                             key={cat.id}
                             onClick={() => setActive(cat.slug)}
                             className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${active === cat.slug
-                                    ? "bg-black text-white"
-                                    : "bg-transparent text-neutral-500 hover:text-black border border-neutral-200 hover:border-black"
+                                ? "bg-black text-white"
+                                : "bg-transparent text-neutral-500 hover:text-black border border-neutral-200 hover:border-black"
                                 }`}
                         >
                             {cat.image_url && (
@@ -69,13 +81,22 @@ export function ShopClient({ products, categories }: ShopClientProps) {
 
             {/* Grid */}
             {filtered.length > 0 ? (
-                <AnimatedProductGrid products={filtered} />
+                <div key={active || "all"}>
+                    <AnimatedProductGrid products={filtered} onQuickAdd={setQuickViewSlug} />
+                </div>
             ) : (
                 <div className="text-center py-24 text-neutral-400 tracking-widest uppercase text-sm">
                     {active
                         ? "No items in this category."
                         : "No items available in the collection at this time."}
                 </div>
+            )}
+
+            {quickViewSlug && (
+                <QuickViewModal
+                    slug={quickViewSlug}
+                    onClose={() => setQuickViewSlug(null)}
+                />
             )}
         </>
     );

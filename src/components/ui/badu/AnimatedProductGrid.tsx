@@ -12,7 +12,7 @@ interface Product {
     category?: string;
 }
 
-export function AnimatedProductGrid({ products }: { products: Product[] }) {
+export function AnimatedProductGrid({ products, onQuickAdd }: { products: Product[], onQuickAdd?: (slug: string) => void }) {
     const container: Variants = {
         hidden: { opacity: 0 },
         show: {
@@ -45,6 +45,7 @@ export function AnimatedProductGrid({ products }: { products: Product[] }) {
                         imageUrl={product.imageUrl}
                         hoverImageUrl={product.hoverImageUrl}
                         category={product.category}
+                        onQuickAdd={onQuickAdd ? (e) => { e.preventDefault(); e.stopPropagation(); onQuickAdd(product.slug); } : undefined}
                     />
                 </motion.div>
             ))}
