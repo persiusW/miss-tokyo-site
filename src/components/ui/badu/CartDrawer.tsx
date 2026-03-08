@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export function CartDrawer() {
-    const { isOpen, setIsOpen, items, removeItem, updateQuantity, totalAmount } = useCart();
+    const { isOpen, setIsOpen, items, removeItem, updateQuantity } = useCart();
+    const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
 
@@ -97,7 +98,7 @@ export function CartDrawer() {
                     <div className="p-6 border-t border-neutral-100 bg-white space-y-4">
                         <div className="flex justify-between items-center text-lg">
                             <span className="font-serif tracking-widest uppercase">Total</span>
-                            <span className="font-medium">GHS {totalAmount()}</span>
+                            <span className="font-medium">GHS {total}</span>
                         </div>
                         <p className="text-[10px] text-neutral-400 uppercase tracking-widest text-center">Shipping and taxes calculated at checkout.</p>
 
