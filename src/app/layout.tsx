@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
-import { Geist, Playfair_Display } from "next/font/google";
+import { Cinzel } from "next/font/google";
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Cinzel — used for headings, logo, and body text ("conzel")
+const cinzel = Cinzel({
+  variable: "--font-cinzel",
   subsets: ["latin"],
-});
-
-const playfairDisplay = Playfair_Display({
-  variable: "--font-playfair-display",
-  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 import { supabase } from "@/lib/supabase";
@@ -29,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: "BADU | Minimalist Luxury",
-    description: "Handmade in Ghana. A minimalist collection of luxury footwear.",
+    title: "Miss Tokyo | Women's Fashion & Lifestyle",
+    description: "Your all-girl destination for everything cute, cool, and unmistakably feminine.",
   };
 }
 
@@ -43,8 +42,18 @@ export default function RootLayout({
     <html lang="en">
       <body
         suppressHydrationWarning
-        className={`${geistSans.variable} ${playfairDisplay.variable} antialiased`}
+        className={`${cinzel.variable} antialiased`}
       >
+        <Toaster position="bottom-right" toastOptions={{
+          style: {
+            background: '#000',
+            color: '#fff',
+            fontSize: '11px',
+            borderRadius: '0px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em'
+          }
+        }} />
         {children}
       </body>
     </html>

@@ -3,15 +3,23 @@
 @theme {
   --color-background: #ffffff;
   --color-foreground: #171717;
-  --color-foreground: #171717;
-  --font-sans: var(--font-geist-sans);
-  --font-serif: var(--font-playfair-display);
+  --font-sans: "Arial", "Helvetica Neue", sans-serif;
+  --font-serif: var(--font-cinzel), "Cinzel", Georgia, serif;
+  --gallery_ribbonCornerRadius: 24;
+}
+
+:root {
+  --gallery_ribbonCornerRadius: 24;
 }
 
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
-  font-family: var(--font-sans);
+  font-family: var(--font-cinzel), "Cinzel", Georgia, serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-cinzel), "Cinzel", Georgia, serif;
 }
 
 /* Toast animation */

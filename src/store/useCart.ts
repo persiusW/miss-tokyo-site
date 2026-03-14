@@ -63,7 +63,7 @@ export const useCart = create<CartState>()(
             }
         }),
         {
-            name: 'badu-cart-storage'
+            name: 'miss-tokyo-cart-storage'
         }
     )
 );

@@ -87,7 +87,6 @@ export async function POST(req: Request) {
         const event = JSON.parse(rawBody);
 
         if (event.event === "charge.success") {
-            console.log("Paystack Charge Success Event Received");
             const data = event.data;
             const metadata = data.metadata || {};
             const { orderId, requestId, productId, fullName, phone, address, deliveryMethod, cartItems } = metadata;

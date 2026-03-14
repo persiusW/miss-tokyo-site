@@ -1,39 +1,28 @@
-import { NavBar } from "@/components/ui/badu/NavBar";
-import { Footer } from "@/components/ui/badu/Footer";
-import { Toaster } from "@/components/ui/badu/Toaster";
-import { CartDrawer } from "@/components/ui/badu/CartDrawer";
-import { supabase } from "@/lib/supabase";
+import { Header } from "@/components/ui/miss-tokyo/Header";
+import { Footer } from "@/components/ui/miss-tokyo/Footer";
+import { createClient } from "@/lib/supabaseServer";
 
 export default async function ShopLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const { data } = await supabase.from("store_settings").select("maintenance_mode").eq("id", "default").single();
-    const isMaintenanceMode = data?.maintenance_mode || false;
-
-    if (isMaintenanceMode) {
-        return (
-            <div className="min-h-screen flex flex-col bg-white">
-                <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-                    <h1 className="font-serif text-4xl md:text-5xl tracking-widest uppercase mb-6">BADU</h1>
-                    <p className="text-neutral-500 tracking-widest uppercase text-sm max-w-md mx-auto leading-relaxed">
-                        We are currently preparing something new. <br /><br /> Our atelier will return shortly.
-                    </p>
-                </main>
-            </div>
-        );
-    }
+    const supabase = await createClient();
+    const { data: copyData } = await supabase.from("site_copy").select("copy_key, value");
+    
+    // Simple helper to get copy by key
+    const siteCopy = (copyData || []).reduce((acc: Record<string, string>, row) => ({
+        ...acc,
+        [row.copy_key]: row.value
+    }), {} as Record<string, string>);
 
     return (
         <div className="min-h-screen flex flex-col bg-white">
-            <NavBar />
-            <main className="flex-1">
+            <Header />
+            <div className="flex-1">
                 {children}
-            </main>
-            <Footer />
-            <Toaster />
-            <CartDrawer />
+            </div>
+            <Footer siteCopy={siteCopy} />
         </div>
     );
 }

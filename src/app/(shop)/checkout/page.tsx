@@ -27,10 +27,36 @@ export default function CheckoutPage() {
 
     useEffect(() => {
         setMounted(true);
+        
+        // 1. Fetch Store Settings
         supabase.from("store_settings").select("enable_store_pickup").eq("id", "default").single()
             .then(({ data }) => {
                 if (data) setEnablePickup(data.enable_store_pickup);
             });
+
+        // 2. Role-Based Auto-Fill
+        const autoFill = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from("profiles")
+                    .select("role, full_name, email, phone, address")
+                    .eq("id", user.id)
+                    .single();
+                
+                // Only auto-fill if they are a 'customer' (staff should not auto-fill their own details for orders)
+                if (profile && profile.role === "customer") {
+                    setForm(prev => ({
+                        ...prev,
+                        fullName: profile.full_name || prev.fullName,
+                        email: profile.email || prev.email,
+                        phone: profile.phone || prev.phone,
+                        address: profile.address || prev.address
+                    }));
+                }
+            }
+        };
+        autoFill();
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -116,25 +142,25 @@ export default function CheckoutPage() {
             <div>
                 <header className="mb-12">
                     <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Checkout</h1>
-                    <p className="text-neutral-500">Please provide your details to complete the order.</p>
+                    <p className="text-neutral-500 text-sm">Please provide your details to complete the order.</p>
                 </header>
 
                 <form onSubmit={handleCheckout} className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
-                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Full Name</label>
+                            <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-3">Full Name</label>
                             <input
                                 type="text" name="fullName" value={form.fullName} onChange={handleChange}
-                                className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.fullName ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
+                                className={`w-full border-b bg-transparent py-2 text-xs outline-none transition-colors rounded-none ${errors.fullName ? "border-red-400" : "border-neutral-200 focus:border-black"}`}
                                 placeholder="Abena Mensah"
                             />
                             {errors.fullName && <p className="mt-1 text-[11px] text-red-500">{errors.fullName}</p>}
                         </div>
                         <div>
-                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Email</label>
+                            <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-3">Email</label>
                             <input
                                 type="email" name="email" value={form.email} onChange={handleChange}
-                                className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.email ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
+                                className={`w-full border-b bg-transparent py-2 text-xs outline-none transition-colors rounded-none ${errors.email ? "border-red-400" : "border-neutral-200 focus:border-black"}`}
                                 placeholder="abena@example.com"
                             />
                             {errors.email && <p className="mt-1 text-[11px] text-red-500">{errors.email}</p>}
@@ -142,28 +168,28 @@ export default function CheckoutPage() {
                     </div>
 
                     <div>
-                        <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Phone Number</label>
+                        <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-3">Phone Number</label>
                         <input
                             type="tel" name="phone" value={form.phone} onChange={handleChange}
-                            className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.phone ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
+                            className={`w-full border-b bg-transparent py-2 text-xs outline-none transition-colors rounded-none ${errors.phone ? "border-red-400" : "border-neutral-200 focus:border-black"}`}
                             placeholder="+233 ..."
                         />
                         {errors.phone && <p className="mt-1 text-[11px] text-red-500">{errors.phone}</p>}
                     </div>
 
                     <div>
-                        <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Delivery Method</label>
+                        <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-3">Delivery Method</label>
                         <div className="flex gap-4">
                             <label className="cursor-pointer">
                                 <input type="radio" name="deliveryMethod" value="delivery" checked={form.deliveryMethod === 'delivery'} onChange={handleChange} className="sr-only peer" />
-                                <span className="block px-6 py-3 text-xs uppercase tracking-widest border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors">
+                                <span className="block px-6 py-3 text-[10px] uppercase tracking-widest border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors">
                                     Delivery
                                 </span>
                             </label>
                             {enablePickup && (
                                 <label className="cursor-pointer">
                                     <input type="radio" name="deliveryMethod" value="pickup" checked={form.deliveryMethod === 'pickup'} onChange={handleChange} className="sr-only peer" />
-                                    <span className="block px-6 py-3 text-xs uppercase tracking-widest border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors">
+                                    <span className="block px-6 py-3 text-[10px] uppercase tracking-widest border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors">
                                         Store Pickup
                                     </span>
                                 </label>
@@ -173,10 +199,10 @@ export default function CheckoutPage() {
 
                     {form.deliveryMethod === 'delivery' && (
                         <div>
-                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Shipping Address</label>
+                            <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-3">Shipping Address</label>
                             <input
                                 type="text" name="address" value={form.address} onChange={handleChange}
-                                className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.address ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
+                                className={`w-full border-b bg-transparent py-2 text-xs outline-none transition-colors rounded-none ${errors.address ? "border-red-400" : "border-neutral-200 focus:border-black"}`}
                                 placeholder="123 Osu, Accra, Ghana"
                             />
                             {errors.address && <p className="mt-1 text-[11px] text-red-500">{errors.address}</p>}
@@ -186,33 +212,33 @@ export default function CheckoutPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors mt-8 disabled:opacity-50 mt-12 block text-center"
+                        className="w-full py-5 bg-black text-white text-[10px] uppercase tracking-widest hover:bg-neutral-800 transition-colors mt-8 disabled:opacity-50 mt-12 block text-center"
                     >
-                        {loading ? "Processing..." : `Pay GHS ${totalAmount()}`}
+                        {loading ? "Processing Transaction..." : `Authorize GHS ${totalAmount()}`}
                     </button>
                 </form>
             </div>
 
             {/* Order Summary */}
             <div className="bg-neutral-50 p-8 md:p-12 border border-neutral-100 h-fit">
-                <h2 className="font-serif text-xl tracking-widest uppercase mb-8">Order Summary</h2>
+                <h2 className="font-serif text-xl tracking-widest uppercase mb-8">Purchase Summary</h2>
                 <div className="space-y-6">
                     {items.map(item => (
                         <div key={item.id} className="flex gap-4 items-center">
                             <div className="w-16 h-16 bg-white overflow-hidden flex-shrink-0 border border-neutral-200">
-                                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all" />
                             </div>
                             <div className="flex-1">
-                                <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>
-                                <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} • Qty: {item.quantity}</p>
+                                <h3 className="font-medium text-sm text-neutral-900 font-serif">{item.name}</h3>
+                                <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-sans">Size: {item.size} • Qty: {item.quantity}</p>
                             </div>
-                            <p className="font-medium text-sm">GHS {item.price * item.quantity}</p>
+                            <p className="font-medium text-sm font-sans">GHS {item.price * item.quantity}</p>
                         </div>
                     ))}
                 </div>
                 <div className="border-t border-neutral-200 mt-8 pt-8 flex justify-between items-center">
-                    <span className="font-serif tracking-widest uppercase">Total</span>
-                    <span className="font-medium text-lg">GHS {totalAmount()}</span>
+                    <span className="font-serif tracking-widest uppercase text-xs">Gross Total</span>
+                    <span className="font-medium text-lg font-sans">GHS {totalAmount()}</span>
                 </div>
             </div>
         </div>

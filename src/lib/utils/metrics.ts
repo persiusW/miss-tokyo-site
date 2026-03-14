@@ -7,7 +7,8 @@
  * Explicitly excluded: 'pending', 'cancelled', 'refunded'
  */
 
-import { supabase } from "@/lib/supabase";
+import { supabase as staticSupabase } from "@/lib/supabase";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 // Canonical revenue-qualifying statuses
 export const REVENUE_STATUSES = ["paid", "processing", "fulfilled", "delivered"] as const;
@@ -53,7 +54,7 @@ export type RecentActivity = {
 /**
  * Total confirmed revenue — excludes pending, cancelled, refunded.
  */
-export async function fetchTotalRevenue(): Promise<number> {
+export async function fetchTotalRevenue(supabase: SupabaseClient = staticSupabase): Promise<number> {
     const { data, error } = await supabase
         .from("orders")
         .select("total_amount")
@@ -71,7 +72,7 @@ export async function fetchTotalRevenue(): Promise<number> {
  * Full order statistics including counts per status and derived rates.
  * Single DB round-trip — fetches all orders and derives every stat in JS.
  */
-export async function fetchOrderStats(): Promise<OrderStats> {
+export async function fetchOrderStats(supabase: SupabaseClient = staticSupabase): Promise<OrderStats> {
     const { data, error } = await supabase
         .from("orders")
         .select("id, total_amount, status");
@@ -125,7 +126,7 @@ export async function fetchOrderStats(): Promise<OrderStats> {
  * Parses orders.items (jsonb) and joins against products.category_type.
  * Proportionally splits order total by line-item value when items exist.
  */
-export async function fetchSalesByCategory(): Promise<CategoryRevenue[]> {
+export async function fetchSalesByCategory(supabase: SupabaseClient = staticSupabase): Promise<CategoryRevenue[]> {
     const [ordersRes, productsRes] = await Promise.all([
         supabase
             .from("orders")
@@ -185,7 +186,7 @@ export async function fetchSalesByCategory(): Promise<CategoryRevenue[]> {
  * Monthly revenue grouped by calendar month for the last N months.
  * Only counts revenue-qualifying orders.
  */
-export async function fetchMonthlyRevenue(monthsBack = 6): Promise<MonthlyRevenue[]> {
+export async function fetchMonthlyRevenue(monthsBack = 6, supabase: SupabaseClient = staticSupabase): Promise<MonthlyRevenue[]> {
     const { data, error } = await supabase
         .from("orders")
         .select("total_amount, created_at")
@@ -220,7 +221,7 @@ export async function fetchMonthlyRevenue(monthsBack = 6): Promise<MonthlyRevenu
 /**
  * Last N activity items merged from orders and custom_requests, sorted newest first.
  */
-export async function fetchRecentActivity(limit = 5): Promise<RecentActivity[]> {
+export async function fetchRecentActivity(limit = 5, supabase: SupabaseClient = staticSupabase): Promise<RecentActivity[]> {
     const [ordersRes, requestsRes] = await Promise.all([
         supabase
             .from("orders")

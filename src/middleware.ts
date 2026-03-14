@@ -1,27 +1,89 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from 'next/server';
 
-const SESSION_COOKIE = 'badu_session';
+export async function middleware(request: NextRequest) {
+  // Create request headers with current pathname for server components
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-pathname', request.nextUrl.pathname);
 
-export function middleware(request: NextRequest) {
-    const session = request.cookies.get(SESSION_COOKIE);
-    const expectedToken = process.env.AUTH_SECRET || 'badu-default-session-token-change-in-production';
+  let response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 
-    if (!session?.value || session.value !== expectedToken) {
-        return NextResponse.redirect(new URL('/login', request.url));
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: requestHeaders,
+            },
+          });
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+        remove(name: string, options: CookieOptions) {
+          request.cookies.set({
+            name,
+            value: '',
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: requestHeaders,
+            },
+          });
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          });
+        },
+      },
+    }
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Protect /admin routes
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    // Allow access to the login page
+    if (request.nextUrl.pathname === '/admin/login') {
+      return response;
     }
 
-    return NextResponse.next();
+    if (!user) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
+  }
+
+  return response;
 }
 
 export const config = {
-    matcher: [
-        '/overview/:path*',
-        '/sales/:path*',
-        '/catalog/:path*',
-        '/customers/:path*',
-        '/finance/:path*',
-        '/seo/:path*',
-        '/settings/:path*',
-    ],
+  matcher: [
+    '/admin/:path*',
+    '/overview/:path*',
+    '/sales/:path*',
+    '/catalog/:path*',
+    '/customers/:path*',
+    '/finance/:path*',
+    '/seo/:path*',
+    '/settings/:path*',
+  ],
 };
