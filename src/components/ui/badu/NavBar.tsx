@@ -13,8 +13,8 @@ const NAV_LINKS = [
     { href: "/dresses",     label: "Dresses" },
     { href: "/new-arrivals",label: "New Arrivals" },
     { href: "/gift-card",   label: "Gift Card" },
-    { href: "/contact",     label: "Contact" },
-    { href: "/about",       label: "About" },
+    { href: "/contact",     label: "CONTACT" },
+    { href: "/about",       label: "ABOUT" },
 ];
 
 export function NavBar() {

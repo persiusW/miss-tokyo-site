@@ -31,105 +31,135 @@ export default function ContactPage() {
     };
 
     return (
-        <div className="pt-32 pb-24 px-6 md:px-12 max-w-7xl mx-auto min-h-screen flex flex-col md:flex-row gap-16 lg:gap-32">
-            {/* Contact Details Side */}
-            <div className="w-full md:w-1/3 flex flex-col justify-center">
-                <h1 className="font-serif text-5xl md:text-6xl tracking-widest uppercase mb-12">Contact</h1>
+        <div className="pb-24">
+            <header className="py-24 text-center px-6">
+                <h1 className="text-3xl md:text-5xl font-serif uppercase tracking-[0.2em] text-black mb-4">
+                    Contact Us
+                </h1>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-400 font-bold">
+                    Concierge & Technical Assistance
+                </p>
+            </header>
 
-                <div className="space-y-12">
+            <div className="max-w-7xl mx-auto px-6 md:px-12">
+                <div className="grid md:grid-cols-2 gap-0 border border-black min-h-[600px] mb-24">
+                    {/* Left Column (Map) */}
+                    <div className="relative w-full h-full bg-neutral-100 grayscale hover:grayscale-0 transition-all duration-1000 overflow-hidden">
+                         <iframe 
+                            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d127063.2536836!2d-0.2117!3d5.6!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xfdf9084b2b7a773%3A0xbed1c48c344d9307!2sAccra!5e0!3m2!1sen!2sgh!4v1710437000000!5m2!1sen!2sgh" 
+                            width="100%" 
+                            height="100%" 
+                            style={{ border: 0 }} 
+                            allowFullScreen={false} 
+                            loading="lazy" 
+                            referrerPolicy="no-referrer-when-downgrade"
+                            className="grayscale contrast-125 brightness-90 absolute inset-0"
+                        ></iframe>
+                    </div>
+
+                    {/* Right Column (Form) */}
+                    <div className="bg-white p-8 md:p-12 lg:p-20 flex flex-col justify-center">
+                        <div className="mb-12">
+                            <h2 className="text-[10px] uppercase tracking-[0.3em] font-bold text-neutral-400 mb-6">Send a Message</h2>
+                            <div className="h-px w-10 bg-black"></div>
+                        </div>
+
+                        {status === "success" ? (
+                            <div className="text-center py-12">
+                                <h3 className="font-serif text-2xl tracking-widest uppercase mb-4">Message Sent</h3>
+                                <p className="text-xs tracking-widest uppercase text-neutral-400">Our concierge will respond shortly.</p>
+                                <button
+                                    onClick={() => setStatus("idle")}
+                                    className="mt-8 text-[10px] uppercase tracking-[0.3em] font-bold border-b border-black pb-1 hover:opacity-50 transition-all"
+                                >
+                                    New Inquiry
+                                </button>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+                                {status === "error" && (
+                                    <p className="text-[10px] text-red-500 tracking-widest uppercase">Registry error. Try again.</p>
+                                )}
+                                
+                                <div className="group">
+                                    <label htmlFor="name" className="block text-[10px] uppercase tracking-[0.3em] text-neutral-400 mb-2 font-bold group-focus-within:text-black transition-colors">
+                                        Full Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="name"
+                                        required
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className="w-full bg-transparent border-b border-neutral-200 text-black text-sm py-4 focus:outline-none focus:border-black transition-all rounded-none"
+                                        placeholder="ALEXANDER SMITH"
+                                    />
+                                </div>
+
+                                <div className="group">
+                                    <label htmlFor="email" className="block text-[10px] uppercase tracking-[0.3em] text-neutral-400 mb-2 font-bold group-focus-within:text-black transition-colors">
+                                        Email Address
+                                    </label>
+                                    <input
+                                        type="email"
+                                        id="email"
+                                        required
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        className="w-full bg-transparent border-b border-neutral-200 text-black text-sm py-4 focus:outline-none focus:border-black transition-all rounded-none"
+                                        placeholder="STUDIO@CLIENT.COM"
+                                    />
+                                </div>
+
+                                <div className="group">
+                                    <label htmlFor="message" className="block text-[10px] uppercase tracking-[0.3em] text-neutral-400 mb-2 font-bold group-focus-within:text-black transition-colors">
+                                        Inquiry
+                                    </label>
+                                    <textarea
+                                        id="message"
+                                        required
+                                        rows={4}
+                                        value={formData.message}
+                                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                                        className="w-full bg-transparent border-b border-neutral-200 text-black text-sm py-4 focus:outline-none focus:border-black transition-all rounded-none resize-none"
+                                        placeholder="HOW CAN OUR ATELIER ASSIST YOU?"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={status === "submitting"}
+                                    className="w-full bg-black text-white py-5 text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-neutral-900 transition-all duration-500 rounded-none shadow-xl mt-4"
+                                >
+                                    {status === "submitting" ? "Sending..." : "Submit Inquiry"}
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center py-24 border-t border-neutral-100">
                     <div>
-                        <h2 className="text-xs font-semibold tracking-widest uppercase text-neutral-400 mb-4">Location</h2>
-                        <p className="text-neutral-900 leading-relaxed font-serif text-lg">
+                        <h4 className="text-[10px] uppercase tracking-[0.3em] font-bold text-black mb-4">Location</h4>
+                        <p className="text-sm font-serif text-neutral-500 leading-relaxed italic">
                             Accra Atelier<br />
-                            (By Appointment Only)<br />
                             Ghana
                         </p>
                     </div>
-
                     <div>
-                        <h2 className="text-xs font-semibold tracking-widest uppercase text-neutral-400 mb-4">Inquiries</h2>
-                        <a href="mailto:studio@badu.com" className="text-neutral-900 hover:text-neutral-500 transition-colors font-serif text-lg block mb-2">
-                            studio@badu.com
-                        </a>
-                        <a href="tel:+233201234567" className="text-neutral-900 hover:text-neutral-500 transition-colors font-serif text-lg">
-                            +233 20 123 4567
-                        </a>
+                        <h4 className="text-[10px] uppercase tracking-[0.3em] font-bold text-black mb-4">Studio</h4>
+                        <p className="text-sm font-serif text-neutral-500 leading-relaxed italic">
+                            concierge@misstokyo.shop<br />
+                            By Appointment Only
+                        </p>
+                    </div>
+                    <div>
+                        <h4 className="text-[10px] uppercase tracking-[0.3em] font-bold text-black mb-4">Press</h4>
+                        <p className="text-sm font-serif text-neutral-500 leading-relaxed italic">
+                            archive@misstokyo.shop
+                        </p>
                     </div>
                 </div>
-            </div>
-
-            {/* Form Side */}
-            <div className="w-full md:w-2/3 flex flex-col justify-center">
-                {status === "success" ? (
-                    <div className="bg-white p-12 text-center border border-neutral-100">
-                        <h3 className="font-serif text-2xl tracking-widest uppercase mb-4">Message Received</h3>
-                        <p className="text-neutral-600">We will review your inquiry and respond shortly.</p>
-                        <button
-                            onClick={() => setStatus("idle")}
-                            className="mt-8 text-xs uppercase tracking-widest font-semibold border-b border-black pb-1 hover:text-neutral-500 transition-colors"
-                        >
-                            Send another message
-                        </button>
-                    </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className="space-y-8 max-w-xl">
-                        {status === "error" && (
-                            <div className="p-4 bg-red-50 text-red-900 text-sm">
-                                There was an issue submitting your message. Please try again or email us directly.
-                            </div>
-                        )}
-
-                        <div>
-                            <label htmlFor="name" className="block text-xs uppercase tracking-widest font-semibold text-neutral-400 mb-2">Full Name</label>
-                            <input
-                                type="text"
-                                id="name"
-                                required
-                                disabled={status === "submitting"}
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full border-b border-neutral-300 py-3 bg-transparent text-neutral-900 focus:outline-none focus:border-black transition-colors disabled:opacity-50"
-                                placeholder="Your name"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="email" className="block text-xs uppercase tracking-widest font-semibold text-neutral-400 mb-2">Email Address</label>
-                            <input
-                                type="email"
-                                id="email"
-                                required
-                                disabled={status === "submitting"}
-                                value={formData.email}
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                className="w-full border-b border-neutral-300 py-3 bg-transparent text-neutral-900 focus:outline-none focus:border-black transition-colors disabled:opacity-50"
-                                placeholder="your@email.com"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="message" className="block text-xs uppercase tracking-widest font-semibold text-neutral-400 mb-2">Message</label>
-                            <textarea
-                                id="message"
-                                required
-                                disabled={status === "submitting"}
-                                rows={4}
-                                value={formData.message}
-                                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                                className="w-full border-b border-neutral-300 py-3 bg-transparent text-neutral-900 focus:outline-none focus:border-black transition-colors resize-none disabled:opacity-50"
-                                placeholder="How can we help you?"
-                            />
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={status === "submitting"}
-                            className="w-full bg-black text-white px-8 py-4 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {status === "submitting" ? "Sending..." : "Send Message"}
-                        </button>
-                    </form>
-                )}
             </div>
         </div>
     );

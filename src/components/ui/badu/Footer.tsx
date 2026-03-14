@@ -81,6 +81,7 @@ export function Footer() {
                     <ul className="space-y-4 text-[11px] uppercase tracking-[0.2em] text-neutral-400">
                         <li><Link href="/faq" className="hover:text-white transition-colors">Information</Link></li>
                         <li><Link href="/shipping" className="hover:text-white transition-colors">Logistics</Link></li>
+                        <li><Link href="/about" className="hover:text-white transition-colors">Story</Link></li>
                         <li><Link href="/contact" className="hover:text-white transition-colors">Concierge</Link></li>
                     </ul>
                 </div>
