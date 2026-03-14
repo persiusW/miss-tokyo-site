@@ -6,6 +6,7 @@ interface ShopCatalogProps {
     subtitle?: string;
     defaultCategorySlug?: string;
     isSaleOnly?: boolean;
+    searchQuery?: string;
     defaultSort?: "newest" | string;
 }
 
@@ -16,6 +17,7 @@ export default async function ShopCatalog({
     subtitle = "Enduring Quality. Quiet Aesthetics.",
     defaultCategorySlug,
     isSaleOnly = false,
+    searchQuery,
     defaultSort
 }: ShopCatalogProps) {
     
@@ -28,6 +30,10 @@ export default async function ShopCatalog({
 
     if (defaultCategorySlug) {
         productsQuery = productsQuery.eq("category_type", defaultCategorySlug);
+    }
+
+    if (searchQuery) {
+        productsQuery = productsQuery.ilike("name", `%${searchQuery}%`);
     }
 
     // Apply sorting

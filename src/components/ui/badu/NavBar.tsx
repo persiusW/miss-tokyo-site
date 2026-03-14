@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { X, Search } from "lucide-react";
 import { CartButton } from "./CartButton";
 
@@ -19,7 +20,10 @@ const NAV_LINKS = [
 
 export function NavBar() {
     const [menuOpen, setMenuOpen] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
     const pathname = usePathname();
+    const router = useRouter();
 
     // Prevent body scroll when menu is open
     useEffect(() => {
@@ -31,6 +35,15 @@ export function NavBar() {
         return () => { document.body.style.overflow = ""; };
     }, [menuOpen]);
 
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+            setSearchOpen(false);
+            setSearchQuery("");
+        }
+    };
+
     return (
         <>
             <header className="h-20 w-full flex items-center justify-between px-6 md:px-12 bg-black text-white sticky top-0 z-50 rounded-none border-b border-gray-900 shadow-sm">
@@ -38,24 +51,37 @@ export function NavBar() {
                     MISS TOKYO
                 </Link>
 
-                <nav className="space-x-4 lg:space-x-8 text-[10px] md:text-xs tracking-[0.2em] font-medium uppercase hidden xl:block">
-                    {NAV_LINKS.map(l => {
-                        const isActive = pathname === l.href;
-                        return (
-                            <Link 
-                                key={l.href} 
-                                href={l.href} 
-                                className={`transition-colors hover:text-neutral-400 pb-1 ${
-                                    isActive 
-                                    ? "underline underline-offset-8 decoration-1" 
-                                    : "border-b border-transparent hover:border-white"
-                                }`}
-                            >
-                                {l.label}
-                            </Link>
-                        );
-                    })}
-                </nav>
+                {!searchOpen ? (
+                    <nav className="space-x-4 lg:space-x-8 text-[10px] md:text-xs tracking-[0.2em] font-medium uppercase hidden xl:block">
+                        {NAV_LINKS.map(l => {
+                            const isActive = pathname === l.href;
+                            return (
+                                <Link 
+                                    key={l.href} 
+                                    href={l.href} 
+                                    className={`transition-colors hover:text-neutral-400 pb-1 ${
+                                        isActive 
+                                        ? "underline underline-offset-8 decoration-1" 
+                                        : "border-b border-transparent hover:border-white"
+                                    }`}
+                                >
+                                    {l.label}
+                                </Link>
+                            );
+                        })}
+                    </nav>
+                ) : (
+                    <form onSubmit={handleSearch} className="flex-1 max-w-md mx-4 md:mx-8 animate-in fade-in slide-in-from-right-4">
+                        <input
+                            autoFocus
+                            type="text"
+                            placeholder="SEARCH ARCHIVE..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-transparent border-b border-white py-1 text-[10px] tracking-[0.3em] uppercase outline-none focus:border-neutral-400 transition-colors rounded-none"
+                        />
+                    </form>
+                )}
 
                 <div className="flex items-center gap-6">
                     <div className="hidden md:flex items-center gap-6 text-[11px] uppercase tracking-[0.2em] font-medium mr-4">
@@ -64,8 +90,12 @@ export function NavBar() {
                         </Link>
                     </div>
                     
-                    <button className="hover:text-neutral-400 transition-colors" aria-label="Search">
-                        <Search size={20} strokeWidth={1.5} />
+                    <button 
+                        onClick={() => setSearchOpen(!searchOpen)}
+                        className="hover:text-neutral-400 transition-colors" 
+                        aria-label="Toggle Search"
+                    >
+                        {searchOpen ? <X size={20} strokeWidth={1.5} /> : <Search size={20} strokeWidth={1.5} />}
                     </button>
                     
                     <CartButton />
