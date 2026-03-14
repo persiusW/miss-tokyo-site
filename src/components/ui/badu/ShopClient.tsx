@@ -56,11 +56,23 @@ interface ShopClientProps {
     products: Product[];
     categories: Category[];
     gridCols?: 2 | 3 | 4;
+    defaultCategory?: string | null;
+    defaultColor?: string | null;
+    defaultSize?: string | null;
+    defaultSort?: string;
 }
 
 const ITEMS_PER_PAGE = 8;
 
-export function ShopClient({ products, categories, gridCols = 4 }: ShopClientProps) {
+export function ShopClient({ 
+    products, 
+    categories, 
+    gridCols = 4,
+    defaultCategory = null,
+    defaultColor = null,
+    defaultSize = null,
+    defaultSort: initialSort = "newest"
+}: ShopClientProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -68,12 +80,12 @@ export function ShopClient({ products, categories, gridCols = 4 }: ShopClientPro
     const [quickViewSlug, setQuickViewSlug] = useState<string | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    // Filter states from URL
-    const activeCategory = searchParams.get("category") || null;
-    const activeSort = searchParams.get("sort") || "newest";
+    // Filter states from URL with prop fallbacks
+    const activeCategory = searchParams.get("category") || defaultCategory;
+    const activeSort = searchParams.get("sort") || initialSort;
     const activePage = parseInt(searchParams.get("page") || "1");
-    const activeColor = searchParams.get("color") || null;
-    const activeSize = searchParams.get("size") || null;
+    const activeColor = searchParams.get("color") || defaultColor;
+    const activeSize = searchParams.get("size") || defaultSize;
 
     // Helper to update URL
     const updateParams = (newParams: Record<string, string | null>) => {

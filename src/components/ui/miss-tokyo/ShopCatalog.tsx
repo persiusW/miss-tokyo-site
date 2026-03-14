@@ -76,6 +76,8 @@ export default async function ShopCatalog({
                     image_url: c.image_url || null,
                 }))}
                 gridCols={shopGridCols}
+                defaultCategory={defaultCategorySlug}
+                defaultSort={defaultSort}
             />
         </div>
     );
