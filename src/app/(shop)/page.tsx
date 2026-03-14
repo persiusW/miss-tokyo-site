@@ -1,6 +1,8 @@
 import { Hero } from "@/components/ui/badu/Hero";
 import { HomepageGrid } from "@/components/ui/badu/HomepageGrid";
 import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import Image from "next/image";
 
 export const revalidate = 60; // Revalidate every minute
 
@@ -54,46 +56,86 @@ export default async function HomePage() {
                 ctaLink="/shop"
             />
 
-            <section className="py-24 md:py-32 px-6 max-w-4xl mx-auto text-center">
-                <h2 className="text-xs uppercase tracking-widest font-semibold mb-8 text-neutral-400">
-                    {copy['philosophy_eyebrow'] || "The Philosophy"}
-                </h2>
-                <p className="font-serif text-2xl md:text-4xl leading-relaxed text-neutral-900">
-                    {copy['philosophy_body'] || "We strip away the non-essential to reveal the true character of our materials. Every piece is a testament to the art of restraint."}
-                </p>
+            {/* Shop By Category Section */}
+            <section className="py-24 bg-white px-6 md:px-12 rounded-none">
+                <div className="max-w-7xl mx-auto text-center mb-16">
+                    <h2 className="text-3xl md:text-4xl font-serif text-center uppercase tracking-widest text-black mb-4">
+                        Shop By Category
+                    </h2>
+                    <p className="text-center text-sm text-gray-500 uppercase tracking-widest mb-12">
+                        Explore our curated collections
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        {[
+                            { name: "Sale", href: "/sale", img: "https://wcygtmcnysbhzgcicocm.supabase.co/storage/v1/object/public/site_assets/categories/sale.jpg" },
+                            { name: "New Arrivals", href: "/new-arrivals", img: "https://wcygtmcnysbhzgcicocm.supabase.co/storage/v1/object/public/site_assets/categories/new-arrivals.jpg" },
+                            { name: "Dresses", href: "/dresses", img: "https://wcygtmcnysbhzgcicocm.supabase.co/storage/v1/object/public/site_assets/categories/dresses.jpg" }
+                        ].map((cat) => (
+                            <Link key={cat.name} href={cat.href} className="group relative aspect-[4/5] overflow-hidden">
+                                <Image 
+                                    src={cat.img} 
+                                    alt={cat.name} 
+                                    fill 
+                                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="bg-white text-black px-8 py-3 text-sm uppercase tracking-widest shadow-md">
+                                        {cat.name}
+                                    </span>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
             </section>
 
-            <section className="py-24 bg-white px-6 md:px-12">
+            <section className="py-24 bg-white px-6 md:px-12 rounded-none border-t border-neutral-100">
                 <div className="max-w-7xl mx-auto">
-                    <div className="flex justify-between items-end mb-16">
-                        <h2 className="font-serif text-4xl tracking-widest uppercase">The Collection</h2>
-                        <a href="/shop" className="text-xs uppercase tracking-widest font-semibold hover:text-neutral-500 transition-colors border-b border-black pb-1">
-                            View All
-                        </a>
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl md:text-4xl font-serif uppercase tracking-[0.25em] text-black mb-4">
+                            Latest Arrivals
+                        </h2>
+                        <p className="text-sm text-gray-500 uppercase tracking-widest mb-12">
+                            The newest pieces from the archive
+                        </p>
                     </div>
 
                     {formattedProducts.length > 0 ? (
-                        <HomepageGrid products={formattedProducts} gridCols={homeGridCols} />
+                        <div className="space-y-12">
+                            <HomepageGrid products={formattedProducts} gridCols={homeGridCols} />
+                            <div className="flex justify-center mt-16">
+                                <Link 
+                                    href="/shop" 
+                                    className="text-[10px] uppercase tracking-[0.3em] font-bold border-b border-black pb-2 hover:text-neutral-500 transition-colors"
+                                >
+                                    Explore All Arrivals
+                                </Link>
+                            </div>
+                        </div>
                     ) : (
-                        <div className="text-center py-12 text-neutral-500 tracking-widest uppercase text-sm">
-                            Collection is currently being updated.
+                        <div className="text-center py-12 text-neutral-500 tracking-[0.2em] uppercase text-[10px]">
+                            Archive is currently being updated.
                         </div>
                     )}
                 </div>
             </section>
 
-            <section className="py-32 px-6 flex flex-col items-center justify-center text-center">
-                <h2 className="font-serif text-5xl md:text-7xl tracking-widest uppercase mb-8">
-                    {(copy['handmade_title'] || "Handmade in Ghana").split("\n").map((line: string, i: number, arr: string[]) => (
+            <section className="py-32 px-6 flex flex-col items-center justify-center text-center bg-neutral-50 rounded-none">
+                <h2 className="font-serif text-5xl md:text-7xl lg:text-8xl tracking-[0.1em] uppercase mb-10 text-black">
+                    {(copy['handmade_title'] || "Atelier Ghana").split("\n").map((line: string, i: number, arr: string[]) => (
                         <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
                     ))}
                 </h2>
-                <p className="max-w-xl text-neutral-600 leading-relaxed mb-12">
+                <p className="max-w-xl text-neutral-500 tracking-wide leading-relaxed mb-16 text-sm">
                     {copy['handmade_body'] || "Crafted by artisans who have honed their skills over generations. We source the finest local leather to create footwear that only gets better with time."}
                 </p>
-                <a href="/craft" className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors">
-                    {copy['handmade_cta_text'] || "Discover The Craft"}
-                </a>
+                <Link 
+                    href="/craft" 
+                    className="inline-block bg-black text-white px-12 py-5 text-[10px] font-bold uppercase tracking-[0.3em] border border-black hover:bg-white hover:text-black transition-all duration-500 rounded-none shadow-xl"
+                >
+                    {copy['handmade_cta_text'] || "The Process"}
+                </Link>
             </section>
         </>
     );

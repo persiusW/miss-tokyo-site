@@ -23,16 +23,19 @@ export function Hero({ title, subtitle, imageUrl, ctaText, ctaLink }: HeroProps)
             </div>
 
             <div className="relative z-10 text-center text-white px-6">
-                <h1 className="font-serif text-4xl sm:text-5xl md:text-7xl lg:text-8xl tracking-widest uppercase mb-6 drop-shadow-sm">
+                <h1 className="font-serif text-4xl md:text-6xl tracking-wider uppercase mb-6 drop-shadow-md">
                     {title}
                 </h1>
                 {subtitle && (
-                    <p className="text-sm md:text-base tracking-[0.2em] uppercase max-w-2xl mx-auto drop-shadow-sm mb-8">
+                    <p className="text-sm md:text-base text-white/90 font-light tracking-wide max-w-2xl mx-auto drop-shadow-sm mb-12">
                         {subtitle}
                     </p>
                 )}
                 {ctaText && ctaLink && (
-                    <a href={ctaLink} className="inline-block px-8 py-4 border border-white text-white text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-colors">
+                    <a 
+                        href={ctaLink} 
+                        className="inline-block bg-white text-black px-10 py-4 text-xs font-bold uppercase tracking-[0.2em] border border-white hover:bg-black hover:text-white transition-colors duration-300 rounded-none shadow-lg"
+                    >
                         {ctaText}
                     </a>
                 )}

@@ -8,15 +8,15 @@ export default async function DashboardOverviewPage() {
     const [
         stats,
         recentActivity,
-        { count: totalCustomRequests },
-        { data: productRows },
-        { data: orderStatuses },
-        { data: lowStockProducts },
+        customRequestsRes,
+        productRowsRes,
+        orderStatusesRes,
+        lowStockProductsRes,
     ] = await Promise.all([
         fetchOrderStats(),
         fetchRecentActivity(5),
         supabase.from("custom_requests").select("*", { count: "exact", head: true }),
-        supabase.from("products").select("category_type").eq("is_active", true),
+        supabase.from("products").select("id").eq("is_active", true),
         supabase.from("orders").select("status"),
         supabase.from("products")
             .select("id, name, inventory_count")
@@ -25,17 +25,29 @@ export default async function DashboardOverviewPage() {
             .order("inventory_count"),
     ]);
 
-    if (!orderStatuses) {
-        console.error("[OverviewPage] Failed to load order statuses");
+    const { count: totalCustomRequests, error: customRequestsError } = customRequestsRes;
+    const { data: productRows, error: productRowsError } = productRowsRes;
+    const { data: orderStatuses, error: orderStatusesError } = orderStatusesRes;
+    const { data: lowStockProducts, error: lowStockProductsError } = lowStockProductsRes;
+
+    if (customRequestsError) {
+        console.error("Supabase Fetch Error (custom_requests):", customRequestsError.message, customRequestsError.details, customRequestsError.hint);
     }
-    if (!productRows) {
+    if (orderStatusesError) {
+        console.error("Supabase Fetch Error (orders):", orderStatusesError.message, orderStatusesError.details, orderStatusesError.hint);
+    }
+    if (productRowsError) {
+        console.error("Supabase Fetch Error (productRows):", productRowsError.message, productRowsError.details, productRowsError.hint);
         console.error("[OverviewPage] Failed to load product rows");
+    }
+    if (lowStockProductsError) {
+        console.error("Supabase Fetch Error (lowStockProducts):", lowStockProductsError.message, lowStockProductsError.details, lowStockProductsError.hint);
     }
 
     // Products by category (catalog distribution, not revenue)
     const categoryMap: Record<string, number> = {};
     for (const p of (productRows ?? [])) {
-        const key = p.category_type || "Uncategorised";
+        const key = (p as any).category_type || "Uncategorised";
         categoryMap[key] = (categoryMap[key] ?? 0) + 1;
     }
     const totalProducts = productRows?.length ?? 0;

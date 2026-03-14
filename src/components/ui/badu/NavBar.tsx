@@ -2,20 +2,24 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { X, Search } from "lucide-react";
 import { CartButton } from "./CartButton";
 
 const NAV_LINKS = [
+    { href: "/",            label: "Home" },
     { href: "/shop",        label: "Shop" },
-    { href: "/gallery",     label: "Gallery" },
-    { href: "/whitelabel",  label: "White Labelling" },
-    { href: "/craft",       label: "Craft" },
+    { href: "/sale",        label: "Sale" },
+    { href: "/dresses",     label: "Dresses" },
+    { href: "/new-arrivals",label: "New Arrivals" },
+    { href: "/gift-card",   label: "Gift Card" },
     { href: "/contact",     label: "Contact" },
-    { href: "/faq",         label: "FAQ" },
+    { href: "/about",       label: "About" },
 ];
 
 export function NavBar() {
     const [menuOpen, setMenuOpen] = useState(false);
+    const pathname = usePathname();
 
     // Prevent body scroll when menu is open
     useEffect(() => {
@@ -29,62 +33,85 @@ export function NavBar() {
 
     return (
         <>
-            <header className="h-16 w-full flex items-center justify-between px-6 md:px-12 bg-white border-b border-neutral-200 sticky top-0 z-50">
-                <Link href="/" className="font-serif text-2xl tracking-widest uppercase">
-                    BADU
+            <header className="h-20 w-full flex items-center justify-between px-6 md:px-12 bg-black text-white sticky top-0 z-50 rounded-none border-b border-gray-900 shadow-sm">
+                <Link href="/" className="font-serif text-2xl md:text-3xl tracking-[0.15em] uppercase hover:opacity-80 transition-opacity">
+                    MISS TOKYO
                 </Link>
 
-                <nav className="space-x-8 text-sm tracking-widest uppercase hidden md:block">
-                    {NAV_LINKS.map(l => (
-                        <Link key={l.href} href={l.href} className="hover:text-neutral-500 transition-colors">
-                            {l.label}
-                        </Link>
-                    ))}
+                <nav className="space-x-4 lg:space-x-8 text-[10px] md:text-xs tracking-[0.2em] font-medium uppercase hidden xl:block">
+                    {NAV_LINKS.map(l => {
+                        const isActive = pathname === l.href;
+                        return (
+                            <Link 
+                                key={l.href} 
+                                href={l.href} 
+                                className={`transition-colors hover:text-neutral-400 pb-1 ${
+                                    isActive 
+                                    ? "underline underline-offset-8 decoration-1" 
+                                    : "border-b border-transparent hover:border-white"
+                                }`}
+                            >
+                                {l.label}
+                            </Link>
+                        );
+                    })}
                 </nav>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-6">
+                    <div className="hidden md:flex items-center gap-6 text-[11px] uppercase tracking-[0.2em] font-medium mr-4">
+                        <Link href="/login" className="flex items-center gap-2 hover:text-neutral-400">
+                             Log In
+                        </Link>
+                    </div>
+                    
+                    <button className="hover:text-neutral-400 transition-colors" aria-label="Search">
+                        <Search size={20} strokeWidth={1.5} />
+                    </button>
+                    
                     <CartButton />
-                    {/* Hamburger — mobile only */}
+
                     <button
                         onClick={() => setMenuOpen(true)}
                         aria-label="Open navigation menu"
-                        className="md:hidden flex flex-col justify-center items-end gap-[5px] w-10 h-10 -mr-2"
+                        className="xl:hidden flex flex-col justify-center items-end gap-[6px] w-8 h-8 rounded-none"
                     >
-                        <span className="block w-6 h-px bg-current transition-all" />
-                        <span className="block w-4 h-px bg-current transition-all" />
+                        <span className="block w-6 h-[1px] bg-white transition-all" />
+                        <span className="block w-4 h-[1px] bg-white transition-all" />
                     </button>
                 </div>
             </header>
 
             {/* Full-screen mobile overlay */}
             {menuOpen && (
-                <div className="fixed inset-0 z-[100] bg-white flex flex-col md:hidden">
+                <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col xl:hidden animate-in fade-in duration-500">
                     {/* Top bar */}
-                    <div className="flex items-center justify-between px-6 h-16 flex-shrink-0">
+                    <div className="flex items-center justify-between px-6 h-20 flex-shrink-0 border-b border-gray-900">
                         <Link
                             href="/"
                             onClick={() => setMenuOpen(false)}
-                            className="font-serif text-2xl tracking-widest uppercase"
+                            className="font-serif text-2xl tracking-[0.15em] uppercase"
                         >
-                            BADU
+                            MISS TOKYO
                         </Link>
                         <button
                             onClick={() => setMenuOpen(false)}
                             aria-label="Close navigation menu"
-                            className="flex items-center justify-center w-10 h-10 -mr-2"
+                            className="flex items-center justify-center w-10 h-10 -mr-2 rounded-none"
                         >
-                            <X size={22} />
+                            <X size={24} className="stroke-[1.5px]" />
                         </button>
                     </div>
 
                     {/* Links */}
-                    <nav className="flex-1 flex flex-col items-center justify-center gap-8 pb-16 px-6">
+                    <nav className="flex-1 flex flex-col items-center justify-center gap-6 pb-16 px-6 overflow-y-auto">
                         {NAV_LINKS.map(l => (
                             <Link
                                 key={l.href}
                                 href={l.href}
                                 onClick={() => setMenuOpen(false)}
-                                className="font-serif text-4xl sm:text-5xl tracking-widest uppercase text-neutral-900 hover:text-neutral-400 transition-colors"
+                                className={`font-serif text-3xl sm:text-4xl tracking-[0.1em] uppercase hover:text-neutral-400 transition-colors py-2 ${
+                                    pathname === l.href ? "text-white" : "text-neutral-500"
+                                }`}
                             >
                                 {l.label}
                             </Link>

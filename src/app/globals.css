@@ -6,6 +6,7 @@
   --color-foreground: #171717;
   --font-sans: var(--font-geist-sans);
   --font-serif: var(--font-playfair-display);
+  --font-cinzel: var(--font-cinzel);
 }
 
 body {

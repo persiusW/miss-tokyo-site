@@ -15,9 +15,9 @@ export function CartButton() {
     return (
         <button
             onClick={() => setIsOpen(true)}
-            className="tracking-widest uppercase text-sm hover:text-neutral-500 transition-colors"
+            className="text-[10px] md:text-xs tracking-[0.3em] uppercase hover:text-neutral-400 transition-colors rounded-none outline-none"
         >
-            Cart {mounted && totalItems > 0 && `(${totalItems})`}
+            Bag {mounted && totalItems > 0 && `[${totalItems}]`}
         </button>
     );
 }
