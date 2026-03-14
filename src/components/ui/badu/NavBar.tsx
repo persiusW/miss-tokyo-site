@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { X, Search } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { CartButton } from "./CartButton";
 
 const NAV_LINKS = [
@@ -18,6 +18,8 @@ const NAV_LINKS = [
     { href: "/about",       label: "ABOUT" },
 ];
 
+const TRENDING_SEARCHES = ["DRESSES", "NEW ARRIVALS", "SALE", "BLACK"];
+
 export function NavBar() {
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -25,20 +27,19 @@ export function NavBar() {
     const pathname = usePathname();
     const router = useRouter();
 
-    // Prevent body scroll when menu is open
+    // Prevent body scroll when menu or search is open
     useEffect(() => {
-        if (menuOpen) {
+        if (menuOpen || searchOpen) {
             document.body.style.overflow = "hidden";
         } else {
             document.body.style.overflow = "";
         }
         return () => { document.body.style.overflow = ""; };
-    }, [menuOpen]);
+    }, [menuOpen, searchOpen]);
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (searchQuery.trim()) {
-            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    const handleSearch = (query: string) => {
+        if (query.trim()) {
+            router.push(`/search?q=${encodeURIComponent(query.trim())}`);
             setSearchOpen(false);
             setSearchQuery("");
         }
@@ -51,37 +52,24 @@ export function NavBar() {
                     MISS TOKYO
                 </Link>
 
-                {!searchOpen ? (
-                    <nav className="space-x-4 lg:space-x-8 text-[10px] md:text-xs tracking-[0.2em] font-medium uppercase hidden xl:block">
-                        {NAV_LINKS.map(l => {
-                            const isActive = pathname === l.href;
-                            return (
-                                <Link 
-                                    key={l.href} 
-                                    href={l.href} 
-                                    className={`transition-colors hover:text-neutral-400 pb-1 ${
-                                        isActive 
-                                        ? "underline underline-offset-8 decoration-1" 
-                                        : "border-b border-transparent hover:border-white"
-                                    }`}
-                                >
-                                    {l.label}
-                                </Link>
-                            );
-                        })}
-                    </nav>
-                ) : (
-                    <form onSubmit={handleSearch} className="flex-1 max-w-md mx-4 md:mx-8 animate-in fade-in slide-in-from-right-4">
-                        <input
-                            autoFocus
-                            type="text"
-                            placeholder="SEARCH ARCHIVE..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-transparent border-b border-white py-1 text-[10px] tracking-[0.3em] uppercase outline-none focus:border-neutral-400 transition-colors rounded-none"
-                        />
-                    </form>
-                )}
+                <nav className="space-x-4 lg:space-x-8 text-[10px] md:text-xs tracking-[0.2em] font-medium uppercase hidden xl:block">
+                    {NAV_LINKS.map(l => {
+                        const isActive = pathname === l.href;
+                        return (
+                            <Link 
+                                key={l.href} 
+                                href={l.href} 
+                                className={`transition-colors hover:text-neutral-400 pb-1 ${
+                                    isActive 
+                                    ? "underline underline-offset-8 decoration-1" 
+                                    : "border-b border-transparent hover:border-white"
+                                }`}
+                            >
+                                {l.label}
+                            </Link>
+                        );
+                    })}
+                </nav>
 
                 <div className="flex items-center gap-6">
                     <div className="hidden md:flex items-center gap-6 text-[11px] uppercase tracking-[0.2em] font-medium mr-4">
@@ -91,11 +79,11 @@ export function NavBar() {
                     </div>
                     
                     <button 
-                        onClick={() => setSearchOpen(!searchOpen)}
+                        onClick={() => setSearchOpen(true)}
                         className="hover:text-neutral-400 transition-colors" 
                         aria-label="Toggle Search"
                     >
-                        {searchOpen ? <X size={20} strokeWidth={1.5} /> : <Search size={20} strokeWidth={1.5} />}
+                        <Search size={20} strokeWidth={1.5} />
                     </button>
                     
                     <CartButton />
@@ -110,6 +98,59 @@ export function NavBar() {
                     </button>
                 </div>
             </header>
+
+            {/* Premium Full-Screen Search Modal */}
+            <AnimatePresence>
+                {searchOpen && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] bg-white text-black flex flex-col justify-center items-center px-6"
+                    >
+                        <button 
+                            onClick={() => setSearchOpen(false)}
+                            className="absolute top-6 right-6 md:top-12 md:right-12 hover:rotate-90 transition-transform duration-500"
+                            aria-label="Close Search"
+                        >
+                            <X size={32} strokeWidth={1} />
+                        </button>
+
+                        <div className="w-full max-w-4xl animate-in fade-in slide-in-from-bottom-8 duration-700">
+                            <form 
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    handleSearch(searchQuery);
+                                }}
+                            >
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    placeholder="SEARCH ARCHIVE..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-transparent border-b-2 border-black text-2xl md:text-5xl uppercase tracking-[0.1em] md:tracking-[0.2em] text-center py-6 focus:outline-none rounded-none placeholder:text-neutral-200 mt-[-10vh]"
+                                />
+                            </form>
+
+                            <div className="mt-12 text-center">
+                                <h3 className="text-[10px] uppercase tracking-[0.4em] text-neutral-400 font-bold mb-6">Trending Searches</h3>
+                                <div className="flex flex-wrap justify-center gap-x-8 gap-y-4">
+                                    {TRENDING_SEARCHES.map(term => (
+                                        <button
+                                            key={term}
+                                            onClick={() => handleSearch(term)}
+                                            className="text-[11px] md:text-xs uppercase tracking-[0.3em] font-medium hover:text-neutral-400 transition-colors border-b border-transparent hover:border-neutral-400 pb-1"
+                                        >
+                                            {term}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Full-screen mobile overlay */}
             {menuOpen && (
