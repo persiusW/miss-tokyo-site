@@ -4,7 +4,33 @@ import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { AnimatedProductGrid } from "@/components/ui/badu/AnimatedProductGrid";
 import { QuickViewModal } from "@/components/ui/badu/QuickViewModal";
-import { ChevronDown, ChevronRight, X, Filter } from "lucide-react";
+import { ChevronDown, ChevronRight, X, Filter, Plus, Minus } from "lucide-react";
+
+interface FilterSectionProps {
+    title: string;
+    children: React.ReactNode;
+    defaultOpen?: boolean;
+}
+
+function FilterSection({ title, children, defaultOpen = false }: FilterSectionProps) {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+    return (
+        <div className="border-b border-neutral-100 last:border-0 overflow-hidden">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between py-5 group"
+            >
+                <span className="text-[11px] font-serif tracking-[0.3em] uppercase transition-colors group-hover:text-neutral-500">
+                    {title}
+                </span>
+                {isOpen ? <Minus size={14} className="text-neutral-300" /> : <Plus size={14} className="text-neutral-300" />}
+            </button>
+            <div className={`transition-all duration-500 ease-in-out ${isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
+                {children}
+            </div>
+        </div>
+    );
+}
 
 interface Category {
     id: string;
@@ -121,73 +147,106 @@ export function ShopClient({ products, categories, gridCols = 4 }: ShopClientPro
                         <button onClick={() => setSidebarOpen(false)}><X size={24} /></button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto hide-scrollbar space-y-10">
-                        {/* Categories */}
-                        <div>
-                            <h3 className="text-xs font-bold uppercase tracking-[0.2em] mb-4">Category</h3>
-                            <div className="flex flex-col gap-2">
-                                <button
-                                    onClick={() => updateParams({ category: null })}
-                                    className={`text-[11px] uppercase tracking-widest text-left transition-colors ${!activeCategory ? "text-black font-bold" : "text-neutral-400 hover:text-black"}`}
-                                >
-                                    All Collections
-                                </button>
-                                {categories.map(cat => (
+                    <div className="flex-1 overflow-y-auto hide-scrollbar">
+                        <h2 className="text-sm font-serif tracking-[0.3em] uppercase mb-8 pb-4 border-b border-neutral-100 hidden lg:block">Filter By</h2>
+                        
+                        <div className="space-y-0 border-t border-neutral-100 lg:border-t-0">
+                            {/* Categories */}
+                            <FilterSection title="Category" defaultOpen={true}>
+                                <div className="flex flex-col gap-3 py-4">
                                     <button
-                                        key={cat.id}
-                                        onClick={() => updateParams({ category: cat.slug })}
-                                        className={`text-[11px] uppercase tracking-widest text-left transition-colors ${activeCategory === cat.slug ? "text-black font-bold underline underline-offset-4" : "text-neutral-400 hover:text-black"}`}
+                                        onClick={() => updateParams({ category: null })}
+                                        className={`text-[10px] uppercase tracking-[0.2em] text-left transition-all ${!activeCategory ? "text-black font-black translate-x-1" : "text-neutral-400 hover:text-black"}`}
                                     >
-                                        {cat.name}
+                                        All Collections
                                     </button>
-                                ))}
-                            </div>
+                                    {categories.map(cat => (
+                                        <button
+                                            key={cat.id}
+                                            onClick={() => updateParams({ category: cat.slug })}
+                                            className={`text-[10px] uppercase tracking-[0.2em] text-left transition-all ${activeCategory === cat.slug ? "text-black font-black translate-x-1" : "text-neutral-400 hover:text-black"}`}
+                                        >
+                                            {cat.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </FilterSection>
+
+                            {/* Price (Placeholder/Structure) */}
+                            <FilterSection title="Price">
+                                <div className="py-6">
+                                    <div className="flex flex-col gap-3">
+                                        {["Under 100 GHS", "100 - 500 GHS", "500 - 1000 GHS", "Over 1000 GHS"].map(range => (
+                                            <button key={range} className="text-[10px] uppercase tracking-[0.2em] text-left text-neutral-400 hover:text-black transition-colors">
+                                                {range}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </FilterSection>
+
+                            {/* Colors */}
+                            {allColors.length > 0 && (
+                                <FilterSection title="Color">
+                                    <div className="flex flex-col gap-3 py-6">
+                                        {allColors.map(color => {
+                                            const isActive = activeColor === color;
+                                            // Handle basic color mapping for swatches
+                                            const swatchColor = color.toLowerCase();
+                                            
+                                            return (
+                                                <button
+                                                    key={color}
+                                                    onClick={() => updateParams({ color: isActive ? null : color })}
+                                                    className="flex items-center gap-3 group text-left"
+                                                >
+                                                    <span 
+                                                        className={`w-4 h-4 rounded-full border transition-all ${isActive ? "border-black scale-110" : "border-neutral-200 group-hover:border-black"}`}
+                                                        style={{ backgroundColor: swatchColor }}
+                                                    />
+                                                    <span className={`text-[10px] uppercase tracking-[0.2em] transition-colors ${isActive ? "text-black font-black" : "text-neutral-400 group-hover:text-black"}`}>
+                                                        {color}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </FilterSection>
+                            )}
+
+                            {/* Sizes */}
+                            {allSizes.length > 0 && (
+                                <FilterSection title="Size">
+                                    <div className="grid grid-cols-4 gap-1 py-6">
+                                        {allSizes.map(size => (
+                                            <button
+                                                key={size}
+                                                onClick={() => updateParams({ size: activeSize === size ? null : size })}
+                                                className={`h-11 text-[10px] flex items-center justify-center border transition-all font-bold ${activeSize === size ? "bg-black text-white border-black" : "bg-white text-neutral-400 border-neutral-100 hover:border-black"}`}
+                                            >
+                                                {size}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </FilterSection>
+                            )}
+
+                            {/* Choices (Placeholder/Structure) */}
+                            <FilterSection title="Choices">
+                                <div className="py-6">
+                                    <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-300 italic">No specific choices available</p>
+                                </div>
+                            </FilterSection>
                         </div>
-
-                        {/* Colors */}
-                        {allColors.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-bold uppercase tracking-[0.2em] mb-4">Color</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {allColors.map(color => (
-                                        <button
-                                            key={color}
-                                            onClick={() => updateParams({ color: activeColor === color ? null : color })}
-                                            className={`px-3 py-1.5 text-[10px] uppercase tracking-widest border transition-all ${activeColor === color ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black"}`}
-                                        >
-                                            {color}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Sizes */}
-                        {allSizes.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-bold uppercase tracking-[0.2em] mb-4">Size</h3>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {allSizes.map(size => (
-                                        <button
-                                            key={size}
-                                            onClick={() => updateParams({ size: activeSize === size ? null : size })}
-                                            className={`h-10 text-[10px] flex items-center justify-center border transition-all ${activeSize === size ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black"}`}
-                                        >
-                                            {size}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     {/* Clear All */}
                     {(activeCategory || activeColor || activeSize) && (
                         <button 
                             onClick={() => updateParams({ category: null, color: null, size: null })}
-                            className="mt-8 text-[10px] uppercase tracking-[0.2em] font-bold text-red-500 hover:text-red-700 text-left"
+                            className="mt-8 text-[9px] uppercase tracking-[0.3em] font-black text-red-500 hover:text-red-700 text-left border-b border-red-500/20 pb-1"
                         >
-                            Clear All Filters
+                            Clear Archive Filters
                         </button>
                     )}
                 </div>
@@ -201,18 +260,21 @@ export function ShopClient({ products, categories, gridCols = 4 }: ShopClientPro
                          {filteredAndSorted.length} results found
                     </div>
                     
-                    <div className="w-full md:w-auto flex items-center justify-end gap-3">
-                        <span className="text-[10px] uppercase tracking-widest text-neutral-400 mr-2">Sort by</span>
+                    <div className="w-full md:w-auto flex items-center justify-end">
                         <select 
                             value={activeSort}
                             onChange={(e) => updateParams({ sort: e.target.value })}
-                            className="bg-transparent text-[11px] uppercase tracking-widest font-bold border-b border-black py-1 pr-8 outline-none focus:ring-0 appearance-none cursor-pointer"
-                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 0 center" }}
+                            className="bg-transparent text-[10px] uppercase tracking-[0.2em] font-bold border border-neutral-200 px-6 py-4 pr-12 outline-none focus:ring-0 appearance-none cursor-pointer flex items-center justify-between min-w-[180px]"
+                            style={{ 
+                                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, 
+                                backgroundRepeat: "no-repeat", 
+                                backgroundPosition: "right 1.5rem center" 
+                            }}
                         >
-                            <option value="newest">Newest First</option>
-                            <option value="price-low">Price: Low to High</option>
-                            <option value="price-high">Price: High to Low</option>
-                            <option value="name-asc">Alphabetical</option>
+                            <option value="newest">Sort By: Newest</option>
+                            <option value="price-low">Sort By: Price Low-High</option>
+                            <option value="price-high">Sort By: Price High-Low</option>
+                            <option value="name-asc">Sort By: A-Z</option>
                         </select>
                     </div>
                 </div>

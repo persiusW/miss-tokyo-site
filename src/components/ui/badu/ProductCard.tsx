@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 
 interface ProductCardProps {
     slug: string;
@@ -32,18 +33,27 @@ export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, catego
                             className="object-cover object-center absolute inset-0 opacity-0 group-hover:opacity-100 group-hover:scale-[1.05] transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)]"
                         />
                     )}
+
+                    {/* Badge */}
+                    <div className="absolute top-4 left-4 z-10">
+                        <span className="bg-white text-black text-[8px] md:text-[9px] px-3 py-1.5 uppercase font-bold tracking-[0.2em] shadow-sm">
+                            New Arrivals
+                        </span>
+                    </div>
+
+                    {/* Hover overlay button */}
+                    {onQuickAdd && (
+                        <div className="absolute inset-x-0 bottom-8 flex justify-center items-center z-20 px-6">
+                            <button
+                                onClick={onQuickAdd}
+                                className="w-full bg-white text-black text-[10px] tracking-[0.2em] uppercase py-3.5 opacity-0 group-hover:opacity-100 transition-all duration-500 rounded-none border border-neutral-100 shadow-xl translate-y-4 group-hover:translate-y-0 flex items-center justify-center gap-2 font-bold"
+                            >
+                                <Plus size={14} strokeWidth={2.5} /> Add to Cart
+                            </button>
+                        </div>
+                    )}
                 </div>
             </Link>
-
-            {/* Hover overlay button */}
-            {onQuickAdd && (
-                <button
-                    onClick={onQuickAdd}
-                    className="absolute top-[calc(80%-48px)] left-0 w-full bg-black/90 text-white text-[10px] tracking-[0.2em] uppercase py-4 opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-none z-20 shadow-xl translate-y-4 group-hover:translate-y-0"
-                >
-                    Add to Cart
-                </button>
-            )}
 
             <Link href={`/shop/${slug}`} className="flex flex-col items-start text-left relative group/info mt-4">
                 <div className="flex w-full items-baseline justify-between gap-4">
