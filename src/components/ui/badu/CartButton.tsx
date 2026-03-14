@@ -2,6 +2,7 @@
 
 import { useCart } from "@/store/useCart";
 import { useEffect, useState } from "react";
+import { ShoppingBag } from "lucide-react";
 
 export function CartButton() {
     const { setIsOpen, items } = useCart();
@@ -15,9 +16,15 @@ export function CartButton() {
     return (
         <button
             onClick={() => setIsOpen(true)}
-            className="text-[10px] md:text-xs tracking-[0.3em] uppercase hover:text-neutral-400 transition-colors rounded-none outline-none"
+            className="group relative flex items-center justify-center hover:text-neutral-400 transition-colors rounded-none outline-none"
+            aria-label={`View shopping bag, ${totalItems} items`}
         >
-            Bag {mounted && totalItems > 0 && `[${totalItems}]`}
+            <ShoppingBag size={20} className="stroke-[1.5px]" />
+            {mounted && totalItems > 0 && (
+                <span className="absolute -top-1 -right-2 flex items-center justify-center min-w-[14px] h-[14px] bg-white text-black text-[8px] font-bold px-1 rounded-none border border-black shadow-sm">
+                    {totalItems}
+                </span>
+            )}
         </button>
     );
 }

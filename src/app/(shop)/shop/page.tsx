@@ -19,10 +19,14 @@ export default async function ShopPage() {
     const formattedProducts = (products || []).map((p, idx) => ({
         slug: p.slug || p.id,
         name: p.name,
+        priceNum: p.price_ghs,
         price: `${p.price_ghs} GHS`,
         imageUrl: p.image_urls?.[0] || FALLBACK_IMAGE,
         hoverImageUrl: p.image_urls?.[1],
         category: p.category_type || "",
+        colors: p.available_colors || [],
+        sizes: p.available_sizes || [],
+        createdAt: p.created_at,
     }));
 
     return (

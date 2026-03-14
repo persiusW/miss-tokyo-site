@@ -56,11 +56,11 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
     };
 
     return (
-        <div className="space-y-8 mb-12">
+        <div className="space-y-10 mb-12">
             {/* Color Selection */}
             <div>
-                <span className="block text-xs uppercase tracking-widest font-semibold mb-4">Color</span>
-                <div className="flex gap-3 flex-wrap">
+                <span className="block text-[10px] uppercase tracking-[0.3em] font-bold mb-5 text-neutral-400">Available Colors</span>
+                <div className="flex gap-2 flex-wrap">
                     {colors.map(color => (
                         <label key={color} className="cursor-pointer">
                             <input
@@ -70,7 +70,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
                                 checked={selectedColor === color}
                                 onChange={() => setSelectedColor(color)}
                             />
-                            <span className="flex items-center min-h-[44px] px-4 text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
+                            <span className="flex items-center h-12 px-6 text-[10px] border border-neutral-100 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-all uppercase tracking-[0.2em] font-bold shadow-sm">
                                 {color}
                             </span>
                         </label>
@@ -79,31 +79,33 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
             </div>
 
             {/* Stitching Selection */}
-            <div>
-                <span className="block text-xs uppercase tracking-widest font-semibold mb-4">Stitching</span>
-                <div className="flex gap-3 flex-wrap">
-                    {stitching.map(style => (
-                        <label key={style} className="cursor-pointer">
-                            <input
-                                type="radio"
-                                name="stitching"
-                                className="sr-only peer"
-                                checked={selectedStitching === style}
-                                onChange={() => setSelectedStitching(style)}
-                            />
-                            <span className="flex items-center min-h-[44px] px-4 text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
-                                {style}
-                            </span>
-                        </label>
-                    ))}
+            {stitching.length > 0 && (
+                <div>
+                    <span className="block text-[10px] uppercase tracking-[0.3em] font-bold mb-5 text-neutral-400">Stitching Option</span>
+                    <div className="flex gap-2 flex-wrap">
+                        {stitching.map(style => (
+                            <label key={style} className="cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="stitching"
+                                    className="sr-only peer"
+                                    checked={selectedStitching === style}
+                                    onChange={() => setSelectedStitching(style)}
+                                />
+                                <span className="flex items-center h-12 px-6 text-[10px] border border-neutral-100 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-all uppercase tracking-[0.2em] font-bold shadow-sm">
+                                    {style}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Size Selection */}
             <div id={`size-section-${productId}`} className="transition-all duration-300">
-                <div className="flex justify-between items-center mb-4">
-                    <span className="block text-xs uppercase tracking-widest font-semibold">Size (EU)</span>
-                    <button type="button" className="text-xs uppercase tracking-widest text-neutral-500 underline">Size Guide</button>
+                <div className="flex justify-between items-center mb-5">
+                    <span className="block text-[10px] uppercase tracking-[0.3em] font-bold text-neutral-400">Select Size (EU)</span>
+                    <button type="button" className="text-[9px] uppercase tracking-[0.2em] text-neutral-400 border-b border-neutral-200 pb-0.5 hover:text-black hover:border-black transition-colors">Size Table</button>
                 </div>
                 <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                     {sizesToRender.map(size => (
@@ -115,7 +117,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
                                 checked={selectedSize === size}
                                 onChange={() => setSelectedSize(size)}
                             />
-                            <span className="flex items-center justify-center min-h-[44px] text-center text-sm border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors uppercase tracking-widest">
+                            <span className="flex items-center justify-center h-12 text-center text-[11px] border border-neutral-100 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-all uppercase tracking-widest font-bold shadow-sm">
                                 {size}
                             </span>
                         </label>
@@ -123,23 +125,18 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
                 </div>
             </div>
 
-            {/* Desktop: inline button */}
-            <button
-                type="button"
-                onClick={handleAddToCart}
-                className={`hidden md:block w-full py-5 bg-black text-white text-xs uppercase tracking-widest transition-colors mt-8 ${!selectedSize ? 'opacity-50 cursor-not-allowed hover:bg-black' : 'hover:bg-neutral-800'}`}
-            >
-                Add to Cart — {price}
-            </button>
-
-            {/* Mobile: sticky bottom bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-neutral-200 p-4 safe-area-pb">
+            {/* Registration/Action */}
+            <div className="pt-6 border-t border-neutral-100">
                 <button
                     type="button"
                     onClick={handleAddToCart}
-                    className={`w-full py-4 bg-black text-white text-xs uppercase tracking-widest transition-colors ${!selectedSize ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-800'}`}
+                    className={`w-full py-6 bg-black text-white text-[11px] uppercase tracking-[0.4em] font-black transition-all duration-500 rounded-none shadow-2xl ${
+                        !selectedSize 
+                        ? 'opacity-30 cursor-not-allowed grayscale' 
+                        : 'hover:bg-white hover:text-black border border-black'
+                    }`}
                 >
-                    {selectedSize ? `Add to Cart — ${price}` : `Select a Size — ${price}`}
+                    {selectedSize ? `Add to Archive — ${price}` : `Archive Selection Required`}
                 </button>
             </div>
         </div>
