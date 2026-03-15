@@ -79,15 +79,16 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders";
+type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders" | "communications";
 
 const TABS: { key: TabKey; label: string }[] = [
-    { key: "business", label: "Business" },
-    { key: "store", label: "Store" },
-    { key: "seo", label: "SEO" },
-    { key: "assets", label: "Site Assets" },
-    { key: "emails", label: "Emails" },
-    { key: "riders", label: "Riders" },
+    { key: "business",       label: "Business" },
+    { key: "store",          label: "Store" },
+    { key: "seo",            label: "SEO" },
+    { key: "assets",         label: "Site Assets" },
+    { key: "emails",         label: "Emails" },
+    { key: "riders",         label: "Riders" },
+    { key: "communications", label: "Communications" },
 ];
 
 export default function SettingsPage() {
@@ -113,12 +114,13 @@ export default function SettingsPage() {
                 </div>
             </header>
 
-            {activeTab === "business" && <BusinessTab />}
-            {activeTab === "store" && <StoreTab />}
-            {activeTab === "seo" && <SEOTab />}
-            {activeTab === "assets" && <AssetsTab />}
-            {activeTab === "emails" && <EmailsTab />}
-            {activeTab === "riders" && <RidersTab />}
+            {activeTab === "business"       && <BusinessTab />}
+            {activeTab === "store"          && <StoreTab />}
+            {activeTab === "seo"            && <SEOTab />}
+            {activeTab === "assets"         && <AssetsTab />}
+            {activeTab === "emails"         && <EmailsTab />}
+            {activeTab === "riders"         && <RidersTab />}
+            {activeTab === "communications" && <CommunicationsTab />}
         </div>
     );
 }
@@ -770,6 +772,171 @@ function SEOTab() {
                             <p className="text-xs text-neutral-500 truncate">{formData.description || "Page description..."}</p>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Communications Tab ───────────────────────────────────────────────────────
+
+type CommTemplate = {
+    id?: string;
+    channel: "email" | "sms";
+    event_type: string;
+    subject?: string | null;
+    greeting?: string | null;
+    body_text: string;
+};
+
+const COMM_EVENTS = [
+    { key: "order_confirmed", label: "Order Confirmed" },
+    { key: "order_shipped",   label: "Order Shipped" },
+    { key: "order_cancelled", label: "Order Cancelled" },
+    { key: "order_fulfilled", label: "Order Fulfilled" },
+];
+
+function CommunicationsTab() {
+    const [channel, setChannel] = useState<"email" | "sms">("email");
+    const [templates, setTemplates] = useState<CommTemplate[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState<string | null>(null);
+    const [saved, setSaved] = useState<string | null>(null);
+
+    useEffect(() => {
+        supabase
+            .from("communication_templates")
+            .select("*")
+            .then(({ data }) => {
+                setTemplates(data ?? []);
+                setLoading(false);
+            });
+    }, []);
+
+    const getTemplate = (event_type: string): CommTemplate => {
+        return templates.find(t => t.channel === channel && t.event_type === event_type) ?? {
+            channel,
+            event_type,
+            subject: "",
+            greeting: "",
+            body_text: "",
+        };
+    };
+
+    const handleUpdate = (event_type: string, field: keyof CommTemplate, value: string) => {
+        setTemplates(prev => {
+            const exists = prev.find(t => t.channel === channel && t.event_type === event_type);
+            if (exists) {
+                return prev.map(t =>
+                    t.channel === channel && t.event_type === event_type
+                        ? { ...t, [field]: value }
+                        : t
+                );
+            }
+            return [...prev, { channel, event_type, subject: null, greeting: "", body_text: "", [field]: value }];
+        });
+    };
+
+    const handleSave = async (event_type: string) => {
+        const tpl = getTemplate(event_type);
+        const key = `${channel}-${event_type}`;
+        setSaving(key);
+        const { error } = await supabase
+            .from("communication_templates")
+            .upsert({ ...tpl, updated_at: new Date().toISOString() }, { onConflict: "channel,event_type" });
+        setSaving(null);
+        if (error) {
+            toast.error("Failed to save template.");
+        } else {
+            setSaved(key);
+            setTimeout(() => setSaved(null), 3000);
+        }
+    };
+
+    if (loading) return <p className="text-neutral-400 italic font-serif">Loading...</p>;
+
+    return (
+        <div className="space-y-8 max-w-3xl">
+            <div className="bg-white border border-neutral-200 p-8">
+                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4 mb-6">Communication Templates</h2>
+                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mb-6">
+                    Customise the messages sent to customers for each event. Dynamic values (order ID, rider info) are injected automatically.
+                </p>
+
+                <div className="flex gap-0 border-b border-neutral-200 mb-8">
+                    {(["email", "sms"] as const).map(ch => (
+                        <button
+                            key={ch}
+                            onClick={() => setChannel(ch)}
+                            className={`px-6 py-3 text-xs font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
+                                channel === ch ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"
+                            }`}
+                        >
+                            {ch === "email" ? "Email" : "SMS"}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="space-y-8">
+                    {COMM_EVENTS.map(({ key, label }) => {
+                        const tpl = getTemplate(key);
+                        const saveKey = `${channel}-${key}`;
+                        return (
+                            <div key={key} className="border border-neutral-100 p-6 space-y-4">
+                                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-600">{label}</h3>
+
+                                {channel === "email" && (
+                                    <div>
+                                        <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2 text-neutral-500">Subject Line</label>
+                                        <input
+                                            type="text"
+                                            value={tpl.subject ?? ""}
+                                            onChange={e => handleUpdate(key, "subject", e.target.value)}
+                                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
+                                            placeholder="Email subject..."
+                                        />
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2 text-neutral-500">Greeting</label>
+                                    <input
+                                        type="text"
+                                        value={tpl.greeting ?? ""}
+                                        onChange={e => handleUpdate(key, "greeting", e.target.value)}
+                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
+                                        placeholder={channel === "email" ? "Hello," : "Miss Tokyo:"}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2 text-neutral-500">
+                                        {channel === "email" ? "Body Text" : "Message"}
+                                    </label>
+                                    <textarea
+                                        rows={channel === "email" ? 4 : 2}
+                                        value={tpl.body_text}
+                                        onChange={e => handleUpdate(key, "body_text", e.target.value)}
+                                        className="w-full border border-neutral-200 bg-transparent p-3 outline-none focus:border-black text-sm transition-colors resize-none"
+                                        placeholder="Message body..."
+                                    />
+                                </div>
+
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => handleSave(key)}
+                                        disabled={saving === saveKey}
+                                        className="px-6 py-2.5 bg-black text-white text-[10px] uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                                    >
+                                        {saving === saveKey ? "Saving..." : "Save"}
+                                    </button>
+                                    {saved === saveKey && (
+                                        <span className="text-[10px] text-green-600 uppercase tracking-wider">Saved</span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>

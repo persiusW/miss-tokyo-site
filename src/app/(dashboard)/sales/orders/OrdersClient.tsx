@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { MoreHorizontal, Copy, Printer, Eye, Truck, X } from "lucide-react";
+import { MoreHorizontal, Copy, Printer, Eye, Truck, X, Search } from "lucide-react";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Order = {
     id: string;
@@ -30,10 +30,12 @@ type Rider = {
     is_active: boolean;
 };
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
     paid:        "bg-green-50 text-green-700",
+    packed:      "bg-blue-50 text-blue-700",
+    shipped:     "bg-indigo-50 text-indigo-700",
     processing:  "bg-blue-50 text-blue-700",
     pending:     "bg-amber-50 text-amber-700",
     fulfilled:   "bg-emerald-50 text-emerald-700",
@@ -45,19 +47,38 @@ const STATUS_STYLES: Record<string, string> = {
 type Tab = "all" | "packed" | "shipped" | "fulfilled";
 
 const TABS: { key: Tab; label: string }[] = [
-    { key: "all",       label: "All Orders" },
+    { key: "all",       label: "Inbox" },
     { key: "packed",    label: "Packed" },
     { key: "shipped",   label: "Shipped" },
     { key: "fulfilled", label: "Fulfilled" },
 ];
 
-function filterByTab(orders: Order[], tab: Tab): Order[] {
-    switch (tab) {
-        case "packed":    return orders.filter(o => o.status === "paid");
-        case "shipped":   return orders.filter(o => o.status === "processing");
-        case "fulfilled": return orders.filter(o => ["fulfilled", "delivered"].includes(o.status));
-        default:          return orders;
+function matchesSearch(order: Order, q: string): boolean {
+    const s = q.toLowerCase();
+    return (
+        (order.customer_name?.toLowerCase().includes(s) ?? false) ||
+        (order.customer_email?.toLowerCase().includes(s) ?? false) ||
+        order.id.toLowerCase().includes(s)
+    );
+}
+
+function filterOrders(orders: Order[], tab: Tab, search: string): Order[] {
+    const q = search.trim();
+    if (tab === "all") {
+        // Inbox: show only `paid` when no search; show all matching when searching
+        return q
+            ? orders.filter(o => matchesSearch(o, q))
+            : orders.filter(o => o.status === "paid");
     }
+    const baseFilter = (() => {
+        switch (tab) {
+            case "packed":    return orders.filter(o => o.status === "packed");
+            case "shipped":   return orders.filter(o => o.status === "shipped");
+            case "fulfilled": return orders.filter(o => ["fulfilled", "delivered"].includes(o.status));
+            default: return orders;
+        }
+    })();
+    return q ? baseFilter.filter(o => matchesSearch(o, q)) : baseFilter;
 }
 
 // ─── Dispatch Modal ───────────────────────────────────────────────────────────
@@ -95,7 +116,6 @@ function DispatchModal({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="bg-white w-full max-w-lg border border-neutral-200 shadow-2xl">
-                {/* Header */}
                 <div className="flex items-center justify-between px-8 py-6 border-b border-neutral-200">
                     <div>
                         <h2 className="font-serif text-xl tracking-widest uppercase">Assign Dispatch Rider</h2>
@@ -107,7 +127,6 @@ function DispatchModal({
                 </div>
 
                 <div className="px-8 py-6 space-y-6">
-                    {/* Order preview */}
                     <div className="bg-neutral-50 border border-neutral-100 p-4 max-h-32 overflow-y-auto space-y-1">
                         {orders.map(o => (
                             <div key={o.id} className="flex justify-between text-xs text-neutral-600">
@@ -117,7 +136,6 @@ function DispatchModal({
                         ))}
                     </div>
 
-                    {/* Rider select */}
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Select Rider</label>
                         {loading ? (
@@ -139,7 +157,6 @@ function DispatchModal({
                         )}
                     </div>
 
-                    {/* Notify rider toggle */}
                     <label className="flex items-center gap-3 cursor-pointer">
                         <input
                             type="checkbox"
@@ -180,26 +197,25 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     const router = useRouter();
     const [orders, setOrders] = useState(initialOrders);
     const [activeTab, setActiveTab] = useState<Tab>("all");
+    const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [showDispatch, setShowDispatch] = useState(false);
     const [bulkLoading, setBulkLoading] = useState(false);
 
-    const visibleOrders = filterByTab(orders, activeTab);
+    const visibleOrders = filterOrders(orders, activeTab, search);
     const allSelected = visibleOrders.length > 0 && visibleOrders.every(o => selected.has(o.id));
 
-    // Tab counts
+    // Tab counts — inbox count is paid orders, others by status
     const tabCounts: Record<Tab, number> = {
-        all:       orders.length,
-        packed:    orders.filter(o => o.status === "paid").length,
-        shipped:   orders.filter(o => o.status === "processing").length,
+        all:       orders.filter(o => o.status === "paid").length,
+        packed:    orders.filter(o => o.status === "packed").length,
+        shipped:   orders.filter(o => o.status === "shipped").length,
         fulfilled: orders.filter(o => ["fulfilled", "delivered"].includes(o.status)).length,
     };
 
-    // Reset selection when tab changes
-    useEffect(() => { setSelected(new Set()); }, [activeTab]);
+    useEffect(() => { setSelected(new Set()); }, [activeTab, search]);
 
-    // Close dropdown on outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
@@ -210,10 +226,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     }, []);
 
     const toggleAll = () => {
-        setSelected(allSelected
-            ? new Set()
-            : new Set(visibleOrders.map(o => o.id))
-        );
+        setSelected(allSelected ? new Set() : new Set(visibleOrders.map(o => o.id)));
     };
 
     const toggleOne = (id: string) => {
@@ -253,7 +266,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
 
             toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} dispatched.`);
             setOrders(prev => prev.map(o =>
-                selected.has(o.id) ? { ...o, status: "processing" } : o
+                selected.has(o.id) ? { ...o, status: "shipped" } : o
             ));
             setSelected(new Set());
             setShowDispatch(false);
@@ -278,27 +291,53 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
 
     return (
         <div className="space-y-0">
-            {/* Sub-tabs */}
-            <div className="flex gap-0 border-b border-neutral-200">
-                {TABS.map(tab => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        className={`px-6 py-3 text-xs font-semibold uppercase tracking-widest transition-colors border-b-2 -mb-px flex items-center gap-2 ${
-                            activeTab === tab.key
-                                ? "border-black text-black"
-                                : "border-transparent text-neutral-400 hover:text-black"
-                        }`}
-                    >
-                        {tab.label}
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                            activeTab === tab.key ? "bg-black text-white" : "bg-neutral-100 text-neutral-500"
-                        }`}>
-                            {tabCounts[tab.key]}
-                        </span>
-                    </button>
-                ))}
+            {/* Search + Tabs row */}
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4 border-b border-neutral-200 pb-0">
+                <div className="flex gap-0">
+                    {TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            className={`px-6 py-3 text-xs font-semibold uppercase tracking-widest transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+                                activeTab === tab.key
+                                    ? "border-black text-black"
+                                    : "border-transparent text-neutral-400 hover:text-black"
+                            }`}
+                        >
+                            {tab.label}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                activeTab === tab.key ? "bg-black text-white" : "bg-neutral-100 text-neutral-500"
+                            }`}>
+                                {tabCounts[tab.key]}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* Search */}
+                <div className="flex items-center gap-2 pb-3 sm:ml-auto">
+                    <Search size={13} className="text-neutral-400 shrink-0" />
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="SEARCH BY NAME, EMAIL OR ORDER ID"
+                        className="border-b border-neutral-300 bg-transparent outline-none focus:border-black text-[10px] uppercase tracking-widest py-1 w-64 placeholder:text-neutral-400"
+                    />
+                    {search && (
+                        <button onClick={() => setSearch("")} className="text-neutral-400 hover:text-black">
+                            <X size={13} />
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* Search context indicator */}
+            {search && (
+                <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 border-t-0 text-[10px] text-neutral-500 uppercase tracking-widest">
+                    Showing {visibleOrders.length} result{visibleOrders.length !== 1 ? "s" : ""} across all statuses for &ldquo;{search}&rdquo;
+                </div>
+            )}
 
             {/* Bulk Actions Bar */}
             {selectedCount > 0 && (
@@ -317,7 +356,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                         </button>
                     ) : (
                         <>
-                            <button onClick={() => bulkUpdate("paid")} disabled={bulkLoading}
+                            <button onClick={() => bulkUpdate("packed")} disabled={bulkLoading}
                                 className="text-xs uppercase tracking-widest px-4 py-2 bg-neutral-700 hover:bg-neutral-600 transition-colors disabled:opacity-50">
                                 Mark Packed
                             </button>
@@ -363,7 +402,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                         {visibleOrders.length === 0 ? (
                             <tr>
                                 <td colSpan={8} className="px-6 py-16 text-center text-neutral-500 italic font-serif">
-                                    No orders in this category.
+                                    {search ? "No orders match your search." : "No orders in this category."}
                                 </td>
                             </tr>
                         ) : visibleOrders.map((order) => (
@@ -420,6 +459,10 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                                                 <Printer size={13} /> Print Invoice
                                             </Link>
                                             <div className="border-t border-neutral-100 my-1" />
+                                            <button onClick={() => { bulkUpdate("fulfilled"); setOpenDropdown(null); }}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-emerald-600 hover:bg-neutral-50 text-left">
+                                                Mark Fulfilled
+                                            </button>
                                             <Link href={`/sales/orders/${order.id}`}
                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50"
                                                 onClick={() => setOpenDropdown(null)}>
@@ -434,7 +477,6 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                 </table>
             </div>
 
-            {/* Dispatch Modal */}
             {showDispatch && (
                 <DispatchModal
                     orders={visibleOrders.filter(o => selected.has(o.id))}

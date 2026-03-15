@@ -33,16 +33,17 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 export default async function ProductPage({ params }: { params: { slug: string } }) {
     const { slug } = await params;
 
-    // Fetch product
-    const { data: product } = await supabase
-        .from("products")
-        .select("*")
-        .eq("slug", slug)
-        .single();
+    // Fetch product + whitelabel toggle in parallel
+    const [{ data: product }, { data: storeSettings }] = await Promise.all([
+        supabase.from("products").select("*").eq("slug", slug).single(),
+        supabase.from("store_settings").select("enable_whitelabel").eq("id", "default").single(),
+    ]);
 
     if (!product) {
         notFound();
     }
+
+    const enableWhitelabel = storeSettings?.enable_whitelabel ?? true;
 
     // Default mock lists for variants if not in db
     const colors = product.available_colors || ["Noir", "Cognac", "Sand"];
@@ -83,17 +84,19 @@ export default async function ProductPage({ params }: { params: { slug: string }
                         availableSizes={availableSizes}
                     />
 
-                    <div className="border-t border-neutral-200 pt-8 mt-12 pb-8">
-                        <Link href={`/whitelabel?ref=${product.slug}`} className="flex justify-between items-center group">
-                            <span className="text-sm uppercase tracking-widest font-semibold group-hover:text-neutral-500 transition-colors">
-                                Request White Label Version
-                            </span>
-                            <span className="text-xl group-hover:-translate-x-1 transition-transform">→</span>
-                        </Link>
-                        <p className="text-xs text-neutral-500 mt-2">
-                            Looking for a specific leather, color, or modification? Contact our atelier.
-                        </p>
-                    </div>
+                    {enableWhitelabel && (
+                        <div className="border-t border-neutral-200 pt-8 mt-12 pb-8">
+                            <Link href={`/whitelabel?ref=${product.slug}`} className="flex justify-between items-center group">
+                                <span className="text-sm uppercase tracking-widest font-semibold group-hover:text-neutral-500 transition-colors">
+                                    Request White Label Version
+                                </span>
+                                <span className="text-xl group-hover:-translate-x-1 transition-transform">→</span>
+                            </Link>
+                            <p className="text-xs text-neutral-500 mt-2">
+                                Looking for a specific leather, color, or modification? Contact our atelier.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </AnimatedProductView>
         </div>

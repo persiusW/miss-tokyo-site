@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { X, Search } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CartButton } from "./CartButton";
+import { supabase } from "@/lib/supabase";
 
 const NAV_LINKS = [
     { href: "/",            label: "Home" },
@@ -24,8 +25,17 @@ export function NavBar() {
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
+
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user } }) => setIsLoggedIn(!!user));
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+            setIsLoggedIn(!!session?.user);
+        });
+        return () => subscription.unsubscribe();
+    }, []);
 
     // Prevent body scroll when menu or search is open
     useEffect(() => {
@@ -73,9 +83,15 @@ export function NavBar() {
 
                 <div className="flex items-center gap-6">
                     <div className="hidden md:flex items-center gap-6 text-[11px] uppercase tracking-[0.2em] font-medium mr-4">
-                        <Link href="/login" className="flex items-center gap-2 hover:text-neutral-400">
-                             Log In
-                        </Link>
+                        {isLoggedIn ? (
+                            <Link href="/account/orders" className="flex items-center gap-2 hover:text-neutral-400">
+                                Account
+                            </Link>
+                        ) : (
+                            <Link href="/login" className="flex items-center gap-2 hover:text-neutral-400">
+                                Log In
+                            </Link>
+                        )}
                     </div>
                     
                     <button 

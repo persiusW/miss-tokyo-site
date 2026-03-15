@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         // ── Batch update orders ───────────────────────────────────────────────
         const { error: updateError } = await supabaseAdmin
             .from("orders")
-            .update({ status: "processing", assigned_rider_id: riderId })
+            .update({ status: "shipped", assigned_rider_id: riderId })
             .in("id", orderIds);
 
         if (updateError) {

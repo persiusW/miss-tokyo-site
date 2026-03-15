@@ -15,6 +15,53 @@ function parseItems(cartItems: unknown): any[] {
     }
 }
 
+/**
+ * Ensures a Supabase auth user exists for customerEmail.
+ * Creates one if not found, then upserts a profile row.
+ * Returns the user ID and a setup link if the account was newly created.
+ */
+async function ensureCustomerAccount(customerEmail: string, fullName?: string | null): Promise<{ userId: string; setupLink?: string }> {
+    // Check if user already exists
+    const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
+    const found = existing?.users?.find(u => u.email === customerEmail);
+
+    if (found) {
+        // Upsert profile in case it's missing
+        await supabaseAdmin.from("profiles").upsert({ id: found.id, full_name: fullName || null }, { onConflict: "id" });
+        return { userId: found.id };
+    }
+
+    // Create new auth user (no password — they set it via the recovery link)
+    const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
+        email: customerEmail,
+        email_confirm: true,
+    });
+
+    if (error || !newUser?.user) {
+        console.error("[webhook] Failed to create auth user:", error);
+        return { userId: "" };
+    }
+
+    const userId = newUser.user.id;
+
+    // Create profile
+    await supabaseAdmin.from("profiles").upsert({ id: userId, full_name: fullName || null }, { onConflict: "id" });
+
+    // Generate password setup link
+    let setupLink: string | undefined;
+    try {
+        const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+            type: "recovery",
+            email: customerEmail,
+        });
+        setupLink = (linkData as any)?.properties?.action_link || undefined;
+    } catch {
+        // Non-fatal — order confirmation still sends without it
+    }
+
+    return { userId, setupLink };
+}
+
 async function sendOrderConfirmation(
     customerEmail: string,
     orderRef: string,
@@ -23,6 +70,7 @@ async function sendOrderConfirmation(
     bizAddress: string,
     feeAmount?: number,
     feeLabel?: string,
+    setupLink?: string,
 ) {
     if (!process.env.RESEND_API_KEY) return;
 
@@ -71,6 +119,13 @@ async function sendOrderConfirmation(
     <p style="font-size: 13px; color: #525252; line-height: 1.8; margin: 0 0 32px;">
       Your piece is now being prepared with care. We will notify you once it has been dispatched. Questions? Reply to this email.
     </p>
+    ${setupLink ? `
+    <div style="background: #f9f9f9; border: 1px solid #e5e5e5; padding: 24px; margin-bottom: 32px; text-align: center;">
+      <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: #737373; margin: 0 0 12px;">Track Your Order</p>
+      <a href="${setupLink}" style="display: inline-block; background: #171717; color: white; text-decoration: none; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; padding: 14px 28px; font-weight: 600;">
+        Set Up Your Password to Track Your Order
+      </a>
+    </div>` : ""}
     <div style="border-top: 1px solid #e5e5e5; padding-top: 24px; margin-top: 24px;">
       <p style="font-size: 11px; color: #a3a3a3; text-transform: uppercase; letter-spacing: 0.15em; margin: 0;">
         ${bizName}${bizAddress ? ` · ${bizAddress.replace(/\n/g, ", ")}` : ""}
@@ -161,6 +216,17 @@ export async function POST(req: Request) {
                 }
             }
 
+            // Auto-create/link customer account
+            let customerId: string | undefined;
+            let setupLink: string | undefined;
+            if (customerEmail) {
+                const account = await ensureCustomerAccount(customerEmail, fullName);
+                if (account.userId) {
+                    customerId = account.userId;
+                    setupLink = account.setupLink;
+                }
+            }
+
             if (orderId) {
                 // Order was pre-created at initialization — update it to paid
                 const { error } = await supabaseAdmin
@@ -172,13 +238,14 @@ export async function POST(req: Request) {
                         customer_phone: phone || null,
                         shipping_address: address ? { text: address } : null,
                         delivery_method: deliveryMethod || null,
+                        ...(customerId ? { customer_id: customerId } : {}),
                     })
                     .eq("id", orderId);
 
                 if (error) {
                     console.error("Webhook: Failed to update order:", error);
                 } else {
-                    await sendOrderConfirmation(customerEmail, orderId.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined);
+                    await sendOrderConfirmation(customerEmail, orderId.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined, setupLink);
                 }
             } else if (customerEmail) {
                 // Fallback: create a new order if no pre-created one exists
@@ -201,6 +268,7 @@ export async function POST(req: Request) {
                             status: "paid",
                             paystack_reference: paystackRef,
                             items: parsedItems,
+                            ...(customerId ? { customer_id: customerId } : {}),
                         }])
                         .select("id")
                         .single();
@@ -208,7 +276,7 @@ export async function POST(req: Request) {
                     if (error) {
                         console.error("Webhook: Failed to create order:", error);
                     } else if (newOrder) {
-                        await sendOrderConfirmation(customerEmail, newOrder.id.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined);
+                        await sendOrderConfirmation(customerEmail, newOrder.id.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined, setupLink);
                     }
                 }
             }
