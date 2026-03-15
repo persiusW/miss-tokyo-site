@@ -161,6 +161,25 @@ export default function OrderDetailPage() {
                 )}
             </div>
 
+            {/* Payment Method & Details */}
+            <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
+                <header className="px-8 py-5 border-b border-neutral-100">
+                    <h2 className="text-xs uppercase tracking-widest font-semibold">Payment Method &amp; Details</h2>
+                </header>
+                {[
+                    ["Provider",      order.paystack_reference ? "Paystack" : "N/A"],
+                    ["Reference ID",  order.paystack_reference || "—"],
+                    ["Payment Date",  new Date(order.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
+                    ["Status",        ["paid", "processing", "fulfilled", "delivered"].includes(order.status) ? "Successful" : order.status === "pending" ? "Pending" : "Failed"],
+                    ["Amount Paid",   `GH₵ ${Number(order.total_amount).toFixed(2)}`],
+                ].map(([label, value]) => (
+                    <div key={label} className="px-8 py-4 flex justify-between items-center text-sm">
+                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
+                        <span className={`font-medium font-mono ${label === "Status" && value === "Successful" ? "text-green-700" : label === "Status" && value === "Failed" ? "text-red-600" : "text-neutral-900"}`}>{value}</span>
+                    </div>
+                ))}
+            </div>
+
             {/* Items */}
             <div className="bg-white border border-neutral-200">
                 <header className="px-8 py-6 border-b border-neutral-100">

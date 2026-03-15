@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { fetchOrderStats, fetchMonthlyRevenue, fetchSalesByCategory } from "@/lib/utils/metrics";
 
 export const dynamic = "force-dynamic";
@@ -10,14 +10,27 @@ export default async function AnalyticsPage() {
         monthlyData,
         categoryData,
         { count: totalProducts },
-        { count: totalCustomRequests },
+        revenueOrdersRes,
+        dispatchOrdersRes,
     ] = await Promise.all([
         fetchOrderStats(),
         fetchMonthlyRevenue(6),
         fetchSalesByCategory(),
         supabase.from("products").select("*", { count: "exact", head: true }).eq("is_active", true),
-        supabase.from("custom_requests").select("*", { count: "exact", head: true }),
+        supabase.from("orders").select("items").in("status", ["paid", "processing", "fulfilled", "delivered"]),
+        supabase.from("orders")
+            .select("id, customer_name, status, total_amount, created_at, assigned_rider_id, riders(name, phone)")
+            .not("assigned_rider_id", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(20),
     ]);
+
+    // Items Sold — count quantities from all revenue orders
+    const itemsSold = (revenueOrdersRes.data ?? [])
+        .flatMap((o: any) => Array.isArray(o.items) ? o.items : [])
+        .reduce((sum: number, item: any) => sum + (Number(item.quantity) || 1), 0);
+
+    const dispatchOrders = (dispatchOrdersRes.data ?? []) as any[];
 
     const maxRevenue = Math.max(...monthlyData.map(m => m.revenue), 1);
     const maxCatRevenue = Math.max(...categoryData.map(c => c.revenue), 1);
@@ -32,10 +45,11 @@ export default async function AnalyticsPage() {
     const statusTotal = statusEntries.reduce((s, [, c]) => s + c, 0);
 
     const kpis = [
-        { label: "Total Revenue",  value: `GH₵ ${stats.totalRevenue.toFixed(2)}`, sub: "All time" },
-        { label: "Revenue Orders", value: String(stats.revenueOrderCount),         sub: "Confirmed" },
-        { label: "Avg. Order",     value: `GH₵ ${stats.avgOrderValue.toFixed(2)}`, sub: "Per transaction" },
-        { label: "Conversion",     value: `${stats.conversionRate}%`,              sub: "Revenue / Total" },
+        { label: "Total Revenue",       value: `GH₵ ${stats.totalRevenue.toFixed(2)}`, sub: "All time" },
+        { label: "Total Orders",        value: String(stats.totalOrders),               sub: "All statuses" },
+        { label: "Items Sold",          value: String(itemsSold),                       sub: "Units dispatched" },
+        { label: "Avg. Order Value",    value: `GH₵ ${stats.avgOrderValue.toFixed(2)}`, sub: "Per paid order" },
+        { label: "Successful Payments", value: String(stats.revenueOrderCount),         sub: "Paid & fulfilled" },
     ];
 
     return (
@@ -46,7 +60,7 @@ export default async function AnalyticsPage() {
             </header>
 
             {/* Key Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                 {kpis.map(({ label, value, sub }) => (
                     <div key={label} className="bg-white border border-neutral-200 p-6">
                         <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">{label}</span>
@@ -141,11 +155,11 @@ export default async function AnalyticsPage() {
                     <h2 className="text-xs font-semibold uppercase tracking-widest mb-6">Atelier Summary</h2>
                     <div className="space-y-4 divide-y divide-neutral-100">
                         {[
-                            ["Active Products",   totalProducts ?? 0],
-                            ["Total Orders",      stats.totalOrders],
-                            ["Custom Requests",   totalCustomRequests ?? 0],
-                            ["Revenue Orders",    stats.revenueOrderCount],
-                            ["Avg. Order Value",  `GH₵ ${stats.avgOrderValue.toFixed(2)}`],
+                            ["Active Products",      totalProducts ?? 0],
+                            ["Total Orders",         stats.totalOrders],
+                            ["Successful Payments",  stats.revenueOrderCount],
+                            ["Items Sold",           itemsSold],
+                            ["Avg. Order Value",     `GH₵ ${stats.avgOrderValue.toFixed(2)}`],
                         ].map(([label, val]) => (
                             <div key={String(label)} className="flex justify-between items-center py-3 text-sm">
                                 <span className="text-neutral-600">{label}</span>
@@ -154,6 +168,53 @@ export default async function AnalyticsPage() {
                         ))}
                     </div>
                 </div>
+            </div>
+
+            {/* Dispatch Performance */}
+            <div className="bg-white border border-neutral-200">
+                <div className="px-8 py-5 border-b border-neutral-100">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest">Dispatch Performance</h2>
+                </div>
+                {dispatchOrders.length === 0 ? (
+                    <div className="px-8 py-10 text-neutral-400 italic font-serif text-sm text-center">
+                        No dispatched orders yet. Rider assignments will appear here.
+                    </div>
+                ) : (
+                    <table className="w-full text-sm">
+                        <thead className="bg-neutral-50 border-b border-neutral-100">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Order</th>
+                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Customer</th>
+                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Rider</th>
+                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Phone</th>
+                                <th className="px-6 py-3 text-right text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Amount</th>
+                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Status</th>
+                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-50">
+                            {dispatchOrders.map((o: any) => (
+                                <tr key={o.id} className="hover:bg-neutral-50 transition-colors">
+                                    <td className="px-6 py-4 font-mono text-xs text-neutral-600">{o.id.substring(0, 8).toUpperCase()}</td>
+                                    <td className="px-6 py-4 text-neutral-800">{o.customer_name || "—"}</td>
+                                    <td className="px-6 py-4 text-neutral-800">{o.riders?.name || "—"}</td>
+                                    <td className="px-6 py-4 text-neutral-500 text-xs">{o.riders?.phone || "—"}</td>
+                                    <td className="px-6 py-4 text-right font-medium">GH₵ {Number(o.total_amount).toFixed(2)}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded font-semibold ${
+                                            ["fulfilled","delivered"].includes(o.status) ? "bg-green-50 text-green-700"
+                                            : o.status === "processing" ? "bg-blue-50 text-blue-700"
+                                            : "bg-neutral-100 text-neutral-500"
+                                        }`}>{o.status}</span>
+                                    </td>
+                                    <td className="px-6 py-4 text-neutral-400 text-xs">
+                                        {new Date(o.created_at).toLocaleDateString("en-GB")}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
             </div>
         </div>
     );

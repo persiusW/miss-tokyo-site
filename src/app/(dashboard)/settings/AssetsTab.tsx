@@ -24,6 +24,9 @@ type AssetDef = {
 const DEFAULT_ASSETS: AssetDef[] = [
     { section_key: "home_hero",       label: "Homepage Hero",        group: "Homepage" },
     { section_key: "shop_banner",     label: "Shop Page Banner",     group: "Shop" },
+    { section_key: "gift_card_hero",  label: "Gift Card Image",      group: "Gift Card" },
+    { section_key: "about_hero",      label: "About Hero Image",     group: "About" },
+    { section_key: "about_founder",   label: "Founder Photo",        group: "About" },
     { section_key: "craft_banner",    label: "Craft Page Banner",    group: "Craft" },
     { section_key: "craft_img_1",     label: "Craft Image 1",        group: "Craft" },
     { section_key: "craft_img_2",     label: "Craft Image 2",        group: "Craft" },

@@ -18,7 +18,6 @@ const NAV: NavSection[] = [
         title: "Sales",
         items: [
             { label: "Orders", href: "/sales/orders" },
-            { label: "Payments", href: "/sales/payments" },
             { label: "Analytics", href: "/sales/analytics" },
         ],
     },
@@ -100,7 +99,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
                 {/* Main */}
                 <main className="flex-1 min-w-0 overflow-y-auto w-full md:w-auto p-6 md:p-12">
-                    <div className="max-w-6xl mx-auto">
+                    <div className="max-w-5xl mx-auto">
                         {children}
                     </div>
                 </main>

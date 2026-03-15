@@ -14,7 +14,8 @@ type CopyRow = {
 
 const PAGE_GROUP_LABELS: Record<string, string> = {
     homepage: "Homepage",
-    craft: "Craft Page",
+    about:    "About Page",
+    craft:    "Craft Page",
 };
 
 export function TextBlocksTab() {

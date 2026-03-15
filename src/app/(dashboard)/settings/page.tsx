@@ -461,7 +461,13 @@ function SEOTab() {
     useEffect(() => {
         const existing = metadataList.find(m => m.page_path === selectedPath);
         if (existing) {
-            setFormData(existing);
+            setFormData({
+                ...existing,
+                keywords:     existing.keywords     ?? "",
+                og_image_url: existing.og_image_url ?? "",
+                title:        existing.title        ?? "",
+                description:  existing.description  ?? "",
+            });
         } else {
             setFormData({
                 page_path: selectedPath,

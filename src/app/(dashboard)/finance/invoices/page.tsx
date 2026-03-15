@@ -5,7 +5,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 
-type LineItem = { description: string; qty: number; unit_price: number };
+type LineItem = { description: string; qty: number; unit_price: number; mode: "custom" | "product"; product_id?: string };
+type Product = { id: string; name: string; price: number };
 
 type DocForm = {
     type: "invoice" | "quotation";
@@ -36,7 +37,7 @@ const STATUS_STYLES: Record<string, string> = {
     cancelled: "bg-red-50 text-red-600",
 };
 
-const EMPTY_LINE: LineItem = { description: "", qty: 1, unit_price: 0 };
+const EMPTY_LINE: LineItem = { description: "", qty: 1, unit_price: 0, mode: "custom" };
 
 export default function InvoicesPage() {
     const [documents, setDocuments] = useState<Document[]>([]);
@@ -44,6 +45,7 @@ export default function InvoicesPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [saving, setSaving] = useState(false);
     const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+    const [products, setProducts] = useState<Product[]>([]);
     const [form, setForm] = useState<DocForm>({
         type: "invoice",
         customer_name: "",
@@ -78,6 +80,12 @@ export default function InvoicesPage() {
                     setForm(prev => ({ ...prev, tax_rate: rate }));
                 }
             });
+        supabase
+            .from("products")
+            .select("id, name, price")
+            .eq("is_active", true)
+            .order("name")
+            .then(({ data }) => { if (data) setProducts(data as Product[]); });
     }, []);
 
     const openCreate = () => {
@@ -99,7 +107,25 @@ export default function InvoicesPage() {
     const updateLine = (i: number, field: keyof LineItem, value: string | number) => {
         setForm(prev => {
             const lines = [...prev.line_items];
-            lines[i] = { ...lines[i], [field]: field === "description" ? value : Number(value) };
+            lines[i] = { ...lines[i], [field]: (field === "description" || field === "mode" || field === "product_id") ? value : Number(value) };
+            return { ...prev, line_items: lines };
+        });
+    };
+
+    const setLineMode = (i: number, mode: "custom" | "product") => {
+        setForm(prev => {
+            const lines = [...prev.line_items];
+            lines[i] = { ...EMPTY_LINE, mode, qty: lines[i].qty };
+            return { ...prev, line_items: lines };
+        });
+    };
+
+    const pickProduct = (i: number, productId: string) => {
+        const p = products.find(p => p.id === productId);
+        if (!p) return;
+        setForm(prev => {
+            const lines = [...prev.line_items];
+            lines[i] = { ...lines[i], product_id: p.id, description: p.name, unit_price: Number(p.price) };
             return { ...prev, line_items: lines };
         });
     };
@@ -247,16 +273,47 @@ export default function InvoicesPage() {
 
                         <div className="space-y-2">
                             {form.line_items.map((line, i) => (
-                                <div key={i} className="grid grid-cols-12 gap-3 items-center group">
-                                    <div className="col-span-6">
-                                        <input
-                                            type="text"
-                                            value={line.description}
-                                            onChange={e => updateLine(i, "description", e.target.value)}
-                                            className="w-full border-b border-neutral-200 bg-transparent py-1.5 outline-none focus:border-black transition-colors text-sm"
-                                            placeholder="Item description"
-                                            required
-                                        />
+                                <div key={i} className="grid grid-cols-12 gap-3 items-start group">
+                                    <div className="col-span-6 space-y-1">
+                                        {/* Mode toggle */}
+                                        <div className="flex gap-2 mb-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => setLineMode(i, "product")}
+                                                className={`text-[9px] uppercase tracking-widest px-2 py-0.5 border transition-colors ${line.mode === "product" ? "border-black bg-black text-white" : "border-neutral-300 text-neutral-500 hover:border-black"}`}
+                                            >
+                                                Product
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setLineMode(i, "custom")}
+                                                className={`text-[9px] uppercase tracking-widest px-2 py-0.5 border transition-colors ${line.mode === "custom" ? "border-black bg-black text-white" : "border-neutral-300 text-neutral-500 hover:border-black"}`}
+                                            >
+                                                Custom
+                                            </button>
+                                        </div>
+                                        {line.mode === "product" ? (
+                                            <select
+                                                value={line.product_id || ""}
+                                                onChange={e => pickProduct(i, e.target.value)}
+                                                className="w-full border-b border-neutral-200 bg-transparent py-1.5 outline-none focus:border-black transition-colors text-sm appearance-none"
+                                                required
+                                            >
+                                                <option value="">Select a product…</option>
+                                                {products.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.name} — GH₵ {Number(p.price).toFixed(2)}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={line.description}
+                                                onChange={e => updateLine(i, "description", e.target.value)}
+                                                className="w-full border-b border-neutral-200 bg-transparent py-1.5 outline-none focus:border-black transition-colors text-sm"
+                                                placeholder="Item description"
+                                                required
+                                            />
+                                        )}
                                     </div>
                                     <div className="col-span-2">
                                         <input

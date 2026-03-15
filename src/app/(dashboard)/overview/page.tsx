@@ -8,14 +8,12 @@ export default async function DashboardOverviewPage() {
     const [
         stats,
         recentActivity,
-        customRequestsRes,
         productRowsRes,
         orderStatusesRes,
         lowStockProductsRes,
     ] = await Promise.all([
         fetchOrderStats(),
         fetchRecentActivity(5),
-        supabase.from("custom_requests").select("*", { count: "exact", head: true }),
         supabase.from("products").select("id").eq("is_active", true),
         supabase.from("orders").select("status"),
         supabase.from("products")
@@ -25,20 +23,15 @@ export default async function DashboardOverviewPage() {
             .order("inventory_count"),
     ]);
 
-    const { count: totalCustomRequests, error: customRequestsError } = customRequestsRes;
     const { data: productRows, error: productRowsError } = productRowsRes;
     const { data: orderStatuses, error: orderStatusesError } = orderStatusesRes;
     const { data: lowStockProducts, error: lowStockProductsError } = lowStockProductsRes;
 
-    if (customRequestsError) {
-        console.error("Supabase Fetch Error (custom_requests):", customRequestsError.message, customRequestsError.details, customRequestsError.hint);
-    }
     if (orderStatusesError) {
         console.error("Supabase Fetch Error (orders):", orderStatusesError.message, orderStatusesError.details, orderStatusesError.hint);
     }
     if (productRowsError) {
         console.error("Supabase Fetch Error (productRows):", productRowsError.message, productRowsError.details, productRowsError.hint);
-        console.error("[OverviewPage] Failed to load product rows");
     }
     if (lowStockProductsError) {
         console.error("Supabase Fetch Error (lowStockProducts):", lowStockProductsError.message, lowStockProductsError.details, lowStockProductsError.hint);
@@ -59,13 +52,12 @@ export default async function DashboardOverviewPage() {
         statusMap[o.status] = (statusMap[o.status] ?? 0) + 1;
     }
 
-    // Conversion funnel — inquiries = total orders + custom requests
-    const inquiries = stats.totalOrders + (totalCustomRequests ?? 0);
-    const funnelMax = Math.max(inquiries, 1);
+    // Conversion funnel
+    const funnelMax = Math.max(stats.totalOrders, 1);
     const funnelSteps = [
-        { label: "Inquiries",  value: inquiries,                   h: 100 },
-        { label: "Orders",     value: stats.totalOrders,           h: Math.round((stats.totalOrders / funnelMax) * 100) },
-        { label: "Paid",       value: stats.revenueOrderCount,     h: Math.round((stats.revenueOrderCount / funnelMax) * 100) },
+        { label: "Orders",    value: stats.totalOrders,                                                 h: 100 },
+        { label: "Paid",      value: stats.revenueOrderCount,                                          h: Math.round((stats.revenueOrderCount / funnelMax) * 100) },
+        { label: "Fulfilled", value: stats.fulfilledCount,                                             h: Math.round((stats.fulfilledCount / funnelMax) * 100) },
     ];
 
     return (
@@ -95,9 +87,9 @@ export default async function DashboardOverviewPage() {
                     <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">SHIPPED · DELIVERED</span>
                 </div>
                 <div className="bg-white border border-neutral-200 p-6 flex flex-col justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Custom Requests</span>
-                    <span className="text-3xl font-serif">{totalCustomRequests ?? 0}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">NEEDS ATTENTION</span>
+                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Avg. Order Value</span>
+                    <span className="text-3xl font-serif">GH₵ {stats.avgOrderValue.toFixed(2)}</span>
+                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">PER PAID ORDER</span>
                 </div>
             </div>
 
@@ -130,7 +122,7 @@ export default async function DashboardOverviewPage() {
                 {/* Live Conversion Funnel */}
                 <div className="bg-white border border-neutral-200 p-6">
                     <h2 className="text-xs font-semibold uppercase tracking-widest mb-6">Conversion Funnel</h2>
-                    {inquiries === 0 ? (
+                    {stats.totalOrders === 0 ? (
                         <p className="text-neutral-400 italic text-sm font-serif">No activity yet. Funnel will populate as orders come in.</p>
                     ) : (
                         <>
@@ -228,7 +220,7 @@ export default async function DashboardOverviewPage() {
                                     <p className="text-sm text-neutral-900">
                                         <span className="font-medium">{item.label}</span>
                                         {" "}
-                                        {item.type === "order" ? "placed an order." : "submitted a custom request."}
+                                        placed an order.
                                     </p>
                                     <p className="text-xs text-neutral-400 mt-0.5">{item.sub}</p>
                                 </div>

@@ -1,7 +1,8 @@
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PrintButton } from "./PrintButton";
+import { InvoiceActions } from "./InvoiceActions";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -34,7 +35,14 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 >
                     ← Back to Invoices
                 </Link>
-                <PrintButton />
+                <div className="flex items-center gap-3">
+                    <InvoiceActions
+                        docId={doc.id}
+                        docAmount={total}
+                        customerEmail={doc.customer_email ?? null}
+                    />
+                    <PrintButton />
+                </div>
             </div>
 
             {/* Invoice Document */}
