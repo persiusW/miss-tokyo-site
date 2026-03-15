@@ -158,7 +158,7 @@ export default function NewProductPage() {
                             onBlur={handleSlugify}
                             required
                             className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                            placeholder="e.g. Badu Slide 02"
+                            placeholder="e.g. Miss Tokyo Piece 02"
                         />
                     </div>
 

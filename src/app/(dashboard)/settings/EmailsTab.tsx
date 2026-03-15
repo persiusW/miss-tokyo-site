@@ -4,7 +4,7 @@ import { useState } from "react";
 
 type Template = "order_confirmation" | "admin_new_order";
 
-const BIZ_NAME = "Badu Atelier";
+const BIZ_NAME = "Miss Tokyo";
 const BIZ_ADDRESS = "Accra, Ghana";
 
 function OrderConfirmationPreview() {
@@ -68,7 +68,7 @@ function AdminNewOrderPreview() {
                             ["Email", "abena@example.com"],
                             ["Amount", "GH₵ 300.00"],
                             ["Delivery", "Delivery — Accra"],
-                            ["Items", "1 × Badu Slide 01 (Size 42, Noir)"],
+                            ["Items", "1 × Miss Tokyo Piece 01 (Size 42, Noir)"],
                         ].map(([label, value]) => (
                             <tr key={label} style={{ borderBottom: "1px solid #f5f5f5" }}>
                                 <td style={{ padding: "10px 0", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.15em", color: "#737373", paddingRight: 24 }}>{label}</td>

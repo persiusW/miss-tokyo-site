@@ -51,7 +51,7 @@ export default async function CraftPage() {
                     {siteAssets['craft_img_1']?.image_url ? (
                         <Image
                             src={siteAssets['craft_img_1'].image_url}
-                            alt={siteAssets['craft_img_1']?.alt_text || "Badu Ghanaian Leather Footwear"}
+                            alt={siteAssets['craft_img_1']?.alt_text || "Miss Tokyo Craftsmanship"}
                             fill
                             className="object-cover object-center"
                         />
@@ -61,7 +61,7 @@ export default async function CraftPage() {
                     {siteAssets['craft_img_2']?.image_url ? (
                         <Image
                             src={siteAssets['craft_img_2'].image_url}
-                            alt={siteAssets['craft_img_2']?.alt_text || "Badu Craftsmanship"}
+                            alt={siteAssets['craft_img_2']?.alt_text || "Miss Tokyo Atelier"}
                             fill
                             className="object-cover object-center"
                         />
@@ -71,7 +71,7 @@ export default async function CraftPage() {
                     {siteAssets['craft_img_3']?.image_url ? (
                         <Image
                             src={siteAssets['craft_img_3'].image_url}
-                            alt={siteAssets['craft_img_3']?.alt_text || "Badu Atelier Details"}
+                            alt={siteAssets['craft_img_3']?.alt_text || "Miss Tokyo Atelier Details"}
                             fill
                             className="object-cover object-center"
                         />

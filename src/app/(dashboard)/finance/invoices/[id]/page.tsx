@@ -47,7 +47,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                             <img src={biz.logo_url} alt={biz.business_name} className="h-12 w-12 object-cover mb-4" />
                         )}
                         <h1 className="font-serif text-2xl tracking-widest uppercase">
-                            {biz?.business_name || "Badu Atelier"}
+                            {biz?.business_name || "Miss Tokyo"}
                         </h1>
                         {biz?.address && (
                             <p className="text-xs text-neutral-500 mt-2 whitespace-pre-line">{biz.address}</p>
@@ -152,7 +152,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
                 {/* Footer */}
                 <div className="border-t border-neutral-100 pt-6 text-center">
                     <p className="text-[10px] uppercase tracking-widest text-neutral-400">
-                        Thank you for your business — {biz?.business_name || "Badu Atelier"}
+                        Thank you for your business — {biz?.business_name || "Miss Tokyo"}
                     </p>
                 </div>
             </div>

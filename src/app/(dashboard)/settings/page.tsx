@@ -28,7 +28,7 @@ type StoreSettings = {
 };
 
 const DEFAULT_BUSINESS: BusinessSettings = {
-    business_name: "Badu Atelier",
+    business_name: "Miss Tokyo",
     email: "",
     contact: "",
     address: "",
@@ -165,7 +165,7 @@ function BusinessTab() {
                         value={form.business_name}
                         onChange={handleChange}
                         className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                        placeholder="Badu Atelier"
+                        placeholder="Miss Tokyo"
                     />
                 </div>
 
@@ -503,7 +503,7 @@ function SEOTab() {
                             value={formData.title}
                             onChange={handleChange}
                             className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                            placeholder="Badu Atelier | Handcrafted in Ghana"
+                            placeholder="Miss Tokyo | Handcrafted in Ghana"
                         />
                     </div>
 
@@ -567,8 +567,8 @@ function SEOTab() {
                                 <span className="font-serif italic text-[10px]">B</span>
                             </div>
                             <div>
-                                <p className="font-medium">Badu Atelier</p>
-                                <p className="text-neutral-500 text-[10px]">https://badu.co{selectedPath}</p>
+                                <p className="font-medium">Miss Tokyo</p>
+                                <p className="text-neutral-500 text-[10px]">https://misstokyo.shop{selectedPath}</p>
                             </div>
                         </div>
                         <h3 className="text-[#1a0dab] text-lg font-medium cursor-pointer hover:underline mb-1 w-full truncate">

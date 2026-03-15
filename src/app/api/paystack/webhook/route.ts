@@ -101,7 +101,7 @@ export async function POST(req: Request) {
                 .eq("id", "default")
                 .single();
 
-            const bizName = biz?.business_name || "Badu Atelier";
+            const bizName = biz?.business_name || "Miss Tokyo";
             const bizAddress = biz?.address || "";
 
             if (requestId) {

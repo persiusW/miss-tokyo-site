@@ -16,8 +16,8 @@ export async function POST(req: Request) {
 
         if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
-        const bizName = biz?.business_name || "Badu Atelier";
-        const bizEmail = biz?.email || "no-reply@badu.co";
+        const bizName = biz?.business_name || "Miss Tokyo";
+        const bizEmail = biz?.email || "orders@misstokyo.shop";
         const orderRef = order.id.substring(0, 8).toUpperCase();
 
         if (!process.env.RESEND_API_KEY) return NextResponse.json({ status: "skipped" });

@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
     if (product) {
         return {
-            title: `${product.name} | Badu`,
+            title: `${product.name} | Miss Tokyo`,
             description: product.description || `Our signature piece. Minimalist design featuring premium Ghanaian leather. Discover the ${product.name}.`,
             openGraph: {
                 images: product.image_urls?.[0] ? [{ url: product.image_urls[0] }] : [],
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
         };
     }
 
-    return { title: "Product | Badu" };
+    return { title: "Product | Miss Tokyo" };
 }
 
 export default async function ProductPage({ params }: { params: { slug: string } }) {

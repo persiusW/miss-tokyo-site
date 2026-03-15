@@ -30,7 +30,7 @@ export default async function WhiteLabelPage({ searchParams }: { searchParams: P
             <div className="w-full md:w-7/12 py-8">
                 <h1 className="font-serif text-4xl md:text-5xl tracking-widest uppercase mb-6">White Labelling</h1>
                 <p className="text-neutral-600 leading-relaxed mb-12 max-w-xl">
-                    Whether you want to customize an existing silhouette or create something entirely new, our white labelling service allows you to leverage Badu's signature craftsmanship.
+                    Whether you want to customize an existing silhouette or create something entirely new, our white labelling service allows you to leverage Miss Tokyo's signature craftsmanship.
                 </p>
 
                 <Suspense fallback={<p className="text-neutral-400 italic">Loading form...</p>}>

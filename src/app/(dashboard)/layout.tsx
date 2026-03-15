@@ -60,7 +60,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <aside className="w-64 border-r border-neutral-200 hidden md:flex flex-col h-screen sticky top-0 bg-white">
                     <div className="p-8 border-b border-neutral-200">
                         <Link href="/overview" className="font-serif text-2xl tracking-widest uppercase block">
-                            Badu
+                            Miss Tokyo
                         </Link>
                         <span className="text-[10px] uppercase tracking-widest text-neutral-400 mt-2 block">Atelier Console</span>
                     </div>

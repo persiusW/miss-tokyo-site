@@ -13,22 +13,22 @@ export default async function GalleryPage() {
     const rawImages = [
         {
             src: siteAssets['gallery_img_1']?.image_url,
-            alt: siteAssets['gallery_img_1']?.alt_text || "Badu Ghanaian Leather Footwear - Leather Craft and Stitching",
+            alt: siteAssets['gallery_img_1']?.alt_text || "Miss Tokyo - Craft and Stitching",
             aspectRatio: "aspect-[3/4]",
         },
         {
             src: siteAssets['gallery_img_2']?.image_url,
-            alt: siteAssets['gallery_img_2']?.alt_text || "Badu Ghanaian Leather Footwear - Macro Leather Texture",
+            alt: siteAssets['gallery_img_2']?.alt_text || "Miss Tokyo - Macro Texture",
             aspectRatio: "aspect-[4/3]",
         },
         {
             src: siteAssets['gallery_img_3']?.image_url,
-            alt: siteAssets['gallery_img_3']?.alt_text || "Badu Ghanaian Leather Footwear - Minimalist Architecture Space",
+            alt: siteAssets['gallery_img_3']?.alt_text || "Miss Tokyo - Minimalist Space",
             aspectRatio: "aspect-square",
         },
         {
             src: siteAssets['gallery_img_4']?.image_url,
-            alt: siteAssets['gallery_img_4']?.alt_text || "Badu Ghanaian Leather Footwear - Warm Tones and Abstract Design",
+            alt: siteAssets['gallery_img_4']?.alt_text || "Miss Tokyo - Warm Tones",
             aspectRatio: "aspect-[3/4]",
         }
     ];
