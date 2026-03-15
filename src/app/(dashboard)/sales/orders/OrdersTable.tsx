@@ -35,7 +35,7 @@ export function OrdersTable({ orders: initialOrders }: Props) {
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [bulkLoading, setBulkLoading] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLTableSectionElement>(null);
 
     // Close dropdown on outside click
     useEffect(() => {
