@@ -70,13 +70,18 @@ export async function POST(request: Request) {
         const amountInPesewas = amountInGHS * 100;
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-        const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
-        const subPct = Number(process.env.PAYSTACK_SUBACCOUNT_PERCENTAGE) || 2.5;
-        const subaccountPayload = paystackSubaccount ? {
-            subaccount: paystackSubaccount,
-            bearer: "subaccount",
-            transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
-        } : {};
+        // --- SPLIT GROUP (SPL_xxx) — active for testing ---
+        const paystackSplitCode = process.env.PAYSTACK_SPLIT_CODE;
+        const splitPayload = paystackSplitCode ? { split_code: paystackSplitCode } : {};
+
+        // --- SUBACCOUNT (ACCT_xxx) — commented out while testing split groups ---
+        // const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
+        // const subPct = Number(process.env.PAYSTACK_SUBACCOUNT_PERCENTAGE) || 2.5;
+        // const subaccountPayload = paystackSubaccount ? {
+        //     subaccount: paystackSubaccount,
+        //     bearer: "subaccount",
+        //     transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
+        // } : {};
 
         const response = await fetch("https://api.paystack.co/transaction/initialize", {
             method: "POST",
@@ -90,7 +95,7 @@ export async function POST(request: Request) {
                 currency: "GHS",
                 callback_url: `${siteUrl}/checkout/success`,
                 channels: ["card", "mobile_money", "bank", "bank_transfer", "ussd"],
-                ...subaccountPayload,
+                ...splitPayload,
                 metadata: {
                     ...clientMetadata,
                     productId,

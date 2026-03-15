@@ -34,13 +34,18 @@ export async function POST(req: NextRequest) {
         // Convert GHS amount to pesewas (Paystack uses lowest currency unit)
         const amountInPesewas = Math.round(finalAmount * 100);
 
-        const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
-        const subPct = Number(process.env.PAYSTACK_SUBACCOUNT_PERCENTAGE) || 2.5;
-        const subaccountPayload = paystackSubaccount ? {
-            subaccount: paystackSubaccount,
-            bearer: "subaccount",
-            transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
-        } : {};
+        // --- SPLIT GROUP (SPL_xxx) — active for testing ---
+        const paystackSplitCode = process.env.PAYSTACK_SPLIT_CODE;
+        const splitPayload = paystackSplitCode ? { split_code: paystackSplitCode } : {};
+
+        // --- SUBACCOUNT (ACCT_xxx) — commented out while testing split groups ---
+        // const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
+        // const subPct = Number(process.env.PAYSTACK_SUBACCOUNT_PERCENTAGE) || 2.5;
+        // const subaccountPayload = paystackSubaccount ? {
+        //     subaccount: paystackSubaccount,
+        //     bearer: "subaccount",
+        //     transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
+        // } : {};
 
         const body: Record<string, any> = {
             name: `Invoice #${invoiceId.substring(0, 8).toUpperCase()}`,
@@ -48,7 +53,7 @@ export async function POST(req: NextRequest) {
             amount: amountInPesewas,
             currency: "GHS",
             channels: ["card", "mobile_money", "bank", "bank_transfer", "ussd"],
-            ...subaccountPayload,
+            ...splitPayload,
             metadata: {
                 invoice_id: invoiceId,
                 source: "invoice",

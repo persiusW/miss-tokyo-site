@@ -21,12 +21,13 @@ interface ProductCardProps {
 export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, category, ribbon, isOnSale, salePrice, imageStretch = false, onQuickAdd }: ProductCardProps) {
     return (
         <div className="group block w-full relative">
-            <Link href={`/shop/${slug}`} className="block">
+            <Link href={`/products/${slug}`} className="block">
                 <div className="relative aspect-[4/5] w-full bg-neutral-100 overflow-hidden mb-4 rounded-none">
                     <Image
                         src={imageUrl}
                         alt={name}
                         fill
+                        sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
                         className={`${imageStretch ? "object-fill" : "object-cover object-center"} transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)] ${hoverImageUrl ? "group-hover:opacity-0" : "group-hover:scale-[1.05]"}`}
                     />
                     {hoverImageUrl && (
@@ -34,6 +35,7 @@ export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, catego
                             src={hoverImageUrl}
                             alt={`${name} alternate view`}
                             fill
+                            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
                             className={`${imageStretch ? "object-fill" : "object-cover object-center"} absolute inset-0 opacity-0 group-hover:opacity-100 group-hover:scale-[1.05] transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)]`}
                         />
                     )}
@@ -61,7 +63,7 @@ export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, catego
                 </div>
             </Link>
 
-            <Link href={`/shop/${slug}`} className="flex flex-col items-start text-left relative group/info mt-4">
+            <Link href={`/products/${slug}`} className="flex flex-col items-start text-left relative group/info mt-4">
                 <div className="flex w-full items-baseline justify-between gap-4">
                     <div className="flex-1">
                         <h3 className="text-[11px] tracking-[0.2em] uppercase text-neutral-900 font-bold mb-1">
