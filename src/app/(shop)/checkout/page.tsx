@@ -5,6 +5,12 @@ import { useCart } from "@/store/useCart";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 
+type FeeSettings = {
+    platform_fee_percentage: number;
+    platform_fee_label: string;
+    show_fee_at_checkout: boolean;
+};
+
 export default function CheckoutPage() {
     const { items, totalAmount } = useCart();
     const [mounted, setMounted] = useState(false);
@@ -12,6 +18,11 @@ export default function CheckoutPage() {
 
     // Store Settings
     const [enablePickup, setEnablePickup] = useState(false);
+    const [feeSettings, setFeeSettings] = useState<FeeSettings>({
+        platform_fee_percentage: 0,
+        platform_fee_label: "Service Charge",
+        show_fee_at_checkout: false,
+    });
 
     // Form State
     const [form, setForm] = useState({
@@ -19,7 +30,7 @@ export default function CheckoutPage() {
         email: "",
         phone: "",
         address: "",
-        deliveryMethod: "delivery" // 'delivery' or 'pickup'
+        deliveryMethod: "delivery" as "delivery" | "pickup",
     });
 
     // Validation errors
@@ -27,16 +38,26 @@ export default function CheckoutPage() {
 
     useEffect(() => {
         setMounted(true);
-        supabase.from("store_settings").select("enable_store_pickup").eq("id", "default").single()
+        supabase
+            .from("store_settings")
+            .select("enable_store_pickup, platform_fee_percentage, platform_fee_label, show_fee_at_checkout")
+            .eq("id", "default")
+            .single()
             .then(({ data }) => {
-                if (data) setEnablePickup(data.enable_store_pickup);
+                if (data) {
+                    setEnablePickup(data.enable_store_pickup || false);
+                    setFeeSettings({
+                        platform_fee_percentage: Number(data.platform_fee_percentage) || 0,
+                        platform_fee_label: data.platform_fee_label || "Service Charge",
+                        show_fee_at_checkout: data.show_fee_at_checkout ?? false,
+                    });
+                }
             });
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setForm(p => ({ ...p, [name]: value }));
-        // Clear error on change
         if (errors[name]) setErrors(p => ({ ...p, [name]: "" }));
     };
 
@@ -59,6 +80,12 @@ export default function CheckoutPage() {
         return newErrors;
     };
 
+    // Fee calculations
+    const subtotal = mounted ? totalAmount() : 0;
+    const shipping = 0;
+    const feeAmount = parseFloat(((subtotal + shipping) * (feeSettings.platform_fee_percentage / 100)).toFixed(2));
+    const finalTotal = parseFloat((subtotal + shipping + feeAmount).toFixed(2));
+
     const handleCheckout = async (e: React.FormEvent) => {
         e.preventDefault();
         const validationErrors = validate();
@@ -70,14 +97,16 @@ export default function CheckoutPage() {
         try {
             const payload = {
                 email: form.email,
-                amount: totalAmount(),
+                amount: finalTotal,
                 cartItems: items,
                 metadata: {
                     fullName: form.fullName,
                     phone: form.phone,
                     address: form.address,
                     deliveryMethod: form.deliveryMethod,
-                }
+                    platform_fee_amount: feeAmount,
+                    platform_fee_label: feeSettings.platform_fee_label,
+                },
             };
 
             const res = await fetch("/api/paystack/initialize", {
@@ -110,6 +139,9 @@ export default function CheckoutPage() {
             </div>
         );
     }
+
+    const { show_fee_at_checkout, platform_fee_label } = feeSettings;
+    const hasFee = feeAmount > 0;
 
     return (
         <div className="pt-32 pb-32 px-6 md:px-12 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16">
@@ -188,7 +220,7 @@ export default function CheckoutPage() {
                         disabled={loading}
                         className="w-full py-5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors mt-8 disabled:opacity-50 mt-12 block text-center"
                     >
-                        {loading ? "Processing..." : `Pay GHS ${totalAmount()}`}
+                        {loading ? "Processing..." : `Pay GHS ${finalTotal.toFixed(2)}`}
                     </button>
                 </form>
             </div>
@@ -206,13 +238,36 @@ export default function CheckoutPage() {
                                 <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>
                                 <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} • Qty: {item.quantity}</p>
                             </div>
-                            <p className="font-medium text-sm">GHS {item.price * item.quantity}</p>
+                            <p className="font-medium text-sm">GHS {(item.price * item.quantity).toFixed(2)}</p>
                         </div>
                     ))}
                 </div>
-                <div className="border-t border-neutral-200 mt-8 pt-8 flex justify-between items-center">
-                    <span className="font-serif tracking-widest uppercase">Total</span>
-                    <span className="font-medium text-lg">GHS {totalAmount()}</span>
+
+                {/* Totals breakdown */}
+                <div className="border-t border-neutral-200 mt-8 pt-6 space-y-3">
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-neutral-500 uppercase tracking-widest text-xs">Subtotal</span>
+                        <span>GHS {subtotal.toFixed(2)}</span>
+                    </div>
+
+                    {hasFee && show_fee_at_checkout && (
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-neutral-500 uppercase tracking-widest text-xs">{platform_fee_label}</span>
+                            <span>GHS {feeAmount.toFixed(2)}</span>
+                        </div>
+                    )}
+
+                    {hasFee && !show_fee_at_checkout && (
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-neutral-500 uppercase tracking-widest text-xs">Shipping &amp; Handling</span>
+                            <span>GHS {(shipping + feeAmount).toFixed(2)}</span>
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-center pt-4 border-t border-neutral-200">
+                        <span className="font-serif tracking-widest uppercase">Total</span>
+                        <span className="font-medium text-lg">GHS {finalTotal.toFixed(2)}</span>
+                    </div>
                 </div>
             </div>
         </div>

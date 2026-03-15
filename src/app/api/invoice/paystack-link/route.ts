@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 /**
  * POST /api/invoice/paystack-link
@@ -17,17 +18,42 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "invoiceId and amount are required." }, { status: 400 });
         }
 
+        // Fetch fee settings
+        const { data: feeData } = await supabaseAdmin
+            .from("store_settings")
+            .select("platform_fee_percentage, platform_fee_label")
+            .eq("id", "default")
+            .single();
+
+        const feePct = Number(feeData?.platform_fee_percentage) || 0;
+        const feeLabel = feeData?.platform_fee_label || "Service Charge";
+        const baseAmount = Number(amount);
+        const feeAmount = parseFloat((baseAmount * (feePct / 100)).toFixed(2));
+        const finalAmount = parseFloat((baseAmount + feeAmount).toFixed(2));
+
         // Convert GHS amount to pesewas (Paystack uses lowest currency unit)
-        const amountInPesewas = Math.round(Number(amount) * 100);
+        const amountInPesewas = Math.round(finalAmount * 100);
+
+        const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
+        const subPct = Number(process.env.PAYSTACK_SUBACCOUNT_PERCENTAGE) || 2.5;
+        const subaccountPayload = paystackSubaccount ? {
+            subaccount: paystackSubaccount,
+            bearer: "subaccount",
+            transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
+        } : {};
 
         const body: Record<string, any> = {
             name: `Invoice #${invoiceId.substring(0, 8).toUpperCase()}`,
             description: `Payment for invoice #${invoiceId.substring(0, 8).toUpperCase()}`,
             amount: amountInPesewas,
             currency: "GHS",
+            channels: ["card", "mobile_money", "bank", "bank_transfer", "ussd"],
+            ...subaccountPayload,
             metadata: {
                 invoice_id: invoiceId,
                 source: "invoice",
+                platform_fee_amount: feeAmount,
+                platform_fee_label: feeLabel,
             },
         };
 

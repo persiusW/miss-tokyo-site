@@ -30,6 +30,9 @@ type StoreSettings = {
     shop_product_limit: 8 | 12 | 16 | 24 | 32;
     shop_show_title: boolean;
     shop_image_stretch: boolean;
+    platform_fee_percentage: number;
+    platform_fee_label: string;
+    show_fee_at_checkout: boolean;
     enable_gift_cards: boolean;
     enable_gallery: boolean;
     enable_craft: boolean;
@@ -58,6 +61,9 @@ const DEFAULT_STORE: StoreSettings = {
     shop_product_limit: 12,
     shop_show_title: true,
     shop_image_stretch: false,
+    platform_fee_percentage: 0,
+    platform_fee_label: "Service Charge",
+    show_fee_at_checkout: false,
     enable_gift_cards: true,
     enable_gallery: true,
     enable_craft: true,
@@ -259,6 +265,9 @@ function StoreTab() {
                         shop_product_limit: (sData.shop_product_limit as 8 | 12 | 16 | 24 | 32) || 12,
                         shop_show_title: sData.shop_show_title ?? true,
                         shop_image_stretch: sData.shop_image_stretch ?? false,
+                        platform_fee_percentage: Number(sData.platform_fee_percentage) ?? 0,
+                        platform_fee_label: sData.platform_fee_label || "Service Charge",
+                        show_fee_at_checkout: sData.show_fee_at_checkout ?? false,
                         enable_gift_cards: sData.enable_gift_cards ?? true,
                         enable_gallery: sData.enable_gallery ?? true,
                         enable_craft: sData.enable_craft ?? true,
@@ -474,6 +483,57 @@ function StoreTab() {
                         <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stretch Product Images to Fill Frame</span>
                     </label>
                     <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">When on, images fill the card exactly (may distort). When off, images are cropped to fit.</p>
+                </div>
+            </div>
+
+            {/* Platform Fees */}
+            <div className="bg-white border border-neutral-200 p-8 space-y-6">
+                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Platform Fees</h2>
+                <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
+                    A percentage-based fee applied to all orders, invoices, and payment links to offset processing charges.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Fee Percentage (%)</label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={form.platform_fee_percentage}
+                            onChange={(e) => setForm(p => ({ ...p, platform_fee_percentage: parseFloat(e.target.value) || 0 }))}
+                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                            placeholder="2.5"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">e.g. 2.5 adds 2.5% to every order total.</p>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Fee Label</label>
+                        <input
+                            type="text"
+                            value={form.platform_fee_label}
+                            onChange={(e) => setForm(p => ({ ...p, platform_fee_label: e.target.value }))}
+                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                            placeholder="Service Charge"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Label shown to customers on receipts.</p>
+                    </div>
+                </div>
+
+                <div className="pt-4 border-t border-neutral-100">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.show_fee_at_checkout}
+                            onChange={(e) => setForm(p => ({ ...p, show_fee_at_checkout: e.target.checked }))}
+                            className="w-4 h-4 accent-black"
+                        />
+                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Show Fee as Itemised Line at Checkout</span>
+                    </label>
+                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">
+                        When off, the fee is silently rolled into "Shipping &amp; Handling" so the total still adds up without a visible surcharge line.
+                    </p>
                 </div>
             </div>
 

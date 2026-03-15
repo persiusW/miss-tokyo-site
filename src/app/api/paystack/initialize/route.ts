@@ -70,6 +70,14 @@ export async function POST(request: Request) {
         const amountInPesewas = amountInGHS * 100;
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
+        const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
+        const subPct = Number(process.env.PAYSTACK_SUBACCOUNT_PERCENTAGE) || 2.5;
+        const subaccountPayload = paystackSubaccount ? {
+            subaccount: paystackSubaccount,
+            bearer: "subaccount",
+            transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
+        } : {};
+
         const response = await fetch("https://api.paystack.co/transaction/initialize", {
             method: "POST",
             headers: {
@@ -81,6 +89,8 @@ export async function POST(request: Request) {
                 amount: amountInPesewas,
                 currency: "GHS",
                 callback_url: `${siteUrl}/checkout/success`,
+                channels: ["card", "mobile_money", "bank", "bank_transfer", "ussd"],
+                ...subaccountPayload,
                 metadata: {
                     ...clientMetadata,
                     productId,

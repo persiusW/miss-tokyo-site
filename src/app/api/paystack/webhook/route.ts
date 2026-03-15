@@ -21,8 +21,24 @@ async function sendOrderConfirmation(
     amount: number,
     bizName: string,
     bizAddress: string,
+    feeAmount?: number,
+    feeLabel?: string,
 ) {
     if (!process.env.RESEND_API_KEY) return;
+
+    const hasFee = feeAmount && feeAmount > 0;
+    const subtotal = hasFee ? amount - feeAmount : amount;
+
+    const feeRow = hasFee ? `
+      <tr style="border-bottom: 1px solid #f5f5f5;">
+        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Subtotal</td>
+        <td style="padding: 12px 0; font-size: 13px; text-align: right;">GH&#8373; ${subtotal.toFixed(2)}</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f5f5f5;">
+        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">${feeLabel || "Service Charge"}</td>
+        <td style="padding: 12px 0; font-size: 13px; text-align: right;">GH&#8373; ${feeAmount.toFixed(2)}</td>
+      </tr>` : "";
+
     await getResend().emails.send({
         from: `${bizName} <${process.env.RESEND_FROM_EMAIL || "no-reply@resend.dev"}>`,
         to: [customerEmail],
@@ -42,9 +58,10 @@ async function sendOrderConfirmation(
         <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Order Reference</td>
         <td style="padding: 12px 0; font-size: 13px; text-align: right; font-family: monospace; font-weight: 600;">#${orderRef}</td>
       </tr>
+      ${feeRow}
       <tr style="border-bottom: 1px solid #f5f5f5;">
-        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Amount Paid</td>
-        <td style="padding: 12px 0; font-size: 13px; text-align: right; font-weight: 600;">GH₵ ${amount.toFixed(2)}</td>
+        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Total Paid</td>
+        <td style="padding: 12px 0; font-size: 13px; text-align: right; font-weight: 600;">GH&#8373; ${amount.toFixed(2)}</td>
       </tr>
       <tr>
         <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Status</td>
@@ -90,7 +107,7 @@ export async function POST(req: Request) {
             console.log("Paystack Charge Success Event Received");
             const data = event.data;
             const metadata = data.metadata || {};
-            const { orderId, requestId, productId, fullName, phone, address, deliveryMethod, cartItems } = metadata;
+            const { orderId, requestId, productId, fullName, phone, address, deliveryMethod, cartItems, platform_fee_amount, platform_fee_label } = metadata;
             const customerEmail: string = data.customer?.email || "";
             const amountGHS = Number(data.amount) / 100;
             const paystackRef: string = data.reference || "";
@@ -161,7 +178,7 @@ export async function POST(req: Request) {
                 if (error) {
                     console.error("Webhook: Failed to update order:", error);
                 } else {
-                    await sendOrderConfirmation(customerEmail, orderId.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress);
+                    await sendOrderConfirmation(customerEmail, orderId.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined);
                 }
             } else if (customerEmail) {
                 // Fallback: create a new order if no pre-created one exists
@@ -191,7 +208,7 @@ export async function POST(req: Request) {
                     if (error) {
                         console.error("Webhook: Failed to create order:", error);
                     } else if (newOrder) {
-                        await sendOrderConfirmation(customerEmail, newOrder.id.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress);
+                        await sendOrderConfirmation(customerEmail, newOrder.id.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined);
                     }
                 }
             }
