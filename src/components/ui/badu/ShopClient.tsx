@@ -50,24 +50,31 @@ interface Product {
     colors: string[];
     sizes: string[];
     createdAt: string;
+    ribbon?: string | null;
+    isOnSale?: boolean;
+    salePrice?: string | null;
 }
 
 interface ShopClientProps {
     products: Product[];
     categories: Category[];
     gridCols?: 2 | 3 | 4;
+    mobileCols?: 1 | 2;
+    itemsPerPage?: number;
+    imageStretch?: boolean;
     defaultCategory?: string | null;
     defaultColor?: string | null;
     defaultSize?: string | null;
     defaultSort?: string;
 }
 
-const ITEMS_PER_PAGE = 8;
-
-export function ShopClient({ 
-    products, 
-    categories, 
+export function ShopClient({
+    products,
+    categories,
     gridCols = 4,
+    mobileCols = 2,
+    itemsPerPage = 12,
+    imageStretch = false,
     defaultCategory = null,
     defaultColor = null,
     defaultSize = null,
@@ -121,10 +128,10 @@ export function ShopClient({
     }, [products, activeCategory, activeSort, activeColor, activeSize]);
 
     // Pagination
-    const totalPages = Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(filteredAndSorted.length / itemsPerPage);
     const paginatedProducts = filteredAndSorted.slice(
-        (activePage - 1) * ITEMS_PER_PAGE,
-        activePage * ITEMS_PER_PAGE
+        (activePage - 1) * itemsPerPage,
+        activePage * itemsPerPage
     );
 
     useEffect(() => {
@@ -134,7 +141,7 @@ export function ShopClient({
     }, [quickViewSlug]);
 
     return (
-        <div className="flex flex-col lg:flex-row gap-8 lg:gap-16 pt-8">
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-16 pt-2">
             {/* Mobile Filter Toggle */}
             <div className="lg:hidden flex justify-between items-center mb-6">
                 <button 
@@ -294,7 +301,7 @@ export function ShopClient({
                 {/* Grid */}
                 {paginatedProducts.length > 0 ? (
                     <div className="space-y-16">
-                        <AnimatedProductGrid products={paginatedProducts} onQuickAdd={setQuickViewSlug} gridCols={3} />
+                        <AnimatedProductGrid products={paginatedProducts} onQuickAdd={setQuickViewSlug} gridCols={gridCols} mobileCols={mobileCols} imageStretch={imageStretch} />
                         
                         {/* Pagination */}
                         {totalPages > 1 && (

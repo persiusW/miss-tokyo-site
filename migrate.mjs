@@ -160,11 +160,19 @@ log("INFO", "Phase 2 — Migrating images to Supabase Storage");
  */
 async function migrateImage(wixHash, productId) {
   const url = wixImageUrl(wixHash);
-  const filename = path.basename(wixHash.trim());
+  // Sanitise filename — Supabase Storage rejects tilde and other special chars
+  const filename = path.basename(wixHash.trim()).replace(/[~]/g, "-");
   const storagePath = `${productId}/${filename}`;
 
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://www.wix.com/",
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      },
+    });
     if (!res.ok) {
       log("WARN", `Image download failed (${res.status})`, url);
       return null;

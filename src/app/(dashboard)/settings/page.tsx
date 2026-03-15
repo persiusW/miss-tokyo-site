@@ -25,7 +25,11 @@ type StoreSettings = {
     maintenance_mode: boolean;
     home_grid_cols: 2 | 3 | 4;
     shop_grid_cols: 2 | 3 | 4;
+    shop_mobile_cols: 1 | 2;
     home_product_limit: 4 | 6 | 8 | 12;
+    shop_product_limit: 8 | 12 | 16 | 24 | 32;
+    shop_show_title: boolean;
+    shop_image_stretch: boolean;
     enable_gift_cards: boolean;
     enable_gallery: boolean;
     enable_craft: boolean;
@@ -49,7 +53,11 @@ const DEFAULT_STORE: StoreSettings = {
     maintenance_mode: false,
     home_grid_cols: 4,
     shop_grid_cols: 4,
+    shop_mobile_cols: 2,
     home_product_limit: 4,
+    shop_product_limit: 12,
+    shop_show_title: true,
+    shop_image_stretch: false,
     enable_gift_cards: true,
     enable_gallery: true,
     enable_craft: true,
@@ -246,7 +254,11 @@ function StoreTab() {
                         maintenance_mode: sData.maintenance_mode || false,
                         home_grid_cols: (sData.home_grid_cols as 2 | 3 | 4) || 4,
                         shop_grid_cols: (sData.shop_grid_cols as 2 | 3 | 4) || 4,
+                        shop_mobile_cols: (sData.shop_mobile_cols as 1 | 2) || 2,
                         home_product_limit: (sData.home_product_limit as 4 | 6 | 8 | 12) || 4,
+                        shop_product_limit: (sData.shop_product_limit as 8 | 12 | 16 | 24 | 32) || 12,
+                        shop_show_title: sData.shop_show_title ?? true,
+                        shop_image_stretch: sData.shop_image_stretch ?? false,
                         enable_gift_cards: sData.enable_gift_cards ?? true,
                         enable_gallery: sData.enable_gallery ?? true,
                         enable_craft: sData.enable_craft ?? true,
@@ -385,6 +397,23 @@ function StoreTab() {
                         </div>
                         <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Columns on the full shop listing grid.</p>
                     </div>
+
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page Mobile Columns</label>
+                        <div className="flex gap-3 max-w-[160px]">
+                            {([1, 2] as const).map(n => (
+                                <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setForm(p => ({ ...p, shop_mobile_cols: n }))}
+                                    className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_mobile_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                                >
+                                    {n}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Grid columns on mobile devices.</p>
+                    </div>
                 </div>
 
                 <div className="pt-6 border-t border-neutral-100">
@@ -402,6 +431,49 @@ function StoreTab() {
                         ))}
                     </div>
                     <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Number of products shown in the homepage collection grid.</p>
+                </div>
+
+                <div className="pt-6 border-t border-neutral-100">
+                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page — Products Per Page</label>
+                    <div className="flex gap-3 max-w-sm">
+                        {([8, 12, 16, 24, 32] as const).map(n => (
+                            <button
+                                key={n}
+                                type="button"
+                                onClick={() => setForm(p => ({ ...p, shop_product_limit: n }))}
+                                className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_product_limit === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                            >
+                                {n}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Total products loaded per page on the shop listing.</p>
+                </div>
+
+                <div className="pt-6 border-t border-neutral-100">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.shop_show_title}
+                            onChange={(e) => setForm(p => ({ ...p, shop_show_title: e.target.checked }))}
+                            className="w-4 h-4 accent-black"
+                        />
+                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Show Shop Page Title &amp; Subtitle</span>
+                    </label>
+                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Display the hero text header above the product grid on the shop page.</p>
+                </div>
+
+                <div className="pt-6 border-t border-neutral-100">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.shop_image_stretch}
+                            onChange={(e) => setForm(p => ({ ...p, shop_image_stretch: e.target.checked }))}
+                            className="w-4 h-4 accent-black"
+                        />
+                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stretch Product Images to Fill Frame</span>
+                    </label>
+                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">When on, images fill the card exactly (may distort). When off, images are cropped to fit.</p>
                 </div>
             </div>
 

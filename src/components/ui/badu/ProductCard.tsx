@@ -11,10 +11,14 @@ interface ProductCardProps {
     imageUrl: string;
     hoverImageUrl?: string;
     category?: string;
+    ribbon?: string | null;
+    isOnSale?: boolean;
+    salePrice?: string | null;
+    imageStretch?: boolean;
     onQuickAdd?: (e: React.MouseEvent) => void;
 }
 
-export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, category, onQuickAdd }: ProductCardProps) {
+export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, category, ribbon, isOnSale, salePrice, imageStretch = false, onQuickAdd }: ProductCardProps) {
     return (
         <div className="group block w-full relative">
             <Link href={`/shop/${slug}`} className="block">
@@ -23,23 +27,25 @@ export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, catego
                         src={imageUrl}
                         alt={name}
                         fill
-                        className={`object-cover object-center transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)] ${hoverImageUrl ? "group-hover:opacity-0" : "group-hover:scale-[1.05]"}`}
+                        className={`${imageStretch ? "object-fill" : "object-cover object-center"} transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)] ${hoverImageUrl ? "group-hover:opacity-0" : "group-hover:scale-[1.05]"}`}
                     />
                     {hoverImageUrl && (
                         <Image
                             src={hoverImageUrl}
                             alt={`${name} alternate view`}
                             fill
-                            className="object-cover object-center absolute inset-0 opacity-0 group-hover:opacity-100 group-hover:scale-[1.05] transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)]"
+                            className={`${imageStretch ? "object-fill" : "object-cover object-center"} absolute inset-0 opacity-0 group-hover:opacity-100 group-hover:scale-[1.05] transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)]`}
                         />
                     )}
 
-                    {/* Badge */}
-                    <div className="absolute top-4 left-4 z-10">
-                        <span className="bg-white text-black text-[8px] md:text-[9px] px-3 py-1.5 uppercase font-bold tracking-[0.2em] shadow-sm">
-                            New Arrivals
-                        </span>
-                    </div>
+                    {/* Badge — ribbon from DB, fallback to Sale if is_sale */}
+                    {(ribbon || isOnSale) && (
+                        <div className="absolute top-4 left-4 z-10">
+                            <span className={`text-[8px] md:text-[9px] px-3 py-1.5 uppercase font-bold tracking-[0.2em] shadow-sm ${isOnSale ? "bg-black text-white" : "bg-white text-black"}`}>
+                                {ribbon || "Sale"}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Hover overlay button */}
                     {onQuickAdd && (
@@ -67,9 +73,16 @@ export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, catego
                             </span>
                         )}
                     </div>
-                    <p className="text-[11px] tracking-widest text-neutral-500 shrink-0 font-medium">
-                        {price}
-                    </p>
+                    <div className="flex flex-col items-end shrink-0">
+                        {isOnSale && salePrice ? (
+                            <>
+                                <p className="text-[11px] tracking-widest text-red-500 font-medium">{salePrice}</p>
+                                <p className="text-[9px] tracking-widest text-neutral-400 line-through">{price}</p>
+                            </>
+                        ) : (
+                            <p className="text-[11px] tracking-widest text-neutral-500 font-medium">{price}</p>
+                        )}
+                    </div>
                 </div>
             </Link>
         </div>

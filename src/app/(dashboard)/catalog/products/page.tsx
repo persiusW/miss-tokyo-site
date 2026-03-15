@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 
@@ -15,6 +15,7 @@ type Product = {
     inventory_count: number;
     is_active: boolean;
     image_urls: string[] | null;
+    product_variants: { sku: string | null }[] | null;
 };
 
 export default function CatalogProductsPage() {
@@ -27,7 +28,7 @@ export default function CatalogProductsPage() {
     const fetchProducts = useCallback(async () => {
         const { data } = await supabase
             .from("products")
-            .select("id, name, slug, category_type, price_ghs, inventory_count, is_active, image_urls")
+            .select("id, name, slug, category_type, price_ghs, inventory_count, is_active, image_urls, product_variants(sku)")
             .order("created_at", { ascending: false });
         setProducts(data || []);
         setLoading(false);
@@ -47,6 +48,15 @@ export default function CatalogProductsPage() {
         setConfirmDeleteId(null);
     };
 
+    const handleToggleActive = async (id: string, current: boolean) => {
+        const { error } = await supabase.from("products").update({ is_active: !current }).eq("id", id);
+        if (error) {
+            toast.error("Failed to update visibility.");
+        } else {
+            setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: !current } : p));
+        }
+    };
+
     const handleBulkDelete = async () => {
         if (!confirm("Are you sure you want to delete the selected products?")) return;
 
@@ -62,7 +72,7 @@ export default function CatalogProductsPage() {
 
     const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.category_type.toLowerCase().includes(searchQuery.toLowerCase())
+        (p.category_type || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const toggleSelectAll = () => {
@@ -81,7 +91,14 @@ export default function CatalogProductsPage() {
         <div className="space-y-12">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Products</h1>
+                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">
+                        Products
+                        {!loading && (
+                            <span className="ml-3 text-lg font-sans text-neutral-400 tracking-normal normal-case">
+                                ({filteredProducts.length}{searchQuery ? ` of ${products.length}` : ""})
+                            </span>
+                        )}
+                    </h1>
                     <p className="text-neutral-500">Manage your atelier's collection and inventory.</p>
                 </div>
                 <div className="flex items-center gap-4">
@@ -128,6 +145,7 @@ export default function CatalogProductsPage() {
                                 />
                             </th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Product</th>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">SKU</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Inventory</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Price</th>
@@ -137,11 +155,11 @@ export default function CatalogProductsPage() {
                     <tbody className="divide-y divide-neutral-100">
                         {loading ? (
                             <tr>
-                                <td colSpan={6} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td>
+                                <td colSpan={7} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td>
                             </tr>
                         ) : (!filteredProducts || filteredProducts.length === 0) ? (
                             <tr>
-                                <td colSpan={6} className="px-6 py-12 text-center text-neutral-500 italic font-serif">
+                                <td colSpan={7} className="px-6 py-12 text-center text-neutral-500 italic font-serif">
                                     No products found.
                                 </td>
                             </tr>
@@ -149,9 +167,10 @@ export default function CatalogProductsPage() {
                             filteredProducts.map((product) => {
                                 const isLowStock = product.inventory_count < 5;
                                 const isConfirming = confirmDeleteId === product.id;
+                                const firstSku = product.product_variants?.[0]?.sku || "—";
 
                                 return (
-                                    <tr key={product.id} className="hover:bg-neutral-50 transition-colors">
+                                    <tr key={product.id} className={`hover:bg-neutral-50 transition-colors ${!product.is_active ? "opacity-50" : ""}`}>
                                         <td className="px-6 py-4 text-center">
                                             <input
                                                 type="checkbox"
@@ -174,6 +193,9 @@ export default function CatalogProductsPage() {
                                                     <p className="text-xs text-neutral-500 mt-1">{product.category_type}</p>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="text-xs font-mono text-neutral-500">{firstSku}</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${product.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-600'}`}>
@@ -212,6 +234,13 @@ export default function CatalogProductsPage() {
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center gap-3 justify-end">
+                                                    <button
+                                                        onClick={() => handleToggleActive(product.id, product.is_active)}
+                                                        className={`transition-colors ${product.is_active ? "text-neutral-400 hover:text-black" : "text-neutral-300 hover:text-black"}`}
+                                                        title={product.is_active ? "Hide from store" : "Show on store"}
+                                                    >
+                                                        {product.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
+                                                    </button>
                                                     <Link
                                                         href={`/catalog/products/${product.id}/edit`}
                                                         className="text-neutral-400 hover:text-black transition-colors"

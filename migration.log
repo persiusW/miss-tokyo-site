@@ -1,0 +1,230 @@
+[INFO] Phase 1 — Parsing CSV | ./catalog_products.csv
+[INFO] Parsed 212 products from CSV
+[INFO] Found 33 unique categories
+[INFO] Phase 2 — Migrating images to Supabase Storage
+[WARN] Image download failed (403) | https://static.wixstatic.com/media/a4c79b_9550d7fc04cc47c6bb0a4085b9c78b4a
+[WARN] Skipping failed image for product | product_3b6a6911-44a3-0a4a-230c-374835bff34c — a4c79b_9550d7fc04cc47c6bb0a4085b9c78b4a
+[INFO] Images migrated for "Test 2" | 1/2 ok
+[INFO] Images migrated for "Animated Sleep wear." | 4/4 ok
+[INFO] Images migrated for "U Cut Top" | 10/10 ok
+[INFO] Images migrated for "3in1 Plain Tank Top" | 10/10 ok
+[INFO] Images migrated for "3in1 Striped Tank Top" | 6/6 ok
+[INFO] Images migrated for "Dede’s Halter Neck" | 2/2 ok
+[INFO] Images migrated for "Polo Striped Body-con Dress" | 5/5 ok
+[INFO] Images migrated for "Zip-Up Jacket " | 4/4 ok
+[INFO] Images migrated for "Hip pad Shaper " | 1/1 ok
+[INFO] Images migrated for "Buttons V Neck Top" | 4/4 ok
+[INFO] Images migrated for "Lovely Sleep 2 piece " | 3/3 ok
+[INFO] Images migrated for "Kyra Contrast Romper" | 3/3 ok
+[INFO] Images migrated for "M Charm" | 7/7 ok
+[INFO] Images migrated for "V Neck Basic Top" | 4/4 ok
+[WARN] Image download failed (403) | https://static.wixstatic.com/media/00fc05_64c224ca84e44429acf1ed2a86fc8a9e
+[WARN] Skipping failed image for product | product_70aff04e-f8ff-a83c-c51e-3eb688002aae — 00fc05_64c224ca84e44429acf1ed2a86fc8a9e
+[INFO] Images migrated for "Padded Jumpsuit" | 2/3 ok
+[INFO] Images migrated for "Lena Dress" | 1/1 ok
+[INFO] Images migrated for "FAJA " | 4/4 ok
+[INFO] Images migrated for "Bragga Body Shaper" | 2/2 ok
+[INFO] Images migrated for "98 Basic Top" | 3/3 ok
+[INFO] Images migrated for "CK Top" | 5/5 ok
+[INFO] Images migrated for "Tummy Control Pant" | 5/5 ok
+[INFO] Images migrated for "Bbl Set WIth jacket " | 5/5 ok
+[INFO] Images migrated for "Striped Long Sleeves Top" | 6/6 ok
+[INFO] Images migrated for "Lulu  set" | 6/6 ok
+[INFO] Images migrated for "Zip up vest" | 7/7 ok
+[INFO] Images migrated for "Bbl  Shorts" | 4/4 ok
+[INFO] Images migrated for "Glossy Gym Set" | 7/7 ok
+[INFO] Images migrated for "Striped Halter Neck Shirt " | 2/2 ok
+[INFO] Images migrated for "4in1 Bralette set " | 5/5 ok
+[INFO] Images migrated for "Heart Style Night wear " | 7/7 ok
+[INFO] Images migrated for "4in1 Spaghetti Tops" | 8/8 ok
+[INFO] Images migrated for "Two Pieces Lingerie " | 11/11 ok
+[WARN] Storage upload failed | product_e50f6360-b242-a936-2678-6e165ce8643f/dcd1f6_6650775516f8444fb4b24562964162f7-mv2.jpg — Bad Gateway
+[WARN] Skipping failed image for product | product_e50f6360-b242-a936-2678-6e165ce8643f — dcd1f6_6650775516f8444fb4b24562964162f7~mv2.jpg
+[INFO] Images migrated for "Tube Romper" | 6/7 ok
+[INFO] Images migrated for "Iris Jumpsuit" | 3/3 ok
+[INFO] Images migrated for "Bodysuit Shaper" | 4/4 ok
+[INFO] Images migrated for "Gym Suit " | 7/7 ok
+[INFO] Images migrated for "Contour Activewear Set" | 4/4 ok
+[INFO] Images migrated for "Striped Peplum Shirt" | 3/3 ok
+[INFO] Images migrated for "Unspethouse Tops" | 6/6 ok
+[INFO] Images migrated for "Corset Style Lace Up Dress" | 5/5 ok
+[INFO] Images migrated for "Sports Set " | 12/12 ok
+[INFO] Images migrated for "Seamless Quarter -Zip Top" | 10/10 ok
+[INFO] Images migrated for "Corset Style Ruched Tee" | 10/10 ok
+[INFO] Images migrated for "Platform Flip Flops " | 3/3 ok
+[INFO] Images migrated for "Grand Boubou" | 3/3 ok
+[INFO] Images migrated for "Seamless Halter Neck Top" | 6/6 ok
+[INFO] Images migrated for "Rhinestones Flip-Flop " | 8/8 ok
+[INFO] Images migrated for "Golf Shirt" | 5/5 ok
+[INFO] Images migrated for "The Kensington Shirtdress" | 4/4 ok
+[INFO] Images migrated for "Striped Open Back Top" | 7/7 ok
+[INFO] Images migrated for "Floral Bareback Top" | 2/2 ok
+[INFO] Images migrated for "Maxi Boho Skirt" | 9/9 ok
+[INFO] Images migrated for "Knotted  Bow Sandals " | 8/8 ok
+[INFO] Images migrated for "Maxi Shirt Dress" | 2/2 ok
+[INFO] Images migrated for "Athleisure Set" | 3/3 ok
+[INFO] Images migrated for "Pointelle Ribbed Set" | 2/2 ok
+[INFO] Images migrated for "Seersucker Short Set" | 3/3 ok
+[INFO] Images migrated for "Rose Skirts Set " | 3/3 ok
+[INFO] Images migrated for "New Adir TM  Sandals " | 10/10 ok
+[INFO] Images migrated for "Gracie Striped Two Piece " | 1/1 ok
+[INFO] Images migrated for "Scrunch V Cut Pant" | 3/3 ok
+[INFO] Images migrated for "Cross-Strap  Slippers" | 8/8 ok
+[INFO] Images migrated for "V Cut Wide Leg Pant" | 3/3 ok
+[INFO] Images migrated for "The Seraphina Off-Shoulder Mini" | 4/4 ok
+[INFO] Images migrated for "ZA  Shorts" | 3/3 ok
+[INFO] Images migrated for "Summer flat slippers " | 7/7 ok
+[INFO] Images migrated for "Leopard print Romper " | 2/2 ok
+[INFO] Images migrated for "Burbles bareback dress " | 2/2 ok
+[INFO] Images migrated for "Floral Lace Bodycon Mini Dress " | 3/3 ok
+[INFO] Images migrated for "3in1  Seamless Halter Neck Top" | 10/10 ok
+[INFO] Images migrated for "Square neck top" | 7/7 ok
+[INFO] Images migrated for "Lace Off  Shoulder  Dress " | 1/1 ok
+[INFO] Images migrated for "Moonlight Bubble Dress:" | 2/2 ok
+[INFO] Images migrated for "Side Pocket Wide Leg Yoga Pant" | 5/5 ok
+[INFO] Images migrated for "UNNISEX  Bulls Shirt" | 2/2 ok
+[INFO] Images migrated for "Polka Dot Midi Dress with Belt" | 2/2 ok
+[INFO] Images migrated for "Shimmer Long Sleeves Romper  " | 1/1 ok
+[INFO] Images migrated for "Empire Waist Gown" | 1/1 ok
+[INFO] Images migrated for "Tie & Dye Wide Leg Pant" | 3/3 ok
+[INFO] Images migrated for "Pink Pearl " | 2/2 ok
+[INFO] Images migrated for "Seamless Square Neck Top " | 3/3 ok
+[INFO] Images migrated for "Gym Wear " | 4/4 ok
+[INFO] Images migrated for "Side Striped Flare Pant" | 3/3 ok
+[INFO] Images migrated for "Faux Jeans" | 6/6 ok
+[INFO] Images migrated for "Thin Strap Halter Neck" | 3/3 ok
+[INFO] Images migrated for "BridesMaid white Dress" | 1/1 ok
+[INFO] Images migrated for "Seamless Ribbed Two-Piece Set" | 4/4 ok
+[INFO] Images migrated for "BBL Jeans" | 2/2 ok
+[INFO] Images migrated for "Cambridge Skirt Set" | 2/2 ok
+[INFO] Images migrated for "Sea Blue Maxi Dress" | 3/3 ok
+[INFO] Images migrated for "Jumpsuit " | 1/1 ok
+[INFO] Images migrated for "Split Side Seamless Dress " | 3/3 ok
+[INFO] Images migrated for "Polo Two Piece " | 1/1 ok
+[INFO] Images migrated for "Long Sleeves Striped Travel Set" | 7/7 ok
+[INFO] Images migrated for "Crystal slippers" | 1/1 ok
+[INFO] Images migrated for "Half Shoe " | 1/1 ok
+[INFO] Images migrated for "Slip on  Slippers " | 4/4 ok
+[INFO] Images migrated for "Spring Coiled Sandals" | 3/3 ok
+[INFO] Images migrated for "Halter Neck Striped Wide-Leg Jumpsuit" | 2/2 ok
+[INFO] Images migrated for "Floral Summer Dress" | 2/2 ok
+[INFO] Images migrated for "Mesh Layered Maxi Dress" | 2/2 ok
+[INFO] Images migrated for "Seamless Wide Leg Pant With Buttons" | 10/10 ok
+[INFO] Images migrated for "One Hand Seamless Set " | 10/10 ok
+[INFO] Images migrated for "Square Neck Jumpsuit" | 6/6 ok
+[INFO] Images migrated for "Cotton Skirt Set" | 2/2 ok
+[INFO] Images migrated for "Mesh Bodysuit with Low-rise Maxi Skirt" | 1/1 ok
+[INFO] Images migrated for "Knotted Cotton Top" | 3/3 ok
+[INFO] Images migrated for "Travel Set" | 2/2 ok
+[INFO] Images migrated for "Bodycon With Ruffle Hem" | 1/1 ok
+[INFO] Images migrated for "Bell-Bottom Leggings" | 2/2 ok
+[INFO] Images migrated for "Summer Sandals" | 2/2 ok
+[INFO] Images migrated for "Bbl Short Set" | 7/7 ok
+[INFO] Images migrated for "Halter Cowl Neck Mini Dress" | 2/2 ok
+[INFO] Images migrated for "Ribbed Crop Top" | 7/7 ok
+[INFO] Images migrated for "Adir Sandals" | 2/2 ok
+[INFO] Images migrated for "Fbibas sandals " | 1/1 ok
+[INFO] Images migrated for "Buttoned Romper" | 4/4 ok
+[INFO] Images migrated for "BBL Two Piece" | 9/9 ok
+[INFO] Images migrated for "Glassy Loafers" | 4/4 ok
+[INFO] Images migrated for "Moon Print Design Romper " | 1/1 ok
+[INFO] Images migrated for "One-Shoulder Rosette Maxi Dress" | 2/2 ok
+[INFO] Images migrated for "Flat Sandals " | 2/2 ok
+[INFO] Images migrated for "Knotted Hem Tee Top" | 5/5 ok
+[INFO] Images migrated for "Modest Pleated Maxi Dress" | 3/3 ok
+[INFO] Images migrated for "Trilana Sandals " | 2/2 ok
+[INFO] Images migrated for "Seamless Crop Top" | 8/8 ok
+[INFO] Images migrated for "Max Extra Sandals " | 4/4 ok
+[INFO] Images migrated for "Seamless Turtle Neck Top" | 6/6 ok
+[INFO] Images migrated for "Yapin Sandals " | 2/2 ok
+[INFO] Images migrated for "Wetlook Maxi Dress" | 1/1 ok
+[INFO] Images migrated for "Long sleeve Spaghetti Top" | 1/1 ok
+[INFO] Images migrated for "Striped Lacoste Dress" | 2/2 ok
+[INFO] Images migrated for "Cotton Biker Short" | 1/1 ok
+[INFO] Images migrated for "Black & White Striped Two Piece" | 1/1 ok
+[INFO] Images migrated for "Floral Ribbed Cami Set" | 1/1 ok
+[INFO] Images migrated for "Basic Striped Top" | 4/4 ok
+[INFO] Images migrated for "Long Sleeved Cheery Two Piece " | 2/2 ok
+[INFO] Images migrated for "Leopard Print Mini Dress" | 5/5 ok
+[INFO] Images migrated for "Pearl Set" | 4/4 ok
+[INFO] Images migrated for "Cross -Over sandals " | 2/2 ok
+[INFO] Images migrated for "Short Sleeved Cherry Two Piece " | 3/3 ok
+[INFO] Images migrated for "Yoga Set" | 2/2 ok
+[INFO] Images migrated for "Satin Halter Neck Top" | 8/8 ok
+[INFO] Images migrated for "Coucou Tar Dress" | 5/5 ok
+[INFO] Images migrated for "Crewneck Long Sleeve Top" | 2/2 ok
+[INFO] Images migrated for "Striped Polo Crop Top" | 2/2 ok
+[INFO] Images migrated for "Bow Tie Sandals" | 6/6 ok
+[INFO] Images migrated for "Silk Stripe Top" | 7/7 ok
+[INFO] Images migrated for "Striped Halter Mini Dress" | 5/5 ok
+[INFO] Images migrated for "Cotton Pant With Belt" | 5/5 ok
+[INFO] Images migrated for "Bedroom Shoes " | 8/8 ok
+[INFO] Images migrated for "Satin Puff  Top" | 4/4 ok
+[INFO] Images migrated for "Leopard-Print Wide Leg" | 1/1 ok
+[INFO] Images migrated for "Cece Floral Lace Dress" | 1/1 ok
+[INFO] Images migrated for "Basic Cotton Leggings " | 5/5 ok
+[INFO] Images migrated for "Long-Sleeve Turtleneck Top" | 2/2 ok
+[INFO] Images migrated for "Blue Floral Maxi Dress" | 2/2 ok
+[INFO] Images migrated for "Leapard Print Leggings " | 4/4 ok
+[INFO] Images migrated for "Zipped Cropped Jacket" | 5/5 ok
+[INFO] Images migrated for "Rib-Knit Ruffle Hem Polo Dress" | 3/3 ok
+[INFO] Images migrated for "Yoga Flair Pants" | 7/7 ok
+[INFO] Images migrated for "Short Sleeved Zipped Palazzo Set " | 6/6 ok
+[INFO] Images migrated for "Linen Pant With Belt" | 3/3 ok
+[INFO] Images migrated for "Striped Color Two Piece" | 3/3 ok
+[INFO] Images migrated for "Bel Bodycon Dress" | 1/1 ok
+[INFO] Images migrated for "Rich Aunty Boubou" | 1/1 ok
+[INFO] Images migrated for "Purple Satin Halter Neck Dress" | 2/2 ok
+[INFO] Images migrated for "Long-sleeve Stripe Top" | 5/5 ok
+[INFO] Images migrated for "Jersey Set" | 1/1 ok
+[INFO] Images migrated for "Alo Pants " | 1/1 ok
+[INFO] Images migrated for "Babydoll Romper" | 4/4 ok
+[INFO] Images migrated for "Bubble Hem Halter Mini Dress." | 2/2 ok
+[INFO] Images migrated for "Paisley legging set" | 2/2 ok
+[INFO] Images migrated for "Wide Leg Pants   " | 8/8 ok
+[INFO] Images migrated for "3-Piece Ribbed Nightwear" | 3/3 ok
+[INFO] Images migrated for "Silk Abaya" | 3/3 ok
+[INFO] Images migrated for "Baggy seamless Pants" | 4/4 ok
+[INFO] Images migrated for "Heart-Print Sleepwear" | 2/2 ok
+[INFO] Images migrated for "Seamless Skirt Set " | 9/9 ok
+[INFO] Images migrated for "The Marina Knot-Front Set" | 2/2 ok
+[INFO] Images migrated for "Lace Skirt Set " | 2/2 ok
+[INFO] Images migrated for "Stripe Short Shirt " | 4/4 ok
+[INFO] Images migrated for "Silk Booty Shorts (5 for ¢100)" | 5/5 ok
+[INFO] Images migrated for "Dolly Set" | 1/1 ok
+[INFO] Images migrated for "Cross Back jumpsuit " | 2/2 ok
+[INFO] Images migrated for "Lapel Buttoned Midi Dress" | 3/3 ok
+[INFO] Images migrated for "Tweed Mini Dress " | 6/6 ok
+[INFO] Images migrated for "Spaghetti Jumpsuit " | 6/6 ok
+[INFO] Images migrated for "Sleeveless Short Dress " | 4/4 ok
+[INFO] Images migrated for "Buttoned Sleeveless maxi dress " | 2/2 ok
+[INFO] Images migrated for "Short Sleeve Knitted Dress " | 3/3 ok
+[INFO] Images migrated for "Jayda Golf Skirt  Set  " | 2/2 ok
+[INFO] Images migrated for "Willow Chiffon Dress " | 3/3 ok
+[INFO] Images migrated for "Scrunch maxi dress " | 1/1 ok
+[INFO] Images migrated for "Blue Seashell Print Cotton Dress" | 2/2 ok
+[INFO] Images migrated for "Cinderella mini dress " | 3/3 ok
+[INFO] Images migrated for "Floral Maxi Dress" | 3/3 ok
+[INFO] Images migrated for "Zipped Top Seamless Two Peice" | 3/3 ok
+[INFO] Images migrated for "Rich Auntie Skirt Set " | 1/1 ok
+[INFO] Images migrated for "Elegant Lace Mermaid Dress" | 4/4 ok
+[INFO] Images migrated for "Slip Maxi Dress " | 2/2 ok
+[INFO] Images migrated for "Alo booty Short  " | 5/5 ok
+[INFO] Images migrated for "Blue Zara Two peice" | 2/2 ok
+[INFO] Images migrated for "Poncho Maxi Dress " | 1/1 ok
+[INFO] Images migrated for "Halter Neck Mini Dress" | 3/3 ok
+[INFO] Images migrated for "Guizio Chiffon Wrap Around Top Set" | 2/2 ok
+[INFO] Images migrated for "Polka Dot Short Set " | 1/1 ok
+[INFO] Images migrated for "Halter Neck Bareback Top" | 7/7 ok
+[INFO] Images migrated for "Braided Off Shoulder Dress" | 2/2 ok
+[INFO] Images migrated for "Jayda Pant Set" | 2/2 ok
+[INFO] Images migrated for "Sassy Mocha Dress" | 2/2 ok
+[INFO] Images migrated for "Pink Tasha Ribbon Dress" | 3/3 ok
+[INFO] Image migration complete | 807/810 succeeded, 3 skipped
+[INFO] Phase 3 — Upserting into Supabase
+[INFO] Categories upserted | 33 rows
+[INFO] ─── Migration Complete ───────────────────────
+[INFO] Products | 212 ok, 0 failed
+[INFO] Variants | 1291 ok, 0 failed
+[INFO] Images | 807 migrated, 3 skipped
+[INFO] Categories | 33 upserted

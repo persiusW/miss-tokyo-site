@@ -10,6 +10,9 @@ interface Product {
     imageUrl: string;
     hoverImageUrl?: string;
     category?: string;
+    ribbon?: string | null;
+    isOnSale?: boolean;
+    salePrice?: string | null;
 }
 
 const GRID_COLS_MAP: Record<2 | 3 | 4, string> = {
@@ -18,7 +21,12 @@ const GRID_COLS_MAP: Record<2 | 3 | 4, string> = {
     4: "lg:grid-cols-4",
 };
 
-export function AnimatedProductGrid({ products, onQuickAdd, gridCols = 4 }: { products: Product[], onQuickAdd?: (slug: string) => void, gridCols?: 2 | 3 | 4 }) {
+const MOBILE_COLS_MAP: Record<1 | 2, string> = {
+    1: "grid-cols-1",
+    2: "grid-cols-2",
+};
+
+export function AnimatedProductGrid({ products, onQuickAdd, gridCols = 4, mobileCols = 2, imageStretch = false }: { products: Product[], onQuickAdd?: (slug: string) => void, gridCols?: 2 | 3 | 4, mobileCols?: 1 | 2, imageStretch?: boolean }) {
     const container: Variants = {
         hidden: { opacity: 0 },
         show: {
@@ -36,7 +44,7 @@ export function AnimatedProductGrid({ products, onQuickAdd, gridCols = 4 }: { pr
 
     return (
         <motion.div
-            className={`grid grid-cols-2 md:grid-cols-2 ${GRID_COLS_MAP[gridCols]} gap-4 md:gap-8`}
+            className={`grid ${MOBILE_COLS_MAP[mobileCols]} md:grid-cols-2 ${GRID_COLS_MAP[gridCols]} gap-4 md:gap-8`}
             variants={container}
             initial="hidden"
             whileInView="show"
@@ -51,6 +59,10 @@ export function AnimatedProductGrid({ products, onQuickAdd, gridCols = 4 }: { pr
                         imageUrl={product.imageUrl}
                         hoverImageUrl={product.hoverImageUrl}
                         category={product.category}
+                        ribbon={product.ribbon}
+                        isOnSale={product.isOnSale}
+                        salePrice={product.salePrice}
+                        imageStretch={imageStretch}
                         onQuickAdd={onQuickAdd ? (e) => { e.preventDefault(); e.stopPropagation(); onQuickAdd(product.slug); } : undefined}
                     />
                 </motion.div>
