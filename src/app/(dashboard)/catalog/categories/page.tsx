@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/badu/ImageUploader";
-import { Pencil, Trash2, X, Check } from "lucide-react";
+import { Pencil, Trash2, X, Check, Star } from "lucide-react";
 import { toast } from "@/lib/toast";
 
 type Category = {
@@ -13,6 +13,7 @@ type Category = {
     description: string | null;
     image_url: string | null;
     is_active: boolean;
+    is_featured: boolean;
     created_at: string;
 };
 
@@ -65,6 +66,22 @@ export default function CategoriesPage() {
             await fetchCategories();
         }
         setSaving(false);
+    };
+
+    const toggleFeatured = async (id: string, is_featured: boolean) => {
+        if (!is_featured) {
+            const featuredCount = categories.filter(c => c.is_featured).length;
+            if (featuredCount >= 3) {
+                toast.error("Max 3 featured categories. Unfeature one first.");
+                return;
+            }
+        }
+        setCategories(prev => prev.map(c => c.id === id ? { ...c, is_featured: !is_featured } : c));
+        const { error } = await supabase.from("categories").update({ is_featured: !is_featured }).eq("id", id);
+        if (error) {
+            toast.error("Failed to update featured status.");
+            setCategories(prev => prev.map(c => c.id === id ? { ...c, is_featured } : c));
+        }
     };
 
     const toggleActive = async (id: string, is_active: boolean) => {
@@ -121,7 +138,12 @@ export default function CategoriesPage() {
             <header className="flex items-center justify-between">
                 <div>
                     <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Categories</h1>
-                    <p className="text-neutral-500">Organise your catalog for future expansion.</p>
+                    <p className="text-neutral-500">
+                        Organise your catalog for future expansion.
+                        <span className="ml-3 text-xs font-semibold uppercase tracking-widest text-amber-600">
+                            {categories.filter(c => c.is_featured).length}/3 Featured
+                        </span>
+                    </p>
                 </div>
                 <button
                     onClick={() => setIsAdding(!isAdding)}
@@ -206,6 +228,7 @@ export default function CategoriesPage() {
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Slug</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Description</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Featured</th>
                             <th className="px-6 py-4"></th>
                         </tr>
                     </thead>
@@ -257,6 +280,7 @@ export default function CategoriesPage() {
                                     <td className="px-6 py-4">
                                         <span className="text-xs text-neutral-400 italic">editing</span>
                                     </td>
+                                    <td className="px-6 py-4">—</td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3 justify-end">
                                             <button
@@ -297,6 +321,15 @@ export default function CategoriesPage() {
                                             className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${cat.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}
                                         >
                                             {cat.is_active ? "Active" : "Inactive"}
+                                        </button>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <button
+                                            onClick={() => toggleFeatured(cat.id, cat.is_featured)}
+                                            title={cat.is_featured ? "Unfeature" : "Feature on homepage"}
+                                            className={`transition-colors ${cat.is_featured ? "text-amber-500 hover:text-amber-300" : "text-neutral-300 hover:text-amber-500"}`}
+                                        >
+                                            <Star size={16} fill={cat.is_featured ? "currentColor" : "none"} />
                                         </button>
                                     </td>
                                     <td className="px-6 py-4">

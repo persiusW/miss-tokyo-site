@@ -561,4 +561,76 @@ CREATE TABLE public.store_settings (
     "qual": "true",
     "with_check": null
   }
+  
+
+  [
+  {
+    "table_name": "business_settings",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "store_settings",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "categories",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "products",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "gift_cards",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "pay_links",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "contacts",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "newsletter_subs",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "contact_inquiries",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "custom_requests",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "site_assets",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "site_copy",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "site_metadata",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "coupons",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "back_in_stock_requests",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "orders",
+    "rls_enabled": true
+  },
+  {
+    "table_name": "profiles",
+    "rls_enabled": true
+  }
+]
 ]

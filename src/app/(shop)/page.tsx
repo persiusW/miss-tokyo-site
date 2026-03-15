@@ -7,10 +7,11 @@ import Image from "next/image";
 export const revalidate = 60; // Revalidate every minute
 
 export default async function HomePage() {
-    const [{ data: assetsData }, { data: copyData }, { data: storeSettingsData }] = await Promise.all([
+    const [{ data: assetsData }, { data: copyData }, { data: storeSettingsData }, { data: featuredCategories }] = await Promise.all([
         supabase.from("site_assets").select("*"),
         supabase.from("site_copy").select("copy_key, value"),
         supabase.from("store_settings").select("home_grid_cols, home_product_limit").eq("id", "default").single(),
+        supabase.from("categories").select("id, name, slug, image_url").eq("is_featured", true).eq("is_active", true).limit(3),
     ]);
 
     const homeGridCols = ([2, 3, 4].includes(storeSettingsData?.home_grid_cols)
@@ -66,27 +67,31 @@ export default async function HomePage() {
                         Explore our curated collections
                     </p>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {[
-                            { name: "Sale", href: "/sale", img: "https://wcygtmcnysbhzgcicocm.supabase.co/storage/v1/object/public/site_assets/categories/sale.jpg" },
-                            { name: "New Arrivals", href: "/new-arrivals", img: "https://wcygtmcnysbhzgcicocm.supabase.co/storage/v1/object/public/site_assets/categories/new-arrivals.jpg" },
-                            { name: "Dresses", href: "/dresses", img: "https://wcygtmcnysbhzgcicocm.supabase.co/storage/v1/object/public/site_assets/categories/dresses.jpg" }
-                        ].map((cat) => (
-                            <Link key={cat.name} href={cat.href} className="group relative aspect-[4/5] overflow-hidden">
-                                <Image 
-                                    src={cat.img} 
-                                    alt={cat.name} 
-                                    fill 
-                                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="bg-white text-black px-8 py-3 text-sm uppercase tracking-widest shadow-md">
-                                        {cat.name}
-                                    </span>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
+                    {featuredCategories && featuredCategories.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            {featuredCategories.map((cat) => (
+                                <Link key={cat.id} href={`/shop?category=${cat.slug}`} className="group relative aspect-[4/5] overflow-hidden">
+                                    {cat.image_url ? (
+                                        <Image
+                                            src={cat.image_url}
+                                            alt={cat.name}
+                                            fill
+                                            className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full bg-neutral-100" />
+                                    )}
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="bg-white text-black px-8 py-3 text-sm uppercase tracking-widest shadow-md">
+                                            {cat.name}
+                                        </span>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-neutral-400 italic font-serif">No featured categories yet.</p>
+                    )}
                 </div>
             </section>
 

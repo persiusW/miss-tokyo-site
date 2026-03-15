@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { fetchOrderStats, fetchRecentActivity } from "@/lib/utils/metrics";
 
 export const dynamic = "force-dynamic";

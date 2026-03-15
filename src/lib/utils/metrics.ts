@@ -7,7 +7,7 @@
  * Explicitly excluded: 'pending', 'cancelled', 'refunded'
  */
 
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 
 // Canonical revenue-qualifying statuses
 export const REVENUE_STATUSES = ["paid", "processing", "fulfilled", "delivered"] as const;
