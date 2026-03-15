@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { ShopClient } from "@/components/ui/badu/ShopClient";
 
@@ -92,21 +93,23 @@ export default async function ShopCatalog({
                 </header>
             )}
 
-            <ShopClient
-                products={formattedProducts}
-                categories={(categories || []).map(c => ({
-                    id: c.id,
-                    name: c.name,
-                    slug: c.slug,
-                    image_url: c.image_url || null,
-                }))}
-                gridCols={shopGridCols}
-                mobileCols={shopMobileCols}
-                itemsPerPage={shopProductLimit}
-                imageStretch={shopImageStretch}
-                defaultCategory={defaultCategorySlug}
-                defaultSort={defaultSort}
-            />
+            <Suspense fallback={null}>
+                <ShopClient
+                    products={formattedProducts}
+                    categories={(categories || []).map(c => ({
+                        id: c.id,
+                        name: c.name,
+                        slug: c.slug,
+                        image_url: c.image_url || null,
+                    }))}
+                    gridCols={shopGridCols}
+                    mobileCols={shopMobileCols}
+                    itemsPerPage={shopProductLimit}
+                    imageStretch={shopImageStretch}
+                    defaultCategory={defaultCategorySlug}
+                    defaultSort={defaultSort}
+                />
+            </Suspense>
         </div>
     );
 }
