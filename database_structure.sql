@@ -29,6 +29,7 @@ CREATE TABLE public.categories (
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   image_url text,
+  is_featured boolean DEFAULT false,
   CONSTRAINT categories_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.contact_inquiries (
@@ -145,6 +146,8 @@ CREATE TABLE public.products (
   sale_subtext text,
   media jsonb DEFAULT '[]'::jsonb,
   is_sale boolean DEFAULT false,
+  category_type text,
+  available_stitching ARRAY,
   CONSTRAINT products_pkey PRIMARY KEY (id),
   CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id)
 );
@@ -204,6 +207,7 @@ CREATE TABLE public.store_settings (
   home_grid_cols integer NOT NULL DEFAULT 4,
   shop_grid_cols integer NOT NULL DEFAULT 4,
   home_product_limit integer NOT NULL DEFAULT 8,
+  global_stitching ARRAY DEFAULT ARRAY['Tonal'::text, 'Contrast White'::text],
   CONSTRAINT store_settings_pkey PRIMARY KEY (id)
 );
 

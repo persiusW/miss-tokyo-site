@@ -27,6 +27,8 @@ const NAV: NavSection[] = [
         items: [
             { label: "Products", href: "/catalog/products" },
             { label: "Categories", href: "/catalog/categories" },
+            { label: "Discounts", href: "/catalog/discounts" },
+            { label: "Gift Cards", href: "/catalog/gift-cards" },
         ],
     },
     {
@@ -40,6 +42,7 @@ const NAV: NavSection[] = [
         title: "Customers",
         items: [
             { label: "Contact List", href: "/customers" },
+            { label: "Abandoned Carts", href: "/customers/abandoned" },
             { label: "Custom Requests", href: "/customers/requests" },
             { label: "Form Submissions", href: "/customers/forms" },
         ],

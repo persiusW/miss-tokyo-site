@@ -6,6 +6,7 @@ import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 import { toast } from "@/lib/toast";
 import { AssetsTab } from "./AssetsTab";
 import { EmailsTab } from "./EmailsTab";
+import { RidersTab } from "./RidersTab";
 
 type BusinessSettings = {
     business_name: string;
@@ -25,6 +26,10 @@ type StoreSettings = {
     home_grid_cols: 2 | 3 | 4;
     shop_grid_cols: 2 | 3 | 4;
     home_product_limit: 4 | 6 | 8 | 12;
+    enable_gift_cards: boolean;
+    enable_gallery: boolean;
+    enable_craft: boolean;
+    enable_whitelabel: boolean;
 };
 
 const DEFAULT_BUSINESS: BusinessSettings = {
@@ -45,6 +50,10 @@ const DEFAULT_STORE: StoreSettings = {
     home_grid_cols: 4,
     shop_grid_cols: 4,
     home_product_limit: 4,
+    enable_gift_cards: true,
+    enable_gallery: true,
+    enable_craft: true,
+    enable_whitelabel: true,
 };
 
 type SiteMetadata = {
@@ -56,7 +65,7 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "seo" | "assets" | "emails";
+type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders";
 
 const TABS: { key: TabKey; label: string }[] = [
     { key: "business", label: "Business" },
@@ -64,6 +73,7 @@ const TABS: { key: TabKey; label: string }[] = [
     { key: "seo", label: "SEO" },
     { key: "assets", label: "Site Assets" },
     { key: "emails", label: "Emails" },
+    { key: "riders", label: "Riders" },
 ];
 
 export default function SettingsPage() {
@@ -94,6 +104,7 @@ export default function SettingsPage() {
             {activeTab === "seo" && <SEOTab />}
             {activeTab === "assets" && <AssetsTab />}
             {activeTab === "emails" && <EmailsTab />}
+            {activeTab === "riders" && <RidersTab />}
         </div>
     );
 }
@@ -236,6 +247,10 @@ function StoreTab() {
                         home_grid_cols: (sData.home_grid_cols as 2 | 3 | 4) || 4,
                         shop_grid_cols: (sData.shop_grid_cols as 2 | 3 | 4) || 4,
                         home_product_limit: (sData.home_product_limit as 4 | 6 | 8 | 12) || 4,
+                        enable_gift_cards: sData.enable_gift_cards ?? true,
+                        enable_gallery: sData.enable_gallery ?? true,
+                        enable_craft: sData.enable_craft ?? true,
+                        enable_whitelabel: sData.enable_whitelabel ?? true,
                     });
                 }
                 setLoading(false);
@@ -388,6 +403,29 @@ function StoreTab() {
                     </div>
                     <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Number of products shown in the homepage collection grid.</p>
                 </div>
+            </div>
+
+            {/* Feature Toggles */}
+            <div className="bg-white border border-neutral-200 p-8 space-y-5">
+                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Feature Toggles</h2>
+                <p className="text-[10px] text-neutral-400 tracking-wider uppercase">Enable or disable storefront sections. Hidden sections are removed from the navigation.</p>
+
+                {([
+                    { key: "enable_gift_cards" as const, label: "Gift Cards", desc: "Show the gift card purchase page in the navbar." },
+                    { key: "enable_gallery" as const,    label: "Gallery",    desc: "Show the gallery page and nav link." },
+                    { key: "enable_craft" as const,      label: "The Craft",  desc: "Show the craft / process page in the navbar." },
+                    { key: "enable_whitelabel" as const, label: "White Labelling", desc: "Show the white labelling / custom order page." },
+                ] as const).map(({ key, label, desc }) => (
+                    <div key={key} className="pt-4 border-t border-neutral-100 first:border-t-0 first:pt-0">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" checked={form[key]}
+                                onChange={(e) => setForm(p => ({ ...p, [key]: e.target.checked }))}
+                                className="w-4 h-4 accent-black" />
+                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">{label}</span>
+                        </label>
+                        <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">{desc}</p>
+                    </div>
+                ))}
             </div>
 
             <div className="flex justify-end items-center gap-6">

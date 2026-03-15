@@ -1,0 +1,447 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { toast } from "@/lib/toast";
+import { MoreHorizontal, Copy, Printer, Eye, Truck, X } from "lucide-react";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type Order = {
+    id: string;
+    customer_name: string | null;
+    customer_email: string | null;
+    customer_phone: string | null;
+    total_amount: number | null;
+    status: string;
+    paystack_reference: string | null;
+    shipping_address: Record<string, string> | null;
+    created_at: string;
+};
+
+type Rider = {
+    id: string;
+    full_name: string;
+    phone_number: string;
+    bike_reg: string | null;
+    image_url: string | null;
+    is_active: boolean;
+};
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const STATUS_STYLES: Record<string, string> = {
+    paid:        "bg-green-50 text-green-700",
+    processing:  "bg-blue-50 text-blue-700",
+    pending:     "bg-amber-50 text-amber-700",
+    fulfilled:   "bg-emerald-50 text-emerald-700",
+    delivered:   "bg-emerald-100 text-emerald-800",
+    cancelled:   "bg-red-50 text-red-600",
+    refunded:    "bg-neutral-100 text-neutral-600",
+};
+
+type Tab = "all" | "packed" | "shipped" | "fulfilled";
+
+const TABS: { key: Tab; label: string }[] = [
+    { key: "all",       label: "All Orders" },
+    { key: "packed",    label: "Packed" },
+    { key: "shipped",   label: "Shipped" },
+    { key: "fulfilled", label: "Fulfilled" },
+];
+
+function filterByTab(orders: Order[], tab: Tab): Order[] {
+    switch (tab) {
+        case "packed":    return orders.filter(o => o.status === "paid");
+        case "shipped":   return orders.filter(o => o.status === "processing");
+        case "fulfilled": return orders.filter(o => ["fulfilled", "delivered"].includes(o.status));
+        default:          return orders;
+    }
+}
+
+// ─── Dispatch Modal ───────────────────────────────────────────────────────────
+
+function DispatchModal({
+    orders,
+    onClose,
+    onConfirm,
+}: {
+    orders: Order[];
+    onClose: () => void;
+    onConfirm: (riderId: string, notifyRider: boolean) => void;
+}) {
+    const [riders, setRiders] = useState<Rider[]>([]);
+    const [selectedRider, setSelectedRider] = useState<string>("");
+    const [notifyRider, setNotifyRider] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [confirming, setConfirming] = useState(false);
+
+    useEffect(() => {
+        supabase.from("riders").select("*").eq("is_active", true).order("full_name")
+            .then(({ data }) => {
+                setRiders(data ?? []);
+                if (data && data.length > 0) setSelectedRider(data[0].id);
+                setLoading(false);
+            });
+    }, []);
+
+    const handleConfirm = async () => {
+        if (!selectedRider) { toast.error("Select a rider first."); return; }
+        setConfirming(true);
+        onConfirm(selectedRider, notifyRider);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white w-full max-w-lg border border-neutral-200 shadow-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between px-8 py-6 border-b border-neutral-200">
+                    <div>
+                        <h2 className="font-serif text-xl tracking-widest uppercase">Assign Dispatch Rider</h2>
+                        <p className="text-xs text-neutral-500 mt-1">{orders.length} order{orders.length !== 1 ? "s" : ""} to dispatch</p>
+                    </div>
+                    <button onClick={onClose} className="text-neutral-400 hover:text-black transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="px-8 py-6 space-y-6">
+                    {/* Order preview */}
+                    <div className="bg-neutral-50 border border-neutral-100 p-4 max-h-32 overflow-y-auto space-y-1">
+                        {orders.map(o => (
+                            <div key={o.id} className="flex justify-between text-xs text-neutral-600">
+                                <span className="font-mono">{o.id.substring(0, 8).toUpperCase()}</span>
+                                <span>{o.customer_name || o.customer_email}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Rider select */}
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Select Rider</label>
+                        {loading ? (
+                            <p className="text-xs text-neutral-400 italic">Loading riders...</p>
+                        ) : riders.length === 0 ? (
+                            <p className="text-xs text-red-500">No active riders. Add riders in Settings → Riders.</p>
+                        ) : (
+                            <select
+                                value={selectedRider}
+                                onChange={e => setSelectedRider(e.target.value)}
+                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm"
+                            >
+                                {riders.map(r => (
+                                    <option key={r.id} value={r.id}>
+                                        {r.full_name} · {r.phone_number}{r.bike_reg ? ` · ${r.bike_reg}` : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+
+                    {/* Notify rider toggle */}
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={notifyRider}
+                            onChange={e => setNotifyRider(e.target.checked)}
+                            className="w-4 h-4 accent-black"
+                        />
+                        <div>
+                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-700">Notify Rider via SMS</span>
+                            <p className="text-[10px] text-neutral-400 mt-0.5">Sends customer name, phone, and delivery address to rider.</p>
+                        </div>
+                    </label>
+                </div>
+
+                <div className="px-8 py-5 border-t border-neutral-200 flex justify-end gap-4">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-3 text-xs uppercase tracking-widest text-neutral-500 hover:text-black border border-neutral-200 hover:border-black transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleConfirm}
+                        disabled={confirming || !selectedRider || riders.length === 0}
+                        className="px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                    >
+                        {confirming ? "Dispatching..." : "Confirm Dispatch"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
+    const router = useRouter();
+    const [orders, setOrders] = useState(initialOrders);
+    const [activeTab, setActiveTab] = useState<Tab>("all");
+    const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+    const [showDispatch, setShowDispatch] = useState(false);
+    const [bulkLoading, setBulkLoading] = useState(false);
+
+    const visibleOrders = filterByTab(orders, activeTab);
+    const allSelected = visibleOrders.length > 0 && visibleOrders.every(o => selected.has(o.id));
+
+    // Tab counts
+    const tabCounts: Record<Tab, number> = {
+        all:       orders.length,
+        packed:    orders.filter(o => o.status === "paid").length,
+        shipped:   orders.filter(o => o.status === "processing").length,
+        fulfilled: orders.filter(o => ["fulfilled", "delivered"].includes(o.status)).length,
+    };
+
+    // Reset selection when tab changes
+    useEffect(() => { setSelected(new Set()); }, [activeTab]);
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest("[data-dropdown]")) setOpenDropdown(null);
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const toggleAll = () => {
+        setSelected(allSelected
+            ? new Set()
+            : new Set(visibleOrders.map(o => o.id))
+        );
+    };
+
+    const toggleOne = (id: string) => {
+        setSelected(prev => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    };
+
+    const bulkUpdate = async (status: string) => {
+        setBulkLoading(true);
+        const ids = [...selected];
+        const { error } = await supabase.from("orders").update({ status }).in("id", ids);
+        if (error) {
+            toast.error("Failed to update orders.");
+        } else {
+            toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} → ${status}.`);
+            setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, status } : o));
+            setSelected(new Set());
+        }
+        setBulkLoading(false);
+    };
+
+    const handleDispatchConfirm = async (riderId: string, notifyRider: boolean) => {
+        const selectedOrders = visibleOrders.filter(o => selected.has(o.id));
+        const ids = selectedOrders.map(o => o.id);
+
+        try {
+            const res = await fetch("/api/dispatch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderIds: ids, riderId, notifyRider }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Dispatch failed");
+
+            toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} dispatched.`);
+            setOrders(prev => prev.map(o =>
+                selected.has(o.id) ? { ...o, status: "processing" } : o
+            ));
+            setSelected(new Set());
+            setShowDispatch(false);
+        } catch (err: any) {
+            toast.error(err.message || "Dispatch failed.");
+        }
+    };
+
+    const copyOrderId = (id: string) => {
+        navigator.clipboard.writeText(id);
+        toast.success("Order ID copied.");
+        setOpenDropdown(null);
+    };
+
+    const handleRowClick = (e: React.MouseEvent, orderId: string) => {
+        const target = e.target as HTMLElement;
+        if (target.closest("input, button, a, [data-no-nav]")) return;
+        router.push(`/sales/orders/${orderId}`);
+    };
+
+    const selectedCount = selected.size;
+
+    return (
+        <div className="space-y-0">
+            {/* Sub-tabs */}
+            <div className="flex gap-0 border-b border-neutral-200">
+                {TABS.map(tab => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`px-6 py-3 text-xs font-semibold uppercase tracking-widest transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+                            activeTab === tab.key
+                                ? "border-black text-black"
+                                : "border-transparent text-neutral-400 hover:text-black"
+                        }`}
+                    >
+                        {tab.label}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                            activeTab === tab.key ? "bg-black text-white" : "bg-neutral-100 text-neutral-500"
+                        }`}>
+                            {tabCounts[tab.key]}
+                        </span>
+                    </button>
+                ))}
+            </div>
+
+            {/* Bulk Actions Bar */}
+            {selectedCount > 0 && (
+                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-black text-white px-6 py-4 shadow-2xl">
+                    <span className="text-xs uppercase tracking-widest text-neutral-300 mr-2">
+                        {selectedCount} selected
+                    </span>
+
+                    {activeTab === "packed" ? (
+                        <button
+                            onClick={() => setShowDispatch(true)}
+                            disabled={bulkLoading}
+                            className="flex items-center gap-2 text-xs uppercase tracking-widest px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-50"
+                        >
+                            <Truck size={14} /> Initiate Dispatch
+                        </button>
+                    ) : (
+                        <>
+                            <button onClick={() => bulkUpdate("paid")} disabled={bulkLoading}
+                                className="text-xs uppercase tracking-widest px-4 py-2 bg-neutral-700 hover:bg-neutral-600 transition-colors disabled:opacity-50">
+                                Mark Packed
+                            </button>
+                            <button onClick={() => setShowDispatch(true)} disabled={bulkLoading}
+                                className="flex items-center gap-2 text-xs uppercase tracking-widest px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-50">
+                                <Truck size={14} /> Mark Shipped
+                            </button>
+                            <button onClick={() => bulkUpdate("fulfilled")} disabled={bulkLoading}
+                                className="text-xs uppercase tracking-widest px-4 py-2 bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50">
+                                Mark Fulfilled
+                            </button>
+                        </>
+                    )}
+
+                    <button
+                        onClick={() => setSelected(new Set())}
+                        className="ml-2 text-neutral-400 hover:text-white transition-colors"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+            )}
+
+            {/* Table */}
+            <div className="bg-white border border-neutral-200 border-t-0 overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-neutral-50 border-b border-neutral-200">
+                        <tr>
+                            <th className="px-4 py-4 w-10">
+                                <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                                    className="w-4 h-4 cursor-pointer accent-black" />
+                            </th>
+                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Order ID</th>
+                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Customer</th>
+                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Amount</th>
+                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
+                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Reference</th>
+                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Date</th>
+                            <th className="px-4 py-4 w-12"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                        {visibleOrders.length === 0 ? (
+                            <tr>
+                                <td colSpan={8} className="px-6 py-16 text-center text-neutral-500 italic font-serif">
+                                    No orders in this category.
+                                </td>
+                            </tr>
+                        ) : visibleOrders.map((order) => (
+                            <tr
+                                key={order.id}
+                                onClick={(e) => handleRowClick(e, order.id)}
+                                className={`hover:bg-neutral-50 transition-colors cursor-pointer ${selected.has(order.id) ? "bg-neutral-50" : ""}`}
+                            >
+                                <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                                    <input type="checkbox" checked={selected.has(order.id)}
+                                        onChange={() => toggleOne(order.id)}
+                                        className="w-4 h-4 cursor-pointer accent-black" />
+                                </td>
+                                <td className="px-4 py-4">
+                                    <span className="font-mono text-xs text-neutral-600">
+                                        {order.id.substring(0, 8).toUpperCase()}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-4 text-neutral-700">
+                                    {order.customer_name || order.customer_email || "—"}
+                                </td>
+                                <td className="px-4 py-4 text-right font-medium">
+                                    GH₵ {Number(order.total_amount ?? 0).toFixed(2)}
+                                </td>
+                                <td className="px-4 py-4">
+                                    <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
+                                        {order.status}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-4">
+                                    <span className="font-mono text-xs text-neutral-500">
+                                        {order.paystack_reference || "—"}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-4 text-right text-neutral-500 text-xs">
+                                    {new Date(order.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-4 py-4 text-right relative" onClick={e => e.stopPropagation()} data-dropdown>
+                                    <button
+                                        onClick={() => setOpenDropdown(openDropdown === order.id ? null : order.id)}
+                                        className="p-1.5 text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors"
+                                    >
+                                        <MoreHorizontal size={16} />
+                                    </button>
+                                    {openDropdown === order.id && (
+                                        <div className="absolute right-4 top-12 z-20 bg-white border border-neutral-200 shadow-lg min-w-[180px] py-1">
+                                            <button onClick={() => copyOrderId(order.id)}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50 text-left">
+                                                <Copy size={13} /> Copy Order ID
+                                            </button>
+                                            <Link href={`/sales/orders/${order.id}?print=1`}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50"
+                                                onClick={() => setOpenDropdown(null)}>
+                                                <Printer size={13} /> Print Invoice
+                                            </Link>
+                                            <div className="border-t border-neutral-100 my-1" />
+                                            <Link href={`/sales/orders/${order.id}`}
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50"
+                                                onClick={() => setOpenDropdown(null)}>
+                                                <Eye size={13} /> View Details
+                                            </Link>
+                                        </div>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Dispatch Modal */}
+            {showDispatch && (
+                <DispatchModal
+                    orders={visibleOrders.filter(o => selected.has(o.id))}
+                    onClose={() => setShowDispatch(false)}
+                    onConfirm={handleDispatchConfirm}
+                />
+            )}
+        </div>
+    );
+}

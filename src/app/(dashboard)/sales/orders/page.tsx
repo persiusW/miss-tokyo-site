@@ -1,6 +1,6 @@
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { fetchOrderStats } from "@/lib/utils/metrics";
-import { OrdersTable } from "./OrdersTable";
+import { OrdersClient } from "./OrdersClient";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -60,7 +60,7 @@ export default async function OrdersPage() {
                 </div>
             </div>
 
-            <OrdersTable orders={allOrders} />
+            <OrdersClient orders={allOrders} />
         </div>
     );
 }
