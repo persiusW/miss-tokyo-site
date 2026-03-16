@@ -2,6 +2,91 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Check } from "lucide-react";
+
+// ── Status timeline ───────────────────────────────────────────────────────────
+
+const TIMELINE_STEPS = [
+    { key: "ordered",    label: "Ordered" },
+    { key: "processing", label: "Processing" },
+    { key: "packed",     label: "Packed" },
+    { key: "shipped",    label: "Shipped" },
+    { key: "delivered",  label: "Delivered" },
+] as const;
+
+// Map DB status to which step index is active (0-based)
+function statusToStep(status: string): number {
+    switch (status) {
+        case "pending":               return 0;
+        case "paid":
+        case "processing":            return 1;
+        case "packed":                return 2;
+        case "shipped":               return 3;
+        case "delivered":
+        case "fulfilled":             return 4;
+        default:                      return 0;
+    }
+}
+
+function isCancelled(status: string) {
+    return status === "cancelled" || status === "refunded";
+}
+
+function StatusTimeline({ status }: { status: string }) {
+    if (isCancelled(status)) {
+        return (
+            <div className="mt-4 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-red-400" />
+                <span className="text-[10px] uppercase tracking-widest text-red-500 font-semibold">
+                    {status === "refunded" ? "Refunded" : "Cancelled"}
+                </span>
+            </div>
+        );
+    }
+
+    const active = statusToStep(status);
+
+    return (
+        <div className="mt-4 flex items-center gap-0 overflow-x-auto">
+            {TIMELINE_STEPS.map((step, i) => {
+                const done    = i < active;
+                const current = i === active;
+                const future  = i > active;
+
+                return (
+                    <div key={step.key} className="flex items-center min-w-0">
+                        {/* Node */}
+                        <div className="flex flex-col items-center shrink-0">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-colors ${
+                                done    ? "bg-black border-black" :
+                                current ? "bg-white border-black" :
+                                          "bg-white border-neutral-300"
+                            }`}>
+                                {done ? (
+                                    <Check size={11} className="text-white" strokeWidth={3} />
+                                ) : current ? (
+                                    <div className="w-2 h-2 rounded-full bg-black" />
+                                ) : null}
+                            </div>
+                            <span className={`mt-1.5 text-[9px] uppercase tracking-wider whitespace-nowrap font-semibold ${
+                                future ? "text-neutral-300" : "text-black"
+                            }`}>
+                                {step.label}
+                            </span>
+                        </div>
+
+                        {/* Connector line (not after last) */}
+                        {i < TIMELINE_STEPS.length - 1 && (
+                            <div className={`h-[2px] w-8 md:w-14 shrink-0 mx-1 ${done ? "bg-black" : "bg-neutral-200"}`} />
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+// ── Status badge ──────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
     paid:        "bg-green-50 text-green-700",
@@ -9,11 +94,13 @@ const STATUS_STYLES: Record<string, string> = {
     shipped:     "bg-indigo-50 text-indigo-700",
     processing:  "bg-blue-50 text-blue-700",
     pending:     "bg-amber-50 text-amber-700",
-    fulfilled:   "bg-emerald-50 text-emerald-700",
+    fulfilled:   "bg-emerald-50 text-emerald-800",
     delivered:   "bg-emerald-100 text-emerald-800",
     cancelled:   "bg-red-50 text-red-600",
     refunded:    "bg-neutral-100 text-neutral-600",
 };
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type Order = {
     id: string;
@@ -28,6 +115,8 @@ type Rider = {
     full_name: string;
     phone_number: string;
 };
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AccountOrdersPage() {
     const [orders, setOrders] = useState<Order[]>([]);
@@ -77,7 +166,8 @@ export default function AccountOrdersPage() {
                         const isShipped = order.status === "shipped" || order.status === "processing";
                         return (
                             <div key={order.id} className="border border-neutral-200 bg-white p-6">
-                                <div className="flex flex-wrap items-start justify-between gap-4 mb-2">
+                                {/* Header row */}
+                                <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
                                     <div>
                                         <p className="font-mono text-xs text-neutral-500 mb-1">
                                             ORDER #{order.id.substring(0, 8).toUpperCase()}
@@ -98,8 +188,12 @@ export default function AccountOrdersPage() {
                                     </div>
                                 </div>
 
+                                {/* Status timeline */}
+                                <StatusTimeline status={order.status} />
+
+                                {/* Rider info (when shipped) */}
                                 {isShipped && rider && (
-                                    <div className="bg-indigo-50 border border-indigo-100 px-4 py-3 mt-3 text-xs">
+                                    <div className="bg-indigo-50 border border-indigo-100 px-4 py-3 mt-4 text-xs">
                                         <p className="font-semibold uppercase tracking-widest text-indigo-700 mb-1">Dispatch Rider</p>
                                         <p className="text-indigo-600">{rider.full_name} · {rider.phone_number}</p>
                                     </div>

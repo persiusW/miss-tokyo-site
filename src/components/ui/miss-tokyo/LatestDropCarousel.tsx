@@ -147,7 +147,7 @@ export function LatestDropCarousel() {
             {Array.from({ length: 5 }).map((_, i) => (
                 <div
                     key={i}
-                    className="min-w-[85vw] md:min-w-[calc(33.333%-1rem)] lg:min-w-[calc(20%-1.2rem)] flex-shrink-0 animate-pulse"
+                    className="min-w-[95vw] md:min-w-[calc(38.4%-1rem)] lg:min-w-[calc(23%-1rem)] flex-shrink-0 animate-pulse"
                 >
                     <div className="aspect-[3/4] w-full bg-neutral-100" />
                     <div className="mt-4 h-3 bg-neutral-100 w-3/4 rounded" />
@@ -222,7 +222,7 @@ export function LatestDropCarousel() {
                                     <div
                                         key={p.slug}
                                         data-card
-                                        className="min-w-[85vw] md:min-w-[calc(33.333%-1rem)] lg:min-w-[calc(20%-1.2rem)] flex-shrink-0 snap-start group"
+                                        className="min-w-[95vw] md:min-w-[calc(38.4%-1rem)] lg:min-w-[calc(23%-1rem)] flex-shrink-0 snap-start group"
                                     >
                                         <Link href={`/products/${p.slug}`} className="block">
                                             {/* Portrait image */}
