@@ -157,7 +157,7 @@ function BusinessTab() {
                     bucket="site-assets"
                     folder="logos"
                     currentUrls={form.logo_url ? [form.logo_url] : []}
-                    onUpload={(urls) => setForm(p => ({ ...p, logo_url: urls[0] }))}
+                    onUpload={(urls: string[]) => setForm(p => ({ ...p, logo_url: urls[0] }))}
                     onRemove={() => setForm(p => ({ ...p, logo_url: null }))}
                     aspectRatio="square"
                     label="Signature Logo"

@@ -166,7 +166,7 @@ export function AssetsTab() {
                                         bucket="site-assets"
                                         folder="banners"
                                         currentUrls={asset?.image_url ? [asset.image_url] : []}
-                                        onUpload={(urls) => handleAssetSave(def.section_key, { image_url: urls[0], is_active: true })}
+                                        onUpload={(urls: string[]) => handleAssetSave(def.section_key, { image_url: urls[0], is_active: true })}
                                         onRemove={() => handleAssetSave(def.section_key, { image_url: null, is_active: false })}
                                         aspectRatio="banner"
                                         label="Imagery"
