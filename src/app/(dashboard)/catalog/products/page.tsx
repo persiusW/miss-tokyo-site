@@ -13,6 +13,7 @@ type Product = {
     category_type: string;
     price_ghs: number;
     inventory_count: number;
+    track_inventory: boolean;
     is_active: boolean;
     image_urls: string[] | null;
     product_variants: { sku: string | null }[] | null;
@@ -28,7 +29,7 @@ export default function CatalogProductsPage() {
     const fetchProducts = useCallback(async () => {
         const { data } = await supabase
             .from("products")
-            .select("id, name, slug, category_type, price_ghs, inventory_count, is_active, image_urls, product_variants(sku)")
+            .select("id, name, slug, category_type, price_ghs, inventory_count, track_inventory, is_active, image_urls, product_variants(sku)")
             .order("created_at", { ascending: false });
         setProducts(data || []);
         setLoading(false);
@@ -66,6 +67,20 @@ export default function CatalogProductsPage() {
         } else {
             toast.success("Products deleted.");
             setProducts(prev => prev.filter(p => !selectedIds.includes(p.id)));
+            setSelectedIds([]);
+        }
+    };
+
+    const handleBulkUntrack = async () => {
+        const { error } = await supabase
+            .from("products")
+            .update({ track_inventory: false, inventory_count: 9999 })
+            .in("id", selectedIds);
+        if (error) {
+            toast.error("Failed to update inventory tracking.");
+        } else {
+            toast.success(`Inventory tracking disabled for ${selectedIds.length} product${selectedIds.length !== 1 ? "s" : ""}.`);
+            setProducts(prev => prev.map(p => selectedIds.includes(p.id) ? { ...p, track_inventory: false, inventory_count: 9999 } : p));
             setSelectedIds([]);
         }
     };
@@ -110,6 +125,12 @@ export default function CatalogProductsPage() {
                         className="px-4 py-3 text-xs tracking-widest uppercase border border-neutral-200 outline-none focus:border-black transition-colors w-64 bg-transparent"
                     />
                     <Link
+                        href="/catalog/products/low-stock"
+                        className="border border-amber-400 text-amber-700 px-5 py-3 text-xs uppercase tracking-widest hover:bg-amber-50 transition-colors whitespace-nowrap"
+                    >
+                        Low Stock
+                    </Link>
+                    <Link
                         href="/catalog/products/new"
                         className="bg-black text-white px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors whitespace-nowrap"
                     >
@@ -121,14 +142,22 @@ export default function CatalogProductsPage() {
             {selectedIds.length > 0 && (
                 <div className="bg-neutral-50 border border-neutral-200 p-4 flex items-center justify-between">
                     <span className="text-xs uppercase tracking-widest font-semibold text-neutral-600">
-                        {selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
+                        {selectedIds.length} item{selectedIds.length !== 1 ? "s" : ""} selected
                     </span>
-                    <button
-                        onClick={handleBulkDelete}
-                        className="text-xs uppercase tracking-widest text-red-600 hover:text-red-800 font-semibold"
-                    >
-                        Delete Selected
-                    </button>
+                    <div className="flex items-center gap-6">
+                        <button
+                            onClick={handleBulkUntrack}
+                            className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black font-semibold transition-colors"
+                        >
+                            Untrack Inventory
+                        </button>
+                        <button
+                            onClick={handleBulkDelete}
+                            className="text-xs uppercase tracking-widest text-red-600 hover:text-red-800 font-semibold"
+                        >
+                            Delete Selected
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -165,7 +194,7 @@ export default function CatalogProductsPage() {
                             </tr>
                         ) : (
                             filteredProducts.map((product) => {
-                                const isLowStock = product.inventory_count < 5;
+                                const isLowStock = product.track_inventory && product.inventory_count < 5;
                                 const isConfirming = confirmDeleteId === product.id;
                                 const firstSku = product.product_variants?.[0]?.sku || "—";
 
@@ -203,7 +232,9 @@ export default function CatalogProductsPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            {isLowStock ? (
+                                            {!product.track_inventory ? (
+                                                <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">Untracked</span>
+                                            ) : isLowStock ? (
                                                 <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1 rounded">
                                                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                                                     <span className="font-medium">{product.inventory_count || 0} left</span>

@@ -19,6 +19,7 @@ export default async function DashboardOverviewPage() {
         supabase.from("products")
             .select("id, name, inventory_count")
             .eq("is_active", true)
+            .eq("track_inventory", true)
             .lt("inventory_count", 5)
             .order("inventory_count"),
     ]);
@@ -181,29 +182,7 @@ export default async function DashboardOverviewPage() {
                 </div>
             )}
 
-            {/* Low Stock Alert */}
-            {lowStockProducts && lowStockProducts.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-amber-700">Low Stock Alert</span>
-                        <span className="bg-amber-200 text-amber-800 text-[10px] px-2 py-0.5 font-semibold rounded-full">
-                            {lowStockProducts.length}
-                        </span>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {lowStockProducts.map(p => (
-                            <div key={p.id} className="bg-white border border-amber-100 px-4 py-3">
-                                <div className="text-sm font-medium text-neutral-800 truncate">{p.name}</div>
-                                <div className={`text-xs mt-1 font-semibold ${p.inventory_count === 0 ? "text-red-600" : "text-amber-600"}`}>
-                                    {p.inventory_count === 0 ? "Out of stock" : `${p.inventory_count} remaining`}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Recent Activity — LIMIT 5 from orders + custom_requests, sorted by created_at DESC */}
+            {/* Recent Activity */}
             <div className="bg-white border border-neutral-200">
                 <div className="px-6 py-4 border-b border-neutral-200">
                     <h2 className="text-xs font-semibold uppercase tracking-widest">Recent Activity</h2>
@@ -237,6 +216,36 @@ export default async function DashboardOverviewPage() {
                     </ul>
                 )}
             </div>
+
+            {/* Low Stock Alert — max 15, with View All link */}
+            {lowStockProducts && lowStockProducts.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] uppercase tracking-widest font-semibold text-amber-700">Low Stock Alert</span>
+                            <span className="bg-amber-200 text-amber-800 text-[10px] px-2 py-0.5 font-semibold rounded-full">
+                                {lowStockProducts.length}{lowStockProducts.length === 15 ? "+" : ""}
+                            </span>
+                        </div>
+                        <a
+                            href="/catalog/products/low-stock"
+                            className="text-[10px] uppercase tracking-widest font-semibold text-amber-700 hover:text-amber-900 border-b border-amber-400 hover:border-amber-700 transition-colors pb-0.5"
+                        >
+                            View All →
+                        </a>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {lowStockProducts.slice(0, 15).map(p => (
+                            <div key={p.id} className="bg-white border border-amber-100 px-4 py-3">
+                                <div className="text-sm font-medium text-neutral-800 truncate">{p.name}</div>
+                                <div className={`text-xs mt-1 font-semibold ${p.inventory_count === 0 ? "text-red-600" : "text-amber-600"}`}>
+                                    {p.inventory_count === 0 ? "Out of stock" : `${p.inventory_count} remaining`}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

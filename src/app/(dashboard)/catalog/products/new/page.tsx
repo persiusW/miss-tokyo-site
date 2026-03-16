@@ -20,6 +20,7 @@ export default function NewProductPage() {
     const [selectedColors, setSelectedColors] = useState<string[]>([]);
     const [globalStitching, setGlobalStitching] = useState<string[]>([]);
     const [selectedStitching, setSelectedStitching] = useState<string[]>([]);
+    const [trackInventory, setTrackInventory] = useState(true);
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
@@ -107,7 +108,8 @@ export default function NewProductPage() {
                     name: formData.name,
                     slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
                     price_ghs: Number(formData.price_ghs),
-                    inventory_count: Number(formData.inventory_count),
+                    inventory_count: trackInventory ? Number(formData.inventory_count) : 9999,
+                    track_inventory: trackInventory,
                     description: formData.description,
                     category_type: formData.category_type,
                     image_urls: uploadedUrls,
@@ -214,6 +216,25 @@ export default function NewProductPage() {
                 <div className="bg-white p-8 border border-neutral-200 space-y-8">
                     <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Pricing & Inventory</h2>
 
+                    {/* Track Inventory Toggle */}
+                    <div className="flex items-start gap-4 p-4 bg-neutral-50 border border-neutral-200">
+                        <button
+                            type="button"
+                            onClick={() => setTrackInventory(v => !v)}
+                            className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none mt-0.5 ${trackInventory ? "bg-black" : "bg-neutral-300"}`}
+                        >
+                            <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${trackInventory ? "translate-x-4" : "translate-x-0"}`} />
+                        </button>
+                        <div>
+                            <p className="text-xs uppercase tracking-widest font-semibold">Track Inventory</p>
+                            <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">
+                                {trackInventory
+                                    ? "Inventory is tracked. Product goes out of stock when count reaches 0."
+                                    : "Inventory not tracked. Product always shows as available."}
+                            </p>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                             <label htmlFor="price_ghs" className="block text-xs uppercase tracking-widest font-semibold mb-3">Price (GHS)</label>
@@ -228,18 +249,20 @@ export default function NewProductPage() {
                                 className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
                             />
                         </div>
-                        <div>
-                            <label htmlFor="inventory_count" className="block text-xs uppercase tracking-widest font-semibold mb-3">Inventory Count</label>
-                            <input
-                                type="number"
-                                id="inventory_count"
-                                value={formData.inventory_count}
-                                onChange={handleChange}
-                                min="0"
-                                required
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                            />
-                        </div>
+                        {trackInventory && (
+                            <div>
+                                <label htmlFor="inventory_count" className="block text-xs uppercase tracking-widest font-semibold mb-3">Inventory Count</label>
+                                <input
+                                    type="number"
+                                    id="inventory_count"
+                                    value={formData.inventory_count}
+                                    onChange={handleChange}
+                                    min="0"
+                                    required
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div className="pt-8 border-t border-neutral-100">
