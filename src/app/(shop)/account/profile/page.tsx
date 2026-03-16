@@ -32,16 +32,31 @@ export default function AccountProfilePage() {
         e.preventDefault();
         setSaving(true);
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { error } = await supabase
+        if (!user) { setSaving(false); return; }
+
+        const payload = { full_name: form.full_name, phone: form.phone };
+
+        // Try update first (profile row exists for all registered customers)
+        const { data: updated, error: updateError } = await supabase
             .from("profiles")
-            .upsert({ id: user.id, ...form, updated_at: new Date().toISOString() }, { onConflict: "id" });
-        setSaving(false);
-        if (error) {
-            toast.error("Failed to save changes.");
-        } else {
+            .update(payload)
+            .eq("id", user.id)
+            .select("id");
+
+        if (!updateError && updated && updated.length > 0) {
             toast.success("Profile updated.");
+        } else if (!updateError && (!updated || updated.length === 0)) {
+            // Row didn't exist yet — insert it (email is required)
+            const { error: insertError } = await supabase
+                .from("profiles")
+                .insert({ id: user.id, email: user.email ?? "", ...payload });
+            if (insertError) toast.error("Failed to save changes.");
+            else toast.success("Profile updated.");
+        } else {
+            toast.error("Failed to save changes.");
         }
+
+        setSaving(false);
     };
 
     if (loading) return <p className="text-neutral-400 italic font-serif">Loading...</p>;

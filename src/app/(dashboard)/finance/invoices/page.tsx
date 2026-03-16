@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 
 type LineItem = { description: string; qty: number; unit_price: number; mode: "custom" | "product"; product_id?: string };
-type Product = { id: string; name: string; price: number };
+type Product = { id: string; name: string; price_ghs: number };
 
 type DocForm = {
     type: "invoice" | "quotation";
@@ -82,7 +82,7 @@ export default function InvoicesPage() {
             });
         supabase
             .from("products")
-            .select("id, name, price")
+            .select("id, name, price_ghs")
             .eq("is_active", true)
             .order("name")
             .then(({ data }) => { if (data) setProducts(data as Product[]); });
@@ -125,7 +125,7 @@ export default function InvoicesPage() {
         if (!p) return;
         setForm(prev => {
             const lines = [...prev.line_items];
-            lines[i] = { ...lines[i], product_id: p.id, description: p.name, unit_price: Number(p.price) };
+            lines[i] = { ...lines[i], product_id: p.id, description: p.name, unit_price: Number(p.price_ghs) };
             return { ...prev, line_items: lines };
         });
     };
@@ -301,7 +301,7 @@ export default function InvoicesPage() {
                                             >
                                                 <option value="">Select a product…</option>
                                                 {products.map(p => (
-                                                    <option key={p.id} value={p.id}>{p.name} — GH₵ {Number(p.price).toFixed(2)}</option>
+                                                    <option key={p.id} value={p.id}>{p.name} — GH₵ {Number(p.price_ghs).toFixed(2)}</option>
                                                 ))}
                                             </select>
                                         ) : (

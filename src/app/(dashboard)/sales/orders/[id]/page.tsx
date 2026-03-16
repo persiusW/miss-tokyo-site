@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { Printer } from "lucide-react";
 
 type Order = {
     id: string;
@@ -36,20 +37,22 @@ const STATUS_STYLES: Record<string, string> = {
 export default function OrderDetailPage() {
     const { id } = useParams<{ id: string }>();
     const [order, setOrder] = useState<Order | null>(null);
+    const [bizName, setBizName] = useState("Miss Tokyo");
+    const [bizContact, setBizContact] = useState<{ email?: string; contact?: string; address?: string }>({});
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
     const [sendingEmail, setSendingEmail] = useState(false);
 
     useEffect(() => {
-        supabase
-            .from("orders")
-            .select("*")
-            .eq("id", id)
-            .single()
-            .then(({ data }) => {
-                if (data) setOrder(data);
-                setLoading(false);
-            });
+        Promise.all([
+            supabase.from("orders").select("*").eq("id", id).single(),
+            supabase.from("business_settings").select("business_name, email, contact, address").eq("id", "default").single(),
+        ]).then(([{ data: ord }, { data: biz }]) => {
+            if (ord) setOrder(ord);
+            if (biz?.business_name) setBizName(biz.business_name);
+            setBizContact({ email: biz?.email ?? undefined, contact: biz?.contact ?? undefined, address: biz?.address ?? undefined });
+            setLoading(false);
+        });
     }, [id]);
 
     const updateStatus = async (newStatus: string) => {
@@ -116,18 +119,42 @@ export default function OrderDetailPage() {
         );
     }
 
+    const items: any[] = Array.isArray(order?.items) ? order.items : [];
+    const orderNum = order.id.substring(0, 8).toUpperCase();
+    const dateStr = new Date(order.created_at).toLocaleDateString("en-GH", { year: "numeric", month: "long", day: "numeric" });
+    const addr = typeof order.shipping_address === "string" ? order.shipping_address : order.shipping_address?.text || null;
+
     return (
-        <div className="space-y-10 max-w-2xl">
+        <>
+        {/* Print styles */}
+        <style>{`
+            @media print {
+                * { visibility: hidden !important; }
+                #admin-receipt-print, #admin-receipt-print * { visibility: visible !important; }
+                #admin-receipt-print { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; border: none !important; }
+                .no-print { display: none !important; }
+            }
+        `}</style>
+
+        <div className="no-print space-y-10 max-w-2xl">
             <div className="flex items-center justify-between">
                 <Link href="/sales/orders" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black transition-colors">
                     ← Orders
                 </Link>
-                <button
-                    onClick={copyDetails}
-                    className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black border-b border-neutral-300 hover:border-black transition-colors pb-0.5"
-                >
-                    Copy Customer Details
-                </button>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={copyDetails}
+                        className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black border-b border-neutral-300 hover:border-black transition-colors pb-0.5"
+                    >
+                        Copy Customer Details
+                    </button>
+                    <button
+                        onClick={() => window.print()}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
+                    >
+                        <Printer size={14} /> Print Receipt
+                    </button>
+                </div>
             </div>
 
             <header>
@@ -305,6 +332,127 @@ export default function OrderDetailPage() {
                     </p>
                 )}
             </div>
+        </div>{/* end no-print */}
+
+        {/* ── Print Receipt (screen-hidden, print-visible) ── */}
+        <div id="admin-receipt-print" style={{ display: "none" }} className="bg-white p-12 max-w-2xl">
+
+            {/* Header */}
+            <div className="flex items-start justify-between mb-8 pb-6 border-b border-neutral-100">
+                <div>
+                    <h2 className="font-serif text-xl tracking-widest uppercase">{bizName}</h2>
+                    <p className="text-[10px] uppercase tracking-widest text-neutral-400 mt-1">Order Receipt</p>
+                </div>
+                <div className="text-right">
+                    <p className="font-mono text-sm font-bold text-neutral-900">#{orderNum}</p>
+                    <p className="text-xs text-neutral-400 mt-1">{dateStr}</p>
+                    <span className={`mt-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
+                        {order.status}
+                    </span>
+                </div>
+            </div>
+
+            {/* Customer + Delivery */}
+            {(order.customer_name || addr || order.delivery_method) && (
+                <div className="mb-8 pb-6 border-b border-neutral-100 grid grid-cols-2 gap-6">
+                    {order.customer_name && (
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-2">Customer</p>
+                            <p className="text-sm text-neutral-800 font-medium">{order.customer_name}</p>
+                            {order.customer_phone && <p className="text-xs text-neutral-500">{order.customer_phone}</p>}
+                            {order.customer_email && <p className="text-xs text-neutral-500">{order.customer_email}</p>}
+                        </div>
+                    )}
+                    {addr && (
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-2">Delivery Address</p>
+                            <p className="text-sm text-neutral-700 whitespace-pre-line">{addr}</p>
+                            {order.delivery_method && (
+                                <p className="text-[10px] uppercase tracking-widest text-neutral-400 mt-1">{order.delivery_method}</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Items */}
+            <div className="mb-8">
+                <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-4">Items Ordered</p>
+                {items.length === 0 ? (
+                    <p className="text-sm text-neutral-400 italic">No item details available.</p>
+                ) : (
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-neutral-100">
+                                <th className="text-left text-[10px] uppercase tracking-widest text-neutral-400 font-semibold pb-2">Item</th>
+                                <th className="text-center text-[10px] uppercase tracking-widest text-neutral-400 font-semibold pb-2 w-12">Qty</th>
+                                <th className="text-right text-[10px] uppercase tracking-widest text-neutral-400 font-semibold pb-2 w-28">Price</th>
+                                <th className="text-right text-[10px] uppercase tracking-widest text-neutral-400 font-semibold pb-2 w-28">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-50">
+                            {items.map((item: any, i: number) => {
+                                const name = item.name || item.productName || "Item";
+                                const price = Number(item.price ?? item.unit_price ?? 0);
+                                const qty = Number(item.quantity ?? item.qty ?? 1);
+                                return (
+                                    <tr key={i}>
+                                        <td className="py-3">
+                                            <div className="flex items-center gap-3">
+                                                {(item.imageUrl || item.image_url) && (
+                                                    <img src={item.imageUrl || item.image_url} alt={name} className="w-14 h-14 object-cover border border-neutral-100" />
+                                                )}
+                                                <div>
+                                                    <p className="font-medium text-neutral-800">{name}</p>
+                                                    {(item.size || item.color) && (
+                                                        <p className="text-[10px] uppercase tracking-wider text-neutral-400 mt-0.5">
+                                                            {[item.size, item.color].filter(Boolean).join(" · ")}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 text-center text-neutral-600">{qty}</td>
+                                        <td className="py-3 text-right text-neutral-600">GH₵ {price.toFixed(2)}</td>
+                                        <td className="py-3 text-right font-medium">GH₵ {(price * qty).toFixed(2)}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
+            {/* Total */}
+            <div className="flex justify-end border-t border-neutral-200 pt-4">
+                <div className="w-56 space-y-2 text-sm">
+                    <div className="flex justify-between font-semibold text-base">
+                        <span>Total Paid</span>
+                        <span>GH₵ {Number(order.total_amount ?? 0).toFixed(2)}</span>
+                    </div>
+                    {order.paystack_reference && (
+                        <div className="flex justify-between text-neutral-400 text-xs">
+                            <span>Ref</span>
+                            <span className="font-mono">{order.paystack_reference.substring(0, 16)}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-neutral-100 mt-8 pt-6 text-center space-y-1">
+                {(bizContact.address || bizContact.contact || bizContact.email) && (
+                    <div className="text-xs text-neutral-500 space-y-0.5 mb-3">
+                        {bizContact.address && <p>{bizContact.address}</p>}
+                        {bizContact.contact && <p>{bizContact.contact}</p>}
+                        {bizContact.email && <p>{bizContact.email}</p>}
+                    </div>
+                )}
+                <p className="text-[10px] uppercase tracking-widest text-neutral-400">
+                    Thank you for your order — {bizName}
+                </p>
+            </div>
         </div>
+        </>
     );
 }

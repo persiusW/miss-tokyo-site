@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Check } from "lucide-react";
 
@@ -127,13 +128,29 @@ export default function AccountOrdersPage() {
         supabase.auth.getUser().then(async ({ data: { user } }) => {
             if (!user) return;
 
-            const { data: orderData } = await supabase
-                .from("orders")
-                .select("id, created_at, total_amount, status, assigned_rider_id, paystack_reference")
-                .eq("customer_id", user.id)
-                .order("created_at", { ascending: false });
+            const SELECT = "id, created_at, total_amount, status, assigned_rider_id, paystack_reference";
 
-            const allOrders = orderData ?? [];
+            // Fetch by customer_id (primary) AND customer_email (fallback for
+            // orders placed before the account was linked), then merge & dedupe
+            const [{ data: byId }, { data: byEmail }] = await Promise.all([
+                supabase
+                    .from("orders")
+                    .select(SELECT)
+                    .eq("customer_id", user.id)
+                    .order("created_at", { ascending: false }),
+                user.email
+                    ? supabase
+                        .from("orders")
+                        .select(SELECT)
+                        .eq("customer_email", user.email)
+                        .order("created_at", { ascending: false })
+                    : Promise.resolve({ data: [] }),
+            ]);
+
+            const seen = new Set<string>();
+            const allOrders = [...(byId ?? []), ...(byEmail ?? [])]
+                .filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; })
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             setOrders(allOrders);
 
             const riderIds = [...new Set(allOrders.map(o => o.assigned_rider_id).filter(Boolean))] as string[];
@@ -198,6 +215,16 @@ export default function AccountOrdersPage() {
                                         <p className="text-indigo-600">{rider.full_name} · {rider.phone_number}</p>
                                     </div>
                                 )}
+
+                                {/* View details link */}
+                                <div className="mt-4 flex justify-end">
+                                    <Link
+                                        href={`/account/orders/${order.id}`}
+                                        className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500 hover:text-black transition-colors border-b border-neutral-300 hover:border-black pb-0.5"
+                                    >
+                                        View Details →
+                                    </Link>
+                                </div>
                             </div>
                         );
                     })}
