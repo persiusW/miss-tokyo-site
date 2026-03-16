@@ -10,23 +10,23 @@ import { Check, Printer, ArrowLeft } from "lucide-react";
 // ── Status timeline (same logic as orders list) ───────────────────────────────
 
 const TIMELINE_STEPS = [
-    { key: "ordered",    label: "Ordered" },
+    { key: "ordered", label: "Ordered" },
     { key: "processing", label: "Processing" },
-    { key: "packed",     label: "Packed" },
-    { key: "shipped",    label: "Shipped" },
-    { key: "delivered",  label: "Delivered" },
+    { key: "packed", label: "Packed" },
+    { key: "shipped", label: "Shipped" },
+    { key: "delivered", label: "Delivered" },
 ];
 
 function statusToStep(status: string) {
     switch (status) {
-        case "pending":               return 0;
+        case "pending": return 0;
         case "paid":
-        case "processing":            return 1;
-        case "packed":                return 2;
-        case "shipped":               return 3;
+        case "processing": return 1;
+        case "packed": return 2;
+        case "shipped": return 3;
         case "delivered":
-        case "fulfilled":             return 4;
-        default:                      return 0;
+        case "fulfilled": return 4;
+        default: return 0;
     }
 }
 
@@ -49,15 +49,13 @@ function StatusTimeline({ status }: { status: string }) {
                 return (
                     <div key={step.key} className="flex items-center">
                         <div className="flex flex-col items-center">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
-                                done ? "bg-black border-black" : current ? "bg-white border-black" : "bg-white border-neutral-300"
-                            }`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${done ? "bg-black border-black" : current ? "bg-white border-black" : "bg-white border-neutral-300"
+                                }`}>
                                 {done ? <Check size={11} className="text-white" strokeWidth={3} /> :
-                                 current ? <div className="w-2 h-2 rounded-full bg-black" /> : null}
+                                    current ? <div className="w-2 h-2 rounded-full bg-black" /> : null}
                             </div>
-                            <span className={`mt-1.5 text-[9px] uppercase tracking-wider whitespace-nowrap font-semibold ${
-                                i > active ? "text-neutral-300" : "text-black"
-                            }`}>{step.label}</span>
+                            <span className={`mt-1.5 text-[9px] uppercase tracking-wider whitespace-nowrap font-semibold ${i > active ? "text-neutral-300" : "text-black"
+                                }`}>{step.label}</span>
                         </div>
                         {i < TIMELINE_STEPS.length - 1 && (
                             <div className={`h-[2px] w-8 md:w-14 shrink-0 mx-1 mb-4 ${done ? "bg-black" : "bg-neutral-200"}`} />
@@ -209,14 +207,13 @@ export default function OrderDetailPage() {
                     <div className="text-right">
                         <p className="font-mono text-sm font-bold text-neutral-900">#{orderNum}</p>
                         <p className="text-xs text-neutral-400 mt-1">{dateStr}</p>
-                        <span className={`mt-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded ${
-                            order.status === "delivered" || order.status === "fulfilled" ? "bg-emerald-100 text-emerald-700" :
-                            order.status === "shipped"   ? "bg-indigo-50 text-indigo-700" :
-                            order.status === "packed"    ? "bg-blue-50 text-blue-700" :
-                            order.status === "paid" || order.status === "processing" ? "bg-blue-50 text-blue-700" :
-                            order.status === "cancelled" ? "bg-red-50 text-red-600" :
-                            "bg-amber-50 text-amber-700"
-                        }`}>
+                        <span className={`mt-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded ${order.status === "delivered" || order.status === "fulfilled" ? "bg-emerald-100 text-emerald-700" :
+                                order.status === "shipped" ? "bg-indigo-50 text-indigo-700" :
+                                    order.status === "packed" ? "bg-blue-50 text-blue-700" :
+                                        order.status === "paid" || order.status === "processing" ? "bg-blue-50 text-blue-700" :
+                                            order.status === "cancelled" ? "bg-red-50 text-red-600" :
+                                                "bg-amber-50 text-amber-700"
+                            }`}>
                             {order.status}
                         </span>
                     </div>
@@ -321,8 +318,8 @@ export default function OrderDetailPage() {
                 <div className="border-t border-neutral-100 mt-8 pt-6 text-center space-y-1">
                     {(bizContact.address || bizContact.contact || bizContact.email) && (
                         <div className="text-xs text-neutral-500 space-y-0.5 mb-3">
-                            {bizContact.address && <p>{bizContact.address}</p>}
-                            {bizContact.contact && <p>{bizContact.contact}</p>}
+                            {bizContact.address && <p>{bizContact.address}|</p>}
+                            {bizContact.contact && <p>{bizContact.contact}|</p>}
                             {bizContact.email && <p>{bizContact.email}</p>}
                         </div>
                     )}
