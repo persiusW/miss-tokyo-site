@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { MoreHorizontal, Copy, Printer, Eye, Truck, X, Search } from "lucide-react";
+import { MoreHorizontal, Copy, Printer, Eye, Truck, X, Search, Store } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +18,7 @@ type Order = {
     status: string;
     paystack_reference: string | null;
     shipping_address: Record<string, string> | null;
+    delivery_method: string | null;
     created_at: string;
 };
 
@@ -30,27 +31,38 @@ type Rider = {
     is_active: boolean;
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function isPickup(order: Order) {
+    return order.delivery_method?.toLowerCase().includes("pickup") ?? false;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
-    paid:        "bg-green-50 text-green-700",
-    packed:      "bg-blue-50 text-blue-700",
-    shipped:     "bg-indigo-50 text-indigo-700",
-    processing:  "bg-blue-50 text-blue-700",
-    pending:     "bg-amber-50 text-amber-700",
-    fulfilled:   "bg-emerald-50 text-emerald-700",
-    delivered:   "bg-emerald-100 text-emerald-800",
-    cancelled:   "bg-red-50 text-red-600",
-    refunded:    "bg-neutral-100 text-neutral-600",
+    paid:              "bg-green-50 text-green-700",
+    packed:            "bg-blue-50 text-blue-700",
+    shipped:           "bg-indigo-50 text-indigo-700",
+    processing:        "bg-blue-50 text-blue-700",
+    pending:           "bg-amber-50 text-amber-700",
+    fulfilled:         "bg-emerald-50 text-emerald-700",
+    delivered:         "bg-emerald-100 text-emerald-800",
+    cancelled:         "bg-red-50 text-red-600",
+    refunded:          "bg-neutral-100 text-neutral-600",
+    ready_for_pickup:  "bg-neutral-900 text-white",
 };
 
-type Tab = "all" | "packed" | "shipped" | "fulfilled";
+type Tab = "all" | "packed" | "pickups" | "shipped" | "fulfilled" | "cancelled" | "refunded" | "all-orders";
 
 const TABS: { key: Tab; label: string }[] = [
-    { key: "all",       label: "Inbox" },
-    { key: "packed",    label: "Packed" },
-    { key: "shipped",   label: "Shipped" },
-    { key: "fulfilled", label: "Fulfilled" },
+    { key: "all",         label: "Inbox" },
+    { key: "packed",      label: "Packed" },
+    { key: "pickups",     label: "Pickups" },
+    { key: "shipped",     label: "Shipped" },
+    { key: "fulfilled",   label: "Fulfilled" },
+    { key: "cancelled",   label: "Cancelled" },
+    { key: "refunded",    label: "Refunds" },
+    { key: "all-orders",  label: "All" },
 ];
 
 function matchesSearch(order: Order, q: string): boolean {
@@ -65,7 +77,6 @@ function matchesSearch(order: Order, q: string): boolean {
 function filterOrders(orders: Order[], tab: Tab, search: string): Order[] {
     const q = search.trim();
     if (tab === "all") {
-        // Inbox: show only `paid` when no search; show all matching when searching
         return q
             ? orders.filter(o => matchesSearch(o, q))
             : orders.filter(o => o.status === "paid");
@@ -73,8 +84,12 @@ function filterOrders(orders: Order[], tab: Tab, search: string): Order[] {
     const baseFilter = (() => {
         switch (tab) {
             case "packed":    return orders.filter(o => o.status === "packed");
+            case "pickups":   return orders.filter(o => o.status === "ready_for_pickup");
             case "shipped":   return orders.filter(o => o.status === "shipped");
             case "fulfilled": return orders.filter(o => ["fulfilled", "delivered"].includes(o.status));
+            case "cancelled": return orders.filter(o => ["cancelled", "failed"].includes(o.status));
+            case "refunded":  return orders.filter(o => o.status === "refunded");
+            case "all-orders": return orders;
             default: return orders;
         }
     })();
@@ -200,18 +215,23 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+    const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
     const [showDispatch, setShowDispatch] = useState(false);
+    const [dispatchOrders, setDispatchOrders] = useState<Order[]>([]);
     const [bulkLoading, setBulkLoading] = useState(false);
 
     const visibleOrders = filterOrders(orders, activeTab, search);
     const allSelected = visibleOrders.length > 0 && visibleOrders.every(o => selected.has(o.id));
 
-    // Tab counts — inbox count is paid orders, others by status
     const tabCounts: Record<Tab, number> = {
-        all:       orders.filter(o => o.status === "paid").length,
-        packed:    orders.filter(o => o.status === "packed").length,
-        shipped:   orders.filter(o => o.status === "shipped").length,
-        fulfilled: orders.filter(o => ["fulfilled", "delivered"].includes(o.status)).length,
+        all:          orders.filter(o => o.status === "paid").length,
+        packed:       orders.filter(o => o.status === "packed").length,
+        pickups:      orders.filter(o => o.status === "ready_for_pickup").length,
+        shipped:      orders.filter(o => o.status === "shipped").length,
+        fulfilled:    orders.filter(o => ["fulfilled", "delivered"].includes(o.status)).length,
+        cancelled:    orders.filter(o => ["cancelled", "failed"].includes(o.status)).length,
+        refunded:     orders.filter(o => o.status === "refunded").length,
+        "all-orders": orders.length,
     };
 
     useEffect(() => { setSelected(new Set()); }, [activeTab, search]);
@@ -219,7 +239,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
-            if (!target.closest("[data-dropdown]")) setOpenDropdown(null);
+            if (!target.closest("[data-dropdown]")) { setOpenDropdown(null); setDropdownPos(null); }
         };
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
@@ -251,10 +271,45 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
         setBulkLoading(false);
     };
 
-    const handleDispatchConfirm = async (riderId: string, notifyRider: boolean) => {
-        const selectedOrders = visibleOrders.filter(o => selected.has(o.id));
-        const ids = selectedOrders.map(o => o.id);
+    const bulkMarkPickupReady = async () => {
+        const pickupIds = visibleOrders
+            .filter(o => selected.has(o.id) && isPickup(o))
+            .map(o => o.id);
+        if (!pickupIds.length) { toast.error("No pickup orders in selection."); return; }
+        setBulkLoading(true);
+        try {
+            const res = await fetch("/api/pickup-ready", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderIds: pickupIds }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed");
+            toast.success(`${pickupIds.length} order${pickupIds.length > 1 ? "s" : ""} marked ready for pickup.`);
+            setOrders(prev => prev.map(o => pickupIds.includes(o.id) ? { ...o, status: "ready_for_pickup" } : o));
+            setSelected(new Set());
+        } catch (err: any) {
+            toast.error(err.message || "Failed to mark pickup ready.");
+        }
+        setBulkLoading(false);
+    };
 
+    const openDispatchForSelected = () => {
+        const deliveryOrders = visibleOrders.filter(o => selected.has(o.id) && !isPickup(o));
+        if (!deliveryOrders.length) { toast.error("No delivery orders in selection."); return; }
+        setDispatchOrders(deliveryOrders);
+        setShowDispatch(true);
+    };
+
+    const openDispatchForOrder = (order: Order) => {
+        setDispatchOrders([order]);
+        setShowDispatch(true);
+        setOpenDropdown(null);
+        setDropdownPos(null);
+    };
+
+    const handleDispatchConfirm = async (riderId: string, notifyRider: boolean) => {
+        const ids = dispatchOrders.map(o => o.id);
         try {
             const res = await fetch("/api/dispatch", {
                 method: "POST",
@@ -266,12 +321,31 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
 
             toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} dispatched.`);
             setOrders(prev => prev.map(o =>
-                selected.has(o.id) ? { ...o, status: "shipped" } : o
+                ids.includes(o.id) ? { ...o, status: "shipped" } : o
             ));
             setSelected(new Set());
             setShowDispatch(false);
+            setDispatchOrders([]);
         } catch (err: any) {
             toast.error(err.message || "Dispatch failed.");
+        }
+    };
+
+    const markPickupReadyForOrder = async (order: Order) => {
+        setOpenDropdown(null);
+        setDropdownPos(null);
+        try {
+            const res = await fetch("/api/pickup-ready", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderIds: [order.id] }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed");
+            toast.success("Order marked ready for pickup.");
+            setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "ready_for_pickup" } : o));
+        } catch (err: any) {
+            toast.error(err.message || "Failed.");
         }
     };
 
@@ -279,6 +353,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
         navigator.clipboard.writeText(id);
         toast.success("Order ID copied.");
         setOpenDropdown(null);
+        setDropdownPos(null);
     };
 
     const handleRowClick = (e: React.MouseEvent, orderId: string) => {
@@ -288,17 +363,19 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     };
 
     const selectedCount = selected.size;
+    const hasPickupSelected = visibleOrders.some(o => selected.has(o.id) && isPickup(o));
+    const hasDeliverySelected = visibleOrders.some(o => selected.has(o.id) && !isPickup(o));
 
     return (
         <div className="space-y-0">
             {/* Search + Tabs row */}
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 border-b border-neutral-200 pb-0">
-                <div className="flex gap-0">
+                <div className="flex gap-0 overflow-x-auto">
                     {TABS.map(tab => (
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
-                            className={`px-6 py-3 text-xs font-semibold uppercase tracking-widest transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+                            className={`px-5 py-3 text-xs font-semibold uppercase tracking-widest transition-colors border-b-2 -mb-px flex items-center gap-2 whitespace-nowrap ${
                                 activeTab === tab.key
                                     ? "border-black text-black"
                                     : "border-transparent text-neutral-400 hover:text-black"
@@ -339,6 +416,14 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                 </div>
             )}
 
+            {/* Pickups tab info banner */}
+            {activeTab === "pickups" && visibleOrders.length > 0 && (
+                <div className="px-4 py-3 bg-neutral-900 text-white text-[10px] uppercase tracking-widest border-b border-neutral-700">
+                    <Store size={12} className="inline mr-2 mb-0.5" />
+                    {visibleOrders.length} order{visibleOrders.length !== 1 ? "s" : ""} awaiting in-store pickup
+                </div>
+            )}
+
             {/* Bulk Actions Bar */}
             {selectedCount > 0 && (
                 <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-black text-white px-6 py-4 shadow-2xl">
@@ -347,20 +432,33 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                     </span>
 
                     {activeTab === "packed" ? (
-                        <button
-                            onClick={() => setShowDispatch(true)}
-                            disabled={bulkLoading}
-                            className="flex items-center gap-2 text-xs uppercase tracking-widest px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-50"
-                        >
-                            <Truck size={14} /> Initiate Dispatch
-                        </button>
+                        <>
+                            {hasPickupSelected && (
+                                <button
+                                    onClick={bulkMarkPickupReady}
+                                    disabled={bulkLoading}
+                                    className="flex items-center gap-2 text-xs uppercase tracking-widest px-4 py-2 bg-neutral-700 hover:bg-neutral-600 transition-colors disabled:opacity-50"
+                                >
+                                    <Store size={14} /> Mark Ready for Pickup
+                                </button>
+                            )}
+                            {hasDeliverySelected && (
+                                <button
+                                    onClick={openDispatchForSelected}
+                                    disabled={bulkLoading}
+                                    className="flex items-center gap-2 text-xs uppercase tracking-widest px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-50"
+                                >
+                                    <Truck size={14} /> Assign Rider & Ship
+                                </button>
+                            )}
+                        </>
                     ) : (
                         <>
                             <button onClick={() => bulkUpdate("packed")} disabled={bulkLoading}
                                 className="text-xs uppercase tracking-widest px-4 py-2 bg-neutral-700 hover:bg-neutral-600 transition-colors disabled:opacity-50">
                                 Mark Packed
                             </button>
-                            <button onClick={() => setShowDispatch(true)} disabled={bulkLoading}
+                            <button onClick={openDispatchForSelected} disabled={bulkLoading}
                                 className="flex items-center gap-2 text-xs uppercase tracking-widest px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-50">
                                 <Truck size={14} /> Mark Shipped
                             </button>
@@ -391,6 +489,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                             </th>
                             <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Order ID</th>
                             <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Customer</th>
+                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Type</th>
                             <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Amount</th>
                             <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
                             <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Reference</th>
@@ -401,7 +500,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                     <tbody className="divide-y divide-neutral-100">
                         {visibleOrders.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-6 py-16 text-center text-neutral-500 italic font-serif">
+                                <td colSpan={9} className="px-6 py-16 text-center text-neutral-500 italic font-serif">
                                     {search ? "No orders match your search." : "No orders in this category."}
                                 </td>
                             </tr>
@@ -424,12 +523,21 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                                 <td className="px-4 py-4 text-neutral-700">
                                     {order.customer_name || order.customer_email || "—"}
                                 </td>
+                                <td className="px-4 py-4">
+                                    <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded-sm ${
+                                        isPickup(order)
+                                            ? "bg-neutral-900 text-white"
+                                            : "bg-neutral-100 text-neutral-600"
+                                    }`}>
+                                        {isPickup(order) ? "Pickup" : "Delivery"}
+                                    </span>
+                                </td>
                                 <td className="px-4 py-4 text-right font-medium">
                                     GH₵ {Number(order.total_amount ?? 0).toFixed(2)}
                                 </td>
                                 <td className="px-4 py-4">
                                     <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
-                                        {order.status}
+                                        {order.status === "ready_for_pickup" ? "Ready for Pickup" : order.status}
                                     </span>
                                 </td>
                                 <td className="px-4 py-4">
@@ -442,13 +550,22 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                                 </td>
                                 <td className="px-4 py-4 text-right relative" onClick={e => e.stopPropagation()} data-dropdown>
                                     <button
-                                        onClick={() => setOpenDropdown(openDropdown === order.id ? null : order.id)}
+                                        onClick={(e) => {
+                                            if (openDropdown === order.id) {
+                                                setOpenDropdown(null);
+                                                setDropdownPos(null);
+                                            } else {
+                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                setDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                                                setOpenDropdown(order.id);
+                                            }
+                                        }}
                                         className="p-1.5 text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors"
                                     >
                                         <MoreHorizontal size={16} />
                                     </button>
-                                    {openDropdown === order.id && (
-                                        <div className="absolute right-4 top-12 z-20 bg-white border border-neutral-200 shadow-lg min-w-[180px] py-1">
+                                    {openDropdown === order.id && dropdownPos && (
+                                        <div style={{ position: "fixed", top: dropdownPos.top, right: dropdownPos.right }} className="z-[9999] bg-white border border-neutral-200 shadow-lg min-w-[190px] py-1">
                                             <button onClick={() => copyOrderId(order.id)}
                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50 text-left">
                                                 <Copy size={13} /> Copy Order ID
@@ -459,6 +576,26 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                                                 <Printer size={13} /> Print Invoice
                                             </Link>
                                             <div className="border-t border-neutral-100 my-1" />
+
+                                            {/* Packed-stage contextual action */}
+                                            {order.status === "packed" && (
+                                                isPickup(order) ? (
+                                                    <button
+                                                        onClick={() => markPickupReadyForOrder(order)}
+                                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-900 font-semibold hover:bg-neutral-50 text-left"
+                                                    >
+                                                        <Store size={13} /> Mark Ready for Pickup
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => openDispatchForOrder(order)}
+                                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-blue-700 font-semibold hover:bg-neutral-50 text-left"
+                                                    >
+                                                        <Truck size={13} /> Assign Rider & Ship
+                                                    </button>
+                                                )
+                                            )}
+
                                             <button onClick={() => { bulkUpdate("fulfilled"); setOpenDropdown(null); }}
                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-emerald-600 hover:bg-neutral-50 text-left">
                                                 Mark Fulfilled
@@ -479,8 +616,8 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
 
             {showDispatch && (
                 <DispatchModal
-                    orders={visibleOrders.filter(o => selected.has(o.id))}
-                    onClose={() => setShowDispatch(false)}
+                    orders={dispatchOrders}
+                    onClose={() => { setShowDispatch(false); setDispatchOrders([]); }}
                     onConfirm={handleDispatchConfirm}
                 />
             )}

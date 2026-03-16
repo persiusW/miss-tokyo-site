@@ -169,7 +169,6 @@ export default function EditProductPage() {
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
-
         if (active.id !== over?.id && over) {
             setImageSlots((items) => {
                 const oldIndex = items.findIndex(item => item.id === active.id);
@@ -233,257 +232,267 @@ export default function EditProductPage() {
     }
 
     return (
-        <div className="space-y-12 max-w-3xl">
-            <header>
-                <div className="flex items-center gap-2 text-sm text-neutral-500 mb-4">
-                    <Link href="/catalog/products" className="hover:text-black">Products</Link>
-                    <span>/</span>
-                    <span className="text-black">Edit</span>
+        <div className="space-y-8">
+            {/* Header with top-right save */}
+            <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div>
+                    <div className="flex items-center gap-2 text-sm text-neutral-500 mb-4">
+                        <Link href="/catalog/products" className="hover:text-black">Products</Link>
+                        <span>/</span>
+                        <span className="text-black">Edit</span>
+                    </div>
+                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Edit Product</h1>
+                    <p className="text-neutral-500">{formData.name}</p>
                 </div>
-                <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Edit Product</h1>
-                <p className="text-neutral-500">{formData.name}</p>
-            </header>
-
-            <form onSubmit={handleSubmit} className="space-y-8">
-                {/* Basic Info */}
-                <div className="bg-white p-8 border border-neutral-200 space-y-8">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Basic Information</h2>
-
-                    <div>
-                        <label htmlFor="name" className="block text-xs uppercase tracking-widest font-semibold mb-3">Product Name</label>
-                        <input
-                            type="text"
-                            id="name"
-                            value={formData.name}
-                            onChange={handleChange}
-                            required
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <label htmlFor="slug" className="block text-xs uppercase tracking-widest font-semibold mb-3">URL Slug</label>
-                            <input
-                                type="text"
-                                id="slug"
-                                value={formData.slug}
-                                onChange={handleChange}
-                                required
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="category_type" className="block text-xs uppercase tracking-widest font-semibold mb-3">Category</label>
-                            {categories.length === 0 ? (
-                                <div className="border-b border-neutral-200 py-2">
-                                    <span className="text-sm text-neutral-400 italic">No categories — </span>
-                                    <Link href="/catalog/categories" className="text-sm text-black underline">add one first</Link>
-                                </div>
-                            ) : (
-                                <select
-                                    id="category_type"
-                                    value={formData.category_type}
-                                    onChange={handleChange}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
-                                >
-                                    {categories.map(cat => (
-                                        <option key={cat.id} value={cat.slug}>{cat.name}</option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
-                    </div>
-
-                    <div>
-                        <label htmlFor="description" className="block text-xs uppercase tracking-widest font-semibold mb-3">Description</label>
-                        <textarea
-                            id="description"
-                            rows={4}
-                            value={formData.description}
-                            onChange={handleChange}
-                            className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black transition-colors resize-y"
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="checkbox"
-                            id="is_active"
-                            checked={formData.is_active}
-                            onChange={handleChange}
-                            className="w-4 h-4 accent-black"
-                        />
-                        <label htmlFor="is_active" className="text-xs uppercase tracking-widest font-semibold">Active (visible in shop)</label>
-                    </div>
-
-                    <div className="pt-8 border-t border-neutral-100">
-                        <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Sizes</label>
-                        {globalSizes.length === 0 ? (
-                            <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading sizes from store settings...</p>
-                        ) : (
-                            <div className="flex flex-wrap gap-4">
-                                {globalSizes.map(size => (
-                                    <label key={size} className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedSizes.includes(size)}
-                                            onChange={() => toggleSize(size)}
-                                            className="w-4 h-4 accent-black"
-                                        />
-                                        <span className="text-sm font-medium">{size}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Select the sizes available for this specific product.</p>
-                    </div>
-
-                    <div className="pt-8 border-t border-neutral-100">
-                        <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Colors</label>
-                        {globalColors.length === 0 ? (
-                            <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading colors from store settings...</p>
-                        ) : (
-                            <div className="flex flex-wrap gap-4">
-                                {globalColors.map(col => (
-                                    <label key={col} className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedColors.includes(col)}
-                                            onChange={() => toggleColor(col)}
-                                            className="w-4 h-4 accent-black"
-                                        />
-                                        <span className="text-sm font-medium">{col}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Select the colors available for this specific product.</p>
-                    </div>
-
-                    <div className="pt-8 border-t border-neutral-100">
-                        <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Stitching</label>
-                        {globalStitching.length === 0 ? (
-                            <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading stitching from store settings...</p>
-                        ) : (
-                            <div className="flex flex-wrap gap-4">
-                                {globalStitching.map(stitch => (
-                                    <label key={stitch} className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedStitching.includes(stitch)}
-                                            onChange={() => toggleStitching(stitch)}
-                                            className="w-4 h-4 accent-black"
-                                        />
-                                        <span className="text-sm font-medium">{stitch}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Select the stitching options available for this specific product.</p>
-                    </div>
-                </div>
-
-                {/* Pricing & Inventory */}
-                <div className="bg-white p-8 border border-neutral-200 space-y-8">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Pricing & Inventory</h2>
-
-                    {/* Track Inventory Toggle */}
-                    <div className="flex items-start gap-4 p-4 bg-neutral-50 border border-neutral-200">
-                        <button
-                            type="button"
-                            onClick={() => setTrackInventory(v => !v)}
-                            className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none mt-0.5 ${trackInventory ? "bg-black" : "bg-neutral-300"}`}
-                        >
-                            <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${trackInventory ? "translate-x-4" : "translate-x-0"}`} />
-                        </button>
-                        <div>
-                            <p className="text-xs uppercase tracking-widest font-semibold">Track Inventory</p>
-                            <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">
-                                {trackInventory
-                                    ? "Inventory is tracked. Product goes out of stock when count reaches 0."
-                                    : "Inventory not tracked. Product always shows as available."}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <label htmlFor="price_ghs" className="block text-xs uppercase tracking-widest font-semibold mb-3">Price (GHS)</label>
-                            <input
-                                type="number"
-                                id="price_ghs"
-                                value={formData.price_ghs}
-                                onChange={handleChange}
-                                min="0"
-                                step="0.01"
-                                required
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                            />
-                        </div>
-                        {trackInventory && (
-                            <div>
-                                <label htmlFor="inventory_count" className="block text-xs uppercase tracking-widest font-semibold mb-3">Inventory Count</label>
-                                <input
-                                    type="number"
-                                    id="inventory_count"
-                                    value={formData.inventory_count}
-                                    onChange={handleChange}
-                                    min="0"
-                                    required
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                                />
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Media — up to 4 images */}
-                <div className="bg-white p-8 border border-neutral-200 space-y-6">
-                    <div>
-                        <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Images</h2>
-                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4 block">Upload up to 4 images. The first image is the primary display photo. Drag by the icon to reorder.</p>
-                    </div>
-
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
-                    >
-                        <SortableContext
-                            items={imageSlots.map(s => s.id)}
-                            strategy={rectSortingStrategy}
-                        >
-                            <div className="grid grid-cols-2 gap-6">
-                                {imageSlots.map((slot, index) => (
-                                    <SortableImageItem
-                                        key={slot.id}
-                                        id={slot.id}
-                                        url={slot.url}
-                                        index={index}
-                                        onUpload={handleImageUpload}
-                                        onRemove={handleImageRemove}
-                                    />
-                                ))}
-                            </div>
-                        </SortableContext>
-                    </DndContext>
-                </div>
-
-                <div className="pt-4 flex justify-end gap-4">
+                <div className="flex items-center gap-3 md:mt-8">
                     <Link
                         href="/catalog/products"
-                        className="px-6 py-4 text-xs uppercase tracking-widest hover:bg-neutral-100 transition-colors"
+                        className="px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-100 transition-colors border border-neutral-200"
                     >
                         Cancel
                     </Link>
                     <button
                         type="submit"
+                        form="product-form"
                         disabled={saving}
-                        className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                        className="px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
                     >
                         {saving ? "Saving..." : "Update Product"}
                     </button>
+                </div>
+            </header>
+
+            <form id="product-form" onSubmit={handleSubmit}>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {/* Left column — main details */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* Basic Info */}
+                        <div className="bg-white p-8 border border-neutral-200 space-y-8">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Basic Information</h2>
+
+                            <div>
+                                <label htmlFor="name" className="block text-xs uppercase tracking-widest font-semibold mb-3">Product Name</label>
+                                <input
+                                    type="text"
+                                    id="name"
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <label htmlFor="slug" className="block text-xs uppercase tracking-widest font-semibold mb-3">URL Slug</label>
+                                    <input
+                                        type="text"
+                                        id="slug"
+                                        value={formData.slug}
+                                        onChange={handleChange}
+                                        required
+                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="category_type" className="block text-xs uppercase tracking-widest font-semibold mb-3">Category</label>
+                                    {categories.length === 0 ? (
+                                        <div className="border-b border-neutral-200 py-2">
+                                            <span className="text-sm text-neutral-400 italic">No categories — </span>
+                                            <Link href="/catalog/categories" className="text-sm text-black underline">add one first</Link>
+                                        </div>
+                                    ) : (
+                                        <select
+                                            id="category_type"
+                                            value={formData.category_type}
+                                            onChange={handleChange}
+                                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
+                                        >
+                                            {categories.map(cat => (
+                                                <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="description" className="block text-xs uppercase tracking-widest font-semibold mb-3">Description</label>
+                                <textarea
+                                    id="description"
+                                    rows={4}
+                                    value={formData.description}
+                                    onChange={handleChange}
+                                    className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black transition-colors resize-y"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    id="is_active"
+                                    checked={formData.is_active}
+                                    onChange={handleChange}
+                                    className="w-4 h-4 accent-black"
+                                />
+                                <label htmlFor="is_active" className="text-xs uppercase tracking-widest font-semibold">Active (visible in shop)</label>
+                            </div>
+                        </div>
+
+                        {/* Variants */}
+                        <div className="bg-white p-8 border border-neutral-200 space-y-8">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Variants</h2>
+
+                            <div>
+                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Sizes</label>
+                                {globalSizes.length === 0 ? (
+                                    <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading sizes from store settings...</p>
+                                ) : (
+                                    <div className="flex flex-wrap gap-4">
+                                        {globalSizes.map(size => (
+                                            <label key={size} className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedSizes.includes(size)}
+                                                    onChange={() => toggleSize(size)}
+                                                    className="w-4 h-4 accent-black"
+                                                />
+                                                <span className="text-sm font-medium">{size}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="pt-6 border-t border-neutral-100">
+                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Colors</label>
+                                {globalColors.length === 0 ? (
+                                    <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading colors from store settings...</p>
+                                ) : (
+                                    <div className="flex flex-wrap gap-4">
+                                        {globalColors.map(col => (
+                                            <label key={col} className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedColors.includes(col)}
+                                                    onChange={() => toggleColor(col)}
+                                                    className="w-4 h-4 accent-black"
+                                                />
+                                                <span className="text-sm font-medium">{col}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="pt-6 border-t border-neutral-100">
+                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Stitching</label>
+                                {globalStitching.length === 0 ? (
+                                    <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading stitching from store settings...</p>
+                                ) : (
+                                    <div className="flex flex-wrap gap-4">
+                                        {globalStitching.map(stitch => (
+                                            <label key={stitch} className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedStitching.includes(stitch)}
+                                                    onChange={() => toggleStitching(stitch)}
+                                                    className="w-4 h-4 accent-black"
+                                                />
+                                                <span className="text-sm font-medium">{stitch}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right column — pricing, inventory, images */}
+                    <div className="space-y-6">
+                        {/* Pricing & Inventory */}
+                        <div className="bg-white p-6 border border-neutral-200 space-y-6">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Pricing & Inventory</h2>
+
+                            <div>
+                                <label htmlFor="price_ghs" className="block text-xs uppercase tracking-widest font-semibold mb-3">Price (GHS)</label>
+                                <input
+                                    type="number"
+                                    id="price_ghs"
+                                    value={formData.price_ghs}
+                                    onChange={handleChange}
+                                    min="0"
+                                    step="0.01"
+                                    required
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                />
+                            </div>
+
+                            {/* Track Inventory Toggle */}
+                            <div className="flex items-start gap-3 p-4 bg-neutral-50 border border-neutral-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setTrackInventory(v => !v)}
+                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none mt-0.5 ${trackInventory ? "bg-black" : "bg-neutral-300"}`}
+                                >
+                                    <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${trackInventory ? "translate-x-4" : "translate-x-0"}`} />
+                                </button>
+                                <div>
+                                    <p className="text-xs uppercase tracking-widest font-semibold">Track Inventory</p>
+                                    <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">
+                                        {trackInventory ? "Tracked — goes out of stock at 0." : "Untracked — always available."}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {trackInventory && (
+                                <div>
+                                    <label htmlFor="inventory_count" className="block text-xs uppercase tracking-widest font-semibold mb-3">Inventory Count</label>
+                                    <input
+                                        type="number"
+                                        id="inventory_count"
+                                        value={formData.inventory_count}
+                                        onChange={handleChange}
+                                        min="0"
+                                        required
+                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Images */}
+                        <div className="bg-white p-6 border border-neutral-200 space-y-4">
+                            <div>
+                                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Images</h2>
+                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 4 images. First is primary. Drag to reorder.</p>
+                            </div>
+
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={handleDragEnd}
+                            >
+                                <SortableContext
+                                    items={imageSlots.map(s => s.id)}
+                                    strategy={rectSortingStrategy}
+                                >
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {imageSlots.map((slot, index) => (
+                                            <SortableImageItem
+                                                key={slot.id}
+                                                id={slot.id}
+                                                url={slot.url}
+                                                index={index}
+                                                onUpload={handleImageUpload}
+                                                onRemove={handleImageRemove}
+                                            />
+                                        ))}
+                                    </div>
+                                </SortableContext>
+                            </DndContext>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>

@@ -7,17 +7,25 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { Check, Printer, ArrowLeft } from "lucide-react";
 
-// ── Status timeline (same logic as orders list) ───────────────────────────────
+// ── Status timeline ───────────────────────────────────────────────────────────
 
-const TIMELINE_STEPS = [
-    { key: "ordered", label: "Ordered" },
+const DELIVERY_STEPS = [
+    { key: "ordered",    label: "Ordered" },
     { key: "processing", label: "Processing" },
-    { key: "packed", label: "Packed" },
-    { key: "shipped", label: "Shipped" },
-    { key: "delivered", label: "Delivered" },
+    { key: "packed",     label: "Packed" },
+    { key: "shipped",    label: "Shipped" },
+    { key: "delivered",  label: "Delivered" },
 ];
 
-function statusToStep(status: string) {
+const PICKUP_STEPS = [
+    { key: "ordered",          label: "Ordered" },
+    { key: "processing",       label: "Processing" },
+    { key: "packed",           label: "Packed" },
+    { key: "ready_for_pickup", label: "Ready" },
+    { key: "collected",        label: "Collected" },
+];
+
+function deliveryStatusToStep(status: string) {
     switch (status) {
         case "pending": return 0;
         case "paid":
@@ -30,7 +38,20 @@ function statusToStep(status: string) {
     }
 }
 
-function StatusTimeline({ status }: { status: string }) {
+function pickupStatusToStep(status: string) {
+    switch (status) {
+        case "pending": return 0;
+        case "paid":
+        case "processing": return 1;
+        case "packed": return 2;
+        case "ready_for_pickup": return 3;
+        case "fulfilled":
+        case "delivered": return 4;
+        default: return 0;
+    }
+}
+
+function StatusTimeline({ status, deliveryMethod }: { status: string; deliveryMethod: string | null }) {
     const cancelled = status === "cancelled" || status === "refunded";
     if (cancelled) {
         return (
@@ -40,24 +61,30 @@ function StatusTimeline({ status }: { status: string }) {
             </div>
         );
     }
-    const active = statusToStep(status);
+
+    const pickup = deliveryMethod?.toLowerCase().includes("pickup") ?? false;
+    const steps = pickup ? PICKUP_STEPS : DELIVERY_STEPS;
+    const active = pickup ? pickupStatusToStep(status) : deliveryStatusToStep(status);
+
     return (
         <div className="flex items-center gap-0 mt-4 flex-wrap">
-            {TIMELINE_STEPS.map((step, i) => {
+            {steps.map((step, i) => {
                 const done = i < active;
                 const current = i === active;
                 return (
                     <div key={step.key} className="flex items-center">
                         <div className="flex flex-col items-center">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${done ? "bg-black border-black" : current ? "bg-white border-black" : "bg-white border-neutral-300"
-                                }`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
+                                done ? "bg-black border-black" : current ? "bg-white border-black" : "bg-white border-neutral-300"
+                            }`}>
                                 {done ? <Check size={11} className="text-white" strokeWidth={3} /> :
                                     current ? <div className="w-2 h-2 rounded-full bg-black" /> : null}
                             </div>
-                            <span className={`mt-1.5 text-[9px] uppercase tracking-wider whitespace-nowrap font-semibold ${i > active ? "text-neutral-300" : "text-black"
-                                }`}>{step.label}</span>
+                            <span className={`mt-1.5 text-[9px] uppercase tracking-wider whitespace-nowrap font-semibold ${
+                                i > active ? "text-neutral-300" : "text-black"
+                            }`}>{step.label}</span>
                         </div>
-                        {i < TIMELINE_STEPS.length - 1 && (
+                        {i < steps.length - 1 && (
                             <div className={`h-[2px] w-8 md:w-14 shrink-0 mx-1 mb-4 ${done ? "bg-black" : "bg-neutral-200"}`} />
                         )}
                     </div>
@@ -207,14 +234,16 @@ export default function OrderDetailPage() {
                     <div className="text-right">
                         <p className="font-mono text-sm font-bold text-neutral-900">#{orderNum}</p>
                         <p className="text-xs text-neutral-400 mt-1">{dateStr}</p>
-                        <span className={`mt-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded ${order.status === "delivered" || order.status === "fulfilled" ? "bg-emerald-100 text-emerald-700" :
-                                order.status === "shipped" ? "bg-indigo-50 text-indigo-700" :
-                                    order.status === "packed" ? "bg-blue-50 text-blue-700" :
-                                        order.status === "paid" || order.status === "processing" ? "bg-blue-50 text-blue-700" :
-                                            order.status === "cancelled" ? "bg-red-50 text-red-600" :
-                                                "bg-amber-50 text-amber-700"
-                            }`}>
-                            {order.status}
+                        <span className={`mt-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded ${
+                            order.status === "ready_for_pickup" ? "bg-neutral-900 text-white" :
+                            order.status === "delivered" || order.status === "fulfilled" ? "bg-emerald-100 text-emerald-700" :
+                            order.status === "shipped" ? "bg-indigo-50 text-indigo-700" :
+                            order.status === "packed" ? "bg-blue-50 text-blue-700" :
+                            order.status === "paid" || order.status === "processing" ? "bg-blue-50 text-blue-700" :
+                            order.status === "cancelled" ? "bg-red-50 text-red-600" :
+                            "bg-amber-50 text-amber-700"
+                        }`}>
+                            {order.status === "ready_for_pickup" ? "Ready for Pickup" : order.status}
                         </span>
                     </div>
                 </div>
@@ -222,7 +251,15 @@ export default function OrderDetailPage() {
                 {/* Status timeline */}
                 <div className="mb-8 pb-6 border-b border-neutral-100 no-print">
                     <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-2">Order Status</p>
-                    <StatusTimeline status={order.status} />
+                    <StatusTimeline status={order.status} deliveryMethod={order.delivery_method} />
+
+                    {/* Ready for pickup callout */}
+                    {order.status === "ready_for_pickup" && (
+                        <div className="mt-4 bg-neutral-900 text-white p-4">
+                            <p className="text-xs font-semibold uppercase tracking-widest mb-1">Ready for Collection</p>
+                            <p className="text-xs text-neutral-300">Your order is packed and waiting at our store. Please bring your order number when you visit.</p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Customer + Delivery */}

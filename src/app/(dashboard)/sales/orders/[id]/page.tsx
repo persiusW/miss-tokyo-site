@@ -21,18 +21,24 @@ type Order = {
     items?: any[];
 };
 
-const STATUSES = ["pending", "paid", "processing", "shipped", "fulfilled", "delivered", "refunded", "cancelled"];
+const STATUSES = ["pending", "paid", "processing", "packed", "shipped", "ready_for_pickup", "fulfilled", "delivered", "refunded", "cancelled"];
 
 const STATUS_STYLES: Record<string, string> = {
-    pending: "bg-amber-50 text-amber-700",
-    paid: "bg-green-50 text-green-700",
-    processing: "bg-blue-50 text-blue-700",
-    shipped: "bg-purple-50 text-purple-700",
-    fulfilled: "bg-indigo-50 text-indigo-700",
-    delivered: "bg-green-50 text-green-700",
-    refunded: "bg-neutral-100 text-neutral-600",
-    cancelled: "bg-red-50 text-red-600",
+    pending:          "bg-amber-50 text-amber-700",
+    paid:             "bg-green-50 text-green-700",
+    processing:       "bg-blue-50 text-blue-700",
+    packed:           "bg-blue-50 text-blue-700",
+    shipped:          "bg-purple-50 text-purple-700",
+    ready_for_pickup: "bg-neutral-900 text-white",
+    fulfilled:        "bg-indigo-50 text-indigo-700",
+    delivered:        "bg-green-50 text-green-700",
+    refunded:         "bg-neutral-100 text-neutral-600",
+    cancelled:        "bg-red-50 text-red-600",
 };
+
+function isPickupOrder(order: Order) {
+    return order.delivery_method?.toLowerCase().includes("pickup") ?? false;
+}
 
 export default function OrderDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -69,7 +75,21 @@ export default function OrderDetailPage() {
             setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
             toast.success(`Status updated to ${newStatus}.`);
 
-            if (newStatus === "shipped" || newStatus === "fulfilled") {
+            if (newStatus === "ready_for_pickup") {
+                setSendingEmail(true);
+                try {
+                    await fetch("/api/pickup-ready", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ orderIds: [order.id] }),
+                    });
+                    toast.success("Pickup notification sent to customer.");
+                } catch {
+                    toast.error("Could not send pickup notification.");
+                } finally {
+                    setSendingEmail(false);
+                }
+            } else if (newStatus === "shipped" || newStatus === "fulfilled") {
                 setSendingEmail(true);
                 try {
                     await fetch("/api/email/fulfillment", {
@@ -126,211 +146,215 @@ export default function OrderDetailPage() {
 
     return (
         <>
-        {/* Print styles */}
+        {/* Print styles — off-screen on screen, full-page on print */}
         <style>{`
+            #admin-receipt-print {
+                position: fixed;
+                left: -9999px;
+                top: 0;
+                width: 210mm;
+                visibility: hidden;
+                pointer-events: none;
+            }
             @media print {
-                * { visibility: hidden !important; }
-                #admin-receipt-print, #admin-receipt-print * { visibility: visible !important; }
-                #admin-receipt-print { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; border: none !important; }
                 .no-print { display: none !important; }
+                #admin-receipt-print {
+                    position: static !important;
+                    left: auto !important;
+                    width: 100% !important;
+                    visibility: visible !important;
+                    pointer-events: auto !important;
+                }
             }
         `}</style>
 
-        <div className="no-print space-y-10 max-w-2xl">
-            <div className="flex items-center justify-between">
-                <Link href="/sales/orders" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black transition-colors">
-                    ← Orders
-                </Link>
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={copyDetails}
-                        className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black border-b border-neutral-300 hover:border-black transition-colors pb-0.5"
-                    >
-                        Copy Customer Details
+        <div className="no-print space-y-8">
+            {/* Top bar: back + order number + actions */}
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                    <Link href="/sales/orders" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black transition-colors">
+                        ← Orders
+                    </Link>
+                    <div className="flex items-center gap-3 mt-3">
+                        <h1 className="font-serif text-3xl tracking-widest uppercase">
+                            #{order.id.substring(0, 8).toUpperCase()}
+                        </h1>
+                        <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-semibold rounded ${STATUS_STYLES[order.status] || "bg-neutral-100 text-neutral-600"}`}>
+                            {order.status}
+                        </span>
+                    </div>
+                    <p className="text-xs text-neutral-400 mt-1">{dateStr}</p>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                    {/* Packed-stage contextual action */}
+                    {order.status === "packed" && (
+                        isPickupOrder(order) ? (
+                            <button onClick={() => updateStatus("ready_for_pickup")} disabled={updating}
+                                className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-neutral-900 text-white hover:bg-black transition-colors disabled:opacity-50">
+                                Mark Ready for Pickup
+                            </button>
+                        ) : (
+                            <button onClick={() => updateStatus("shipped")} disabled={updating}
+                                className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                Assign Rider & Ship
+                            </button>
+                        )
+                    )}
+                    {order.status !== "fulfilled" && order.status !== "delivered" && order.status !== "packed" && order.status !== "ready_for_pickup" && (
+                        <button onClick={() => updateStatus("fulfilled")} disabled={updating}
+                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                            Mark Fulfilled
+                        </button>
+                    )}
+                    {order.status === "ready_for_pickup" && (
+                        <button onClick={() => updateStatus("fulfilled")} disabled={updating}
+                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50">
+                            Mark Collected
+                        </button>
+                    )}
+                    {order.status !== "refunded" && (
+                        <button onClick={() => updateStatus("refunded")} disabled={updating}
+                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-colors disabled:opacity-50">
+                            Refund
+                        </button>
+                    )}
+                    {order.status !== "cancelled" && (
+                        <button onClick={() => updateStatus("cancelled")} disabled={updating}
+                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50">
+                            Cancel
+                        </button>
+                    )}
+                    <button onClick={copyDetails}
+                        className="px-5 py-2.5 text-xs uppercase tracking-widest border border-neutral-200 hover:border-black text-neutral-500 hover:text-black transition-colors">
+                        Copy Details
                     </button>
-                    <button
-                        onClick={() => window.print()}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
-                    >
+                    <button onClick={() => window.print()}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors">
                         <Printer size={14} /> Print Receipt
                     </button>
                 </div>
             </div>
 
-            <header>
-                <p className="text-[10px] uppercase tracking-widest text-neutral-400 mb-1">Order</p>
-                <h1 className="font-serif text-3xl tracking-widest uppercase">
-                    #{order.id.substring(0, 8).toUpperCase()}
-                </h1>
-            </header>
+            {/* 2-column layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-            {/* Details card */}
-            <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
-                {[
-                    ["Customer", order.customer_name || "—"],
-                    ["Email", order.customer_email],
-                    ["Phone", order.customer_phone || "—"],
-                    ["Amount", `GH₵ ${Number(order.total_amount).toFixed(2)}`],
-                    ["Delivery", order.delivery_method || "Delivery"],
-                    ["Paystack Ref", order.paystack_reference || "—"],
-                    ["Date", new Date(order.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
-                ].map(([label, value]) => (
-                    <div key={label} className="px-8 py-4 flex justify-between items-center text-sm">
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
-                        <span className="text-neutral-900 font-medium font-mono">{value}</span>
-                    </div>
-                ))}
-                {order.shipping_address?.text && (
-                    <div className="px-8 py-4 flex justify-between items-center text-sm">
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Shipping Address</span>
-                        <span className="text-neutral-900 font-medium text-right max-w-[50%]">{order.shipping_address.text}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Payment Method & Details */}
-            <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
-                <header className="px-8 py-5 border-b border-neutral-100">
-                    <h2 className="text-xs uppercase tracking-widest font-semibold">Payment Method &amp; Details</h2>
-                </header>
-                {[
-                    ["Provider",      order.paystack_reference ? "Paystack" : "N/A"],
-                    ["Reference ID",  order.paystack_reference || "—"],
-                    ["Payment Date",  new Date(order.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
-                    ["Status",        ["paid", "processing", "fulfilled", "delivered"].includes(order.status) ? "Successful" : order.status === "pending" ? "Pending" : "Failed"],
-                    ["Amount Paid",   `GH₵ ${Number(order.total_amount).toFixed(2)}`],
-                ].map(([label, value]) => (
-                    <div key={label} className="px-8 py-4 flex justify-between items-center text-sm">
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
-                        <span className={`font-medium font-mono ${label === "Status" && value === "Successful" ? "text-green-700" : label === "Status" && value === "Failed" ? "text-red-600" : "text-neutral-900"}`}>{value}</span>
-                    </div>
-                ))}
-            </div>
-
-            {/* Items */}
-            <div className="bg-white border border-neutral-200">
-                <header className="px-8 py-6 border-b border-neutral-100">
-                    <h2 className="text-xs uppercase tracking-widest font-semibold">Ordered Items</h2>
-                </header>
-                <div className="divide-y divide-neutral-100">
-                    {order.items && order.items.length > 0 ? (
-                        order.items.map((item: any, idx: number) => (
-                            <div key={idx} className="px-8 py-6 flex gap-6 items-center">
-                                {(item.imageUrl || item.image_url) && (
-                                    <div className="w-16 h-20 bg-neutral-50 flex-shrink-0 overflow-hidden rounded-sm border border-neutral-100">
-                                        <img src={item.imageUrl || item.image_url} alt={item.name} className="w-full h-full object-cover" />
-                                    </div>
-                                )}
-                                <div className="flex-1 space-y-1">
-                                    <div className="flex justify-between">
-                                        <h3 className="font-serif text-base">{item.name || "Product"}</h3>
-                                        {item.price && (
-                                            <span className="font-mono text-sm">GH₵ {(Number(item.price) * (item.quantity || 1)).toFixed(2)}</span>
-                                        )}
-                                    </div>
-                                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                                        {item.size && (
-                                            <span className="text-[10px] uppercase tracking-widest text-neutral-500">
-                                                Size: <span className="text-neutral-900 font-semibold">{item.size}</span>
-                                            </span>
-                                        )}
-                                        {item.color && (
-                                            <span className="text-[10px] uppercase tracking-widest text-neutral-500">
-                                                Color: <span className="text-neutral-900 font-semibold">{item.color}</span>
-                                            </span>
-                                        )}
-                                        {item.stitching && (
-                                            <span className="text-[10px] uppercase tracking-widest text-neutral-500">
-                                                Stitching: <span className="text-neutral-900 font-semibold">{item.stitching}</span>
-                                            </span>
-                                        )}
-                                        <span className="text-[10px] uppercase tracking-widest text-neutral-500">
-                                            Qty: <span className="text-neutral-900 font-semibold">{item.quantity || 1}</span>
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="px-8 py-8 space-y-2">
-                            <p className="text-neutral-400 italic text-sm font-serif">No line items stored for this order.</p>
-                            <p className="text-[10px] uppercase tracking-widest text-neutral-400">
-                                Total charged: <span className="text-neutral-700 font-semibold">GH₵ {Number(order.total_amount).toFixed(2)}</span>
-                                {order.paystack_reference && (
-                                    <> · Ref: <span className="font-mono text-neutral-700">{order.paystack_reference}</span></>
-                                )}
-                            </p>
+                {/* LEFT: Customer Details + Items */}
+                <div className="space-y-6">
+                    {/* Customer details */}
+                    <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
+                        <div className="px-6 py-4 border-b border-neutral-100">
+                            <h2 className="text-xs uppercase tracking-widest font-semibold">Customer Details</h2>
                         </div>
-                    )}
+                        {[
+                            ["Customer", order.customer_name || "—"],
+                            ["Email", order.customer_email],
+                            ["Phone", order.customer_phone || "—"],
+                            ["Delivery", order.delivery_method || "Delivery"],
+                            ["Date", new Date(order.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
+                        ].map(([label, value]) => (
+                            <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
+                                <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
+                                <span className="text-neutral-900 font-medium font-mono text-right max-w-[60%] break-all">{value}</span>
+                            </div>
+                        ))}
+                        {order.shipping_address?.text && (
+                            <div className="px-6 py-3 flex justify-between items-start text-sm gap-4">
+                                <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 shrink-0">Address</span>
+                                <span className="text-neutral-900 font-medium text-right">{order.shipping_address.text}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Items */}
+                    <div className="bg-white border border-neutral-200">
+                        <div className="px-6 py-4 border-b border-neutral-100">
+                            <h2 className="text-xs uppercase tracking-widest font-semibold">Ordered Items</h2>
+                        </div>
+                        <div className="divide-y divide-neutral-100">
+                            {order.items && order.items.length > 0 ? (
+                                order.items.map((item: any, idx: number) => (
+                                    <div key={idx} className="px-6 py-4 flex gap-4 items-center">
+                                        {(item.imageUrl || item.image_url) && (
+                                            <div className="w-14 h-16 bg-neutral-50 flex-shrink-0 overflow-hidden border border-neutral-100">
+                                                <img src={item.imageUrl || item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                            </div>
+                                        )}
+                                        <div className="flex-1 space-y-1 min-w-0">
+                                            <div className="flex justify-between gap-2">
+                                                <h3 className="font-serif text-sm truncate">{item.name || "Product"}</h3>
+                                                {item.price && (
+                                                    <span className="font-mono text-sm shrink-0">GH₵ {(Number(item.price) * (item.quantity || 1)).toFixed(2)}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                                                {item.size && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Size: <span className="text-neutral-900 font-semibold">{item.size}</span></span>}
+                                                {item.color && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Color: <span className="text-neutral-900 font-semibold">{item.color}</span></span>}
+                                                {item.stitching && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Stitching: <span className="text-neutral-900 font-semibold">{item.stitching}</span></span>}
+                                                <span className="text-[10px] uppercase tracking-widest text-neutral-500">Qty: <span className="text-neutral-900 font-semibold">{item.quantity || 1}</span></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="px-6 py-6 space-y-1">
+                                    <p className="text-neutral-400 italic text-sm font-serif">No line items stored.</p>
+                                    <p className="text-[10px] uppercase tracking-widest text-neutral-400">
+                                        Total: <span className="text-neutral-700 font-semibold">GH₵ {Number(order.total_amount).toFixed(2)}</span>
+                                        {order.paystack_reference && <> · Ref: <span className="font-mono text-neutral-700">{order.paystack_reference}</span></>}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            {/* Status */}
-            <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-xs uppercase tracking-widest font-semibold">Fulfillment Status</h2>
-                    <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-semibold rounded ${STATUS_STYLES[order.status] || "bg-neutral-100 text-neutral-600"}`}>
-                        {order.status}
-                    </span>
-                </div>
-
-                <div className="flex flex-wrap gap-3 mt-4">
-                    {/* Primary actions */}
-                    {order.status !== "fulfilled" && order.status !== "delivered" && (
-                        <button
-                            onClick={() => updateStatus("fulfilled")}
-                            disabled={updating}
-                            className={`px-6 py-3 text-[11px] uppercase tracking-widest font-bold transition-all bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm disabled:opacity-50`}
-                        >
-                            Mark as Fulfilled
-                        </button>
-                    )}
-
-                    {order.status !== "refunded" && (
-                        <button
-                            onClick={() => updateStatus("refunded")}
-                            disabled={updating}
-                            className={`px-6 py-3 text-[11px] uppercase tracking-widest font-bold transition-all bg-neutral-100 text-neutral-600 hover:bg-neutral-200 disabled:opacity-50`}
-                        >
-                            Refund Order
-                        </button>
-                    )}
-
-                    {order.status !== "cancelled" && (
-                        <button
-                            onClick={() => updateStatus("cancelled")}
-                            disabled={updating}
-                            className={`px-6 py-3 text-[11px] uppercase tracking-widest font-bold transition-all bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50`}
-                        >
-                            Cancel Order
-                        </button>
-                    )}
-                </div>
-
-                <div className="pt-8 border-t border-neutral-100 flex flex-col gap-4">
-                    <h3 className="text-[10px] uppercase font-bold tracking-widest text-neutral-400">All Status Options</h3>
-                    <div className="flex flex-wrap gap-2">
-                        {STATUSES.map(s => (
-                            <button
-                                key={s}
-                                onClick={() => updateStatus(s)}
-                                disabled={updating || order.status === s}
-                                className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${order.status === s
-                                    ? "bg-black text-white cursor-default"
-                                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                                    } disabled:opacity-50`}
-                            >
-                                {s}
-                            </button>
+                {/* RIGHT: Payment + Fulfillment */}
+                <div className="space-y-6">
+                    {/* Payment */}
+                    <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
+                        <div className="px-6 py-4 border-b border-neutral-100">
+                            <h2 className="text-xs uppercase tracking-widest font-semibold">Payment</h2>
+                        </div>
+                        {[
+                            ["Provider",      order.paystack_reference ? "Paystack" : "N/A"],
+                            ["Reference",     order.paystack_reference || "—"],
+                            ["Amount Paid",   `GH₵ ${Number(order.total_amount).toFixed(2)}`],
+                            ["Status",        ["paid", "processing", "fulfilled", "delivered"].includes(order.status) ? "Successful" : order.status === "pending" ? "Pending" : "Failed"],
+                        ].map(([label, value]) => (
+                            <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
+                                <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
+                                <span className={`font-medium font-mono ${label === "Status" && value === "Successful" ? "text-green-700" : label === "Status" && value === "Failed" ? "text-red-600" : "text-neutral-900"}`}>
+                                    {value}
+                                </span>
+                            </div>
                         ))}
                     </div>
-                </div>
 
-                {(order.status === "shipped" || order.status === "fulfilled") && (
-                    <p className="text-[10px] uppercase tracking-widest text-green-700">
-                        Fulfillment email {sendingEmail ? "sending..." : "sent to customer."}
-                    </p>
-                )}
+                    {/* Fulfillment Status — all status options */}
+                    <div className="bg-white border border-neutral-200 p-6 space-y-5">
+                        <h2 className="text-xs uppercase tracking-widest font-semibold">Change Status</h2>
+                        <div className="flex flex-wrap gap-2">
+                            {STATUSES.map(s => (
+                                <button
+                                    key={s}
+                                    onClick={() => updateStatus(s)}
+                                    disabled={updating || order.status === s}
+                                    className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${order.status === s
+                                        ? "bg-black text-white cursor-default"
+                                        : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                                    } disabled:opacity-50`}
+                                >
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+                        {(order.status === "shipped" || order.status === "fulfilled" || order.status === "ready_for_pickup") && (
+                            <p className="text-[10px] uppercase tracking-widest text-green-700">
+                                {sendingEmail ? "Sending notification..." : "Notification sent to customer."}
+                            </p>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>{/* end no-print */}
 
