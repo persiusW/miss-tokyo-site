@@ -32,6 +32,15 @@ body {
   animation: toast-in 0.22s ease-out forwards;
 }
 
+/* Hide scrollbar utility — used by horizontal carousels */
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
 /* Print: hide sidebar and non-content elements */
 @media print {
 

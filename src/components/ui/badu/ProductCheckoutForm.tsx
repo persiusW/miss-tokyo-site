@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useCart } from "@/store/useCart";
+import { SizeGuideModal } from "@/components/ui/miss-tokyo/SizeGuideModal";
 
 interface ProductCheckoutFormProps {
     productId: string;
@@ -105,7 +106,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
             <div id={`size-section-${productId}`} className="transition-all duration-300">
                 <div className="flex justify-between items-center mb-5">
                     <span className="block text-[10px] uppercase tracking-[0.3em] font-bold text-neutral-400">Select Size (EU)</span>
-                    <button type="button" className="text-[9px] uppercase tracking-[0.2em] text-neutral-400 border-b border-neutral-200 pb-0.5 hover:text-black hover:border-black transition-colors">Size Table</button>
+                    <SizeGuideModal />
                 </div>
                 <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
                     {sizesToRender.map(size => (

@@ -50,9 +50,9 @@ export default async function ShopCatalog({
         supabase.from("store_settings").select("shop_grid_cols, shop_product_limit, shop_mobile_cols, shop_show_title, shop_image_stretch").eq("id", "default").single(),
     ]);
 
-    const shopGridCols = ([2, 3, 4].includes(storeSettingsData?.shop_grid_cols)
+    const shopGridCols = ([2, 3, 4, 5].includes(storeSettingsData?.shop_grid_cols)
         ? storeSettingsData!.shop_grid_cols
-        : 4) as 2 | 3 | 4;
+        : 4) as 2 | 3 | 4 | 5;
 
     const shopMobileCols = ([1, 2].includes(storeSettingsData?.shop_mobile_cols)
         ? storeSettingsData!.shop_mobile_cols
@@ -78,7 +78,9 @@ export default async function ShopCatalog({
             colors: p.available_colors || [],
             sizes: p.available_sizes || [],
             createdAt: p.created_at,
-            ribbon: p.ribbon || null,
+            ribbon: p.ribbon
+                || (p.track_inventory && p.stock_quantity === 0 ? "Sold Out" : null)
+                || (p.track_inventory && p.stock_quantity > 0 && p.stock_quantity <= 3 ? `Only ${p.stock_quantity} Left` : null),
             isOnSale,
             salePrice,
         };

@@ -6,6 +6,11 @@ import { AnimatedProductGrid } from "@/components/ui/badu/AnimatedProductGrid";
 import { QuickViewModal } from "@/components/ui/badu/QuickViewModal";
 import { ChevronDown, ChevronRight, X, Filter, Plus, Minus } from "lucide-react";
 
+// Module-level: stable reference, unaffected by React Compiler or re-renders
+function normalize(s: string) {
+    return s.toLowerCase().trim().replace(/[\s_]+/g, "-");
+}
+
 interface FilterSectionProps {
     title: string;
     children: React.ReactNode;
@@ -58,7 +63,7 @@ interface Product {
 interface ShopClientProps {
     products: Product[];
     categories: Category[];
-    gridCols?: 2 | 3 | 4;
+    gridCols?: 2 | 3 | 4 | 5;
     mobileCols?: 1 | 2;
     itemsPerPage?: number;
     imageStretch?: boolean;
@@ -109,14 +114,30 @@ export function ShopClient({
     // Derived filters
     const allColors = useMemo(() => Array.from(new Set(products.flatMap(p => p.colors))), [products]);
     const allSizes = useMemo(() => Array.from(new Set(products.flatMap(p => p.sizes))).sort(), [products]);
+    const activePrice = searchParams.get("price");
 
     const filteredAndSorted = useMemo(() => {
         let result = [...products];
 
-        // Filter
-        if (activeCategory) result = result.filter(p => p.category === activeCategory);
+        // Category — normalize both sides (handles case/spaces/underscores/slug variants).
+        // Also checks category name in case category_type stores "Active Wear" not "active-wear".
+        if (activeCategory) {
+            const normActive = normalize(activeCategory);
+            const matchedCat = categories.find(c => normalize(c.slug) === normActive);
+            result = result.filter(p => {
+                const normCat = normalize(p.category);
+                return normCat === normActive
+                    || (matchedCat && normCat === normalize(matchedCat.name));
+            });
+        }
         if (activeColor) result = result.filter(p => p.colors.includes(activeColor));
         if (activeSize) result = result.filter(p => p.sizes.includes(activeSize));
+
+        // Price range filter
+        if (activePrice === "under-100") result = result.filter(p => p.priceNum < 100);
+        else if (activePrice === "100-500") result = result.filter(p => p.priceNum >= 100 && p.priceNum <= 500);
+        else if (activePrice === "500-1000") result = result.filter(p => p.priceNum > 500 && p.priceNum <= 1000);
+        else if (activePrice === "over-1000") result = result.filter(p => p.priceNum > 1000);
 
         // Sort
         if (activeSort === "newest") result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -125,7 +146,7 @@ export function ShopClient({
         if (activeSort === "name-asc") result.sort((a, b) => a.name.localeCompare(b.name));
 
         return result;
-    }, [products, activeCategory, activeSort, activeColor, activeSize]);
+    }, [products, categories, activeCategory, activeSort, activeColor, activeSize, activePrice]);
 
     // Pagination
     const totalPages = Math.ceil(filteredAndSorted.length / itemsPerPage);
@@ -191,13 +212,22 @@ export function ShopClient({
                                 </div>
                             </FilterSection>
 
-                            {/* Price (Placeholder/Structure) */}
+                            {/* Price */}
                             <FilterSection title="Price">
                                 <div className="py-6">
                                     <div className="flex flex-col gap-3">
-                                        {["Under 100 GHS", "100 - 500 GHS", "500 - 1000 GHS", "Over 1000 GHS"].map(range => (
-                                            <button key={range} className="text-[10px] uppercase tracking-[0.2em] text-left text-neutral-400 hover:text-black transition-colors">
-                                                {range}
+                                        {([
+                                            { label: "Under GH₵ 100", value: "under-100" },
+                                            { label: "GH₵ 100 – 500", value: "100-500" },
+                                            { label: "GH₵ 500 – 1000", value: "500-1000" },
+                                            { label: "Over GH₵ 1000", value: "over-1000" },
+                                        ] as const).map(({ label, value }) => (
+                                            <button
+                                                key={value}
+                                                onClick={() => updateParams({ price: activePrice === value ? null : value })}
+                                                className={`text-[10px] uppercase tracking-[0.2em] text-left transition-all ${activePrice === value ? "text-black font-black translate-x-1" : "text-neutral-400 hover:text-black"}`}
+                                            >
+                                                {label}
                                             </button>
                                         ))}
                                     </div>
@@ -260,9 +290,9 @@ export function ShopClient({
                     </div>
 
                     {/* Clear All */}
-                    {(activeCategory || activeColor || activeSize) && (
-                        <button 
-                            onClick={() => updateParams({ category: null, color: null, size: null })}
+                    {(activeCategory || activeColor || activeSize || activePrice) && (
+                        <button
+                            onClick={() => updateParams({ category: null, color: null, size: null, price: null })}
                             className="mt-8 text-[9px] uppercase tracking-[0.3em] font-black text-red-500 hover:text-red-700 text-left border-b border-red-500/20 pb-1"
                         >
                             Clear Archive Filters
@@ -301,7 +331,14 @@ export function ShopClient({
                 {/* Grid */}
                 {paginatedProducts.length > 0 ? (
                     <div className="space-y-16">
-                        <AnimatedProductGrid products={paginatedProducts} onQuickAdd={setQuickViewSlug} gridCols={gridCols} mobileCols={mobileCols} imageStretch={imageStretch} />
+                        <AnimatedProductGrid
+                                key={`${activeCategory ?? "all"}_${activeColor ?? ""}_${activeSize ?? ""}_${activePrice ?? ""}_${activeSort}_${activePage}`}
+                                products={paginatedProducts}
+                                onQuickAdd={setQuickViewSlug}
+                                gridCols={gridCols}
+                                mobileCols={mobileCols}
+                                imageStretch={imageStretch}
+                            />
                         
                         {/* Pagination */}
                         {totalPages > 1 && (
@@ -337,8 +374,8 @@ export function ShopClient({
                         <p className="text-xs uppercase tracking-[0.3em] text-neutral-400 mb-6 font-medium">
                             The archive holds no matches for your selection.
                         </p>
-                        <button 
-                            onClick={() => updateParams({ category: null, color: null, size: null })}
+                        <button
+                            onClick={() => updateParams({ category: null, color: null, size: null, price: null })}
                             className="text-[10px] uppercase tracking-widest font-bold border-b border-black pb-1 hover:text-neutral-500 transition-colors"
                         >
                             Reset Collections

@@ -7,6 +7,7 @@ import { toast } from "@/lib/toast";
 import { AssetsTab } from "./AssetsTab";
 import { EmailsTab } from "./EmailsTab";
 import { RidersTab } from "./RidersTab";
+import { SizeGuideTab } from "./SizeGuideTab";
 
 type BusinessSettings = {
     business_name: string;
@@ -23,8 +24,8 @@ type StoreSettings = {
     global_stitching: string[];
     enable_store_pickup: boolean;
     maintenance_mode: boolean;
-    home_grid_cols: 2 | 3 | 4;
-    shop_grid_cols: 2 | 3 | 4;
+    home_grid_cols: 2 | 3 | 4 | 5;
+    shop_grid_cols: 2 | 3 | 4 | 5;
     shop_mobile_cols: 1 | 2;
     home_product_limit: 4 | 6 | 8 | 12;
     shop_product_limit: 8 | 12 | 16 | 24 | 32;
@@ -79,7 +80,7 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders" | "communications";
+type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders" | "communications" | "size-guide";
 
 const TABS: { key: TabKey; label: string }[] = [
     { key: "business",       label: "Business" },
@@ -89,6 +90,7 @@ const TABS: { key: TabKey; label: string }[] = [
     { key: "emails",         label: "Emails" },
     { key: "riders",         label: "Riders" },
     { key: "communications", label: "Communications" },
+    { key: "size-guide",     label: "Size Guide" },
 ];
 
 export default function SettingsPage() {
@@ -121,6 +123,7 @@ export default function SettingsPage() {
             {activeTab === "emails"         && <EmailsTab />}
             {activeTab === "riders"         && <RidersTab />}
             {activeTab === "communications" && <CommunicationsTab />}
+            {activeTab === "size-guide"     && <SizeGuideTab />}
         </div>
     );
 }
@@ -260,8 +263,8 @@ function StoreTab() {
                         global_stitching: sData.global_stitching || DEFAULT_STORE.global_stitching,
                         enable_store_pickup: sData.enable_store_pickup || false,
                         maintenance_mode: sData.maintenance_mode || false,
-                        home_grid_cols: (sData.home_grid_cols as 2 | 3 | 4) || 4,
-                        shop_grid_cols: (sData.shop_grid_cols as 2 | 3 | 4) || 4,
+                        home_grid_cols: (sData.home_grid_cols as 2 | 3 | 4 | 5) || 4,
+                        shop_grid_cols: (sData.shop_grid_cols as 2 | 3 | 4 | 5) || 4,
                         shop_mobile_cols: (sData.shop_mobile_cols as 1 | 2) || 2,
                         home_product_limit: (sData.home_product_limit as 4 | 6 | 8 | 12) || 4,
                         shop_product_limit: (sData.shop_product_limit as 8 | 12 | 16 | 24 | 32) || 12,
@@ -297,6 +300,7 @@ function StoreTab() {
     }
 
     return (
+        <>
         <form onSubmit={handleSave} className="space-y-8 max-w-2xl">
             {/* Store Configuration */}
             <div className="bg-white border border-neutral-200 p-8 space-y-6">
@@ -378,7 +382,7 @@ function StoreTab() {
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Homepage Grid Columns</label>
                         <div className="flex gap-3">
-                            {([2, 3, 4] as const).map(n => (
+                            {([2, 3, 4, 5] as const).map(n => (
                                 <button
                                     key={n}
                                     type="button"
@@ -395,7 +399,7 @@ function StoreTab() {
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page Grid Columns</label>
                         <div className="flex gap-3">
-                            {([2, 3, 4] as const).map(n => (
+                            {([2, 3, 4, 5] as const).map(n => (
                                 <button
                                     key={n}
                                     type="button"
@@ -572,6 +576,128 @@ function StoreTab() {
                 </button>
             </div>
         </form>
+        <CarouselConfigSection />
+        </>
+    );
+}
+
+interface CarouselTabConfig {
+    label: string;
+    mode: "newest" | "sort_order";
+    category_name: string;
+}
+
+const DEFAULT_CAROUSEL_TABS: CarouselTabConfig[] = [
+    { label: "New In",      mode: "newest",     category_name: "" },
+    { label: "Bestsellers", mode: "sort_order",  category_name: "" },
+];
+
+function CarouselConfigSection() {
+    const [categories, setCategories] = useState<{ name: string; slug: string }[]>([]);
+    const [tabs, setTabs] = useState<CarouselTabConfig[]>(DEFAULT_CAROUSEL_TABS);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        Promise.all([
+            supabase.from("categories").select("name, slug").eq("is_active", true).order("name"),
+            supabase.from("site_copy").select("value").eq("copy_key", "carousel_config").single(),
+        ]).then(([{ data: cats }, { data: config }]) => {
+            if (cats) setCategories(cats);
+            if (config?.value) {
+                try {
+                    const parsed = JSON.parse(config.value);
+                    if (Array.isArray(parsed.tabs) && parsed.tabs.length > 0) setTabs(parsed.tabs);
+                } catch { /* keep defaults */ }
+            }
+            setLoading(false);
+        });
+    }, []);
+
+    const updateTab = (i: number, field: keyof CarouselTabConfig, value: string) => {
+        setTabs(prev => prev.map((t, idx) => idx === i ? { ...t, [field]: value } : t));
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        await supabase.from("site_copy").upsert(
+            { copy_key: "carousel_config", value: JSON.stringify({ tabs }) },
+            { onConflict: "copy_key" }
+        );
+        setSaving(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+    };
+
+    if (loading) return null;
+
+    return (
+        <div className="bg-white border border-neutral-200 p-8 space-y-6">
+            <div className="border-b border-neutral-100 pb-4">
+                <h2 className="text-xs font-semibold uppercase tracking-widest">Homepage Carousel Tabs</h2>
+                <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">
+                    Configure the tabs on the "A Moment For New" carousel. Filter by category or show all products.
+                </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {tabs.map((tab, i) => (
+                    <div key={i} className="space-y-4 border border-neutral-100 p-5">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Tab {i + 1}</p>
+
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">Label</label>
+                            <input
+                                type="text"
+                                value={tab.label}
+                                onChange={e => updateTab(i, "label", e.target.value)}
+                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
+                                placeholder="e.g. New In"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">Sort Order</label>
+                            <select
+                                value={tab.mode}
+                                onChange={e => updateTab(i, "mode", e.target.value)}
+                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
+                            >
+                                <option value="newest">Newest First</option>
+                                <option value="sort_order">Admin Sort Order (Bestsellers)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">Category Filter</label>
+                            <select
+                                value={tab.category_name}
+                                onChange={e => updateTab(i, "category_name", e.target.value)}
+                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
+                            >
+                                <option value="">All Products</option>
+                                {categories.map(c => (
+                                    <option key={c.slug} value={c.name}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="flex justify-end items-center gap-6 pt-2">
+                {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved</span>}
+                <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                >
+                    {saving ? "Saving..." : "Save Carousel Config"}
+                </button>
+            </div>
+        </div>
     );
 }
 

@@ -15,10 +15,11 @@ interface Product {
     salePrice?: string | null;
 }
 
-const GRID_COLS_MAP: Record<2 | 3 | 4, string> = {
+const GRID_COLS_MAP: Record<2 | 3 | 4 | 5, string> = {
     2: "lg:grid-cols-2",
     3: "lg:grid-cols-3",
     4: "lg:grid-cols-4",
+    5: "lg:grid-cols-5",
 };
 
 const MOBILE_COLS_MAP: Record<1 | 2, string> = {
@@ -26,7 +27,7 @@ const MOBILE_COLS_MAP: Record<1 | 2, string> = {
     2: "grid-cols-2",
 };
 
-export function AnimatedProductGrid({ products, onQuickAdd, gridCols = 4, mobileCols = 2, imageStretch = false }: { products: Product[], onQuickAdd?: (slug: string) => void, gridCols?: 2 | 3 | 4, mobileCols?: 1 | 2, imageStretch?: boolean }) {
+export function AnimatedProductGrid({ products, onQuickAdd, gridCols = 4, mobileCols = 2, imageStretch = false, showDividers = false }: { products: Product[], onQuickAdd?: (slug: string) => void, gridCols?: 2 | 3 | 4 | 5, mobileCols?: 1 | 2, imageStretch?: boolean, showDividers?: boolean }) {
     const container: Variants = {
         hidden: { opacity: 0 },
         show: {
@@ -44,14 +45,14 @@ export function AnimatedProductGrid({ products, onQuickAdd, gridCols = 4, mobile
 
     return (
         <motion.div
-            className={`grid ${MOBILE_COLS_MAP[mobileCols]} md:grid-cols-2 ${GRID_COLS_MAP[gridCols]} gap-4 md:gap-8`}
+            className={`grid ${MOBILE_COLS_MAP[mobileCols]} md:grid-cols-2 ${GRID_COLS_MAP[gridCols]} ${showDividers ? "gap-0 divide-x divide-neutral-200 border-t border-b border-neutral-200" : "gap-4 md:gap-8"}`}
             variants={container}
             initial="hidden"
             whileInView="show"
             viewport={{ once: true, margin: "-100px" }}
         >
             {products.map((product) => (
-                <motion.div key={product.slug} variants={item}>
+                <motion.div key={product.slug} variants={item} className={showDividers ? "pb-5" : ""}>
                     <ProductCard
                         slug={product.slug}
                         name={product.name}

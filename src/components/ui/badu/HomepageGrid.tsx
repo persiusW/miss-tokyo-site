@@ -13,7 +13,7 @@ interface Product {
     category?: string;
 }
 
-export function HomepageGrid({ products, gridCols = 4 }: { products: Product[], gridCols?: 2 | 3 | 4 }) {
+export function HomepageGrid({ products, gridCols = 4, showDividers = false }: { products: Product[], gridCols?: 2 | 3 | 4 | 5, showDividers?: boolean }) {
     const [quickViewSlug, setQuickViewSlug] = useState<string | null>(null);
 
     useEffect(() => {
@@ -23,7 +23,7 @@ export function HomepageGrid({ products, gridCols = 4 }: { products: Product[], 
 
     return (
         <>
-            <AnimatedProductGrid products={products} onQuickAdd={setQuickViewSlug} gridCols={gridCols} />
+            <AnimatedProductGrid products={products} onQuickAdd={setQuickViewSlug} gridCols={gridCols} showDividers={showDividers} />
             {quickViewSlug && (
                 <QuickViewModal slug={quickViewSlug} onClose={() => setQuickViewSlug(null)} />
             )}
