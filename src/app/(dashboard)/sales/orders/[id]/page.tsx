@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "@/lib/toast";
-import { Printer } from "lucide-react";
+import { Printer, X } from "lucide-react";
 
 type Order = {
     id: string;
@@ -19,6 +19,13 @@ type Order = {
     created_at: string;
     shipping_address?: any;
     items?: any[];
+};
+
+type Rider = {
+    id: string;
+    full_name: string;
+    phone_number: string;
+    bike_reg: string | null;
 };
 
 const STATUSES = ["pending", "paid", "processing", "packed", "shipped", "ready_for_pickup", "fulfilled", "delivered", "refunded", "cancelled"];
@@ -40,6 +47,94 @@ function isPickupOrder(order: Order) {
     return order.delivery_method?.toLowerCase().includes("pickup") ?? false;
 }
 
+// ── Inline Rider Picker ───────────────────────────────────────────────────────
+
+function RiderPicker({
+    orderId,
+    customerName,
+    onConfirm,
+    onCancel,
+}: {
+    orderId: string;
+    customerName?: string;
+    onConfirm: (riderId: string, notifyRider: boolean) => void;
+    onCancel: () => void;
+}) {
+    const [riders, setRiders] = useState<Rider[]>([]);
+    const [selectedRider, setSelectedRider] = useState("");
+    const [notifyRider, setNotifyRider] = useState(true);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        supabase.from("riders").select("id, full_name, phone_number, bike_reg")
+            .eq("is_active", true).order("full_name")
+            .then(({ data }) => {
+                setRiders(data ?? []);
+                if (data && data.length > 0) setSelectedRider(data[0].id);
+                setLoading(false);
+            });
+    }, []);
+
+    return (
+        <div className="bg-neutral-50 border border-neutral-200 p-6 space-y-5">
+            <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-widest">Assign Dispatch Rider</h3>
+                <button onClick={onCancel} className="text-neutral-400 hover:text-black">
+                    <X size={16} />
+                </button>
+            </div>
+
+            {loading ? (
+                <p className="text-xs text-neutral-400 italic">Loading riders...</p>
+            ) : riders.length === 0 ? (
+                <p className="text-xs text-red-500">No active riders. Add riders in Settings → Riders.</p>
+            ) : (
+                <select
+                    value={selectedRider}
+                    onChange={e => setSelectedRider(e.target.value)}
+                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm"
+                >
+                    {riders.map(r => (
+                        <option key={r.id} value={r.id}>
+                            {r.full_name} · {r.phone_number}{r.bike_reg ? ` · ${r.bike_reg}` : ""}
+                        </option>
+                    ))}
+                </select>
+            )}
+
+            <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                    type="checkbox"
+                    checked={notifyRider}
+                    onChange={e => setNotifyRider(e.target.checked)}
+                    className="w-4 h-4 accent-black"
+                />
+                <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-700">
+                    Notify rider via SMS
+                </span>
+            </label>
+
+            <div className="flex gap-3 pt-2">
+                <button
+                    onClick={onCancel}
+                    className="px-5 py-2.5 text-xs uppercase tracking-widest border border-neutral-200 hover:border-black text-neutral-500 hover:text-black transition-colors"
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={() => selectedRider && onConfirm(selectedRider, notifyRider)}
+                    disabled={!selectedRider || riders.length === 0}
+                    className="px-6 py-2.5 bg-blue-600 text-white text-xs uppercase tracking-widest font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                    Confirm & Ship
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
 export default function OrderDetailPage() {
     const { id } = useParams<{ id: string }>();
     const [order, setOrder] = useState<Order | null>(null);
@@ -47,7 +142,8 @@ export default function OrderDetailPage() {
     const [bizContact, setBizContact] = useState<{ email?: string; contact?: string; address?: string }>({});
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
-    const [sendingEmail, setSendingEmail] = useState(false);
+    const [notifStatus, setNotifStatus] = useState<"idle" | "sending" | "sent">("idle");
+    const [showRiderPicker, setShowRiderPicker] = useState(false);
 
     useEffect(() => {
         Promise.all([
@@ -61,49 +157,62 @@ export default function OrderDetailPage() {
         });
     }, [id]);
 
+    // Plain status update (for status panel buttons, refund, cancel, collected)
     const updateStatus = async (newStatus: string) => {
         if (!order) return;
         setUpdating(true);
-        const { error } = await supabase
-            .from("orders")
-            .update({ status: newStatus })
-            .eq("id", order.id);
-
+        const { error } = await supabase.from("orders").update({ status: newStatus }).eq("id", order.id);
         if (error) {
             toast.error("Failed to update status.");
         } else {
             setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
             toast.success(`Status updated to ${newStatus}.`);
+        }
+        setUpdating(false);
+    };
 
-            if (newStatus === "ready_for_pickup") {
-                setSendingEmail(true);
-                try {
-                    await fetch("/api/pickup-ready", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ orderIds: [order.id] }),
-                    });
-                    toast.success("Pickup notification sent to customer.");
-                } catch {
-                    toast.error("Could not send pickup notification.");
-                } finally {
-                    setSendingEmail(false);
-                }
-            } else if (newStatus === "shipped" || newStatus === "fulfilled") {
-                setSendingEmail(true);
-                try {
-                    await fetch("/api/email/fulfillment", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ orderId: order.id }),
-                    });
-                    toast.success("Fulfillment email sent.");
-                } catch {
-                    toast.error("Could not send fulfillment email.");
-                } finally {
-                    setSendingEmail(false);
-                }
-            }
+    // Pickup-ready: API handles DB update + email + SMS
+    const handlePickupReady = async () => {
+        if (!order) return;
+        setUpdating(true);
+        setNotifStatus("sending");
+        try {
+            const res = await fetch("/api/pickup-ready", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderIds: [order.id] }),
+            });
+            if (!res.ok) throw new Error("API error");
+            setOrder(prev => prev ? { ...prev, status: "ready_for_pickup" } : prev);
+            setNotifStatus("sent");
+            toast.success("Order marked ready for pickup — customer notified via email & SMS.");
+        } catch {
+            toast.error("Failed to send pickup notification.");
+            setNotifStatus("idle");
+        }
+        setUpdating(false);
+    };
+
+    // Dispatch: API handles DB update (status → shipped) + email + SMS
+    const handleDispatch = async (riderId: string, notifyRider: boolean) => {
+        if (!order) return;
+        setUpdating(true);
+        setShowRiderPicker(false);
+        setNotifStatus("sending");
+        try {
+            const res = await fetch("/api/dispatch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderIds: [order.id], riderId, notifyRider }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Dispatch failed");
+            setOrder(prev => prev ? { ...prev, status: "shipped" } : prev);
+            setNotifStatus("sent");
+            toast.success("Order dispatched — customer & rider notified via email & SMS.");
+        } catch (err: any) {
+            toast.error(err.message || "Dispatch failed.");
+            setNotifStatus("idle");
         }
         setUpdating(false);
     };
@@ -143,10 +252,11 @@ export default function OrderDetailPage() {
     const orderNum = order.id.substring(0, 8).toUpperCase();
     const dateStr = new Date(order.created_at).toLocaleDateString("en-GH", { year: "numeric", month: "long", day: "numeric" });
     const addr = typeof order.shipping_address === "string" ? order.shipping_address : order.shipping_address?.text || null;
+    const pickup = isPickupOrder(order);
 
     return (
         <>
-        {/* Print styles — off-screen on screen, full-page on print */}
+        {/* Print styles */}
         <style>{`
             #admin-receipt-print {
                 position: fixed;
@@ -169,7 +279,7 @@ export default function OrderDetailPage() {
         `}</style>
 
         <div className="no-print space-y-8">
-            {/* Top bar: back + order number + actions */}
+            {/* Top bar */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <Link href="/sales/orders" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black transition-colors">
@@ -177,42 +287,56 @@ export default function OrderDetailPage() {
                     </Link>
                     <div className="flex items-center gap-3 mt-3">
                         <h1 className="font-serif text-3xl tracking-widest uppercase">
-                            #{order.id.substring(0, 8).toUpperCase()}
+                            #{orderNum}
                         </h1>
                         <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-semibold rounded ${STATUS_STYLES[order.status] || "bg-neutral-100 text-neutral-600"}`}>
-                            {order.status}
+                            {order.status === "ready_for_pickup" ? "Ready for Pickup" : order.status}
+                        </span>
+                        <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded-sm ${pickup ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-500"}`}>
+                            {pickup ? "Pickup" : "Delivery"}
                         </span>
                     </div>
                     <p className="text-xs text-neutral-400 mt-1">{dateStr}</p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
-                    {/* Packed-stage contextual action */}
+                    {/* Packed-stage primary action */}
                     {order.status === "packed" && (
-                        isPickupOrder(order) ? (
-                            <button onClick={() => updateStatus("ready_for_pickup")} disabled={updating}
-                                className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-neutral-900 text-white hover:bg-black transition-colors disabled:opacity-50">
-                                Mark Ready for Pickup
+                        pickup ? (
+                            <button
+                                onClick={handlePickupReady}
+                                disabled={updating}
+                                className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-neutral-900 text-white hover:bg-black transition-colors disabled:opacity-50"
+                            >
+                                {notifStatus === "sending" ? "Sending..." : "Send Pickup Ready Notification"}
                             </button>
                         ) : (
-                            <button onClick={() => updateStatus("shipped")} disabled={updating}
-                                className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
+                            <button
+                                onClick={() => setShowRiderPicker(v => !v)}
+                                disabled={updating}
+                                className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                            >
                                 Assign Rider & Ship
                             </button>
                         )
                     )}
-                    {order.status !== "fulfilled" && order.status !== "delivered" && order.status !== "packed" && order.status !== "ready_for_pickup" && (
-                        <button onClick={() => updateStatus("fulfilled")} disabled={updating}
-                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50">
-                            Mark Fulfilled
-                        </button>
-                    )}
+
+                    {/* Collected button for ready_for_pickup */}
                     {order.status === "ready_for_pickup" && (
                         <button onClick={() => updateStatus("fulfilled")} disabled={updating}
                             className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50">
                             Mark Collected
                         </button>
                     )}
-                    {order.status !== "refunded" && (
+
+                    {/* Mark Fulfilled for shipped orders */}
+                    {order.status === "shipped" && (
+                        <button onClick={() => updateStatus("fulfilled")} disabled={updating}
+                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                            Mark Fulfilled
+                        </button>
+                    )}
+
+                    {order.status !== "refunded" && order.status !== "cancelled" && (
                         <button onClick={() => updateStatus("refunded")} disabled={updating}
                             className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-colors disabled:opacity-50">
                             Refund
@@ -235,22 +359,38 @@ export default function OrderDetailPage() {
                 </div>
             </div>
 
+            {/* Inline rider picker (delivery orders, packed status) */}
+            {showRiderPicker && order.status === "packed" && !pickup && (
+                <RiderPicker
+                    orderId={order.id}
+                    customerName={order.customer_name}
+                    onConfirm={handleDispatch}
+                    onCancel={() => setShowRiderPicker(false)}
+                />
+            )}
+
+            {/* Notification sent banner */}
+            {notifStatus === "sent" && (
+                <div className="bg-green-50 border border-green-200 px-5 py-3 text-xs uppercase tracking-widest text-green-700 font-semibold">
+                    ✓ Customer notified via email & SMS
+                </div>
+            )}
+
             {/* 2-column layout */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
                 {/* LEFT: Customer Details + Items */}
                 <div className="space-y-6">
-                    {/* Customer details */}
                     <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
                         <div className="px-6 py-4 border-b border-neutral-100">
                             <h2 className="text-xs uppercase tracking-widest font-semibold">Customer Details</h2>
                         </div>
                         {[
                             ["Customer", order.customer_name || "—"],
-                            ["Email", order.customer_email],
-                            ["Phone", order.customer_phone || "—"],
-                            ["Delivery", order.delivery_method || "Delivery"],
-                            ["Date", new Date(order.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
+                            ["Email",    order.customer_email],
+                            ["Phone",    order.customer_phone || "—"],
+                            ["Type",     pickup ? "Store Pickup" : (order.delivery_method || "Delivery")],
+                            ["Date",     new Date(order.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
                         ].map(([label, value]) => (
                             <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
                                 <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
@@ -308,18 +448,17 @@ export default function OrderDetailPage() {
                     </div>
                 </div>
 
-                {/* RIGHT: Payment + Fulfillment */}
+                {/* RIGHT: Payment + Status */}
                 <div className="space-y-6">
-                    {/* Payment */}
                     <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
                         <div className="px-6 py-4 border-b border-neutral-100">
                             <h2 className="text-xs uppercase tracking-widest font-semibold">Payment</h2>
                         </div>
                         {[
-                            ["Provider",      order.paystack_reference ? "Paystack" : "N/A"],
-                            ["Reference",     order.paystack_reference || "—"],
-                            ["Amount Paid",   `GH₵ ${Number(order.total_amount).toFixed(2)}`],
-                            ["Status",        ["paid", "processing", "fulfilled", "delivered"].includes(order.status) ? "Successful" : order.status === "pending" ? "Pending" : "Failed"],
+                            ["Provider",    order.paystack_reference ? "Paystack" : "N/A"],
+                            ["Reference",   order.paystack_reference || "—"],
+                            ["Amount Paid", `GH₵ ${Number(order.total_amount).toFixed(2)}`],
+                            ["Status",      ["paid", "processing", "fulfilled", "delivered"].includes(order.status) ? "Successful" : order.status === "pending" ? "Pending" : "Failed"],
                         ].map(([label, value]) => (
                             <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
                                 <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
@@ -330,7 +469,6 @@ export default function OrderDetailPage() {
                         ))}
                     </div>
 
-                    {/* Fulfillment Status — all status options */}
                     <div className="bg-white border border-neutral-200 p-6 space-y-5">
                         <h2 className="text-xs uppercase tracking-widest font-semibold">Change Status</h2>
                         <div className="flex flex-wrap gap-2">
@@ -339,29 +477,23 @@ export default function OrderDetailPage() {
                                     key={s}
                                     onClick={() => updateStatus(s)}
                                     disabled={updating || order.status === s}
-                                    className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${order.status === s
-                                        ? "bg-black text-white cursor-default"
-                                        : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                                    className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${
+                                        order.status === s
+                                            ? "bg-black text-white cursor-default"
+                                            : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
                                     } disabled:opacity-50`}
                                 >
-                                    {s}
+                                    {s === "ready_for_pickup" ? "Ready for Pickup" : s}
                                 </button>
                             ))}
                         </div>
-                        {(order.status === "shipped" || order.status === "fulfilled" || order.status === "ready_for_pickup") && (
-                            <p className="text-[10px] uppercase tracking-widest text-green-700">
-                                {sendingEmail ? "Sending notification..." : "Notification sent to customer."}
-                            </p>
-                        )}
                     </div>
                 </div>
             </div>
-        </div>{/* end no-print */}
+        </div>
 
         {/* ── Print Receipt (screen-hidden, print-visible) ── */}
         <div id="admin-receipt-print" style={{ display: "none" }} className="bg-white p-12 max-w-2xl">
-
-            {/* Header */}
             <div className="flex items-start justify-between mb-8 pb-6 border-b border-neutral-100">
                 <div>
                     <h2 className="font-serif text-xl tracking-widest uppercase">{bizName}</h2>
@@ -371,12 +503,11 @@ export default function OrderDetailPage() {
                     <p className="font-mono text-sm font-bold text-neutral-900">#{orderNum}</p>
                     <p className="text-xs text-neutral-400 mt-1">{dateStr}</p>
                     <span className={`mt-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
-                        {order.status}
+                        {order.status === "ready_for_pickup" ? "Ready for Pickup" : order.status}
                     </span>
                 </div>
             </div>
 
-            {/* Customer + Delivery */}
             {(order.customer_name || addr || order.delivery_method) && (
                 <div className="mb-8 pb-6 border-b border-neutral-100 grid grid-cols-2 gap-6">
                     {order.customer_name && (
@@ -389,8 +520,8 @@ export default function OrderDetailPage() {
                     )}
                     {addr && (
                         <div>
-                            <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-2">Delivery Address</p>
-                            <p className="text-sm text-neutral-700 whitespace-pre-line">{addr}</p>
+                            <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-2">{pickup ? "Pickup Location" : "Delivery Address"}</p>
+                            <p className="text-sm text-neutral-700 whitespace-pre-line">{pickup ? (bizContact.address || "Store") : addr}</p>
                             {order.delivery_method && (
                                 <p className="text-[10px] uppercase tracking-widest text-neutral-400 mt-1">{order.delivery_method}</p>
                             )}
@@ -399,7 +530,6 @@ export default function OrderDetailPage() {
                 </div>
             )}
 
-            {/* Items */}
             <div className="mb-8">
                 <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-4">Items Ordered</p>
                 {items.length === 0 ? (
@@ -416,9 +546,9 @@ export default function OrderDetailPage() {
                         </thead>
                         <tbody className="divide-y divide-neutral-50">
                             {items.map((item: any, i: number) => {
-                                const name = item.name || item.productName || "Item";
+                                const name  = item.name || item.productName || "Item";
                                 const price = Number(item.price ?? item.unit_price ?? 0);
-                                const qty = Number(item.quantity ?? item.qty ?? 1);
+                                const qty   = Number(item.quantity ?? item.qty ?? 1);
                                 return (
                                     <tr key={i}>
                                         <td className="py-3">
@@ -447,7 +577,6 @@ export default function OrderDetailPage() {
                 )}
             </div>
 
-            {/* Total */}
             <div className="flex justify-end border-t border-neutral-200 pt-4">
                 <div className="w-56 space-y-2 text-sm">
                     <div className="flex justify-between font-semibold text-base">
@@ -463,13 +592,12 @@ export default function OrderDetailPage() {
                 </div>
             </div>
 
-            {/* Footer */}
             <div className="border-t border-neutral-100 mt-8 pt-6 text-center space-y-1">
                 {(bizContact.address || bizContact.contact || bizContact.email) && (
                     <div className="text-xs text-neutral-500 space-y-0.5 mb-3">
                         {bizContact.address && <p>{bizContact.address}</p>}
                         {bizContact.contact && <p>{bizContact.contact}</p>}
-                        {bizContact.email && <p>{bizContact.email}</p>}
+                        {bizContact.email  && <p>{bizContact.email}</p>}
                     </div>
                 )}
                 <p className="text-[10px] uppercase tracking-widest text-neutral-400">

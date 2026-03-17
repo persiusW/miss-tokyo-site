@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { sendSMS } from "@/lib/sms";
 
 /**
  * POST /api/pickup-ready
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
         // ── Fetch orders ──────────────────────────────────────────────────────
         const { data: orders, error: ordersError } = await supabaseAdmin
             .from("orders")
-            .select("id, customer_name, customer_email, total_amount")
+            .select("id, customer_name, customer_email, customer_phone, total_amount")
             .in("id", orderIds);
 
         if (ordersError || !orders) {
@@ -120,6 +121,23 @@ export async function POST(req: NextRequest) {
 
             await Promise.allSettled(emailPromises);
         }
+
+        // ── Send pickup-ready SMS ─────────────────────────────────────────────
+        const smsPromises = orders
+            .filter(o => !!o.customer_phone)
+            .map(order => {
+                const ref = order.id.substring(0, 8).toUpperCase();
+                const parts = [
+                    `${bizName}: Hi ${order.customer_name || "there"}, your order #${ref} is ready for pickup!`,
+                    bizAddress ? `📍 ${bizAddress.replace(/\n/g, ", ")}` : "",
+                    bizContact ? `📞 ${bizContact}` : "",
+                    bizHours   ? `🕐 ${bizHours}` : "",
+                ].filter(Boolean).join(" | ");
+
+                return sendSMS({ to: order.customer_phone!, message: parts });
+            });
+
+        await Promise.allSettled(smsPromises);
 
         return NextResponse.json({ status: "ready_for_pickup", count: orderIds.length });
     } catch (err: any) {

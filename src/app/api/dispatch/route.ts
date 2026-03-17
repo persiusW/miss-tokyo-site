@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { sendSMS } from "@/lib/sms";
 
 /**
  * POST /api/dispatch
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
         // ── Fetch orders ──────────────────────────────────────────────────────
         const { data: orders, error: ordersError } = await supabaseAdmin
             .from("orders")
-            .select("id, customer_name, customer_email, customer_phone, shipping_address")
+            .select("id, customer_name, customer_email, customer_phone, shipping_address, total_amount")
             .in("id", orderIds);
 
         if (ordersError || !orders) {
@@ -45,18 +46,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Failed to update orders." }, { status: 500 });
         }
 
+        // ── Fetch business settings (needed for email + SMS) ──────────────────
+        const { data: biz } = await supabaseAdmin
+            .from("business_settings")
+            .select("business_name, email")
+            .eq("id", "default")
+            .single();
+
+        const bizName = biz?.business_name || "Miss Tokyo";
+
         // ── Send customer notifications (email) ───────────────────────────────
         if (process.env.RESEND_API_KEY) {
             const { Resend } = await import("resend");
             const resend = new Resend(process.env.RESEND_API_KEY);
 
-            const { data: biz } = await supabaseAdmin
-                .from("business_settings")
-                .select("business_name, email")
-                .eq("id", "default")
-                .single();
-
-            const bizName = biz?.business_name || "Miss Tokyo";
             const fromEmail = biz?.email || "orders@misstokyo.shop";
 
             const emailPromises = orders
@@ -102,19 +105,31 @@ export async function POST(req: NextRequest) {
             await Promise.allSettled(emailPromises);
         }
 
-        // ── Notify rider via SMS (stub — swap in your SMS provider) ──────────
+        // ── SMS: notify rider ─────────────────────────────────────────────────
         if (notifyRider && rider.phone_number) {
             const orderLines = orders
-                .slice(0, 5) // limit SMS length
-                .map(o => `${o.customer_name || o.customer_email} · ${(o.shipping_address as any)?.city || ""}`)
+                .slice(0, 5)
+                .map(o => `${o.customer_name || o.customer_email} · ${(o.shipping_address as any)?.text || (o.shipping_address as any)?.city || ""}`)
                 .join("; ");
 
-            const smsText = `Miss Tokyo Dispatch: You have ${orders.length} order${orders.length > 1 ? "s" : ""} to deliver. ${orderLines}. Check the app for full details.`;
-
-            // TODO: Integrate SMS provider (e.g. AfricasTalking, Twilio)
-            // await sendSMS(rider.phone_number, smsText);
-            console.log("[dispatch] SMS to rider:", rider.phone_number, smsText);
+            await sendSMS({
+                to: rider.phone_number,
+                message: `${bizName} Dispatch: You have ${orders.length} order${orders.length > 1 ? "s" : ""} to deliver. ${orderLines}. Contact dispatch for full details.`,
+            });
         }
+
+        // ── SMS: notify customers ─────────────────────────────────────────────
+        const customerSmsPromises = orders
+            .filter(o => !!o.customer_phone)
+            .map(o => {
+                const ref = o.id.substring(0, 8).toUpperCase();
+                return sendSMS({
+                    to: o.customer_phone!,
+                    message: `${bizName}: Hi ${o.customer_name || "there"}, your order #${ref} is on its way! Your rider ${rider.full_name} will contact you at ${rider.phone_number}. Thank you!`,
+                });
+            });
+
+        await Promise.allSettled(customerSmsPromises);
 
         return NextResponse.json({ status: "dispatched", count: orderIds.length });
     } catch (err: any) {
