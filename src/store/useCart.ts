@@ -1,18 +1,36 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { resolveWholesalePrice, WholesalePrices, WholesaleTiers } from '@/lib/wholesale';
 
 export type CartItem = {
     id: string; // productId + "-" + size + "-" + color
     productId: string;
     name: string;
     slug: string;
-    price: number;
+    price: number; // always the retail price (source of truth)
     size: string;
     color?: string;
     stitching?: string;
     quantity: number;
     imageUrl: string;
+    // Wholesale fields — only present for wholesale users
+    isWholesale?: boolean;
+    wholesalePrices?: WholesalePrices;
+    wholesaleTiers?: WholesaleTiers;
 };
+
+/** Computes the effective per-unit price for a cart item (wholesale-aware). */
+export function getEffectivePrice(item: CartItem): number {
+    if (item.isWholesale && item.wholesalePrices && item.wholesaleTiers) {
+        return resolveWholesalePrice(
+            item.quantity,
+            item.price,
+            item.wholesalePrices,
+            item.wholesaleTiers
+        );
+    }
+    return item.price;
+}
 
 type CartState = {
     items: CartItem[];
@@ -40,30 +58,30 @@ export const useCart = create<CartState>()(
                             items: state.items.map(i =>
                                 i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
                             ),
-                            isOpen: true
+                            isOpen: true,
                         };
                     }
-                    return { items: [...state.items, item], isOpen: true }; // Open cart on add
+                    return { items: [...state.items, item], isOpen: true };
                 });
             },
             removeItem: (id) => set((state) => ({
-                items: state.items.filter(i => i.id !== id)
+                items: state.items.filter(i => i.id !== id),
             })),
             updateQuantity: (id, quantity) => set((state) => ({
                 items: state.items.map(i =>
                     i.id === id ? { ...i, quantity: Math.max(1, quantity) } : i
-                )
+                ),
             })),
             clearCart: () => set({ items: [] }),
             totalAmount: () => {
-                return get().items.reduce((total, item) => total + (item.price * item.quantity), 0);
+                return get().items.reduce((total, item) => {
+                    return total + getEffectivePrice(item) * item.quantity;
+                }, 0);
             },
             totalItems: () => {
                 return get().items.reduce((total, item) => total + item.quantity, 0);
-            }
+            },
         }),
-        {
-            name: 'badu-cart-storage'
-        }
+        { name: 'badu-cart-storage' }
     )
 );

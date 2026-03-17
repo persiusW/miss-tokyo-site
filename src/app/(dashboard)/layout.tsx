@@ -3,38 +3,37 @@ import { ReactNode } from "react";
 import { LogoutButton } from "@/components/ui/badu/LogoutButton";
 import { Toaster } from "@/components/ui/badu/Toaster";
 import { RealtimeStockMonitor } from "@/components/ui/badu/RealtimeStockMonitor";
+import { SidebarNavSection } from "@/components/ui/badu/SidebarNav";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-
-function NavSection({ title, items }: { title: string; items: { label: string; href: string }[] }) {
-    return (
-        <div>
-            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-3 px-4">
-                {title}
-            </h3>
-            <ul className="space-y-1 text-sm text-neutral-600">
-                {items.map((item) => (
-                    <li key={item.href}>
-                        <Link
-                            href={item.href}
-                            className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors"
-                        >
-                            {item.label}
-                        </Link>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-}
+import { createClient } from "@/lib/supabaseServer";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-    const { data: storeSettings } = await supabaseAdmin
-        .from("store_settings")
-        .select("enable_custom_requests")
-        .eq("id", "default")
-        .single();
+    // Fetch current user role + store settings in parallel
+    const serverClient = await createClient();
+    const [{ data: { user } }, { data: storeSettings }] = await Promise.all([
+        serverClient.auth.getUser(),
+        supabaseAdmin.from("store_settings").select("enable_custom_requests").eq("id", "default").single(),
+    ]);
 
+    let userRole: string | null = null;
+    if (user) {
+        const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single();
+        userRole = profile?.role ?? null;
+    }
+
+    const isFullAccess = !userRole || userRole === "admin" || userRole === "owner";
     const showCustomRequests = storeSettings?.enable_custom_requests ?? true;
+
+    const salesItems = [
+        { label: "Orders",    href: "/sales/orders" },
+        { label: "Analytics", href: "/sales/analytics" },
+        { label: "Riders",    href: "/sales/riders" },
+        ...(isFullAccess ? [{ label: "Wholesalers", href: "/sales/wholesalers" }] : []),
+    ];
 
     const customerItems = [
         { label: "Contact List",     href: "/customers" },
@@ -45,48 +44,51 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
     return (
         <>
-            <div className="min-h-screen bg-white font-sans flex text-neutral-900">
+            <div className="min-h-screen bg-neutral-50 font-sans flex text-neutral-900">
                 {/* Sidebar */}
-                <aside className="w-64 border-r border-neutral-200 hidden md:flex flex-col h-screen sticky top-0 bg-white">
-                    <div className="p-8 border-b border-neutral-200">
-                        <Link href="/overview" className="font-serif text-2xl tracking-widest uppercase block">
+                <aside className="w-64 border-r border-neutral-200 hidden md:flex flex-col h-screen sticky top-0 bg-white shadow-sm">
+                    <div className="p-8 border-b border-neutral-100">
+                        <Link href="/overview" className="font-serif text-2xl tracking-widest uppercase block text-neutral-900">
                             Miss Tokyo
                         </Link>
                         <span className="text-[10px] uppercase tracking-widest text-neutral-400 mt-2 block">Atelier Console</span>
                     </div>
 
-                    <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
-                        <NavSection title="Overview" items={[
+                    <nav className="flex-1 overflow-y-auto py-6 px-2 space-y-6">
+                        <SidebarNavSection title="Overview" items={[
                             { label: "Dashboard Home", href: "/overview" },
                         ]} />
 
-                        <NavSection title="Sales" items={[
-                            { label: "Orders",    href: "/sales/orders" },
-                            { label: "Analytics", href: "/sales/analytics" },
-                            { label: "Riders",    href: "/sales/riders" },
-                        ]} />
+                        <SidebarNavSection title="Sales" items={salesItems} />
 
-                        <NavSection title="Catalog" items={[
+                        <SidebarNavSection title="Catalog" items={[
                             { label: "Products",   href: "/catalog/products" },
                             { label: "Categories", href: "/catalog/categories" },
                             { label: "Discounts",  href: "/catalog/discounts" },
                             { label: "Gift Cards", href: "/catalog/gift-cards" },
                         ]} />
 
-                        <NavSection title="Getting Paid" items={[
-                            { label: "Invoices",  href: "/finance/invoices" },
-                            { label: "Pay Links", href: "/finance/links" },
-                        ]} />
+                        {isFullAccess && (
+                            <SidebarNavSection title="Getting Paid" items={[
+                                { label: "Invoices",  href: "/finance/invoices" },
+                                { label: "Pay Links", href: "/finance/links" },
+                            ]} />
+                        )}
 
-                        <NavSection title="Customers" items={customerItems} />
+                        <SidebarNavSection title="Customers" items={customerItems} />
 
-                        <NavSection title="Settings" items={[
-                            { label: "Site Settings", href: "/settings" },
-                        ]} />
+                        {isFullAccess && (
+                            <SidebarNavSection title="Settings" items={[
+                                { label: "Site Settings", href: "/settings" },
+                            ]} />
+                        )}
                     </nav>
 
-                    <div className="p-4 border-t border-neutral-200 space-y-1">
-                        <Link href="/" className="block px-4 py-2 text-sm text-neutral-500 hover:text-black transition-colors">
+                    <div className="p-4 border-t border-neutral-100 space-y-1">
+                        <Link
+                            href="/"
+                            className="flex items-center px-4 py-2 text-sm text-neutral-400 hover:text-black rounded-lg hover:bg-neutral-50 transition-all duration-150"
+                        >
                             &larr; Return to Storefront
                         </Link>
                         <LogoutButton />

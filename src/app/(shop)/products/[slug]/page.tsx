@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
 import { AnimatedProductView } from "@/components/ui/badu/AnimatedProductView";
 import { ProductCheckoutForm } from "@/components/ui/badu/ProductCheckoutForm";
 import { ProductImageCarousel } from "@/components/ui/badu/ProductImageCarousel";
@@ -8,6 +10,7 @@ import { RecentlyViewed } from "@/components/ui/miss-tokyo/RecentlyViewed";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { ChevronRight } from "lucide-react";
+import { WholesaleData } from "@/lib/wholesale";
 
 export const revalidate = 60;
 
@@ -35,14 +38,75 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 export default async function ProductPage({ params }: { params: { slug: string } }) {
     const { slug } = await params;
 
-    const [{ data: product }, { data: storeSettings }] = await Promise.all([
+    // Get the current user's session (cookie-based, server-side)
+    const serverClient = await createClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+
+    const [{ data: product }, { data: storeSettings }, profileResult] = await Promise.all([
         supabase.from("products").select("*").eq("slug", slug).single(),
-        supabase.from("store_settings").select("enable_whitelabel").eq("id", "default").single(),
+        supabase.from("store_settings").select("*").eq("id", "default").single(),
+        user
+            ? supabaseAdmin.from("profiles").select("role").eq("id", user.id).single()
+            : Promise.resolve({ data: null }),
     ]);
 
     if (!product) notFound();
 
-    // Fetch related products (same category, exclude self)
+    const isWholesale = profileResult?.data?.role === "wholesale";
+    const wholesaleEnabled = storeSettings?.wholesale_enabled === true;
+
+    let wholesaleData: WholesaleData | null = null;
+    if (isWholesale && wholesaleEnabled) {
+        const globalTiers = {
+            tier1Min: storeSettings?.wholesale_tier_1_min ?? 3,
+            tier1Max: storeSettings?.wholesale_tier_1_max ?? 5,
+            tier2Min: storeSettings?.wholesale_tier_2_min ?? 8,
+            tier2Max: storeSettings?.wholesale_tier_2_max ?? 10,
+            tier3Min: storeSettings?.wholesale_tier_3_min ?? 12,
+            tier3Max: storeSettings?.wholesale_tier_3_max ?? 24,
+        };
+
+        // Tier 1 — Product-level override takes priority
+        const hasProductOverride = product.wholesale_override === true && (
+            product.wholesale_price_tier_1 != null ||
+            product.wholesale_price_tier_2 != null ||
+            product.wholesale_price_tier_3 != null
+        );
+
+        let prices = { tier1: null as number | null, tier2: null as number | null, tier3: null as number | null };
+
+        if (hasProductOverride) {
+            prices = {
+                tier1: product.wholesale_price_tier_1 ?? null,
+                tier2: product.wholesale_price_tier_2 ?? null,
+                tier3: product.wholesale_price_tier_3 ?? null,
+            };
+        } else {
+            // Tier 2 — Inherit from assigned wholesale category
+            const categoryIds: string[] = product.category_ids ?? [];
+            if (categoryIds.length > 0) {
+                const { data: wholesaleCat } = await supabaseAdmin
+                    .from("categories")
+                    .select("wholesale_tier_1_price, wholesale_tier_2_price, wholesale_tier_3_price")
+                    .eq("is_wholesale", true)
+                    .in("id", categoryIds)
+                    .limit(1)
+                    .single();
+                if (wholesaleCat) {
+                    prices = {
+                        tier1: wholesaleCat.wholesale_tier_1_price ?? null,
+                        tier2: wholesaleCat.wholesale_tier_2_price ?? null,
+                        tier3: wholesaleCat.wholesale_tier_3_price ?? null,
+                    };
+                }
+            }
+            // Tier 3 — If no category pricing, prices stay null and resolveWholesalePrice falls back to retail
+        }
+
+        wholesaleData = { enabled: true, prices, tiers: globalTiers };
+    }
+
+    // Fetch related products
     const { data: relatedRaw } = await supabase
         .from("products")
         .select("slug, name, price_ghs, image_urls, is_sale, discount_value")
@@ -82,10 +146,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
                 {product.category_type && (
                     <>
                         <ChevronRight size={10} />
-                        <Link
-                            href={`/shop?category=${product.category_type}`}
-                            className="hover:text-black transition-colors"
-                        >
+                        <Link href={`/shop?category=${product.category_type}`} className="hover:text-black transition-colors">
                             {categoryLabel}
                         </Link>
                     </>
@@ -109,7 +170,15 @@ export default async function ProductPage({ params }: { params: { slug: string }
 
                     {/* Price + Stock */}
                     <div className="flex items-baseline gap-4 mb-2">
-                        <p className="text-xl text-neutral-600">{priceStr}</p>
+                        {/* Hide retail price for wholesale users */}
+                        {!isWholesale && (
+                            <p className="text-xl text-neutral-600">{priceStr}</p>
+                        )}
+                        {isWholesale && (
+                            <p className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">
+                                RRP <span className="line-through">{priceStr}</span>
+                            </p>
+                        )}
                         {isSoldOut && (
                             <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 border border-neutral-300 px-2 py-0.5">
                                 Sold Out
@@ -136,9 +205,10 @@ export default async function ProductPage({ params }: { params: { slug: string }
                         colors={colors}
                         stitching={stitching}
                         availableSizes={availableSizes}
+                        wholesale={wholesaleData}
                     />
 
-                    {enableWhitelabel && (
+                    {enableWhitelabel && !isWholesale && (
                         <div className="border-t border-neutral-200 pt-8 mt-8 pb-8">
                             <Link href={`/whitelabel?ref=${product.slug}`} className="flex justify-between items-center group">
                                 <span className="text-sm uppercase tracking-widest font-semibold group-hover:text-neutral-500 transition-colors">
@@ -157,7 +227,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
             {/* Related Products */}
             <RelatedProducts products={relatedRaw || []} />
 
-            {/* Recently Viewed — client component, saves + displays */}
+            {/* Recently Viewed */}
             <RecentlyViewed currentSlug={slug} />
         </div>
     );

@@ -8,6 +8,7 @@ import { AssetsTab } from "./AssetsTab";
 import { EmailsTab } from "./EmailsTab";
 import { RidersTab } from "./RidersTab";
 import { SizeGuideTab } from "./SizeGuideTab";
+import { TeamTab } from "./TeamTab";
 
 type BusinessSettings = {
     business_name: string;
@@ -39,6 +40,14 @@ type StoreSettings = {
     enable_craft: boolean;
     enable_whitelabel: boolean;
     enable_custom_requests: boolean;
+    // Wholesale
+    wholesale_enabled: boolean;
+    wholesale_tier_1_min: number;
+    wholesale_tier_1_max: number;
+    wholesale_tier_2_min: number;
+    wholesale_tier_2_max: number;
+    wholesale_tier_3_min: number;
+    wholesale_tier_3_max: number;
 };
 
 const DEFAULT_BUSINESS: BusinessSettings = {
@@ -71,6 +80,13 @@ const DEFAULT_STORE: StoreSettings = {
     enable_craft: true,
     enable_whitelabel: true,
     enable_custom_requests: true,
+    wholesale_enabled: false,
+    wholesale_tier_1_min: 3,
+    wholesale_tier_1_max: 5,
+    wholesale_tier_2_min: 8,
+    wholesale_tier_2_max: 10,
+    wholesale_tier_3_min: 12,
+    wholesale_tier_3_max: 24,
 };
 
 type SiteMetadata = {
@@ -82,16 +98,17 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders" | "size-guide";
+type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders" | "size-guide" | "team";
 
 const TABS: { key: TabKey; label: string }[] = [
-    { key: "business",       label: "Business" },
-    { key: "store",          label: "Store" },
-    { key: "seo",            label: "SEO" },
-    { key: "assets",         label: "Site Assets" },
-    { key: "emails",         label: "Communications" },
+    { key: "business",   label: "Business" },
+    { key: "store",      label: "Store" },
+    { key: "seo",        label: "SEO" },
+    { key: "assets",     label: "Site Assets" },
+    { key: "emails",     label: "Communications" },
     { key: "riders",     label: "Riders" },
     { key: "size-guide", label: "Size Guide" },
+    { key: "team",       label: "Team" },
 ];
 
 export default function SettingsPage() {
@@ -124,6 +141,7 @@ export default function SettingsPage() {
             {activeTab === "emails"         && <EmailsTab />}
             {activeTab === "riders"         && <RidersTab />}
             {activeTab === "size-guide"     && <SizeGuideTab />}
+            {activeTab === "team"           && <TeamTab />}
         </div>
     );
 }
@@ -290,6 +308,13 @@ function StoreTab() {
                         enable_craft: sData.enable_craft ?? true,
                         enable_whitelabel: sData.enable_whitelabel ?? true,
                         enable_custom_requests: sData.enable_custom_requests ?? true,
+                        wholesale_enabled: sData.wholesale_enabled ?? false,
+                        wholesale_tier_1_min: sData.wholesale_tier_1_min ?? 3,
+                        wholesale_tier_1_max: sData.wholesale_tier_1_max ?? 5,
+                        wholesale_tier_2_min: sData.wholesale_tier_2_min ?? 8,
+                        wholesale_tier_2_max: sData.wholesale_tier_2_max ?? 10,
+                        wholesale_tier_3_min: sData.wholesale_tier_3_min ?? 12,
+                        wholesale_tier_3_max: sData.wholesale_tier_3_max ?? 24,
                     });
                 }
                 setLoading(false);
@@ -589,6 +614,69 @@ function StoreTab() {
                     </div>
                 ))}
                 </div>
+            </div>
+
+            {/* Wholesale Configuration */}
+            <div className="bg-white border border-neutral-200 p-8 space-y-6">
+                <div>
+                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Wholesale / B2B Configuration</h2>
+                    <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">
+                        Enable B2B wholesale pricing with quantity-based tiers. Wholesale users see custom pricing instead of retail prices on the storefront.
+                    </p>
+                </div>
+
+                <div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.wholesale_enabled}
+                            onChange={(e) => setForm(p => ({ ...p, wholesale_enabled: e.target.checked }))}
+                            className="w-4 h-4 accent-black"
+                        />
+                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Wholesale Pricing</span>
+                    </label>
+                    <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">
+                        When on, users with the Wholesale role see tier-based pricing on all product pages.
+                    </p>
+                </div>
+
+                {form.wholesale_enabled && (
+                    <div className="pt-6 border-t border-neutral-100 space-y-6">
+                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
+                            Define the quantity range for each pricing tier. These ranges apply globally across all products.
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {([1, 2, 3] as const).map(tier => (
+                                <div key={tier} className="space-y-4 p-5 border border-neutral-100 bg-neutral-50">
+                                    <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Tier {tier}</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[9px] uppercase tracking-widest text-neutral-400 mb-1">Min Qty</label>
+                                            <input
+                                                type="number" min="1"
+                                                value={form[`wholesale_tier_${tier}_min` as keyof StoreSettings] as number}
+                                                onChange={e => setForm(p => ({ ...p, [`wholesale_tier_${tier}_min`]: parseInt(e.target.value) || 1 }))}
+                                                className="w-full border-b border-neutral-300 bg-transparent py-1.5 outline-none focus:border-black text-sm text-center transition-colors"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[9px] uppercase tracking-widest text-neutral-400 mb-1">Max Qty</label>
+                                            <input
+                                                type="number" min="1"
+                                                value={form[`wholesale_tier_${tier}_max` as keyof StoreSettings] as number}
+                                                onChange={e => setForm(p => ({ ...p, [`wholesale_tier_${tier}_max`]: parseInt(e.target.value) || 1 }))}
+                                                className="w-full border-b border-neutral-300 bg-transparent py-1.5 outline-none focus:border-black text-sm text-center transition-colors"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-[9px] text-neutral-400 tracking-widest uppercase">
+                                        {form[`wholesale_tier_${tier}_min` as keyof StoreSettings]} – {form[`wholesale_tier_${tier}_max` as keyof StoreSettings]} units
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="flex justify-end items-center gap-6">

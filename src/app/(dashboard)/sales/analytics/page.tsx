@@ -1,357 +1,336 @@
-import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
-import { fetchOrderStats, fetchMonthlyRevenue, fetchSalesByCategory, REVENUE_STATUSES } from "@/lib/utils/metrics";
+"use client";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
+import { Calendar, TrendingUp, BarChart2, FileText, Lightbulb } from "lucide-react";
+import { RevenueLineChart, OrdersBarChart, TopItemsList, type DailyPoint, type TopItem } from "./HighlightsTab";
+import { SalesByItemTable, SalesByVariantTable, type ItemRow, type VariantRow } from "./ReportsTab";
 
-export default async function AnalyticsPage() {
-    const [
-        stats,
-        monthlyData,
-        categoryData,
-        { count: totalProducts },
-        revenueOrdersRes,
-        dispatchOrdersRes,
-        allOrdersRes,
-        couponsRes,
-    ] = await Promise.all([
-        fetchOrderStats(),
-        fetchMonthlyRevenue(6),
-        fetchSalesByCategory(),
-        supabase.from("products").select("*", { count: "exact", head: true }).eq("is_active", true),
-        supabase.from("orders").select("items, total_amount").in("status", [...REVENUE_STATUSES]),
-        supabase.from("orders")
-            .select("id, customer_name, status, total_amount, created_at, assigned_rider_id, riders(full_name, phone_number)")
-            .not("assigned_rider_id", "is", null)
-            .order("created_at", { ascending: false })
-            .limit(20),
-        supabase.from("orders").select("status, delivery_method, created_at"),
-        supabase.from("coupons").select("code, discount_type, used_count, discount_value, is_active").order("used_count", { ascending: false }).limit(10),
-    ]);
+// ─── Constants ────────────────────────────────────────────────────────────────
+const REVENUE_STATUSES = ["paid", "processing", "packed", "fulfilled", "delivered"];
 
-    // ── Items Sold ──────────────────────────────────────────────────────────
-    const revenueOrders = revenueOrdersRes.data ?? [];
-    const itemsSold = revenueOrders
-        .flatMap((o: any) => Array.isArray(o.items) ? o.items : [])
-        .reduce((sum: number, item: any) => sum + (Number(item.quantity) || 1), 0);
+type Preset = "today" | "yesterday" | "7d" | "30d" | "ytd" | "custom";
+type Tab = "highlights" | "traffic" | "reports" | "insights";
 
-    // ── Top Products ────────────────────────────────────────────────────────
-    const productRevenue: Record<string, { name: string; revenue: number; units: number }> = {};
+const PRESETS: { key: Preset; label: string }[] = [
+    { key: "today",     label: "Today" },
+    { key: "yesterday", label: "Yesterday" },
+    { key: "7d",        label: "Past 7 Days" },
+    { key: "30d",       label: "Past 30 Days" },
+    { key: "ytd",       label: "Year to Date" },
+    { key: "custom",    label: "Custom" },
+];
+
+const TABS: { key: Tab; label: string; Icon: any }[] = [
+    { key: "highlights", label: "Highlights",       Icon: TrendingUp },
+    { key: "traffic",    label: "Traffic",           Icon: BarChart2 },
+    { key: "reports",    label: "Reports",           Icon: FileText },
+    { key: "insights",   label: "Insights",          Icon: Lightbulb },
+];
+
+function getPresetRange(preset: Preset): { start: Date; end: Date } {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    switch (preset) {
+        case "today":
+            return { start: today, end: now };
+        case "yesterday": {
+            const y = new Date(today);
+            y.setDate(y.getDate() - 1);
+            return { start: y, end: today };
+        }
+        case "7d": {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 7);
+            return { start: d, end: now };
+        }
+        case "30d": {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 30);
+            return { start: d, end: now };
+        }
+        case "ytd":
+            return { start: new Date(now.getFullYear(), 0, 1), end: now };
+        default: {
+            const d = new Date(today);
+            d.setDate(d.getDate() - 30);
+            return { start: d, end: now };
+        }
+    }
+}
+
+function fmtDate(iso: string) {
+    const [, m, d] = iso.split("-");
+    return `${d}/${m}`;
+}
+
+function toInputDate(d: Date) {
+    return d.toISOString().substring(0, 10);
+}
+
+// ─── Aggregation helpers ──────────────────────────────────────────────────────
+type RawOrder = { id: string; status: string; total_amount: number; items: any; created_at: string };
+
+function aggregateData(orders: RawOrder[], allOrders: RawOrder[]) {
+    const revenueOrders = orders.filter(o => REVENUE_STATUSES.includes(o.status));
+
+    // Revenue by date
+    const revByDate: Record<string, number> = {};
+    for (const o of revenueOrders) {
+        const d = o.created_at.substring(0, 10);
+        revByDate[d] = (revByDate[d] ?? 0) + Number(o.total_amount ?? 0);
+    }
+    const revenueChart: DailyPoint[] = Object.entries(revByDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, value]) => ({ date: fmtDate(date), value: Math.round(value * 100) / 100 }));
+
+    // Orders by date (all statuses)
+    const ordByDate: Record<string, number> = {};
+    for (const o of allOrders) {
+        const d = o.created_at.substring(0, 10);
+        ordByDate[d] = (ordByDate[d] ?? 0) + 1;
+    }
+    const ordersChart: DailyPoint[] = Object.entries(ordByDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, value]) => ({ date: fmtDate(date), value }));
+
+    // Top items + sales by item/variant
+    const itemMap: Record<string, ItemRow> = {};
+    const variantMap: Record<string, VariantRow> = {};
+
     for (const order of revenueOrders) {
         const items: any[] = Array.isArray(order.items) ? order.items : [];
         const lineSum = items.reduce((s: number, i: any) => s + Number(i.price ?? 0) * Number(i.quantity ?? 1), 0);
         for (const item of items) {
-            const key = item.productId || item.name || "Unknown";
-            const name = item.name || item.productId?.substring(0, 12) || "Unknown";
-            const lineAmt = Number(item.price ?? 0) * Number(item.quantity ?? 1);
+            const qty = Number(item.quantity ?? 1);
+            const lineAmt = Number(item.price ?? 0) * qty;
             const share = lineSum > 0 ? lineAmt / lineSum : 1 / items.length;
-            if (!productRevenue[key]) productRevenue[key] = { name, revenue: 0, units: 0 };
-            productRevenue[key].revenue += Number(order.total_amount ?? 0) * share;
-            productRevenue[key].units += Number(item.quantity ?? 1);
+            const rev = Number(order.total_amount ?? 0) * share;
+            const iKey = item.productId || item.name || "Unknown";
+            const name = item.name || iKey.substring(0, 20) || "Unknown";
+
+            if (!itemMap[iKey]) itemMap[iKey] = { name, productId: iKey, units: 0, revenue: 0 };
+            itemMap[iKey].units += qty;
+            itemMap[iKey].revenue += rev;
+
+            const size = item.size || "";
+            const color = item.color || "";
+            const vKey = `${iKey}|${size}|${color}`;
+            if (!variantMap[vKey]) variantMap[vKey] = { name, productId: iKey, size, color, units: 0, revenue: 0 };
+            variantMap[vKey].units += qty;
+            variantMap[vKey].revenue += rev;
         }
     }
-    const topProducts = Object.values(productRevenue)
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 8);
-    const maxProductRevenue = Math.max(...topProducts.map(p => p.revenue), 1);
 
-    // ── Delivery vs Pickup ──────────────────────────────────────────────────
-    const allOrders = allOrdersRes.data ?? [];
-    const pickupCount  = allOrders.filter(o => o.delivery_method?.toLowerCase().includes("pickup")).length;
-    const deliveryCount = allOrders.length - pickupCount;
+    const topItems: TopItem[] = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+    const itemRows: ItemRow[] = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
+    const variantRows: VariantRow[] = Object.values(variantMap).sort((a, b) => b.revenue - a.revenue);
 
-    // ── Order Status Breakdown ──────────────────────────────────────────────
-    const dispatchOrders = (dispatchOrdersRes.data ?? []) as any[];
-    const maxRevenue = Math.max(...monthlyData.map(m => m.revenue), 1);
-    const maxCatRevenue = Math.max(...categoryData.map(c => c.revenue), 1);
+    const totalRevenue = revenueOrders.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
+    const itemsSold = revenueOrders.flatMap(o => Array.isArray(o.items) ? o.items : [])
+        .reduce((s: number, i: any) => s + (Number(i.quantity) || 1), 0);
 
-    const statusEntries: [string, number][] = [
-        ["pending",           allOrders.filter(o => o.status === "pending").length],
-        ["processing",        allOrders.filter(o => o.status === "processing").length],
-        ["packed",            allOrders.filter(o => o.status === "packed").length],
-        ["shipped",           allOrders.filter(o => o.status === "shipped").length],
-        ["fulfilled",         allOrders.filter(o => ["fulfilled", "delivered"].includes(o.status)).length],
-        ["ready for pickup",  allOrders.filter(o => o.status === "ready_for_pickup").length],
-        ["cancelled",         allOrders.filter(o => ["cancelled", "refunded"].includes(o.status)).length],
-    ].filter(([, count]) => (count as number) > 0) as [string, number][];
-    const statusTotal = statusEntries.reduce((s, [, c]) => s + c, 0);
+    return { revenueChart, ordersChart, topItems, itemRows, variantRows, totalRevenue, itemsSold };
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+export default function AnalyticsPage() {
+    const [activeTab, setActiveTab] = useState<Tab>("highlights");
+    const [preset, setPreset] = useState<Preset>("30d");
+    const [customStart, setCustomStart] = useState(toInputDate(getPresetRange("30d").start));
+    const [customEnd, setCustomEnd] = useState(toInputDate(new Date()));
+    const [loading, setLoading] = useState(true);
+    const [revenueChart, setRevenueChart] = useState<DailyPoint[]>([]);
+    const [ordersChart, setOrdersChart] = useState<DailyPoint[]>([]);
+    const [topItems, setTopItems] = useState<TopItem[]>([]);
+    const [itemRows, setItemRows] = useState<ItemRow[]>([]);
+    const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
+    const [totalRevenue, setTotalRevenue] = useState(0);
+    const [itemsSold, setItemsSold] = useState(0);
+    const [totalOrders, setTotalOrders] = useState(0);
+
+    const dateRange = preset === "custom"
+        ? { start: new Date(customStart), end: new Date(customEnd + "T23:59:59") }
+        : getPresetRange(preset);
+
+    const dateLabel = preset === "custom"
+        ? `${customStart}_${customEnd}`
+        : preset;
+
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        const { start, end } = dateRange;
+
+        const { data: allOrders } = await supabase
+            .from("orders")
+            .select("id, status, total_amount, items, created_at")
+            .gte("created_at", start.toISOString())
+            .lte("created_at", end.toISOString())
+            .order("created_at");
+
+        const rows = (allOrders ?? []) as RawOrder[];
+        const revenueRows = rows.filter(o => REVENUE_STATUSES.includes(o.status));
+
+        const agg = aggregateData(revenueRows, rows);
+        setRevenueChart(agg.revenueChart);
+        setOrdersChart(agg.ordersChart);
+        setTopItems(agg.topItems);
+        setItemRows(agg.itemRows);
+        setVariantRows(agg.variantRows);
+        setTotalRevenue(agg.totalRevenue);
+        setItemsSold(agg.itemsSold);
+        setTotalOrders(rows.length);
+        setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [preset, customStart, customEnd]);
+
+    useEffect(() => { fetchData(); }, [fetchData]);
+
+    const avgOrder = totalOrders > 0
+        ? (totalRevenue / revenueChart.reduce((s, d) => s + (d.value > 0 ? 1 : 0), 0) || totalRevenue)
+        : 0;
 
     const kpis = [
-        { label: "Total Revenue",       value: `GH₵ ${stats.totalRevenue.toFixed(2)}`, sub: "All time" },
-        { label: "Total Orders",        value: String(stats.totalOrders),               sub: "All statuses" },
-        { label: "Items Sold",          value: String(itemsSold),                       sub: "Units dispatched" },
-        { label: "Avg. Order Value",    value: `GH₵ ${stats.avgOrderValue.toFixed(2)}`, sub: "Per paid order" },
-        { label: "Conversion Rate",     value: `${stats.conversionRate}%`,              sub: "Paid / total" },
+        { label: "Revenue",      value: `GH₵ ${totalRevenue.toFixed(2)}` },
+        { label: "Orders",       value: String(totalOrders) },
+        { label: "Items Sold",   value: String(itemsSold) },
+        { label: "Avg. Order",   value: `GH₵ ${totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : "0.00"}` },
     ];
 
-    const coupons = couponsRes.data ?? [];
-
     return (
-        <div className="space-y-12">
+        <div className="space-y-8">
             <header>
                 <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Analytics</h1>
-                <p className="text-neutral-500">Revenue performance and conversion insights.</p>
+                <p className="text-neutral-500">Revenue performance, order flow, and product insights.</p>
             </header>
 
-            {/* Key Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                {kpis.map(({ label, value, sub }) => (
-                    <div key={label} className="bg-white border border-neutral-200 p-6">
-                        <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">{label}</span>
-                        <span className="text-2xl font-serif">{value}</span>
-                        <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider uppercase">{sub}</span>
+            {/* Date Range Picker */}
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <Calendar size={14} className="text-neutral-400" />
+                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Date Range</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {PRESETS.map(p => (
+                        <button
+                            key={p.key}
+                            onClick={() => setPreset(p.key)}
+                            className={`px-4 py-2 text-[11px] uppercase tracking-widest font-semibold rounded-lg transition-all ${
+                                preset === p.key
+                                    ? "bg-black text-white"
+                                    : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+                            }`}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+                {preset === "custom" && (
+                    <div className="flex items-center gap-4 mt-4 pt-4 border-t border-neutral-100">
+                        <div className="flex items-center gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 whitespace-nowrap">From</label>
+                            <input
+                                type="date"
+                                value={customStart}
+                                onChange={e => setCustomStart(e.target.value)}
+                                className="border-b border-neutral-300 bg-transparent py-1 px-2 outline-none focus:border-black text-sm transition-colors"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <label className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 whitespace-nowrap">To</label>
+                            <input
+                                type="date"
+                                value={customEnd}
+                                onChange={e => setCustomEnd(e.target.value)}
+                                className="border-b border-neutral-300 bg-transparent py-1 px-2 outline-none focus:border-black text-sm transition-colors"
+                            />
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* KPI Strip */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {kpis.map(({ label, value }) => (
+                    <div key={label} className="bg-white rounded-2xl shadow-sm p-5">
+                        <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold block mb-3">{label}</span>
+                        <span className="text-2xl font-serif text-neutral-900">
+                            {loading ? <span className="inline-block w-20 h-6 bg-neutral-100 rounded animate-pulse" /> : value}
+                        </span>
                     </div>
                 ))}
             </div>
 
-            {/* Monthly Revenue Chart */}
-            <div className="bg-white border border-neutral-200 p-8">
-                <h2 className="text-xs font-semibold uppercase tracking-widest mb-10">Monthly Revenue (Last 6 Months)</h2>
-                <div className="flex items-end gap-3 h-40">
-                    {monthlyData.map(({ label, revenue }) => (
-                        <div key={label} className="flex-1 flex flex-col items-center gap-2">
-                            <span className="text-[10px] text-neutral-500 font-medium">
-                                {revenue > 0 ? `₵${revenue >= 1000 ? `${(revenue / 1000).toFixed(1)}k` : revenue.toFixed(0)}` : ""}
-                            </span>
-                            <div className="w-full bg-neutral-100 relative" style={{ height: "128px" }}>
-                                <div
-                                    className="absolute bottom-0 w-full bg-black transition-all duration-500"
-                                    style={{ height: `${(revenue / maxRevenue) * 100}%` }}
-                                />
-                            </div>
-                            <span className="text-[10px] uppercase tracking-widest text-neutral-500">{label}</span>
-                        </div>
-                    ))}
-                </div>
-                {stats.totalRevenue === 0 && (
-                    <p className="text-center text-neutral-400 italic text-sm mt-6 font-serif">Revenue data will populate as orders are completed.</p>
-                )}
+            {/* Tab Navigation */}
+            <div className="flex gap-1 bg-white rounded-2xl shadow-sm p-1.5">
+                {TABS.map(({ key, label, Icon }) => (
+                    <button
+                        key={key}
+                        onClick={() => setActiveTab(key)}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-widest transition-all ${
+                            activeTab === key
+                                ? "bg-black text-white shadow-sm"
+                                : "text-neutral-400 hover:text-black"
+                        }`}
+                    >
+                        <Icon size={13} />
+                        <span className="hidden sm:inline">{label}</span>
+                    </button>
+                ))}
             </div>
 
-            {/* Bottom Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Revenue by Category */}
-                <div className="bg-white border border-neutral-200 p-8">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest mb-6">Revenue by Category</h2>
-                    {categoryData.length === 0 ? (
-                        <p className="text-neutral-400 italic text-sm font-serif">No sales data yet.</p>
-                    ) : (
-                        <div className="space-y-4">
-                            {categoryData.map(({ category, revenue }) => {
-                                const pct = Math.round((revenue / maxCatRevenue) * 100);
-                                return (
-                                    <div key={category}>
-                                        <div className="flex justify-between text-xs mb-1">
-                                            <span className="text-neutral-600 capitalize">{category}</span>
-                                            <span className="font-medium">GH₵ {revenue.toFixed(0)}</span>
-                                        </div>
-                                        <div className="w-full bg-neutral-100 h-1.5">
-                                            <div className="bg-black h-1.5 transition-all" style={{ width: `${pct}%` }} />
-                                        </div>
-                                    </div>
-                                );
-                            })}
+            {/* Tab Content */}
+            {activeTab === "highlights" && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-2xl shadow-sm p-6">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Total Revenue over Time</h2>
+                            {loading ? <div className="h-[220px] bg-neutral-50 rounded-xl animate-pulse" /> : <RevenueLineChart data={revenueChart} />}
                         </div>
+                        <div className="bg-white rounded-2xl shadow-sm p-6">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Orders over Time</h2>
+                            {loading ? <div className="h-[220px] bg-neutral-50 rounded-xl animate-pulse" /> : <OrdersBarChart data={ordersChart} />}
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-2xl shadow-sm p-6">
+                        <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Top Selling Items</h2>
+                        {loading ? <div className="h-40 bg-neutral-50 rounded-xl animate-pulse" /> : <TopItemsList items={topItems} />}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "traffic" && (
+                <div className="bg-white rounded-2xl shadow-sm p-12 text-center space-y-4">
+                    <BarChart2 size={40} className="mx-auto text-neutral-200" />
+                    <p className="font-serif text-xl text-neutral-400">Traffic Analytics</p>
+                    <p className="text-[10px] uppercase tracking-widest text-neutral-300">
+                        Connect an analytics provider (e.g. Plausible, Vercel Analytics) to see visitor data here.
+                    </p>
+                </div>
+            )}
+
+            {activeTab === "reports" && (
+                <div className="space-y-6">
+                    {loading ? (
+                        <div className="bg-white rounded-2xl shadow-sm h-48 animate-pulse" />
+                    ) : (
+                        <>
+                            <SalesByItemTable items={itemRows} dateLabel={dateLabel} />
+                            <SalesByVariantTable variants={variantRows} dateLabel={dateLabel} />
+                        </>
                     )}
                 </div>
+            )}
 
-                {/* Order Status Breakdown */}
-                <div className="bg-white border border-neutral-200 p-8">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest mb-6">Order Status</h2>
-                    <div className="space-y-4">
-                        {statusEntries.map(([status, count]) => {
-                            const pct = statusTotal > 0 ? Math.round((count / statusTotal) * 100) : 0;
-                            const barColor =
-                                ["fulfilled"].includes(status) ? "bg-green-500"
-                                : status === "shipped"       ? "bg-blue-400"
-                                : status === "processing"    ? "bg-yellow-400"
-                                : status === "pending"       ? "bg-amber-400"
-                                : status === "cancelled"     ? "bg-red-300"
-                                : "bg-neutral-900";
-                            return (
-                                <div key={status}>
-                                    <div className="flex justify-between text-xs mb-1">
-                                        <span className="capitalize text-neutral-600">{status}</span>
-                                        <span className="font-medium">{count} ({pct}%)</span>
-                                    </div>
-                                    <div className="w-full bg-neutral-100 h-1.5">
-                                        <div className={`${barColor} h-1.5`} style={{ width: `${pct}%` }} />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        {statusEntries.length === 0 && (
-                            <p className="text-neutral-400 italic text-sm font-serif">No order data yet.</p>
-                        )}
-                    </div>
+            {activeTab === "insights" && (
+                <div className="bg-white rounded-2xl shadow-sm p-12 text-center space-y-4">
+                    <Lightbulb size={40} className="mx-auto text-neutral-200" />
+                    <p className="font-serif text-xl text-neutral-400">Behavioral Insights</p>
+                    <p className="text-[10px] uppercase tracking-widest text-neutral-300">
+                        Cart abandonment patterns, repeat customers, and cohort analysis coming soon.
+                    </p>
                 </div>
-
-                {/* Atelier Summary */}
-                <div className="bg-white border border-neutral-200 p-8">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest mb-6">Atelier Summary</h2>
-                    <div className="space-y-4 divide-y divide-neutral-100">
-                        {[
-                            ["Active Products",      totalProducts ?? 0],
-                            ["Total Orders",         stats.totalOrders],
-                            ["Successful Payments",  stats.revenueOrderCount],
-                            ["Items Sold",           itemsSold],
-                            ["Conversion Rate",      `${stats.conversionRate}%`],
-                            ["Avg. Order Value",     `GH₵ ${stats.avgOrderValue.toFixed(2)}`],
-                        ].map(([label, val]) => (
-                            <div key={String(label)} className="flex justify-between items-center py-3 text-sm">
-                                <span className="text-neutral-600">{label}</span>
-                                <span className="font-semibold text-neutral-900">{val}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Top Products + Delivery Split */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Top Products */}
-                <div className="bg-white border border-neutral-200 p-8 md:col-span-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest mb-6">Top Products by Revenue</h2>
-                    {topProducts.length === 0 ? (
-                        <p className="text-neutral-400 italic text-sm font-serif">No sales data yet.</p>
-                    ) : (
-                        <div className="space-y-4">
-                            {topProducts.map(({ name, revenue, units }) => {
-                                const pct = Math.round((revenue / maxProductRevenue) * 100);
-                                return (
-                                    <div key={name}>
-                                        <div className="flex justify-between text-xs mb-1">
-                                            <span className="text-neutral-700 truncate max-w-[60%]">{name}</span>
-                                            <span className="text-neutral-500">{units} units · <span className="font-medium text-neutral-800">GH₵ {revenue.toFixed(0)}</span></span>
-                                        </div>
-                                        <div className="w-full bg-neutral-100 h-1.5">
-                                            <div className="bg-neutral-900 h-1.5 transition-all" style={{ width: `${pct}%` }} />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                {/* Delivery vs Pickup */}
-                <div className="bg-white border border-neutral-200 p-8">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest mb-6">Fulfillment Method</h2>
-                    <div className="space-y-6">
-                        {[
-                            { label: "Delivery", count: deliveryCount, color: "bg-black" },
-                            { label: "Pickup",   count: pickupCount,  color: "bg-neutral-400" },
-                        ].map(({ label, count, color }) => {
-                            const total = deliveryCount + pickupCount;
-                            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                            return (
-                                <div key={label}>
-                                    <div className="flex justify-between text-xs mb-2">
-                                        <span className="text-neutral-600">{label}</span>
-                                        <span className="font-semibold">{count} <span className="text-neutral-400 font-normal">({pct}%)</span></span>
-                                    </div>
-                                    <div className="w-full bg-neutral-100 h-2">
-                                        <div className={`${color} h-2`} style={{ width: `${pct}%` }} />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        <div className="pt-2 border-t border-neutral-100 text-xs text-neutral-400">
-                            {allOrders.length} total orders
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Coupon Performance */}
-            <div className="bg-white border border-neutral-200">
-                <div className="px-8 py-5 border-b border-neutral-100">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest">Coupon Usage</h2>
-                </div>
-                {coupons.length === 0 ? (
-                    <div className="px-8 py-10 text-neutral-400 italic font-serif text-sm text-center">
-                        No coupons created yet.
-                    </div>
-                ) : (
-                    <table className="w-full text-sm">
-                        <thead className="bg-neutral-50 border-b border-neutral-100">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Code</th>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Type</th>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Value</th>
-                                <th className="px-6 py-3 text-center text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Uses</th>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-50">
-                            {coupons.map((c: any) => (
-                                <tr key={c.code} className="hover:bg-neutral-50">
-                                    <td className="px-6 py-4 font-mono font-semibold text-sm">{c.code}</td>
-                                    <td className="px-6 py-4 text-neutral-500 capitalize text-xs">{c.discount_type.replace(/_/g, " ")}</td>
-                                    <td className="px-6 py-4 text-neutral-700 text-xs">
-                                        {c.discount_type === "percentage" ? `${c.discount_value}%` :
-                                         c.discount_type === "free_shipping" ? "Free Shipping" :
-                                         c.discount_value ? `GH₵ ${c.discount_value}` : "—"}
-                                    </td>
-                                    <td className="px-6 py-4 text-center font-semibold">{c.used_count}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded ${c.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-400"}`}>
-                                            {c.is_active ? "Active" : "Inactive"}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
-
-            {/* Dispatch Performance */}
-            <div className="bg-white border border-neutral-200">
-                <div className="px-8 py-5 border-b border-neutral-100">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest">Dispatch Performance</h2>
-                </div>
-                {dispatchOrders.length === 0 ? (
-                    <div className="px-8 py-10 text-neutral-400 italic font-serif text-sm text-center">
-                        No dispatched orders yet. Rider assignments will appear here.
-                    </div>
-                ) : (
-                    <table className="w-full text-sm">
-                        <thead className="bg-neutral-50 border-b border-neutral-100">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Order</th>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Customer</th>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Rider</th>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Phone</th>
-                                <th className="px-6 py-3 text-right text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Amount</th>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Status</th>
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Date</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-50">
-                            {dispatchOrders.map((o: any) => (
-                                <tr key={o.id} className="hover:bg-neutral-50 transition-colors">
-                                    <td className="px-6 py-4 font-mono text-xs text-neutral-600">{o.id.substring(0, 8).toUpperCase()}</td>
-                                    <td className="px-6 py-4 text-neutral-800">{o.customer_name || "—"}</td>
-                                    <td className="px-6 py-4 text-neutral-800">{(o.riders as any)?.full_name || "—"}</td>
-                                    <td className="px-6 py-4 text-neutral-500 text-xs">{(o.riders as any)?.phone_number || "—"}</td>
-                                    <td className="px-6 py-4 text-right font-medium">GH₵ {Number(o.total_amount).toFixed(2)}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded font-semibold ${
-                                            ["fulfilled","delivered"].includes(o.status) ? "bg-green-50 text-green-700"
-                                            : o.status === "shipped" ? "bg-blue-50 text-blue-700"
-                                            : "bg-neutral-100 text-neutral-500"
-                                        }`}>{o.status}</span>
-                                    </td>
-                                    <td className="px-6 py-4 text-neutral-400 text-xs">
-                                        {new Date(o.created_at).toLocaleDateString("en-GB")}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+            )}
         </div>
     );
 }

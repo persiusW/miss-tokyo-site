@@ -11,7 +11,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStr
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from "lucide-react";
 
-type Category = { id: string; name: string; slug: string };
+type Category = { id: string; name: string; slug: string; is_wholesale: boolean };
 
 function SortableImageItem({ id, url, index, onUpload, onRemove, onBeforeUpload }: { id: string, url: string | null, index: number, onUpload: (id: string, url: string) => void, onRemove: (id: string) => void, onBeforeUpload?: (file: File) => boolean }) {
     const {
@@ -73,6 +73,7 @@ export default function EditProductPage() {
         { id: 'slot-3', url: null, type: "image" },
     ]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
     const [globalSizes, setGlobalSizes] = useState<string[]>([]);
     const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
     const [globalColors, setGlobalColors] = useState<string[]>([]);
@@ -80,6 +81,9 @@ export default function EditProductPage() {
     const [globalStitching, setGlobalStitching] = useState<string[]>([]);
     const [selectedStitching, setSelectedStitching] = useState<string[]>([]);
     const [trackInventory, setTrackInventory] = useState(true);
+    const [wholesaleTierConfig, setWholesaleTierConfig] = useState<{ enabled: boolean; tier1Min: number; tier1Max: number; tier2Min: number; tier2Max: number; tier3Min: number; tier3Max: number } | null>(null);
+    const [wholesalePrices, setWholesalePrices] = useState({ tier1: "", tier2: "", tier3: "" });
+    const [wholesaleOverride, setWholesaleOverride] = useState(false);
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
@@ -93,8 +97,8 @@ export default function EditProductPage() {
     const fetchProduct = useCallback(async () => {
         const [{ data: product }, { data: cats }, { data: storeData }] = await Promise.all([
             supabase.from("products").select("*").eq("id", id).single(),
-            supabase.from("categories").select("id, name, slug").eq("is_active", true).order("name"),
-            supabase.from("store_settings").select("global_sizes, global_colors, global_stitching").eq("id", "default").single()
+            supabase.from("categories").select("id, name, slug, is_wholesale").eq("is_active", true).order("name"),
+            supabase.from("store_settings").select("global_sizes, global_colors, global_stitching, wholesale_enabled, wholesale_tier_1_min, wholesale_tier_1_max, wholesale_tier_2_min, wholesale_tier_2_max, wholesale_tier_3_min, wholesale_tier_3_max").eq("id", "default").single()
         ]);
 
         if (!product) {
@@ -146,6 +150,24 @@ export default function EditProductPage() {
             if (storeData.global_stitching) {
                 setGlobalStitching(storeData.global_stitching);
                 setSelectedStitching(product.available_stitching || storeData.global_stitching);
+            }
+            if (storeData.wholesale_enabled) {
+                setWholesaleTierConfig({
+                    enabled: true,
+                    tier1Min: storeData.wholesale_tier_1_min ?? 3,
+                    tier1Max: storeData.wholesale_tier_1_max ?? 5,
+                    tier2Min: storeData.wholesale_tier_2_min ?? 8,
+                    tier2Max: storeData.wholesale_tier_2_max ?? 10,
+                    tier3Min: storeData.wholesale_tier_3_min ?? 12,
+                    tier3Max: storeData.wholesale_tier_3_max ?? 24,
+                });
+                setSelectedCategoryIds(Array.isArray(product.category_ids) ? product.category_ids : []);
+        setWholesaleOverride(product.wholesale_override === true);
+                setWholesalePrices({
+                    tier1: product.wholesale_price_tier_1 != null ? String(product.wholesale_price_tier_1) : "",
+                    tier2: product.wholesale_price_tier_2 != null ? String(product.wholesale_price_tier_2) : "",
+                    tier3: product.wholesale_price_tier_3 != null ? String(product.wholesale_price_tier_3) : "",
+                });
             }
         }
 
@@ -235,11 +257,16 @@ export default function EditProductPage() {
                 track_inventory: trackInventory,
                 description: formData.description,
                 category_type: formData.category_type,
+                category_ids: selectedCategoryIds,
                 image_urls: uploadedUrls,
                 available_sizes: selectedSizes,
                 available_colors: selectedColors,
                 available_stitching: selectedStitching,
                 is_active: formData.is_active,
+                wholesale_override: wholesaleOverride,
+                wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
+                wholesale_price_tier_2: wholesaleOverride && wholesalePrices.tier2 ? Number(wholesalePrices.tier2) : null,
+                wholesale_price_tier_3: wholesaleOverride && wholesalePrices.tier3 ? Number(wholesalePrices.tier3) : null,
             }).eq("id", id);
 
             if (error) throw error;
@@ -325,24 +352,52 @@ export default function EditProductPage() {
                                         className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
                                     />
                                 </div>
-                                <div>
-                                    <label htmlFor="category_type" className="block text-xs uppercase tracking-widest font-semibold mb-3">Category</label>
-                                    {categories.length === 0 ? (
-                                        <div className="border-b border-neutral-200 py-2">
-                                            <span className="text-sm text-neutral-400 italic">No categories — </span>
-                                            <Link href="/catalog/categories" className="text-sm text-black underline">add one first</Link>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label htmlFor="category_type" className="block text-xs uppercase tracking-widest font-semibold mb-3">Primary Category</label>
+                                        {categories.length === 0 ? (
+                                            <div className="border-b border-neutral-200 py-2">
+                                                <span className="text-sm text-neutral-400 italic">No categories — </span>
+                                                <Link href="/catalog/categories" className="text-sm text-black underline">add one first</Link>
+                                            </div>
+                                        ) : (
+                                            <select
+                                                id="category_type"
+                                                value={formData.category_type}
+                                                onChange={handleChange}
+                                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
+                                            >
+                                                {categories.filter(c => !c.is_wholesale).map(cat => (
+                                                    <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
+                                    {categories.length > 0 && (
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">
+                                                Additional Categories
+                                                <span className="ml-2 text-[10px] font-normal text-neutral-400 normal-case tracking-normal">incl. wholesale</span>
+                                            </label>
+                                            <div className="border border-neutral-200 rounded-lg divide-y divide-neutral-100 max-h-44 overflow-y-auto">
+                                                {categories.map(cat => (
+                                                    <label key={cat.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-neutral-50 transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-4 h-4 accent-black flex-shrink-0"
+                                                            checked={selectedCategoryIds.includes(cat.id)}
+                                                            onChange={() => setSelectedCategoryIds(prev =>
+                                                                prev.includes(cat.id) ? prev.filter(id => id !== cat.id) : [...prev, cat.id]
+                                                            )}
+                                                        />
+                                                        <span className="text-sm flex-1">{cat.name}</span>
+                                                        {cat.is_wholesale && (
+                                                            <span className="text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full flex-shrink-0">B2B</span>
+                                                        )}
+                                                    </label>
+                                                ))}
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <select
-                                            id="category_type"
-                                            value={formData.category_type}
-                                            onChange={handleChange}
-                                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
-                                        >
-                                            {categories.map(cat => (
-                                                <option key={cat.id} value={cat.slug}>{cat.name}</option>
-                                            ))}
-                                        </select>
                                     )}
                                 </div>
                             </div>
@@ -491,6 +546,48 @@ export default function EditProductPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Wholesale Pricing */}
+                        {wholesaleTierConfig?.enabled && (
+                            <div className="bg-white p-6 border border-neutral-200 space-y-5">
+                                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Wholesale Pricing</h2>
+                                <label className="flex items-center justify-between cursor-pointer">
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Product-Specific Override</p>
+                                        <p className="text-[10px] text-neutral-400 mt-0.5">When OFF, pricing inherits from the assigned wholesale category</p>
+                                    </div>
+                                    <div onClick={() => setWholesaleOverride(v => !v)}
+                                        className={`w-11 h-6 rounded-full transition-colors cursor-pointer relative flex-shrink-0 ${wholesaleOverride ? "bg-black" : "bg-neutral-200"}`}>
+                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${wholesaleOverride ? "translate-x-5" : ""}`} />
+                                    </div>
+                                </label>
+                                {wholesaleOverride ? (
+                                    <>
+                                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase">Set explicit per-item prices for each quantity tier.</p>
+                                        {([
+                                            { tier: "tier1" as const, label: "Tier 1", min: wholesaleTierConfig.tier1Min, max: wholesaleTierConfig.tier1Max },
+                                            { tier: "tier2" as const, label: "Tier 2", min: wholesaleTierConfig.tier2Min, max: wholesaleTierConfig.tier2Max },
+                                            { tier: "tier3" as const, label: "Tier 3", min: wholesaleTierConfig.tier3Min, max: wholesaleTierConfig.tier3Max },
+                                        ]).map(({ tier, label, min, max }) => (
+                                            <div key={tier}>
+                                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">{label} — {min}–{max} units</label>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-neutral-400 text-sm">GH₵</span>
+                                                    <input type="number" min="0" step="0.01" value={wholesalePrices[tier]}
+                                                        onChange={e => setWholesalePrices(p => ({ ...p, [tier]: e.target.value }))}
+                                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors rounded-none"
+                                                        placeholder="0.00" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                ) : (
+                                    <p className="text-[10px] text-emerald-600 uppercase tracking-widest font-semibold">
+                                        ✓ Will inherit from assigned wholesale category
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         {/* Media */}
                         <div className="bg-white p-6 border border-neutral-200 space-y-4">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import { Pencil, Trash2, Eye, EyeOff, Tag, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 
@@ -19,12 +19,24 @@ type Product = {
     product_variants: { sku: string | null }[] | null;
 };
 
+type WholesaleCategory = {
+    id: string;
+    name: string;
+    wholesale_tier_1_price: number | null;
+    wholesale_tier_2_price: number | null;
+    wholesale_tier_3_price: number | null;
+};
+
 export default function CatalogProductsPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [showWholesaleModal, setShowWholesaleModal] = useState(false);
+    const [wholesaleCategories, setWholesaleCategories] = useState<WholesaleCategory[]>([]);
+    const [selectedWholesaleCatId, setSelectedWholesaleCatId] = useState<string>("");
+    const [assigning, setAssigning] = useState(false);
 
     const fetchProducts = useCallback(async () => {
         const { data } = await supabase
@@ -69,6 +81,47 @@ export default function CatalogProductsPage() {
             setProducts(prev => prev.filter(p => !selectedIds.includes(p.id)));
             setSelectedIds([]);
         }
+    };
+
+    const openWholesaleModal = async () => {
+        const { data } = await supabase
+            .from("categories")
+            .select("id, name, wholesale_tier_1_price, wholesale_tier_2_price, wholesale_tier_3_price")
+            .eq("is_wholesale", true)
+            .eq("is_active", true)
+            .order("name");
+        setWholesaleCategories(data ?? []);
+        setSelectedWholesaleCatId(data?.[0]?.id ?? "");
+        setShowWholesaleModal(true);
+    };
+
+    const handleBulkAssignWholesale = async () => {
+        if (!selectedWholesaleCatId) return;
+        setAssigning(true);
+        // Fetch current category_ids for each selected product then append
+        const { data: currentProducts } = await supabase
+            .from("products")
+            .select("id, category_ids")
+            .in("id", selectedIds);
+
+        const updates = (currentProducts ?? []).map(p => {
+            const existing: string[] = p.category_ids ?? [];
+            const merged = existing.includes(selectedWholesaleCatId)
+                ? existing
+                : [...existing, selectedWholesaleCatId];
+            return supabase.from("products").update({ category_ids: merged }).eq("id", p.id);
+        });
+
+        const results = await Promise.all(updates);
+        const anyError = results.some(r => r.error);
+        if (anyError) {
+            toast.error("Some products failed to update.");
+        } else {
+            toast.success(`Wholesale category assigned to ${selectedIds.length} product${selectedIds.length !== 1 ? "s" : ""}.`);
+            setSelectedIds([]);
+            setShowWholesaleModal(false);
+        }
+        setAssigning(false);
     };
 
     const handleBulkUntrack = async () => {
@@ -145,6 +198,13 @@ export default function CatalogProductsPage() {
                         {selectedIds.length} item{selectedIds.length !== 1 ? "s" : ""} selected
                     </span>
                     <div className="flex items-center gap-6">
+                        <button
+                            onClick={openWholesaleModal}
+                            className="flex items-center gap-2 text-xs uppercase tracking-widest text-emerald-700 hover:text-emerald-900 font-semibold transition-colors"
+                        >
+                            <Tag size={13} />
+                            Assign Wholesale Category
+                        </button>
                         <button
                             onClick={handleBulkUntrack}
                             className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black font-semibold transition-colors"
@@ -296,6 +356,64 @@ export default function CatalogProductsPage() {
                     </tbody>
                 </table>
             </div>
+            {/* Wholesale Category Assignment Modal */}
+            {showWholesaleModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl">
+                        <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
+                            <div>
+                                <h2 className="font-serif text-lg tracking-widest uppercase">Assign Wholesale Category</h2>
+                                <p className="text-[10px] text-neutral-400 mt-0.5 uppercase tracking-widest">
+                                    {selectedIds.length} product{selectedIds.length !== 1 ? "s" : ""} selected
+                                </p>
+                            </div>
+                            <button onClick={() => setShowWholesaleModal(false)} className="text-neutral-400 hover:text-black">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            {wholesaleCategories.length === 0 ? (
+                                <p className="text-neutral-400 italic text-sm font-serif text-center py-4">
+                                    No wholesale categories found. Enable a category's "Wholesale" toggle first.
+                                </p>
+                            ) : (
+                                <>
+                                    <p className="text-[10px] text-neutral-500 uppercase tracking-widest leading-relaxed">
+                                        Select a wholesale category. Its tier pricing will be applied to all selected products that don't have product-level overrides.
+                                    </p>
+                                    <div className="space-y-2">
+                                        {wholesaleCategories.map(cat => (
+                                            <label key={cat.id}
+                                                className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all ${selectedWholesaleCatId === cat.id ? "border-black bg-neutral-50" : "border-neutral-200 hover:border-neutral-300"}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <input type="radio" name="wholesale-cat" value={cat.id} checked={selectedWholesaleCatId === cat.id}
+                                                        onChange={() => setSelectedWholesaleCatId(cat.id)} className="accent-black" />
+                                                    <span className="text-sm font-medium">{cat.name}</span>
+                                                </div>
+                                                <div className="text-[10px] text-neutral-400 text-right">
+                                                    {cat.wholesale_tier_1_price != null && <div>T1: GH₵{cat.wholesale_tier_1_price}</div>}
+                                                    {cat.wholesale_tier_2_price != null && <div>T2: GH₵{cat.wholesale_tier_2_price}</div>}
+                                                    {cat.wholesale_tier_3_price != null && <div>T3: GH₵{cat.wholesale_tier_3_price}</div>}
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center gap-3 pt-2">
+                                        <button onClick={() => setShowWholesaleModal(false)}
+                                            className="flex-1 py-3 border border-neutral-200 text-xs uppercase tracking-widest hover:bg-neutral-50 transition-colors rounded-lg">
+                                            Cancel
+                                        </button>
+                                        <button onClick={handleBulkAssignWholesale} disabled={assigning || !selectedWholesaleCatId}
+                                            className="flex-1 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 rounded-lg">
+                                            {assigning ? "Assigning..." : "Assign Category"}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
