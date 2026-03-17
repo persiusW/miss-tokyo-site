@@ -4,7 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export default function ContactPage() {
-    const [formData, setFormData] = useState({ name: "", email: "", message: "" });
+    const [formData, setFormData] = useState({ name: "", email: "", phone: "", message: "" });
     const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -16,6 +16,7 @@ export default function ContactPage() {
                 {
                     name: formData.name,
                     email: formData.email,
+                    phone: formData.phone || null,
                     message: formData.message,
                 }
             ]);
@@ -23,7 +24,7 @@ export default function ContactPage() {
             if (error) throw error;
 
             setStatus("success");
-            setFormData({ name: "", email: "", message: "" });
+            setFormData({ name: "", email: "", phone: "", message: "" });
         } catch (error) {
             console.error("Error submitting form:", error);
             setStatus("error");
@@ -108,6 +109,20 @@ export default function ContactPage() {
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                         className="w-full bg-transparent border-b border-neutral-200 text-black text-sm py-4 focus:outline-none focus:border-black transition-all rounded-none"
                                         placeholder="STUDIO@CLIENT.COM"
+                                    />
+                                </div>
+
+                                <div className="group">
+                                    <label htmlFor="phone" className="block text-[10px] uppercase tracking-[0.3em] text-neutral-400 mb-2 font-bold group-focus-within:text-black transition-colors">
+                                        Phone Number <span className="normal-case tracking-normal font-normal">(Optional)</span>
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        id="phone"
+                                        value={formData.phone}
+                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        className="w-full bg-transparent border-b border-neutral-200 text-black text-sm py-4 focus:outline-none focus:border-black transition-all rounded-none"
+                                        placeholder="+233 ..."
                                     />
                                 </div>
 

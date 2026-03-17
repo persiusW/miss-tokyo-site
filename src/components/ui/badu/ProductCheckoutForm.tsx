@@ -137,7 +137,7 @@ export function ProductCheckoutForm({ productId, productName, productSlug, produ
                         : 'hover:bg-white hover:text-black border border-black'
                     }`}
                 >
-                    {selectedSize ? `Add to Archive — ${price}` : `Archive Selection Required`}
+                    {selectedSize ? `Add to Cart — ${price}` : `Select a Size to Continue`}
                 </button>
             </div>
         </div>

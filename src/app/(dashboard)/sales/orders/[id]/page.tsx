@@ -22,6 +22,14 @@ type Order = {
     discount_code?: string | null;
     discount_amount?: number | null;
     customer_metadata?: { whatsapp?: string; instagram?: string; snapchat?: string } | null;
+    assigned_rider_id?: string | null;
+};
+
+type AssignedRider = {
+    full_name: string;
+    phone_number: string;
+    bike_reg: string | null;
+    image_url: string | null;
 };
 
 type Rider = {
@@ -147,13 +155,24 @@ export default function OrderDetailPage() {
     const [updating, setUpdating] = useState(false);
     const [notifStatus, setNotifStatus] = useState<"idle" | "sending" | "sent">("idle");
     const [showRiderPicker, setShowRiderPicker] = useState(false);
+    const [assignedRider, setAssignedRider] = useState<AssignedRider | null>(null);
 
     useEffect(() => {
         Promise.all([
             supabase.from("orders").select("*").eq("id", id).single(),
             supabase.from("business_settings").select("business_name, email, contact, address").eq("id", "default").single(),
-        ]).then(([{ data: ord }, { data: biz }]) => {
-            if (ord) setOrder(ord);
+        ]).then(async ([{ data: ord }, { data: biz }]) => {
+            if (ord) {
+                setOrder(ord);
+                if (ord.assigned_rider_id) {
+                    const { data: riderData } = await supabase
+                        .from("riders")
+                        .select("full_name, phone_number, bike_reg, image_url")
+                        .eq("id", ord.assigned_rider_id)
+                        .single();
+                    if (riderData) setAssignedRider(riderData as AssignedRider);
+                }
+            }
             if (biz?.business_name) setBizName(biz.business_name);
             setBizContact({ email: biz?.email ?? undefined, contact: biz?.contact ?? undefined, address: biz?.address ?? undefined });
             setLoading(false);
@@ -210,7 +229,10 @@ export default function OrderDetailPage() {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Dispatch failed");
-            setOrder(prev => prev ? { ...prev, status: "shipped" } : prev);
+            setOrder(prev => prev ? { ...prev, status: "shipped", assigned_rider_id: riderId } : prev);
+            // Load the newly assigned rider for the UI card
+            supabase.from("riders").select("full_name, phone_number, bike_reg, image_url").eq("id", riderId).single()
+                .then(({ data: r }) => { if (r) setAssignedRider(r as AssignedRider); });
             setNotifStatus("sent");
             toast.success("Order dispatched — customer & rider notified via email & SMS.");
         } catch (err: any) {
@@ -270,12 +292,12 @@ export default function OrderDetailPage() {
                 pointer-events: none;
             }
             @media print {
-                .no-print { display: none !important; }
+                * { visibility: hidden !important; }
+                #admin-receipt-print, #admin-receipt-print * { visibility: visible !important; }
                 #admin-receipt-print {
                     position: static !important;
                     left: auto !important;
                     width: 100% !important;
-                    visibility: visible !important;
                     pointer-events: auto !important;
                 }
             }
@@ -509,12 +531,38 @@ export default function OrderDetailPage() {
                             ))}
                         </div>
                     </div>
+
+                    {/* Assigned Rider card (delivery orders that have been shipped/fulfilled) */}
+                    {assignedRider && !pickup && (
+                        <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
+                            <div className="px-6 py-4 border-b border-neutral-100 flex items-center gap-3">
+                                <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
+                                <h2 className="text-xs uppercase tracking-widest font-semibold">Dispatch Rider</h2>
+                            </div>
+                            <div className="px-6 py-4 flex items-center gap-4">
+                                {assignedRider.image_url ? (
+                                    <img src={assignedRider.image_url} alt={assignedRider.full_name} className="w-12 h-12 rounded-full object-cover shrink-0 border border-neutral-100" />
+                                ) : (
+                                    <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center shrink-0">
+                                        <span className="text-sm font-serif font-semibold text-neutral-400">{assignedRider.full_name.charAt(0)}</span>
+                                    </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-sm text-neutral-900 truncate">{assignedRider.full_name}</p>
+                                    <p className="text-xs text-neutral-500 mt-0.5">{assignedRider.phone_number}</p>
+                                    {assignedRider.bike_reg && (
+                                        <p className="text-[10px] font-mono text-neutral-400 mt-0.5">{assignedRider.bike_reg}</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
 
-        {/* ── Print Receipt (screen-hidden, print-visible) ── */}
-        <div id="admin-receipt-print" style={{ display: "none" }} className="bg-white p-12 max-w-2xl">
+        {/* ── Print Receipt (screen-hidden via fixed position, print-visible) ── */}
+        <div id="admin-receipt-print" className="bg-white p-12 max-w-2xl">
             <div className="flex items-start justify-between mb-8 pb-6 border-b border-neutral-100">
                 <div>
                     <h2 className="font-serif text-xl tracking-widest uppercase">{bizName}</h2>
