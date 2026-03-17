@@ -38,6 +38,7 @@ type StoreSettings = {
     enable_gallery: boolean;
     enable_craft: boolean;
     enable_whitelabel: boolean;
+    enable_custom_requests: boolean;
 };
 
 const DEFAULT_BUSINESS: BusinessSettings = {
@@ -69,6 +70,7 @@ const DEFAULT_STORE: StoreSettings = {
     enable_gallery: true,
     enable_craft: true,
     enable_whitelabel: true,
+    enable_custom_requests: true,
 };
 
 type SiteMetadata = {
@@ -80,17 +82,16 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders" | "communications" | "size-guide";
+type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders" | "size-guide";
 
 const TABS: { key: TabKey; label: string }[] = [
     { key: "business",       label: "Business" },
     { key: "store",          label: "Store" },
     { key: "seo",            label: "SEO" },
     { key: "assets",         label: "Site Assets" },
-    { key: "emails",         label: "Emails" },
-    { key: "riders",         label: "Riders" },
-    { key: "communications", label: "Communications" },
-    { key: "size-guide",     label: "Size Guide" },
+    { key: "emails",         label: "Communications" },
+    { key: "riders",     label: "Riders" },
+    { key: "size-guide", label: "Size Guide" },
 ];
 
 export default function SettingsPage() {
@@ -122,7 +123,6 @@ export default function SettingsPage() {
             {activeTab === "assets"         && <AssetsTab />}
             {activeTab === "emails"         && <EmailsTab />}
             {activeTab === "riders"         && <RidersTab />}
-            {activeTab === "communications" && <CommunicationsTab />}
             {activeTab === "size-guide"     && <SizeGuideTab />}
         </div>
     );
@@ -170,36 +170,47 @@ function BusinessTab() {
     }
 
     return (
-        <form onSubmit={handleSave} className="space-y-8 max-w-2xl">
-            {/* Brand / Logo */}
-            <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Brand</h2>
-                <ImageUploader
-                    bucket="site-assets"
-                    folder="logos"
-                    currentUrl={form.logo_url}
-                    onUpload={(url) => setForm(p => ({ ...p, logo_url: url }))}
-                    aspectRatio="square"
-                    label="Business Logo"
-                />
-            </div>
-
-            {/* Business Info */}
-            <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Business Details</h2>
-
-                <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Business Name</label>
-                    <input
-                        type="text" name="business_name" required
-                        value={form.business_name}
-                        onChange={handleChange}
-                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                        placeholder="Miss Tokyo"
+        <form onSubmit={handleSave} className="space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                {/* Left: Brand / Logo */}
+                <div className="bg-white border border-neutral-200 p-8 space-y-6">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Brand</h2>
+                    <ImageUploader
+                        bucket="site-assets"
+                        folder="logos"
+                        currentUrl={form.logo_url}
+                        onUpload={(url) => setForm(p => ({ ...p, logo_url: url }))}
+                        aspectRatio="square"
+                        label="Business Logo"
                     />
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Tax Rate (%)</label>
+                        <input
+                            type="number" name="tax_rate" min="0" max="100" step="0.1"
+                            value={form.tax_rate}
+                            onChange={handleChange}
+                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                            placeholder="0"
+                        />
+                        <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">Applied to taxable order totals.</p>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Right: Business Details */}
+                <div className="bg-white border border-neutral-200 p-8 space-y-6">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Business Details</h2>
+
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Business Name</label>
+                        <input
+                            type="text" name="business_name" required
+                            value={form.business_name}
+                            onChange={handleChange}
+                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                            placeholder="Miss Tokyo"
+                        />
+                    </div>
+
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Business Email</label>
                         <input
@@ -210,6 +221,7 @@ function BusinessTab() {
                             placeholder="hello@badu.co"
                         />
                     </div>
+
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Contact / Phone</label>
                         <input
@@ -220,28 +232,28 @@ function BusinessTab() {
                             placeholder="+233 ..."
                         />
                     </div>
-                </div>
 
-                <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Business Address</label>
-                    <textarea
-                        name="address" rows={2}
-                        value={form.address}
-                        onChange={handleChange}
-                        className="w-full border border-neutral-200 p-3 bg-transparent outline-none focus:border-black transition-colors resize-none text-sm"
-                        placeholder="123 Main Street, Accra, Ghana"
-                    />
-                </div>
-            </div>
+                    <div>
+                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Business Address</label>
+                        <textarea
+                            name="address" rows={2}
+                            value={form.address}
+                            onChange={handleChange}
+                            className="w-full border border-neutral-200 p-3 bg-transparent outline-none focus:border-black transition-colors resize-none text-sm"
+                            placeholder="123 Main Street, Accra, Ghana"
+                        />
+                    </div>
 
-            <div className="flex justify-end items-center gap-6">
-                {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved successfully</span>}
-                <button
-                    type="submit" disabled={saving}
-                    className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                >
-                    {saving ? "Saving..." : "Save Settings"}
-                </button>
+                    <div className="flex justify-end items-center gap-6 pt-2">
+                        {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved</span>}
+                        <button
+                            type="submit" disabled={saving}
+                            className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                        >
+                            {saving ? "Saving..." : "Save Settings"}
+                        </button>
+                    </div>
+                </div>
             </div>
         </form>
     );
@@ -277,6 +289,7 @@ function StoreTab() {
                         enable_gallery: sData.enable_gallery ?? true,
                         enable_craft: sData.enable_craft ?? true,
                         enable_whitelabel: sData.enable_whitelabel ?? true,
+                        enable_custom_requests: sData.enable_custom_requests ?? true,
                     });
                 }
                 setLoading(false);
@@ -301,7 +314,10 @@ function StoreTab() {
 
     return (
         <>
-        <form onSubmit={handleSave} className="space-y-8 max-w-2xl">
+        <form onSubmit={handleSave} className="space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            {/* Left column */}
+            <div className="space-y-8">
             {/* Store Configuration */}
             <div className="bg-white border border-neutral-200 p-8 space-y-6">
                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Store Configuration</h2>
@@ -370,7 +386,10 @@ function StoreTab() {
                     </div>
                 </div>
             </div>
+            </div>{/* end left column */}
 
+            {/* Right column */}
+            <div className="space-y-8">
             {/* Visual Merchandising */}
             <div className="bg-white border border-neutral-200 p-8 space-y-6">
                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Visual Merchandising</h2>
@@ -492,6 +511,9 @@ function StoreTab() {
                 </div>
             </div>
 
+            </div>{/* end right column */}
+            </div>{/* end grid */}
+
             {/* Platform Fees */}
             <div className="bg-white border border-neutral-200 p-8 space-y-6">
                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Platform Fees</h2>
@@ -548,13 +570,15 @@ function StoreTab() {
                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Feature Toggles</h2>
                 <p className="text-[10px] text-neutral-400 tracking-wider uppercase">Enable or disable storefront sections. Hidden sections are removed from the navigation.</p>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8">
                 {([
                     { key: "enable_gift_cards" as const, label: "Gift Cards", desc: "Show the gift card purchase page in the navbar." },
                     { key: "enable_gallery" as const,    label: "Gallery",    desc: "Show the gallery page and nav link." },
                     { key: "enable_craft" as const,      label: "The Craft",  desc: "Show the craft / process page in the navbar." },
-                    { key: "enable_whitelabel" as const, label: "White Labelling", desc: "Show the white labelling / custom order page." },
+                    { key: "enable_whitelabel" as const,       label: "White Labelling",  desc: "Show the white labelling / custom order page." },
+                    { key: "enable_custom_requests" as const, label: "Custom Requests",   desc: "Enable the custom order request form and admin submissions inbox." },
                 ] as const).map(({ key, label, desc }) => (
-                    <div key={key} className="pt-4 border-t border-neutral-100 first:border-t-0 first:pt-0">
+                    <div key={key} className="py-4 border-b border-neutral-100 last:border-b-0">
                         <label className="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" checked={form[key]}
                                 onChange={(e) => setForm(p => ({ ...p, [key]: e.target.checked }))}
@@ -564,6 +588,7 @@ function StoreTab() {
                         <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">{desc}</p>
                     </div>
                 ))}
+                </div>
             </div>
 
             <div className="flex justify-end items-center gap-6">

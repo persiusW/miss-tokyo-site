@@ -93,82 +93,68 @@ function ImagesSubTab() {
     }
 
     return (
-        <div className="space-y-10">
-            {ASSET_GROUPS.map(group => {
-                const groupAssets = DEFAULT_ASSETS.filter(a => a.group === group);
-                return (
-                    <div key={group}>
-                        <h2 className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-4 pb-3 border-b border-neutral-100">
-                            {group}
-                        </h2>
-                        <div className="space-y-4">
-                            {groupAssets.map(({ section_key, label }) => {
-                                const asset = getAsset(section_key);
-                                const isDirty = !!edits[section_key];
-                                const isSaving = saving === section_key;
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {DEFAULT_ASSETS.map(({ section_key, label, group }) => {
+                const asset = getAsset(section_key);
+                const isDirty = !!edits[section_key];
+                const isSaving = saving === section_key;
 
-                                return (
-                                    <div key={section_key} className="bg-white border border-neutral-200">
-                                        <div className="px-8 py-4 border-b border-neutral-100 flex items-center justify-between">
-                                            <div>
-                                                <h3 className="text-sm font-semibold tracking-wide">{label}</h3>
-                                                <span className="font-mono text-[10px] text-neutral-400">{section_key}</span>
-                                            </div>
-                                            {asset && (
-                                                <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded ${asset.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}>
-                                                    {asset.is_active ? "Active" : "Inactive"}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="p-8 space-y-6">
-                                            <ImageUploader
-                                                bucket="site-assets"
-                                                folder="banners"
-                                                currentUrl={asset?.image_url || null}
-                                                onUpload={(url) => handleChange(section_key, "image_url", url)}
-                                                aspectRatio="banner"
-                                                label="Image"
-                                            />
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div>
-                                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Alt Text</label>
-                                                    <input
-                                                        type="text"
-                                                        value={getEditValue(section_key, "alt_text", asset?.alt_text || null)}
-                                                        onChange={e => handleChange(section_key, "alt_text", e.target.value)}
-                                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
-                                                        placeholder="Descriptive alt text"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Link URL (Optional)</label>
-                                                    <input
-                                                        type="url"
-                                                        value={getEditValue(section_key, "link_url", asset?.link_url || null)}
-                                                        onChange={e => handleChange(section_key, "link_url", e.target.value)}
-                                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
-                                                        placeholder="/shop"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-between items-center pt-2">
-                                                <span className="text-[10px] text-neutral-400 tracking-wider">
-                                                    {asset?.updated_at
-                                                        ? `Last updated ${new Date(asset.updated_at).toLocaleDateString()}`
-                                                        : "Not yet configured"}
-                                                </span>
-                                                <button
-                                                    onClick={() => handleSave(section_key)}
-                                                    disabled={isSaving || !isDirty}
-                                                    className="px-6 py-2 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                                >
-                                                    {isSaving ? "Saving..." : "Save"}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                return (
+                    <div key={section_key} className="bg-white border border-neutral-200">
+                        <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] text-neutral-400 uppercase tracking-widest mb-0.5">{group}</p>
+                                <h3 className="text-sm font-semibold tracking-wide">{label}</h3>
+                            </div>
+                            {asset && (
+                                <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded ${asset.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}>
+                                    {asset.is_active ? "Active" : "Inactive"}
+                                </span>
+                            )}
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <ImageUploader
+                                bucket="site-assets"
+                                folder="banners"
+                                currentUrl={asset?.image_url || null}
+                                onUpload={(url) => handleChange(section_key, "image_url", url)}
+                                aspectRatio="banner"
+                                label="Image"
+                            />
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Alt Text</label>
+                                <input
+                                    type="text"
+                                    value={getEditValue(section_key, "alt_text", asset?.alt_text || null)}
+                                    onChange={e => handleChange(section_key, "alt_text", e.target.value)}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
+                                    placeholder="Descriptive alt text"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Link URL (Optional)</label>
+                                <input
+                                    type="url"
+                                    value={getEditValue(section_key, "link_url", asset?.link_url || null)}
+                                    onChange={e => handleChange(section_key, "link_url", e.target.value)}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
+                                    placeholder="/shop"
+                                />
+                            </div>
+                            <div className="flex justify-between items-center pt-1">
+                                <span className="text-[10px] text-neutral-400 tracking-wider">
+                                    {asset?.updated_at
+                                        ? `Updated ${new Date(asset.updated_at).toLocaleDateString()}`
+                                        : "Not yet configured"}
+                                </span>
+                                <button
+                                    onClick={() => handleSave(section_key)}
+                                    disabled={isSaving || !isDirty}
+                                    className="px-6 py-2 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    {isSaving ? "Saving..." : "Save"}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 );

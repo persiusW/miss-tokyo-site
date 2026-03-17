@@ -13,7 +13,7 @@ import { GripVertical } from "lucide-react";
 
 type Category = { id: string; name: string; slug: string };
 
-function SortableImageItem({ id, url, index, onUpload, onRemove }: { id: string, url: string | null, index: number, onUpload: (id: string, url: string) => void, onRemove: (id: string) => void }) {
+function SortableImageItem({ id, url, index, onUpload, onRemove, onBeforeUpload }: { id: string, url: string | null, index: number, onUpload: (id: string, url: string) => void, onRemove: (id: string) => void, onBeforeUpload?: (file: File) => boolean }) {
     const {
         attributes,
         listeners,
@@ -50,8 +50,10 @@ function SortableImageItem({ id, url, index, onUpload, onRemove }: { id: string,
                     currentUrl={url}
                     onUpload={(newUrl) => onUpload(id, newUrl)}
                     onRemove={() => onRemove(id)}
+                    onBeforeUpload={onBeforeUpload}
+                    acceptVideo
                     aspectRatio="video"
-                    label={index === 0 ? "Primary Image" : `Image ${index + 1}`}
+                    label={index === 0 ? "Primary Image" : `Media ${index + 1}`}
                 />
             </div>
         </div>
@@ -63,11 +65,12 @@ export default function EditProductPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [imageSlots, setImageSlots] = useState<{ id: string, url: string | null }[]>([
-        { id: 'slot-0', url: null },
-        { id: 'slot-1', url: null },
-        { id: 'slot-2', url: null },
-        { id: 'slot-3', url: null },
+    type MediaSlot = { id: string; url: string | null; type: "image" | "video" };
+    const [imageSlots, setImageSlots] = useState<MediaSlot[]>([
+        { id: 'slot-0', url: null, type: "image" },
+        { id: 'slot-1', url: null, type: "image" },
+        { id: 'slot-2', url: null, type: "image" },
+        { id: 'slot-3', url: null, type: "image" },
     ]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [globalSizes, setGlobalSizes] = useState<string[]>([]);
@@ -113,18 +116,23 @@ export default function EditProductPage() {
             is_active: product.is_active ?? true,
         });
 
-        const slots = [
-            { id: 'slot-0', url: null as string | null },
-            { id: 'slot-1', url: null as string | null },
-            { id: 'slot-2', url: null as string | null },
-            { id: 'slot-3', url: null as string | null },
+        const baseSlots: { id: string; url: string | null; type: "image" | "video" }[] = [
+            { id: 'slot-0', url: null, type: "image" },
+            { id: 'slot-1', url: null, type: "image" },
+            { id: 'slot-2', url: null, type: "image" },
+            { id: 'slot-3', url: null, type: "image" },
         ];
         if (product.image_urls) {
             product.image_urls.forEach((url: string, i: number) => {
-                if (i < 4) slots[i].url = url;
+                const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(url);
+                if (i < baseSlots.length) {
+                    baseSlots[i] = { ...baseSlots[i], url, type: isVideo ? "video" : "image" };
+                } else {
+                    baseSlots.push({ id: `slot-${i}`, url, type: isVideo ? "video" : "image" });
+                }
             });
         }
-        setImageSlots(slots);
+        setImageSlots(baseSlots);
 
         if (storeData) {
             if (storeData.global_sizes) {
@@ -160,11 +168,34 @@ export default function EditProductPage() {
     );
 
     const handleImageUpload = (id: string, url: string) => {
-        setImageSlots(prev => prev.map(slot => slot.id === id ? { ...slot, url } : slot));
+        const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(url);
+        setImageSlots(prev => prev.map(slot => slot.id === id ? { ...slot, url, type: isVideo ? "video" : "image" } : slot));
     };
 
     const handleImageRemove = (id: string) => {
-        setImageSlots(prev => prev.map(slot => slot.id === id ? { ...slot, url: null } : slot));
+        setImageSlots(prev => prev.map(slot => slot.id === id ? { ...slot, url: null, type: "image" as const } : slot));
+    };
+
+    const addMediaSlot = () => {
+        setImageSlots(prev => {
+            if (prev.length >= 10) return prev;
+            return [...prev, { id: `slot-${Date.now()}`, url: null, type: "image" as const }];
+        });
+    };
+
+    const validateBeforeUpload = (file: File): boolean => {
+        const isVideo = file.type.startsWith("video/");
+        const filledCount = imageSlots.filter(s => s.url !== null).length;
+        const videoCount = imageSlots.filter(s => s.type === "video").length;
+        if (filledCount >= 10) {
+            toast.error("Maximum 10 media files allowed per product.");
+            return false;
+        }
+        if (isVideo && videoCount >= 1) {
+            toast.error("Only 1 video allowed per product. Remove the existing video first.");
+            return false;
+        }
+        return true;
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
@@ -461,11 +492,11 @@ export default function EditProductPage() {
                             )}
                         </div>
 
-                        {/* Images */}
+                        {/* Media */}
                         <div className="bg-white p-6 border border-neutral-200 space-y-4">
                             <div>
-                                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Images</h2>
-                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 4 images. First is primary. Drag to reorder.</p>
+                                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Media</h2>
+                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 10 files — images or 1 video. First is primary. Drag to reorder.</p>
                             </div>
 
                             <DndContext
@@ -486,11 +517,21 @@ export default function EditProductPage() {
                                                 index={index}
                                                 onUpload={handleImageUpload}
                                                 onRemove={handleImageRemove}
+                                                onBeforeUpload={validateBeforeUpload}
                                             />
                                         ))}
                                     </div>
                                 </SortableContext>
                             </DndContext>
+                            {imageSlots.length < 10 && (
+                                <button
+                                    type="button"
+                                    onClick={addMediaSlot}
+                                    className="w-full py-3 border border-dashed border-neutral-300 text-[10px] uppercase tracking-widest text-neutral-400 hover:border-black hover:text-black transition-colors"
+                                >
+                                    + Add Media Slot
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

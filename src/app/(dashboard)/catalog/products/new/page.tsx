@@ -12,7 +12,14 @@ type Category = { id: string; name: string; slug: string };
 export default function NewProductPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
-    const [imageUrls, setImageUrls] = useState<(string | null)[]>([null, null, null, null]);
+
+    type MediaSlot = { id: string; url: string | null; type: "image" | "video" };
+    const [mediaSlots, setMediaSlots] = useState<MediaSlot[]>([
+        { id: "s0", url: null, type: "image" },
+        { id: "s1", url: null, type: "image" },
+        { id: "s2", url: null, type: "image" },
+        { id: "s3", url: null, type: "image" },
+    ]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [globalSizes, setGlobalSizes] = useState<string[]>([]);
     const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
@@ -69,20 +76,35 @@ export default function NewProductPage() {
         }
     };
 
-    const handleImageUpload = (index: number, url: string) => {
-        setImageUrls(prev => {
-            const next = [...prev];
-            next[index] = url;
-            return next;
+    const handleMediaUpload = (id: string, url: string) => {
+        const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(url);
+        setMediaSlots(prev => prev.map(s => s.id === id ? { ...s, url, type: isVideo ? "video" : "image" } : s));
+    };
+
+    const handleMediaRemove = (id: string) => {
+        setMediaSlots(prev => prev.map(s => s.id === id ? { ...s, url: null, type: "image" } : s));
+    };
+
+    const addMediaSlot = () => {
+        setMediaSlots(prev => {
+            if (prev.length >= 10) return prev;
+            return [...prev, { id: `s${Date.now()}`, url: null, type: "image" as const }];
         });
     };
 
-    const handleImageRemove = (index: number) => {
-        setImageUrls(prev => {
-            const next = [...prev];
-            next[index] = null;
-            return next;
-        });
+    const validateBeforeUpload = (file: File): boolean => {
+        const isVideo = file.type.startsWith("video/");
+        const filledCount = mediaSlots.filter(s => s.url !== null).length;
+        const videoCount = mediaSlots.filter(s => s.type === "video").length;
+        if (filledCount >= 10) {
+            toast.error("Maximum 10 media files allowed per product.");
+            return false;
+        }
+        if (isVideo && videoCount >= 1) {
+            toast.error("Only 1 video allowed per product. Remove the existing video first.");
+            return false;
+        }
+        return true;
     };
 
     const toggleSize = (size: string) => {
@@ -102,7 +124,7 @@ export default function NewProductPage() {
         setLoading(true);
 
         try {
-            const uploadedUrls = imageUrls.filter((u): u is string => !!u);
+            const uploadedUrls = mediaSlots.filter(s => s.url !== null).map(s => s.url as string);
             const { error } = await supabase.from("products").insert([
                 {
                     name: formData.name,
@@ -354,27 +376,38 @@ export default function NewProductPage() {
                             )}
                         </div>
 
-                        {/* Images */}
+                        {/* Media */}
                         <div className="bg-white p-6 border border-neutral-200 space-y-4">
                             <div>
-                                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Images</h2>
-                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 4 images. First is primary display photo.</p>
+                                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Media</h2>
+                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 10 files — images or 1 video. First is primary display.</p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                {[0, 1, 2, 3].map((i) => (
-                                    <div key={i}>
+                                {mediaSlots.map((slot, index) => (
+                                    <div key={slot.id}>
                                         <ImageUploader
                                             bucket="product-images"
                                             folder="products"
-                                            currentUrl={imageUrls[i]}
-                                            onUpload={(url) => handleImageUpload(i, url)}
-                                            onRemove={() => handleImageRemove(i)}
+                                            currentUrl={slot.url}
+                                            onUpload={(url) => handleMediaUpload(slot.id, url)}
+                                            onRemove={() => handleMediaRemove(slot.id)}
+                                            onBeforeUpload={validateBeforeUpload}
+                                            acceptVideo
                                             aspectRatio="video"
-                                            label={i === 0 ? "Primary Image" : `Image ${i + 1}`}
+                                            label={index === 0 ? "Primary Image" : `Media ${index + 1}`}
                                         />
                                     </div>
                                 ))}
                             </div>
+                            {mediaSlots.length < 10 && (
+                                <button
+                                    type="button"
+                                    onClick={addMediaSlot}
+                                    className="w-full py-3 border border-dashed border-neutral-300 text-[10px] uppercase tracking-widest text-neutral-400 hover:border-black hover:text-black transition-colors"
+                                >
+                                    + Add Media Slot
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

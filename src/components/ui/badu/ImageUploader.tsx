@@ -12,6 +12,8 @@ interface ImageUploaderProps {
     onRemove?: () => void;
     aspectRatio?: "square" | "video" | "banner" | "og";
     label?: string;
+    acceptVideo?: boolean;
+    onBeforeUpload?: (file: File) => boolean;
 }
 
 const ASPECT_CLASSES = {
@@ -21,8 +23,14 @@ const ASPECT_CLASSES = {
     og: "aspect-[1200/630]",
 };
 
-const MAX_SIZE_MB = 10;
-const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/avi"];
+const IMAGE_MAX_MB = 10;
+const VIDEO_MAX_MB = 200;
+
+function isVideoUrl(url: string | null | undefined): boolean {
+    return !!url && /\.(mp4|webm|mov|avi)(\?|$)/i.test(url);
+}
 
 export function ImageUploader({
     bucket,
@@ -32,8 +40,11 @@ export function ImageUploader({
     onRemove,
     aspectRatio = "video",
     label,
+    acceptVideo = false,
+    onBeforeUpload,
 }: ImageUploaderProps) {
     const [preview, setPreview] = useState<string | null>(currentUrl || null);
+    const [isVideo, setIsVideo] = useState(isVideoUrl(currentUrl));
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -41,40 +52,80 @@ export function ImageUploader({
     const upload = async (rawFile: File) => {
         setError(null);
 
-        if (!ACCEPTED.includes(rawFile.type)) {
-            setError("Please upload a JPEG, PNG, WebP, or GIF image.");
-            return;
-        }
-        if (rawFile.size > MAX_SIZE_MB * 1024 * 1024) {
-            setError(`File must be under ${MAX_SIZE_MB}MB.`);
-            return;
+        // Run parent validation first (e.g. max 10 files, max 1 video)
+        if (onBeforeUpload && !onBeforeUpload(rawFile)) return;
+
+        const isVideoFile = rawFile.type.startsWith("video/");
+
+        // MIME type check
+        if (isVideoFile) {
+            if (!acceptVideo) {
+                setError("Video upload is not enabled for this field.");
+                return;
+            }
+            if (!VIDEO_TYPES.includes(rawFile.type)) {
+                setError("Please upload MP4, WebM, or QuickTime video.");
+                return;
+            }
+            if (rawFile.size > VIDEO_MAX_MB * 1024 * 1024) {
+                setError(`Video must be under ${VIDEO_MAX_MB}MB.`);
+                return;
+            }
+        } else {
+            if (!IMAGE_TYPES.includes(rawFile.type)) {
+                setError("Please upload a JPEG, PNG, WebP, or GIF image.");
+                return;
+            }
+            if (rawFile.size > IMAGE_MAX_MB * 1024 * 1024) {
+                setError(`File must be under ${IMAGE_MAX_MB}MB.`);
+                return;
+            }
         }
 
-        // Instant local preview from original
+        setIsVideo(isVideoFile);
         setPreview(URL.createObjectURL(rawFile));
         setUploading(true);
 
-        // Compress + convert to WebP
-        let file: File;
-        try {
-            file = await compressToWebP(rawFile);
-        } catch {
-            file = rawFile; // fallback to original if compression fails
-        }
+        if (isVideoFile) {
+            // Upload video directly — no WebP conversion
+            const ext = rawFile.name.split(".").pop()?.toLowerCase() || "mp4";
+            const name = `${folder ? folder + "/" : ""}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+            const { data, error: uploadErr } = await supabase.storage
+                .from(bucket)
+                .upload(name, rawFile, { contentType: rawFile.type, upsert: false });
 
-        const name = `${folder ? folder + "/" : ""}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
-
-        const { data, error: uploadErr } = await supabase.storage
-            .from(bucket)
-            .upload(name, file, { contentType: "image/webp", upsert: false });
-
-        if (uploadErr || !data) {
-            setError(uploadErr?.message || "Upload failed.");
-            setPreview(currentUrl || null);
+            if (uploadErr || !data) {
+                setError(uploadErr?.message || "Upload failed.");
+                setPreview(currentUrl || null);
+                setIsVideo(isVideoUrl(currentUrl));
+            } else {
+                const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(data.path);
+                setPreview(publicUrl);
+                onUpload(publicUrl);
+            }
         } else {
-            const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(data.path);
-            setPreview(publicUrl);
-            onUpload(publicUrl);
+            // Compress + convert to WebP
+            let file: File;
+            try {
+                file = await compressToWebP(rawFile);
+            } catch {
+                file = rawFile;
+            }
+
+            const name = `${folder ? folder + "/" : ""}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
+            const { data, error: uploadErr } = await supabase.storage
+                .from(bucket)
+                .upload(name, file, { contentType: "image/webp", upsert: false });
+
+            if (uploadErr || !data) {
+                setError(uploadErr?.message || "Upload failed.");
+                setPreview(currentUrl || null);
+                setIsVideo(isVideoUrl(currentUrl));
+            } else {
+                const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(data.path);
+                setPreview(publicUrl);
+                onUpload(publicUrl);
+            }
         }
 
         setUploading(false);
@@ -83,6 +134,11 @@ export function ImageUploader({
     const handleFiles = (files: FileList | null) => {
         if (files?.[0]) upload(files[0]);
     };
+
+    const accepted = [
+        ...IMAGE_TYPES,
+        ...(acceptVideo ? VIDEO_TYPES : []),
+    ].join(",");
 
     return (
         <div className="space-y-2">
@@ -97,6 +153,7 @@ export function ImageUploader({
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setPreview(null);
+                                setIsVideo(false);
                                 onRemove();
                             }}
                             className="text-[10px] text-red-500 hover:text-red-700 tracking-widest uppercase font-semibold transition-colors"
@@ -117,7 +174,18 @@ export function ImageUploader({
             >
                 {preview ? (
                     <>
-                        <img src={preview} alt="" className="w-full h-full object-cover" />
+                        {isVideo ? (
+                            <video
+                                src={preview}
+                                className="w-full h-full object-cover"
+                                muted
+                                loop
+                                playsInline
+                                autoPlay
+                            />
+                        ) : (
+                            <img src={preview} alt="" className="w-full h-full object-cover" />
+                        )}
                         {/* Hover overlay */}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity text-center">
@@ -125,7 +193,7 @@ export function ImageUploader({
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
                                 <span className="text-white text-[10px] uppercase tracking-widest font-semibold">
-                                    {uploading ? "Uploading..." : "Replace Image"}
+                                    {uploading ? "Uploading..." : isVideo ? "Replace Video" : "Replace Image"}
                                 </span>
                             </div>
                         </div>
@@ -139,7 +207,11 @@ export function ImageUploader({
                             <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">
                                 {uploading ? "Uploading..." : "Click or drag to upload"}
                             </p>
-                            <p className="text-[10px] text-neutral-400 mt-1">JPEG · PNG · WebP — auto-converted to WebP · max {MAX_SIZE_MB}MB</p>
+                            <p className="text-[10px] text-neutral-400 mt-1">
+                                {acceptVideo
+                                    ? "JPEG · PNG · WebP · MP4 · WebM — max 10MB image / 200MB video"
+                                    : "JPEG · PNG · WebP — auto-converted to WebP · max 10MB"}
+                            </p>
                         </div>
                     </div>
                 )}
@@ -157,7 +229,7 @@ export function ImageUploader({
             <input
                 ref={inputRef}
                 type="file"
-                accept={ACCEPTED.join(",")}
+                accept={accepted}
                 className="hidden"
                 onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
             />

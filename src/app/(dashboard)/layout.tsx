@@ -3,59 +3,46 @@ import { ReactNode } from "react";
 import { LogoutButton } from "@/components/ui/badu/LogoutButton";
 import { Toaster } from "@/components/ui/badu/Toaster";
 import { RealtimeStockMonitor } from "@/components/ui/badu/RealtimeStockMonitor";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-type NavItem = { label: string; href: string };
-type NavSection = { title: string; items: NavItem[] };
+function NavSection({ title, items }: { title: string; items: { label: string; href: string }[] }) {
+    return (
+        <div>
+            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-3 px-4">
+                {title}
+            </h3>
+            <ul className="space-y-1 text-sm text-neutral-600">
+                {items.map((item) => (
+                    <li key={item.href}>
+                        <Link
+                            href={item.href}
+                            className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors"
+                        >
+                            {item.label}
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
 
-const NAV: NavSection[] = [
-    {
-        title: "Overview",
-        items: [
-            { label: "Dashboard Home", href: "/overview" },
-        ],
-    },
-    {
-        title: "Sales",
-        items: [
-            { label: "Orders",    href: "/sales/orders" },
-            { label: "Analytics", href: "/sales/analytics" },
-            { label: "Riders",    href: "/sales/riders" },
-        ],
-    },
-    {
-        title: "Catalog",
-        items: [
-            { label: "Products", href: "/catalog/products" },
-            { label: "Categories", href: "/catalog/categories" },
-            { label: "Discounts", href: "/catalog/discounts" },
-            { label: "Gift Cards", href: "/catalog/gift-cards" },
-        ],
-    },
-    {
-        title: "Getting Paid",
-        items: [
-            { label: "Invoices", href: "/finance/invoices" },
-            { label: "Pay Links", href: "/finance/links" },
-        ],
-    },
-    {
-        title: "Customers",
-        items: [
-            { label: "Contact List", href: "/customers" },
-            { label: "Abandoned Carts", href: "/customers/abandoned" },
-            { label: "Custom Requests", href: "/customers/requests" },
-            { label: "Form Submissions", href: "/customers/forms" },
-        ],
-    },
-    {
-        title: "Settings",
-        items: [
-            { label: "Site Settings", href: "/settings" },
-        ],
-    },
-];
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
+    const { data: storeSettings } = await supabaseAdmin
+        .from("store_settings")
+        .select("enable_custom_requests")
+        .eq("id", "default")
+        .single();
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+    const showCustomRequests = storeSettings?.enable_custom_requests ?? true;
+
+    const customerItems = [
+        { label: "Contact List",     href: "/customers" },
+        { label: "Abandoned Carts",  href: "/customers/abandoned" },
+        ...(showCustomRequests ? [{ label: "Custom Requests", href: "/customers/requests" }] : []),
+        { label: "Form Submissions", href: "/customers/forms" },
+    ];
+
     return (
         <>
             <div className="min-h-screen bg-white font-sans flex text-neutral-900">
@@ -69,25 +56,33 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     </div>
 
                     <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
-                        {NAV.map((section) => (
-                            <div key={section.title}>
-                                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-3 px-4">
-                                    {section.title}
-                                </h3>
-                                <ul className="space-y-1 text-sm text-neutral-600">
-                                    {section.items.map((item) => (
-                                        <li key={item.href}>
-                                            <Link
-                                                href={item.href}
-                                                className="block px-4 py-2 hover:bg-neutral-50 hover:text-black rounded transition-colors"
-                                            >
-                                                {item.label}
-                                            </Link>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        ))}
+                        <NavSection title="Overview" items={[
+                            { label: "Dashboard Home", href: "/overview" },
+                        ]} />
+
+                        <NavSection title="Sales" items={[
+                            { label: "Orders",    href: "/sales/orders" },
+                            { label: "Analytics", href: "/sales/analytics" },
+                            { label: "Riders",    href: "/sales/riders" },
+                        ]} />
+
+                        <NavSection title="Catalog" items={[
+                            { label: "Products",   href: "/catalog/products" },
+                            { label: "Categories", href: "/catalog/categories" },
+                            { label: "Discounts",  href: "/catalog/discounts" },
+                            { label: "Gift Cards", href: "/catalog/gift-cards" },
+                        ]} />
+
+                        <NavSection title="Getting Paid" items={[
+                            { label: "Invoices",  href: "/finance/invoices" },
+                            { label: "Pay Links", href: "/finance/links" },
+                        ]} />
+
+                        <NavSection title="Customers" items={customerItems} />
+
+                        <NavSection title="Settings" items={[
+                            { label: "Site Settings", href: "/settings" },
+                        ]} />
                     </nav>
 
                     <div className="p-4 border-t border-neutral-200 space-y-1">
