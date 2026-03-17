@@ -19,6 +19,9 @@ type Order = {
     created_at: string;
     shipping_address?: any;
     items?: any[];
+    discount_code?: string | null;
+    discount_amount?: number | null;
+    customer_metadata?: { whatsapp?: string; instagram?: string; snapchat?: string } | null;
 };
 
 type Rider = {
@@ -389,6 +392,9 @@ export default function OrderDetailPage() {
                             ["Customer", order.customer_name || "—"],
                             ["Email",    order.customer_email],
                             ["Phone",    order.customer_phone || "—"],
+                            ...(order.customer_metadata?.whatsapp ? [["WhatsApp", order.customer_metadata.whatsapp]] : []),
+                            ...(order.customer_metadata?.instagram ? [["Instagram", order.customer_metadata.instagram]] : []),
+                            ...(order.customer_metadata?.snapchat ? [["Snapchat", order.customer_metadata.snapchat]] : []),
                             ["Type",     pickup ? "Store Pickup" : (order.delivery_method || "Delivery")],
                             ["Date",     new Date(order.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
                         ].map(([label, value]) => (
@@ -457,7 +463,6 @@ export default function OrderDetailPage() {
                         {[
                             ["Provider",    order.paystack_reference ? "Paystack" : "N/A"],
                             ["Reference",   order.paystack_reference || "—"],
-                            ["Amount Paid", `GH₵ ${Number(order.total_amount).toFixed(2)}`],
                             ["Status",      ["paid", "processing", "fulfilled", "delivered"].includes(order.status) ? "Successful" : order.status === "pending" ? "Pending" : "Failed"],
                         ].map(([label, value]) => (
                             <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
@@ -467,6 +472,22 @@ export default function OrderDetailPage() {
                                 </span>
                             </div>
                         ))}
+                        {order.discount_code && Number(order.discount_amount ?? 0) > 0 && (
+                            <>
+                                <div className="px-6 py-3 flex justify-between items-center text-sm">
+                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Subtotal</span>
+                                    <span className="font-medium font-mono text-neutral-900">GH₵ {(Number(order.total_amount) + Number(order.discount_amount)).toFixed(2)}</span>
+                                </div>
+                                <div className="px-6 py-3 flex justify-between items-center text-sm">
+                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Discount ({order.discount_code})</span>
+                                    <span className="font-medium font-mono text-green-600">-GH₵ {Number(order.discount_amount).toFixed(2)}</span>
+                                </div>
+                            </>
+                        )}
+                        <div className="px-6 py-3 flex justify-between items-center text-sm">
+                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Amount Paid</span>
+                            <span className="font-medium font-mono text-neutral-900">GH₵ {Number(order.total_amount).toFixed(2)}</span>
+                        </div>
                     </div>
 
                     <div className="bg-white border border-neutral-200 p-6 space-y-5">
@@ -579,6 +600,18 @@ export default function OrderDetailPage() {
 
             <div className="flex justify-end border-t border-neutral-200 pt-4">
                 <div className="w-56 space-y-2 text-sm">
+                    {order.discount_code && Number(order.discount_amount ?? 0) > 0 && (
+                        <>
+                            <div className="flex justify-between text-neutral-500">
+                                <span>Subtotal</span>
+                                <span>GH₵ {(Number(order.total_amount ?? 0) + Number(order.discount_amount ?? 0)).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-green-600">
+                                <span>Discount ({order.discount_code})</span>
+                                <span>-GH₵ {Number(order.discount_amount ?? 0).toFixed(2)}</span>
+                            </div>
+                        </>
+                    )}
                     <div className="flex justify-between font-semibold text-base">
                         <span>Total Paid</span>
                         <span>GH₵ {Number(order.total_amount ?? 0).toFixed(2)}</span>

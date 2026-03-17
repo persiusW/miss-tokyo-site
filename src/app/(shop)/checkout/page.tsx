@@ -5,11 +5,45 @@ import { useCart } from "@/store/useCart";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 
+// ── Static data ───────────────────────────────────────────────────────────────
+
+const GHANA_REGIONS = [
+    "Greater Accra", "Ashanti", "Western", "Central", "Eastern",
+    "Volta", "Oti", "Bono", "Bono East", "Ahafo",
+    "Northern", "Savannah", "North East", "Upper East", "Upper West", "Western North",
+];
+
+const COUNTRIES = [
+    "Ghana",
+    "Nigeria", "Côte d'Ivoire", "Togo", "Benin", "Burkina Faso",
+    "Senegal", "Gambia", "Guinea", "Sierra Leone", "Liberia", "Mali", "Niger",
+    "Cameroon", "Kenya", "Uganda", "Tanzania", "South Africa", "Ethiopia",
+    "Egypt", "Morocco", "Tunisia", "Algeria",
+    "United Kingdom", "United States", "Canada", "France", "Germany",
+    "Italy", "Spain", "Netherlands", "Belgium", "Switzerland", "Sweden", "Norway",
+    "Australia", "New Zealand", "India", "China", "Japan", "South Korea",
+    "Brazil", "Mexico", "Argentina",
+    "United Arab Emirates", "Saudi Arabia", "Qatar", "Kuwait", "Bahrain", "Oman",
+    "Other",
+];
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 type FeeSettings = {
     platform_fee_percentage: number;
     platform_fee_label: string;
     show_fee_at_checkout: boolean;
 };
+
+type AppliedDiscount = {
+    code: string;
+    type: "coupon" | "gift_card";
+    discount_type: string;
+    discount_amount: number;
+    label: string;
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CheckoutPage() {
     const { items, totalAmount } = useCart();
@@ -29,12 +63,24 @@ export default function CheckoutPage() {
         fullName: "",
         email: "",
         phone: "",
+        country: "Ghana",
+        region: "Greater Accra",
         address: "",
         deliveryMethod: "delivery" as "delivery" | "pickup",
+        whatsappSameAsPhone: true,
+        whatsapp: "",
+        instagram: "",
+        snapchat: "",
     });
 
     // Validation errors
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    // Discount / Gift Card
+    const [discountInput, setDiscountInput] = useState("");
+    const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
+    const [codeLoading, setCodeLoading] = useState(false);
+    const [codeError, setCodeError] = useState("");
 
     useEffect(() => {
         setMounted(true);
@@ -56,8 +102,9 @@ export default function CheckoutPage() {
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setForm(p => ({ ...p, [name]: value }));
+        const { name, value, type } = e.target;
+        const checked = (e.target as HTMLInputElement).checked;
+        setForm(p => ({ ...p, [name]: type === "checkbox" ? checked : value }));
         if (errors[name]) setErrors(p => ({ ...p, [name]: "" }));
     };
 
@@ -74,17 +121,55 @@ export default function CheckoutPage() {
         } else if (form.phone.trim().length < 7) {
             newErrors.phone = "Please enter a valid phone number.";
         }
+        if (!form.whatsappSameAsPhone && !form.whatsapp.trim()) {
+            newErrors.whatsapp = "Please enter a WhatsApp number or check the box above.";
+        }
         if (form.deliveryMethod === "delivery" && !form.address.trim()) {
-            newErrors.address = "Shipping address is required for delivery.";
+            newErrors.address = "Street address is required for delivery.";
         }
         return newErrors;
     };
 
-    // Fee calculations
+    // ── Discount code logic ────────────────────────────────────────────────────
+
+    const applyCode = async () => {
+        if (!discountInput.trim()) return;
+        setCodeLoading(true);
+        setCodeError("");
+        try {
+            const res = await fetch("/api/checkout/validate-code", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: discountInput.trim(), subtotal }),
+            });
+            const data = await res.json();
+            if (data.valid) {
+                setAppliedDiscount(data as AppliedDiscount);
+                setDiscountInput("");
+            } else {
+                setCodeError(data.error || "Invalid code.");
+            }
+        } catch {
+            setCodeError("Could not validate code. Please try again.");
+        } finally {
+            setCodeLoading(false);
+        }
+    };
+
+    const removeCode = () => {
+        setAppliedDiscount(null);
+        setCodeError("");
+    };
+
+    // ── Fee calculations ───────────────────────────────────────────────────────
+
     const subtotal = mounted ? totalAmount() : 0;
-    const shipping = 0;
-    const feeAmount = parseFloat(((subtotal + shipping) * (feeSettings.platform_fee_percentage / 100)).toFixed(2));
-    const finalTotal = parseFloat((subtotal + shipping + feeAmount).toFixed(2));
+    const discountAmount = appliedDiscount?.discount_amount ?? 0;
+    const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+    const feeAmount = parseFloat((discountedSubtotal * (feeSettings.platform_fee_percentage / 100)).toFixed(2));
+    const finalTotal = parseFloat((discountedSubtotal + feeAmount).toFixed(2));
+
+    // ── Submit ─────────────────────────────────────────────────────────────────
 
     const handleCheckout = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -102,10 +187,20 @@ export default function CheckoutPage() {
                 metadata: {
                     fullName: form.fullName,
                     phone: form.phone,
-                    address: form.address,
+                    address: form.deliveryMethod === "delivery" ? form.address : "",
+                    country: form.country,
+                    region: form.region,
+                    whatsapp: form.whatsappSameAsPhone ? form.phone : form.whatsapp,
+                    ...(form.instagram.trim() ? { instagram: form.instagram.trim() } : {}),
+                    ...(form.snapchat.trim() ? { snapchat: form.snapchat.trim() } : {}),
                     deliveryMethod: form.deliveryMethod,
                     platform_fee_amount: feeAmount,
                     platform_fee_label: feeSettings.platform_fee_label,
+                    ...(appliedDiscount ? {
+                        discount_code: appliedDiscount.code,
+                        discount_amount: appliedDiscount.discount_amount,
+                        discount_tag: appliedDiscount.type,
+                    } : {}),
                 },
             };
 
@@ -142,9 +237,13 @@ export default function CheckoutPage() {
 
     const { show_fee_at_checkout, platform_fee_label } = feeSettings;
     const hasFee = feeAmount > 0;
+    const inputClass = (field: string) =>
+        `w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors[field] ? "border-red-400" : "border-neutral-300 focus:border-black"}`;
 
     return (
         <div className="pt-32 pb-32 px-6 md:px-12 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16">
+
+            {/* ── LEFT: Form ── */}
             <div>
                 <header className="mb-12">
                     <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Checkout</h1>
@@ -152,49 +251,70 @@ export default function CheckoutPage() {
                 </header>
 
                 <form onSubmit={handleCheckout} className="space-y-8">
+
+                    {/* Name + Email */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div>
                             <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Full Name</label>
-                            <input
-                                type="text" name="fullName" value={form.fullName} onChange={handleChange}
-                                className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.fullName ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
-                                placeholder="Abena Mensah"
-                            />
+                            <input type="text" name="fullName" value={form.fullName} onChange={handleChange}
+                                className={inputClass("fullName")} placeholder="Abena Mensah" />
                             {errors.fullName && <p className="mt-1 text-[11px] text-red-500">{errors.fullName}</p>}
                         </div>
                         <div>
                             <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Email</label>
-                            <input
-                                type="email" name="email" value={form.email} onChange={handleChange}
-                                className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.email ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
-                                placeholder="abena@example.com"
-                            />
+                            <input type="email" name="email" value={form.email} onChange={handleChange}
+                                className={inputClass("email")} placeholder="abena@example.com" />
                             {errors.email && <p className="mt-1 text-[11px] text-red-500">{errors.email}</p>}
                         </div>
                     </div>
 
+                    {/* Phone */}
                     <div>
                         <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Phone Number</label>
-                        <input
-                            type="tel" name="phone" value={form.phone} onChange={handleChange}
-                            className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.phone ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
-                            placeholder="+233 ..."
-                        />
+                        <input type="tel" name="phone" value={form.phone} onChange={handleChange}
+                            className={inputClass("phone")} placeholder="+233 ..." />
                         {errors.phone && <p className="mt-1 text-[11px] text-red-500">{errors.phone}</p>}
                     </div>
 
+                    {/* Country + Region */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Country</label>
+                            <select name="country" value={form.country} onChange={handleChange}
+                                className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none transition-colors rounded-none">
+                                {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">
+                                {form.country === "Ghana" ? "Region" : "State / Region"}
+                            </label>
+                            {form.country === "Ghana" ? (
+                                <select name="region" value={form.region} onChange={handleChange}
+                                    className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none transition-colors rounded-none">
+                                    {GHANA_REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                                </select>
+                            ) : (
+                                <input type="text" name="region" value={form.region} onChange={handleChange}
+                                    className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none transition-colors rounded-none"
+                                    placeholder="Enter your state or region" />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Delivery Method */}
                     <div>
                         <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Delivery Method</label>
                         <div className="flex gap-4">
                             <label className="cursor-pointer">
-                                <input type="radio" name="deliveryMethod" value="delivery" checked={form.deliveryMethod === 'delivery'} onChange={handleChange} className="sr-only peer" />
+                                <input type="radio" name="deliveryMethod" value="delivery" checked={form.deliveryMethod === "delivery"} onChange={handleChange} className="sr-only peer" />
                                 <span className="block px-6 py-3 text-xs uppercase tracking-widest border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors">
                                     Delivery
                                 </span>
                             </label>
                             {enablePickup && (
                                 <label className="cursor-pointer">
-                                    <input type="radio" name="deliveryMethod" value="pickup" checked={form.deliveryMethod === 'pickup'} onChange={handleChange} className="sr-only peer" />
+                                    <input type="radio" name="deliveryMethod" value="pickup" checked={form.deliveryMethod === "pickup"} onChange={handleChange} className="sr-only peer" />
                                     <span className="block px-6 py-3 text-xs uppercase tracking-widest border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors">
                                         Store Pickup
                                     </span>
@@ -203,17 +323,62 @@ export default function CheckoutPage() {
                         </div>
                     </div>
 
-                    {form.deliveryMethod === 'delivery' && (
+                    {/* Street Address */}
+                    {form.deliveryMethod === "delivery" && (
                         <div>
-                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Shipping Address</label>
-                            <input
-                                type="text" name="address" value={form.address} onChange={handleChange}
-                                className={`w-full border-b bg-transparent py-2 outline-none transition-colors rounded-none ${errors.address ? "border-red-400" : "border-neutral-300 focus:border-black"}`}
-                                placeholder="123 Osu, Accra, Ghana"
-                            />
+                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Street Address / Landmark</label>
+                            <input type="text" name="address" value={form.address} onChange={handleChange}
+                                className={inputClass("address")} placeholder="123 Osu Oxford Street, near ..." />
                             {errors.address && <p className="mt-1 text-[11px] text-red-500">{errors.address}</p>}
                         </div>
                     )}
+
+                    {/* ── Social Contact ── */}
+                    <div className="space-y-5 pt-2">
+                        <h2 className="text-xs uppercase tracking-widest font-semibold text-neutral-700">
+                            Social Contact <span className="text-neutral-400 normal-case tracking-normal font-normal">(Optional)</span>
+                        </h2>
+
+                        {/* WhatsApp same-as-phone toggle */}
+                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                name="whatsappSameAsPhone"
+                                checked={form.whatsappSameAsPhone}
+                                onChange={handleChange}
+                                className="w-4 h-4 accent-black"
+                            />
+                            <span className="text-[11px] uppercase tracking-widest text-neutral-600 font-medium">
+                                WhatsApp number is the same as my phone number
+                            </span>
+                        </label>
+
+                        {/* WhatsApp input — shown when unchecked */}
+                        {!form.whatsappSameAsPhone && (
+                            <div>
+                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">WhatsApp Number</label>
+                                <input type="tel" name="whatsapp" value={form.whatsapp} onChange={handleChange}
+                                    className={inputClass("whatsapp")} placeholder="+233 ..." />
+                                {errors.whatsapp && <p className="mt-1 text-[11px] text-red-500">{errors.whatsapp}</p>}
+                            </div>
+                        )}
+
+                        {/* Instagram + Snapchat */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Instagram Handle</label>
+                                <input type="text" name="instagram" value={form.instagram} onChange={handleChange}
+                                    className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none transition-colors rounded-none"
+                                    placeholder="@yourhandle" />
+                            </div>
+                            <div>
+                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Snapchat Handle</label>
+                                <input type="text" name="snapchat" value={form.snapchat} onChange={handleChange}
+                                    className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none transition-colors rounded-none"
+                                    placeholder="@yourhandle" />
+                            </div>
+                        </div>
+                    </div>
 
                     <button
                         type="submit"
@@ -225,9 +390,11 @@ export default function CheckoutPage() {
                 </form>
             </div>
 
-            {/* Order Summary */}
-            <div className="bg-neutral-50 p-8 md:p-12 border border-neutral-100 h-fit">
-                <h2 className="font-serif text-xl tracking-widest uppercase mb-8">Order Summary</h2>
+            {/* ── RIGHT: Order Summary ── */}
+            <div className="bg-neutral-50 p-8 md:p-12 border border-neutral-100 h-fit space-y-8">
+                <h2 className="font-serif text-xl tracking-widest uppercase">Order Summary</h2>
+
+                {/* Items */}
                 <div className="space-y-6">
                     {items.map(item => (
                         <div key={item.id} className="flex gap-4 items-center">
@@ -236,19 +403,64 @@ export default function CheckoutPage() {
                             </div>
                             <div className="flex-1">
                                 <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>
-                                <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} • Qty: {item.quantity}</p>
+                                <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} · Qty: {item.quantity}</p>
                             </div>
                             <p className="font-medium text-sm">GHS {(item.price * item.quantity).toFixed(2)}</p>
                         </div>
                     ))}
                 </div>
 
+                {/* Discount / Gift Card input */}
+                <div className="space-y-3">
+                    <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Gift Card or Discount Code</p>
+
+                    {appliedDiscount ? (
+                        <div className="flex items-center justify-between bg-green-50 border border-green-200 px-4 py-3">
+                            <div>
+                                <p className="text-xs font-semibold text-green-700 uppercase tracking-widest">{appliedDiscount.code}</p>
+                                <p className="text-[11px] text-green-600 mt-0.5">{appliedDiscount.label}</p>
+                            </div>
+                            <button onClick={removeCode} className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors ml-4">
+                                Remove
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={discountInput}
+                                onChange={e => { setDiscountInput(e.target.value); setCodeError(""); }}
+                                onKeyDown={e => e.key === "Enter" && (e.preventDefault(), applyCode())}
+                                className="flex-1 border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none text-sm transition-colors rounded-none"
+                                placeholder="Enter code"
+                            />
+                            <button
+                                type="button"
+                                onClick={applyCode}
+                                disabled={codeLoading || !discountInput.trim()}
+                                className="px-5 py-2 bg-black text-white text-[10px] uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                            >
+                                {codeLoading ? "..." : "Apply"}
+                            </button>
+                        </div>
+                    )}
+
+                    {codeError && <p className="text-[11px] text-red-500">{codeError}</p>}
+                </div>
+
                 {/* Totals breakdown */}
-                <div className="border-t border-neutral-200 mt-8 pt-6 space-y-3">
+                <div className="border-t border-neutral-200 pt-6 space-y-3">
                     <div className="flex justify-between items-center text-sm">
                         <span className="text-neutral-500 uppercase tracking-widest text-xs">Subtotal</span>
                         <span>GHS {subtotal.toFixed(2)}</span>
                     </div>
+
+                    {appliedDiscount && discountAmount > 0 && (
+                        <div className="flex justify-between items-center text-sm text-green-600">
+                            <span className="uppercase tracking-widest text-xs">Discount ({appliedDiscount.code})</span>
+                            <span>-GHS {discountAmount.toFixed(2)}</span>
+                        </div>
+                    )}
 
                     {hasFee && show_fee_at_checkout && (
                         <div className="flex justify-between items-center text-sm">
@@ -260,7 +472,7 @@ export default function CheckoutPage() {
                     {hasFee && !show_fee_at_checkout && (
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-neutral-500 uppercase tracking-widest text-xs">Shipping &amp; Handling</span>
-                            <span>GHS {(shipping + feeAmount).toFixed(2)}</span>
+                            <span>GHS {feeAmount.toFixed(2)}</span>
                         </div>
                     )}
 

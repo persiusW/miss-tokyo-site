@@ -62,6 +62,41 @@ async function ensureCustomerAccount(customerEmail: string, fullName?: string | 
     return { userId, setupLink };
 }
 
+async function trackDiscountUsage(discountCode: string | undefined, discountAmount: unknown, discountTag: string | undefined) {
+    if (!discountCode) return;
+    const code = discountCode.trim().toUpperCase();
+
+    if (discountTag === "coupon" || !discountTag) {
+        const { data: coupon } = await supabaseAdmin
+            .from("coupons")
+            .select("id, used_count")
+            .ilike("code", code)
+            .single();
+        if (coupon) {
+            await supabaseAdmin
+                .from("coupons")
+                .update({ used_count: (coupon.used_count || 0) + 1 })
+                .eq("id", coupon.id);
+            return;
+        }
+    }
+
+    if (discountTag === "gift_card" || !discountTag) {
+        const { data: card } = await supabaseAdmin
+            .from("gift_cards")
+            .select("id, remaining_value")
+            .ilike("code", code)
+            .single();
+        if (card) {
+            const newBalance = Math.max(0, Number(card.remaining_value) - Number(discountAmount));
+            await supabaseAdmin
+                .from("gift_cards")
+                .update({ remaining_value: newBalance, ...(newBalance === 0 ? { is_active: false } : {}) })
+                .eq("id", card.id);
+        }
+    }
+}
+
 async function sendOrderConfirmation(
     customerEmail: string,
     orderRef: string,
@@ -71,11 +106,24 @@ async function sendOrderConfirmation(
     feeAmount?: number,
     feeLabel?: string,
     setupLink?: string,
+    discountCode?: string,
+    discountAmount?: number,
 ) {
     if (!process.env.RESEND_API_KEY) return;
 
+    const hasDiscount = discountAmount && discountAmount > 0;
     const hasFee = feeAmount && feeAmount > 0;
     const subtotal = hasFee ? amount - feeAmount : amount;
+
+    const discountRow = hasDiscount ? `
+      <tr style="border-bottom: 1px solid #f5f5f5;">
+        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Subtotal</td>
+        <td style="padding: 12px 0; font-size: 13px; text-align: right;">GH&#8373; ${(amount + discountAmount).toFixed(2)}</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f5f5f5;">
+        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Discount${discountCode ? ` (${discountCode})` : ""}</td>
+        <td style="padding: 12px 0; font-size: 13px; text-align: right; color: #16a34a;">-GH&#8373; ${discountAmount.toFixed(2)}</td>
+      </tr>` : "";
 
     const feeRow = hasFee ? `
       <tr style="border-bottom: 1px solid #f5f5f5;">
@@ -106,6 +154,7 @@ async function sendOrderConfirmation(
         <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Order Reference</td>
         <td style="padding: 12px 0; font-size: 13px; text-align: right; font-family: monospace; font-weight: 600;">#${orderRef}</td>
       </tr>
+      ${discountRow}
       ${feeRow}
       <tr style="border-bottom: 1px solid #f5f5f5;">
         <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Total Paid</td>
@@ -162,7 +211,10 @@ export async function POST(req: Request) {
             console.log("Paystack Charge Success Event Received");
             const data = event.data;
             const metadata = data.metadata || {};
-            const { orderId, requestId, productId, fullName, phone, address, deliveryMethod, cartItems, platform_fee_amount, platform_fee_label } = metadata;
+            const { orderId, requestId, productId, fullName, phone, address, country, region,
+                    whatsapp, instagram, snapchat, deliveryMethod, cartItems,
+                    platform_fee_amount, platform_fee_label,
+                    discount_code, discount_amount, discount_tag } = metadata;
             const customerEmail: string = data.customer?.email || "";
             const amountGHS = Number(data.amount) / 100;
             const paystackRef: string = data.reference || "";
@@ -236,8 +288,11 @@ export async function POST(req: Request) {
                         paystack_reference: paystackRef,
                         customer_name: fullName || null,
                         customer_phone: phone || null,
-                        shipping_address: address ? { text: address } : null,
+                        shipping_address: address ? { text: address, country: country || null, region: region || null } : null,
                         delivery_method: deliveryMethod || null,
+                        discount_code: discount_code || null,
+                        discount_amount: Number(discount_amount) || 0,
+                        customer_metadata: { whatsapp: whatsapp || null, instagram: instagram || null, snapchat: snapchat || null },
                         ...(customerId ? { customer_id: customerId } : {}),
                     })
                     .eq("id", orderId);
@@ -245,7 +300,8 @@ export async function POST(req: Request) {
                 if (error) {
                     console.error("Webhook: Failed to update order:", error);
                 } else {
-                    await sendOrderConfirmation(customerEmail, orderId.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined, setupLink);
+                    await sendOrderConfirmation(customerEmail, orderId.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined, setupLink, discount_code || undefined, Number(discount_amount) || undefined);
+                    await trackDiscountUsage(discount_code, discount_amount, discount_tag);
                 }
             } else if (customerEmail) {
                 // Fallback: create a new order if no pre-created one exists
@@ -262,12 +318,15 @@ export async function POST(req: Request) {
                             customer_email: customerEmail,
                             customer_name: fullName || null,
                             customer_phone: phone || null,
-                            shipping_address: address ? { text: address } : null,
+                            shipping_address: address ? { text: address, country: country || null, region: region || null } : null,
                             delivery_method: deliveryMethod || null,
                             total_amount: amountGHS,
                             status: "paid",
                             paystack_reference: paystackRef,
                             items: parsedItems,
+                            discount_code: discount_code || null,
+                            discount_amount: Number(discount_amount) || 0,
+                            customer_metadata: { whatsapp: whatsapp || null, instagram: instagram || null, snapchat: snapchat || null },
                             ...(customerId ? { customer_id: customerId } : {}),
                         }])
                         .select("id")
@@ -276,7 +335,8 @@ export async function POST(req: Request) {
                     if (error) {
                         console.error("Webhook: Failed to create order:", error);
                     } else if (newOrder) {
-                        await sendOrderConfirmation(customerEmail, newOrder.id.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined, setupLink);
+                        await sendOrderConfirmation(customerEmail, newOrder.id.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined, setupLink, discount_code || undefined, Number(discount_amount) || undefined);
+                        await trackDiscountUsage(discount_code, discount_amount, discount_tag);
                     }
                 }
             }

@@ -121,6 +121,8 @@ type Order = {
     customer_email: string | null;
     shipping_address: { text?: string } | string | null;
     delivery_method: string | null;
+    discount_code: string | null;
+    discount_amount: number | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -160,7 +162,7 @@ export default function OrderDetailPage() {
             const [{ data: ord }, { data: biz }] = await Promise.all([
                 supabase
                     .from("orders")
-                    .select("id, created_at, total_amount, status, paystack_reference, items, customer_name, customer_phone, customer_email, shipping_address, delivery_method")
+                    .select("id, created_at, total_amount, status, paystack_reference, items, customer_name, customer_phone, customer_email, shipping_address, delivery_method, discount_code, discount_amount")
                     .eq("id", id)
                     // Security: only show this order if it belongs to the user
                     .or(`customer_id.eq.${user.id},customer_email.eq.${user.email ?? ""}`)
@@ -338,6 +340,18 @@ export default function OrderDetailPage() {
                 {/* Total */}
                 <div className="flex justify-end border-t border-neutral-200 pt-4">
                     <div className="w-56 space-y-2 text-sm">
+                        {order.discount_code && Number(order.discount_amount ?? 0) > 0 && (
+                            <>
+                                <div className="flex justify-between text-neutral-500">
+                                    <span>Subtotal</span>
+                                    <span>GH₵ {(Number(order.total_amount ?? 0) + Number(order.discount_amount ?? 0)).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-green-600">
+                                    <span>Discount ({order.discount_code})</span>
+                                    <span>-GH₵ {Number(order.discount_amount ?? 0).toFixed(2)}</span>
+                                </div>
+                            </>
+                        )}
                         <div className="flex justify-between font-semibold text-base">
                             <span>Total Paid</span>
                             <span>GH₵ {Number(order.total_amount ?? 0).toFixed(2)}</span>

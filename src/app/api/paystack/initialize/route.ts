@@ -52,11 +52,22 @@ export async function POST(request: Request) {
                 customer_email: email,
                 customer_name: clientMetadata?.fullName || null,
                 customer_phone: clientMetadata?.phone || null,
-                shipping_address: clientMetadata?.address ? { text: clientMetadata.address } : null,
+                shipping_address: clientMetadata?.address ? {
+                    text: clientMetadata.address,
+                    country: clientMetadata.country || null,
+                    region: clientMetadata.region || null,
+                } : null,
                 delivery_method: clientMetadata?.deliveryMethod || "delivery",
                 total_amount: amountInGHS,
                 status: "pending",
                 items: cartArr,
+                discount_code: clientMetadata?.discount_code || null,
+                discount_amount: Number(clientMetadata?.discount_amount) || 0,
+                customer_metadata: {
+                    whatsapp: clientMetadata?.whatsapp || null,
+                    instagram: clientMetadata?.instagram || null,
+                    snapchat: clientMetadata?.snapchat || null,
+                },
             }])
             .select("id")
             .single();
