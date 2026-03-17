@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 const SESSION_COOKIE = 'badu_session';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const session = request.cookies.get(SESSION_COOKIE);
     const expectedToken = process.env.AUTH_SECRET || 'badu-default-session-token-change-in-production';
 
