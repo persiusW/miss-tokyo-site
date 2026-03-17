@@ -11,26 +11,37 @@ type PayLink = {
     description: string | null;
     paystack_url: string | null;
     paystack_reference: string | null;
+    status: string;
     created_at: string;
 };
+
+type Tab = "active" | "archived";
 
 export default function PayLinksPage() {
     const [links, setLinks] = useState<PayLink[]>([]);
     const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState<Tab>("active");
     const [generating, setGenerating] = useState(false);
     const [form, setForm] = useState({ email: "", amount: "", description: "" });
     const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+    const [archiving, setArchiving] = useState<string | null>(null);
 
-    const fetchLinks = async () => {
+    const fetchLinks = async (currentTab: Tab) => {
         setLoading(true);
-        const { data } = await supabase.from("pay_links").select("*").order("created_at", { ascending: false });
+        const { data } = await supabase
+            .from("pay_links")
+            .select("*")
+            .eq("status", currentTab === "active" ? "active" : "archived")
+            .order("created_at", { ascending: false });
         if (data) setLinks(data);
         setLoading(false);
     };
 
     useEffect(() => {
-        fetchLinks();
-        // Pre-fill business email from settings
+        fetchLinks(tab);
+    }, [tab]);
+
+    useEffect(() => {
         supabase
             .from("business_settings")
             .select("email")
@@ -66,9 +77,10 @@ export default function PayLinksPage() {
                     description: form.description || null,
                     paystack_url: data.authorizationUrl,
                     paystack_reference: data.reference || null,
+                    status: "active",
                 }]);
 
-                await fetchLinks();
+                if (tab === "active") fetchLinks("active");
                 toast.success("Pay link generated.");
             } else {
                 toast.error("Failed to generate pay link. Check Paystack configuration.");
@@ -84,6 +96,23 @@ export default function PayLinksPage() {
         navigator.clipboard.writeText(url);
         toast.info("Link copied to clipboard.");
     };
+
+    const handleArchive = async (id: string) => {
+        setArchiving(id);
+        const { error } = await supabase
+            .from("pay_links")
+            .update({ status: "archived" })
+            .eq("id", id);
+        if (error) {
+            toast.error("Failed to archive link.");
+        } else {
+            toast.success("Link archived.");
+            fetchLinks(tab);
+        }
+        setArchiving(null);
+    };
+
+    const colSpan = tab === "active" ? 6 : 5;
 
     return (
         <div className="space-y-12">
@@ -151,10 +180,21 @@ export default function PayLinksPage() {
                 </form>
             </div>
 
-            {/* History */}
+            {/* Tabs + History */}
             <div className="bg-white border border-neutral-200 overflow-x-auto">
-                <div className="px-6 py-4 border-b border-neutral-200">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest">Link History</h2>
+                <div className="px-6 py-4 border-b border-neutral-200 flex items-center gap-6">
+                    <button
+                        onClick={() => setTab("active")}
+                        className={`text-xs uppercase tracking-widest font-semibold pb-1 transition-colors ${tab === "active" ? "border-b-2 border-black text-black" : "text-neutral-400 hover:text-black"}`}
+                    >
+                        Active
+                    </button>
+                    <button
+                        onClick={() => setTab("archived")}
+                        className={`text-xs uppercase tracking-widest font-semibold pb-1 transition-colors ${tab === "archived" ? "border-b-2 border-black text-black" : "text-neutral-400 hover:text-black"}`}
+                    >
+                        Archived
+                    </button>
                 </div>
                 <table className="w-full text-left text-sm whitespace-nowrap">
                     <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -164,13 +204,20 @@ export default function PayLinksPage() {
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Amount</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Date</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Link</th>
+                            {tab === "active" && (
+                                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Action</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
                         {loading ? (
-                            <tr><td colSpan={5} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td></tr>
+                            <tr><td colSpan={colSpan} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td></tr>
                         ) : links.length === 0 ? (
-                            <tr><td colSpan={5} className="px-6 py-16 text-center text-neutral-500 italic font-serif">No pay links generated yet.</td></tr>
+                            <tr>
+                                <td colSpan={colSpan} className="px-6 py-16 text-center text-neutral-500 italic font-serif">
+                                    {tab === "active" ? "No active pay links." : "No archived pay links."}
+                                </td>
+                            </tr>
                         ) : links.map((link) => (
                             <tr key={link.id} className="hover:bg-neutral-50 transition-colors">
                                 <td className="px-6 py-4">
@@ -191,6 +238,17 @@ export default function PayLinksPage() {
                                         <span className="text-xs text-neutral-300">Unavailable</span>
                                     )}
                                 </td>
+                                {tab === "active" && (
+                                    <td className="px-6 py-4 text-right">
+                                        <button
+                                            onClick={() => handleArchive(link.id)}
+                                            disabled={archiving === link.id}
+                                            className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black transition-colors disabled:opacity-50"
+                                        >
+                                            {archiving === link.id ? "..." : "Archive"}
+                                        </button>
+                                    </td>
+                                )}
                             </tr>
                         ))}
                     </tbody>

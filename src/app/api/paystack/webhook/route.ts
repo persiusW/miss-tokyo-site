@@ -279,6 +279,15 @@ export async function POST(req: Request) {
                 }
             }
 
+            // Auto-archive any pay link that matches this Paystack reference
+            if (paystackRef) {
+                await supabaseAdmin
+                    .from("pay_links")
+                    .update({ status: "archived" })
+                    .eq("paystack_reference", paystackRef)
+                    .eq("status", "active");
+            }
+
             if (orderId) {
                 // Order was pre-created at initialization — update it to paid
                 const { error } = await supabaseAdmin

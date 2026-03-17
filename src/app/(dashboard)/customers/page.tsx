@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { X } from "lucide-react";
@@ -53,6 +54,7 @@ function downloadCSV(rows: Contact[], filename: string) {
 }
 
 export default function CustomersPage() {
+    const router = useRouter();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [loading, setLoading] = useState(true);
     const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -306,9 +308,10 @@ export default function CustomersPage() {
                         ) : contacts.map((contact) => (
                             <tr
                                 key={contact.id}
-                                className={`hover:bg-neutral-50 transition-colors ${selected.has(contact.id) ? "bg-neutral-50" : ""}`}
+                                onClick={() => router.push(`/customers/${encodeURIComponent(contact.email)}`)}
+                                className={`cursor-pointer hover:bg-neutral-50 transition-colors ${selected.has(contact.id) ? "bg-neutral-50" : ""}`}
                             >
-                                <td className="px-4 py-4">
+                                <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
                                     <input
                                         type="checkbox"
                                         checked={selected.has(contact.id)}
@@ -320,10 +323,8 @@ export default function CustomersPage() {
                                 <td className="px-4 py-4 font-medium text-neutral-900 whitespace-nowrap">
                                     {contact.name || <span className="text-neutral-400 font-normal italic">—</span>}
                                 </td>
-                                <td className="px-4 py-4 whitespace-nowrap">
-                                    <a href={`mailto:${contact.email}`} className="text-neutral-600 hover:text-black hover:underline">
-                                        {contact.email}
-                                    </a>
+                                <td className="px-4 py-4 whitespace-nowrap text-neutral-600">
+                                    {contact.email}
                                 </td>
                                 <td className="px-4 py-4 text-neutral-500 whitespace-nowrap">
                                     {contact.phone || <span className="text-neutral-300">—</span>}
