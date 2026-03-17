@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 type DiscountType = "fixed" | "percentage" | "free_shipping" | "sale_price" | "buy_x_get_y";
+
+type Category = { id: string; name: string; slug: string };
 
 type Coupon = {
     id: string;
@@ -20,6 +22,7 @@ type Coupon = {
     buy_quantity: number | null;
     get_quantity: number | null;
     free_shipping: boolean;
+    category_id: string | null;
     created_at: string;
 };
 
@@ -32,20 +35,21 @@ type CouponForm = {
     expires_at: string;
     buy_quantity: string;
     get_quantity: string;
+    category_id: string;
 };
 
 const EMPTY_FORM: CouponForm = {
     code: "", discount_type: "percentage", discount_value: "",
     min_order_value: "", usage_limit: "", expires_at: "",
-    buy_quantity: "", get_quantity: "",
+    buy_quantity: "", get_quantity: "", category_id: "",
 };
 
 const TYPE_LABELS: Record<DiscountType, string> = {
-    fixed:       "Fixed Discount",
-    percentage:  "Percentage Off",
+    fixed:         "Fixed Discount",
+    percentage:    "Percentage Off",
     free_shipping: "Free Shipping",
-    sale_price:  "Sale Price",
-    buy_x_get_y: "Buy X Get Y",
+    sale_price:    "Sale Price",
+    buy_x_get_y:   "Buy X Get Y",
 };
 
 const TYPE_STYLES: Record<DiscountType, string> = {
@@ -58,11 +62,11 @@ const TYPE_STYLES: Record<DiscountType, string> = {
 
 function formatValue(coupon: Coupon): string {
     switch (coupon.discount_type) {
-        case "fixed":        return coupon.discount_value ? `GH₵ ${coupon.discount_value}` : "—";
-        case "percentage":   return coupon.discount_value ? `${coupon.discount_value}%` : "—";
+        case "fixed":         return coupon.discount_value ? `GH₵ ${coupon.discount_value}` : "—";
+        case "percentage":    return coupon.discount_value ? `${coupon.discount_value}%` : "—";
         case "free_shipping": return "Free shipping";
-        case "sale_price":   return coupon.discount_value ? `GH₵ ${coupon.discount_value}` : "—";
-        case "buy_x_get_y":  return `Buy ${coupon.buy_quantity ?? "?"} Get ${coupon.get_quantity ?? "?"}`;
+        case "sale_price":    return coupon.discount_value ? `GH₵ ${coupon.discount_value}` : "—";
+        case "buy_x_get_y":   return `Buy ${coupon.buy_quantity ?? "?"} Get ${coupon.get_quantity ?? "?"}`;
     }
 }
 
@@ -71,21 +75,26 @@ function genCode(): string {
 }
 
 export default function DiscountsPage() {
-    const [coupons, setCoupons] = useState<Coupon[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [isAdding, setIsAdding] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState<CouponForm>(EMPTY_FORM);
+    const [coupons, setCoupons]           = useState<Coupon[]>([]);
+    const [categories, setCategories]     = useState<Category[]>([]);
+    const [loading, setLoading]           = useState(true);
+    const [isAdding, setIsAdding]         = useState(false);
+    const [saving, setSaving]             = useState(false);
+    const [form, setForm]                 = useState<CouponForm>(EMPTY_FORM);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-    const fetchCoupons = async () => {
+    const fetchAll = async () => {
         setLoading(true);
-        const { data } = await supabase.from("coupons").select("*").order("created_at", { ascending: false });
-        if (data) setCoupons(data);
+        const [{ data: couponData }, { data: catData }] = await Promise.all([
+            supabase.from("coupons").select("*").order("created_at", { ascending: false }),
+            supabase.from("categories").select("id, name, slug").eq("is_active", true).order("name"),
+        ]);
+        if (couponData) setCoupons(couponData);
+        if (catData)    setCategories(catData);
         setLoading(false);
     };
 
-    useEffect(() => { fetchCoupons(); }, []);
+    useEffect(() => { fetchAll(); }, []);
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -93,17 +102,18 @@ export default function DiscountsPage() {
         setSaving(true);
 
         const payload: any = {
-            code: form.code.toUpperCase(),
-            discount_type: form.discount_type,
-            is_active: true,
-            used_count: 0,
-            discount_value: form.discount_value ? Number(form.discount_value) : null,
+            code:            form.code.toUpperCase(),
+            discount_type:   form.discount_type,
+            is_active:       true,
+            used_count:      0,
+            discount_value:  form.discount_value  ? Number(form.discount_value)  : null,
             min_order_value: form.min_order_value ? Number(form.min_order_value) : null,
-            usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
-            expires_at: form.expires_at || null,
-            free_shipping: form.discount_type === "free_shipping",
-            buy_quantity: form.buy_quantity ? Number(form.buy_quantity) : null,
-            get_quantity: form.get_quantity ? Number(form.get_quantity) : null,
+            usage_limit:     form.usage_limit     ? Number(form.usage_limit)     : null,
+            expires_at:      form.expires_at      || null,
+            free_shipping:   form.discount_type === "free_shipping",
+            buy_quantity:    form.buy_quantity    ? Number(form.buy_quantity)    : null,
+            get_quantity:    form.get_quantity    ? Number(form.get_quantity)    : null,
+            category_id:     form.category_id     || null,
         };
 
         const { error } = await supabase.from("coupons").insert([payload]);
@@ -113,7 +123,7 @@ export default function DiscountsPage() {
             toast.success("Discount created.");
             setForm(EMPTY_FORM);
             setIsAdding(false);
-            await fetchCoupons();
+            await fetchAll();
         }
         setSaving(false);
     };
@@ -133,6 +143,11 @@ export default function DiscountsPage() {
         }
         setConfirmDeleteId(null);
     };
+
+    const categoryName = (id: string | null) =>
+        id ? (categories.find(c => c.id === id)?.name ?? "—") : null;
+
+    const supportsCategory = (t: DiscountType) => t !== "free_shipping";
 
     return (
         <div className="space-y-12">
@@ -161,7 +176,7 @@ export default function DiscountsPage() {
                             {(Object.keys(TYPE_LABELS) as DiscountType[]).map(t => (
                                 <button
                                     key={t} type="button"
-                                    onClick={() => setForm(p => ({ ...p, discount_type: t }))}
+                                    onClick={() => setForm(p => ({ ...p, discount_type: t, category_id: "" }))}
                                     className={`px-4 py-2 text-xs uppercase tracking-widest border transition-colors ${
                                         form.discount_type === t
                                             ? "bg-black text-white border-black"
@@ -223,6 +238,23 @@ export default function DiscountsPage() {
                             </>
                         )}
 
+                        {/* Category (optional, not for free_shipping) */}
+                        {supportsCategory(form.discount_type) && (
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">
+                                    Apply to Category <span className="normal-case text-neutral-400">(optional)</span>
+                                </label>
+                                <select value={form.category_id}
+                                    onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm text-neutral-700">
+                                    <option value="">All categories</option>
+                                    {categories.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
                         {/* Min order */}
                         <div>
                             <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Min Order (GH₵)</label>
@@ -267,6 +299,7 @@ export default function DiscountsPage() {
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Code</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Type</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Value</th>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Category</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Min Order</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Used</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Expires</th>
@@ -276,9 +309,9 @@ export default function DiscountsPage() {
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
                         {loading ? (
-                            <tr><td colSpan={8} className="px-6 py-12 text-center text-neutral-400 italic font-serif">Loading...</td></tr>
+                            <tr><td colSpan={9} className="px-6 py-12 text-center text-neutral-400 italic font-serif">Loading...</td></tr>
                         ) : coupons.length === 0 ? (
-                            <tr><td colSpan={8} className="px-6 py-16 text-center text-neutral-400 italic font-serif">No discounts yet.</td></tr>
+                            <tr><td colSpan={9} className="px-6 py-16 text-center text-neutral-400 italic font-serif">No discounts yet.</td></tr>
                         ) : coupons.map(c => (
                             <tr key={c.id} className="hover:bg-neutral-50 transition-colors">
                                 <td className="px-6 py-4 font-mono font-semibold text-sm">{c.code}</td>
@@ -288,6 +321,15 @@ export default function DiscountsPage() {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-neutral-700">{formatValue(c)}</td>
+                                <td className="px-6 py-4 text-neutral-500 text-xs">
+                                    {categoryName(c.category_id) ? (
+                                        <span className="px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded text-[10px] uppercase tracking-wider">
+                                            {categoryName(c.category_id)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-neutral-300">All</span>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4 text-neutral-500 text-xs">
                                     {c.min_order_value ? `GH₵ ${c.min_order_value}` : "None"}
                                 </td>

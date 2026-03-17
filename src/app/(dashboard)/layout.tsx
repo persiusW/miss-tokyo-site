@@ -17,8 +17,9 @@ const NAV: NavSection[] = [
     {
         title: "Sales",
         items: [
-            { label: "Orders", href: "/sales/orders" },
+            { label: "Orders",    href: "/sales/orders" },
             { label: "Analytics", href: "/sales/analytics" },
+            { label: "Riders",    href: "/sales/riders" },
         ],
     },
     {
