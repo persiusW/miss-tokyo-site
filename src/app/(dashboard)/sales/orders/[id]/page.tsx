@@ -151,6 +151,8 @@ export default function OrderDetailPage() {
     const [order, setOrder] = useState<Order | null>(null);
     const [bizName, setBizName] = useState("Miss Tokyo");
     const [bizContact, setBizContact] = useState<{ email?: string; contact?: string; address?: string }>({});
+    const [pickupSettings, setPickupSettings] = useState<{ instructions: string; address: string; phone: string; wait: string } | null>(null);
+    const [pickupPanelOpen, setPickupPanelOpen] = useState(true);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
     const [notifStatus, setNotifStatus] = useState<"idle" | "sending" | "sent">("idle");
@@ -161,7 +163,8 @@ export default function OrderDetailPage() {
         Promise.all([
             supabase.from("orders").select("*").eq("id", id).single(),
             supabase.from("business_settings").select("business_name, email, contact, address").eq("id", "default").single(),
-        ]).then(async ([{ data: ord }, { data: biz }]) => {
+            supabase.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
+        ]).then(async ([{ data: ord }, { data: biz }, { data: ss }]) => {
             if (ord) {
                 setOrder(ord);
                 if (ord.assigned_rider_id) {
@@ -175,6 +178,14 @@ export default function OrderDetailPage() {
             }
             if (biz?.business_name) setBizName(biz.business_name);
             setBizContact({ email: biz?.email ?? undefined, contact: biz?.contact ?? undefined, address: biz?.address ?? undefined });
+            if (ss?.pickup_enabled) {
+                setPickupSettings({
+                    instructions: ss.pickup_instructions || "",
+                    address: ss.pickup_address || biz?.address || "",
+                    phone: ss.pickup_contact_phone || biz?.contact || "",
+                    wait: ss.pickup_estimated_wait || "24 hours",
+                });
+            }
             setLoading(false);
         });
     }, [id]);
@@ -532,6 +543,34 @@ export default function OrderDetailPage() {
                         </div>
                     </div>
 
+                    {/* Pickup info panel (pickup orders) */}
+                    {pickup && pickupSettings && (
+                        <div className="bg-white border border-neutral-200">
+                            <button
+                                onClick={() => setPickupPanelOpen(v => !v)}
+                                className="w-full px-6 py-4 flex items-center justify-between border-b border-neutral-100"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-neutral-900" />
+                                    <h2 className="text-xs uppercase tracking-widest font-semibold">Pickup Instructions</h2>
+                                </div>
+                                <span className="text-neutral-400 text-sm">{pickupPanelOpen ? "▲" : "▼"}</span>
+                            </button>
+                            {pickupPanelOpen && (
+                                <div className="px-6 py-4 space-y-3">
+                                    <p className="text-sm leading-relaxed text-neutral-700" style={{ whiteSpace: "pre-wrap" }}>
+                                        {pickupSettings.instructions}
+                                    </p>
+                                    <div className="text-[11px] text-neutral-500 space-y-1 pt-2 border-t border-neutral-100">
+                                        {pickupSettings.address && <p>📍 {pickupSettings.address}</p>}
+                                        {pickupSettings.phone && <p>📞 {pickupSettings.phone}</p>}
+                                        {pickupSettings.wait && <p>⏱ Ready in: {pickupSettings.wait}</p>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Assigned Rider card (delivery orders that have been shipped/fulfilled) */}
                     {assignedRider && !pickup && (
                         <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
@@ -672,6 +711,23 @@ export default function OrderDetailPage() {
                     )}
                 </div>
             </div>
+
+            {/* Pickup instructions on print receipt */}
+            {pickup && pickupSettings && (
+                <div className="mt-8" style={{ backgroundColor: "#F7F2EC", padding: "16px", border: "1px solid #E8E4DE" }}>
+                    <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "10px" }}>
+                        📦 Store Pickup Instructions
+                    </p>
+                    <p style={{ fontSize: "13px", lineHeight: 1.7, color: "#404040", whiteSpace: "pre-wrap", marginBottom: "12px" }}>
+                        {pickupSettings.instructions}
+                    </p>
+                    <div style={{ borderTop: "1px solid #DDD8D1", paddingTop: "10px", fontSize: "12px", color: "#525252", lineHeight: 2 }}>
+                        {pickupSettings.address && <div>📍 {pickupSettings.address}</div>}
+                        {pickupSettings.phone && <div>📞 {pickupSettings.phone}</div>}
+                        {pickupSettings.wait && <div>⏱ Ready in: {pickupSettings.wait}</div>}
+                    </div>
+                </div>
+            )}
 
             <div className="border-t border-neutral-100 mt-8 pt-6 text-center space-y-1">
                 {(bizContact.address || bizContact.contact || bizContact.email) && (

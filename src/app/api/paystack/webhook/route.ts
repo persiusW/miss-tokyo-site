@@ -187,6 +187,11 @@ async function sendOrderConfirmation(opts: {
     isFirstTimeBuyer?: boolean;
     discountCode?: string;
     discountAmount?: number;
+    isPickup?: boolean;
+    pickupInstructions?: string;
+    pickupAddress?: string;
+    pickupPhone?: string;
+    pickupWait?: string;
 }) {
     if (!process.env.RESEND_API_KEY) return;
 
@@ -194,6 +199,7 @@ async function sendOrderConfirmation(opts: {
         customerEmail, orderRef, amount, bizName, bizAddress,
         items = [], feeAmount, feeLabel, setupLink, isFirstTimeBuyer,
         discountCode, discountAmount,
+        isPickup, pickupInstructions, pickupAddress, pickupPhone, pickupWait,
     } = opts;
 
     const hasDiscount = discountAmount && discountAmount > 0;
@@ -242,6 +248,19 @@ async function sendOrderConfirmation(opts: {
       </a>
     </div>` : "";
 
+    const pickupBlock = isPickup && pickupInstructions ? `
+    <div style="background: #F7F2EC; padding: 20px; margin-bottom: 28px; border: 1px solid #E8E4DE;">
+      <p style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 12px; color: #171717;">
+        📦 Your Pickup Instructions
+      </p>
+      <p style="font-size: 13px; color: #404040; line-height: 1.7; margin: 0 0 16px; white-space: pre-line;">${pickupInstructions}</p>
+      <div style="border-top: 1px solid #DDD8D1; padding-top: 12px; font-size: 12px; color: #525252; line-height: 2;">
+        ${pickupAddress ? `<div>📍 ${pickupAddress}</div>` : ""}
+        ${pickupPhone ? `<div>📞 ${pickupPhone}</div>` : ""}
+        ${pickupWait ? `<div>⏱ Ready in: ${pickupWait}</div>` : ""}
+      </div>
+    </div>` : "";
+
     const viewOrderBtn = `
     <a href="${baseUrl}/account/orders" style="display: block; border: 1px solid #e5e5e5; padding: 14px; text-align: center; text-decoration: none; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: #171717; margin-bottom: 32px;">
       View Order Status →
@@ -285,11 +304,12 @@ async function sendOrderConfirmation(opts: {
       </tr>
     </table>
 
+    ${pickupBlock}
     ${firstTimeBuyerBlock}
     ${viewOrderBtn}
 
     <p style="font-size: 13px; color: #525252; line-height: 1.8; margin: 0 0 32px;">
-      Your piece is now being prepared with care. We will notify you once it has been dispatched. Questions? Reply to this email.
+      ${isPickup ? "Your order is being prepared for pickup. We will notify you when it is ready for collection. Questions? Reply to this email." : "Your piece is now being prepared with care. We will notify you once it has been dispatched. Questions? Reply to this email."}
     </p>
 
     <div style="border-top: 1px solid #e5e5e5; padding-top: 24px; margin-top: 24px;">
@@ -340,14 +360,22 @@ export async function POST(req: Request) {
             const amountGHS = Number(data.amount) / 100;
             const paystackRef: string = data.reference || "";
 
-            const { data: biz } = await supabaseAdmin
-                .from("business_settings")
-                .select("business_name, address")
-                .eq("id", "default")
-                .single();
+            const [{ data: biz }, { data: pickupSettings }] = await Promise.all([
+                supabaseAdmin.from("business_settings").select("business_name, address, contact").eq("id", "default").single(),
+                supabaseAdmin.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
+            ]);
 
             const bizName = biz?.business_name || "Miss Tokyo";
             const bizAddress = biz?.address || "";
+            const isPickupOrder = (deliveryMethod as string | undefined)?.toLowerCase().includes("pickup") ?? false;
+            const pickupEnabled = pickupSettings?.pickup_enabled ?? true;
+            const pickupMeta = isPickupOrder && pickupEnabled ? {
+                isPickup: true,
+                pickupInstructions: pickupSettings?.pickup_instructions || "",
+                pickupAddress: pickupSettings?.pickup_address || biz?.address || "",
+                pickupPhone: pickupSettings?.pickup_contact_phone || biz?.contact || "",
+                pickupWait: pickupSettings?.pickup_estimated_wait || "24 hours",
+            } : {};
 
             // Fetch SMS template for order_confirmed (used below for both order paths)
             const { data: smsTpl } = await supabaseAdmin
@@ -448,6 +476,7 @@ export async function POST(req: Request) {
                 isFirstTimeBuyer,
                 discountCode: discount_code || undefined,
                 discountAmount: Number(discount_amount) || undefined,
+                ...pickupMeta,
             };
 
             if (orderId) {

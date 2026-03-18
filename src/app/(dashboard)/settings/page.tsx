@@ -4,18 +4,13 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 import { toast } from "@/lib/toast";
-import { AssetsTab } from "./AssetsTab";
 import { EmailsTab } from "./EmailsTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { RidersTab } from "./RidersTab";
 import { SizeGuideTab } from "./SizeGuideTab";
 import { TeamTab } from "./TeamTab";
 import { BusinessSettingsTab } from "./BusinessSettingsTab";
-import { HeroSlidesTab } from "./HeroSlidesTab";
-import { NavigationTab } from "./NavigationTab";
-import { TrustBarTab } from "./TrustBarTab";
-import { HomepageSectionsTab } from "./HomepageSectionsTab";
-import { ReviewsTab } from "./ReviewsTab";
+import { ShippingTab } from "./ShippingTab";
 
 type BusinessSettings = {
     business_name: string;
@@ -105,62 +100,89 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "notifications" | "riders" | "size-guide" | "team" | "hero-slides" | "navigation" | "trust-bar" | "homepage" | "reviews";
+type TabKey = "business" | "store" | "shipping" | "seo" | "emails" | "notifications" | "riders" | "size-guide" | "team";
 
-const TABS: { key: TabKey; label: string }[] = [
-    { key: "business",      label: "Business" },
-    { key: "store",         label: "Store" },
-    { key: "seo",           label: "SEO" },
-    { key: "assets",        label: "Site Assets" },
-    { key: "emails",        label: "Communications" },
-    { key: "notifications", label: "Notifications" },
-    { key: "riders",        label: "Riders" },
-    { key: "size-guide",    label: "Size Guide" },
-    { key: "team",          label: "Team" },
-    { key: "hero-slides",   label: "Hero Slides" },
-    { key: "navigation",    label: "Navigation" },
-    { key: "trust-bar",     label: "Trust Bar" },
-    { key: "homepage",      label: "Homepage" },
-    { key: "reviews",       label: "Reviews" },
+const SETTINGS_TAB_GROUPS: { group: string; tabs: { key: TabKey; label: string }[] }[] = [
+    {
+        group: "Store",
+        tabs: [
+            { key: "business",  label: "Business" },
+            { key: "store",     label: "Store" },
+            { key: "shipping",  label: "Shipping" },
+            { key: "seo",       label: "SEO" },
+        ],
+    },
+    {
+        group: "Commerce",
+        tabs: [
+            { key: "emails",        label: "Emails" },
+            { key: "notifications", label: "Notifications" },
+        ],
+    },
+    {
+        group: "Team & Access",
+        tabs: [
+            { key: "riders",     label: "Riders" },
+            { key: "size-guide", label: "Size Guide" },
+            { key: "team",       label: "Team" },
+        ],
+    },
 ];
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<TabKey>("business");
 
     return (
-        <div className="space-y-10 max-w-6xl">
-            <header className="border-b border-neutral-200 pb-0">
-                <div className="mb-6">
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Settings</h1>
-                    <p className="text-neutral-500">Manage your atelier's business details, store configuration, SEO, site assets, and email templates.</p>
-                </div>
-                <div className="flex gap-6 text-xs font-semibold uppercase tracking-widest overflow-x-auto scrollbar-hide">
-                    {TABS.map(tab => (
-                        <button
-                            key={tab.key}
-                            onClick={() => setActiveTab(tab.key)}
-                            className={`pb-4 border-b-2 transition-colors whitespace-nowrap -mb-px ${activeTab === tab.key ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"}`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
+        <div className="max-w-6xl">
+            <header className="mb-8">
+                <h1 className="text-[20px] font-medium text-neutral-900 tracking-tight">Settings</h1>
+                <p className="text-sm text-neutral-500 mt-1">Business details, store configuration, and operations.</p>
             </header>
 
-            {activeTab === "business"       && <><BusinessTab /><div className="mt-8"><BusinessSettingsTab /></div></>}
-            {activeTab === "store"          && <StoreTab />}
-            {activeTab === "seo"            && <SEOTab />}
-            {activeTab === "assets"         && <AssetsTab />}
-            {activeTab === "emails"         && <EmailsTab />}
-            {activeTab === "notifications"  && <NotificationsTab />}
-            {activeTab === "riders"         && <RidersTab />}
-            {activeTab === "size-guide"     && <SizeGuideTab />}
-            {activeTab === "team"           && <TeamTab />}
-            {activeTab === "hero-slides"    && <HeroSlidesTab />}
-            {activeTab === "navigation"     && <NavigationTab />}
-            {activeTab === "trust-bar"      && <TrustBarTab />}
-            {activeTab === "homepage"       && <HomepageSectionsTab />}
-            {activeTab === "reviews"        && <ReviewsTab />}
+            <div className="flex gap-8 items-start">
+                {/* Vertical tab nav */}
+                <aside className="w-44 shrink-0 sticky top-6">
+                    <nav className="space-y-5">
+                        {SETTINGS_TAB_GROUPS.map((group) => (
+                            <div key={group.group}>
+                                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-400 mb-1 px-2">
+                                    {group.group}
+                                </p>
+                                <ul className="space-y-0.5">
+                                    {group.tabs.map((tab) => (
+                                        <li key={tab.key}>
+                                            <button
+                                                onClick={() => setActiveTab(tab.key)}
+                                                className={`w-full text-left px-2 py-[7px] text-sm transition-colors rounded ${
+                                                    activeTab === tab.key
+                                                        ? "bg-neutral-100 text-black font-semibold"
+                                                        : "text-neutral-500 hover:bg-neutral-50 hover:text-black"
+                                                }`}
+                                                style={activeTab === tab.key ? { borderLeft: "2px solid black", borderRadius: "0 6px 6px 0", paddingLeft: "6px" } : {}}
+                                            >
+                                                {tab.label}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </nav>
+                </aside>
+
+                {/* Tab content */}
+                <div className="flex-1 min-w-0">
+                    {activeTab === "business"       && <><BusinessTab /><div className="mt-8"><BusinessSettingsTab /></div></>}
+                    {activeTab === "store"          && <StoreTab />}
+                    {activeTab === "shipping"       && <ShippingTab />}
+                    {activeTab === "seo"            && <SEOTab />}
+                    {activeTab === "emails"         && <EmailsTab />}
+                    {activeTab === "notifications"  && <NotificationsTab />}
+                    {activeTab === "riders"         && <RidersTab />}
+                    {activeTab === "size-guide"     && <SizeGuideTab />}
+                    {activeTab === "team"           && <TeamTab />}
+                </div>
+            </div>
         </div>
     );
 }

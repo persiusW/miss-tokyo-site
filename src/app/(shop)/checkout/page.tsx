@@ -52,6 +52,8 @@ export default function CheckoutPage() {
 
     // Store Settings
     const [enablePickup, setEnablePickup] = useState(false);
+    const [pickupDetails, setPickupDetails] = useState<{ instructions: string; address: string; phone: string; wait: string } | null>(null);
+    const [pickupExpanded, setPickupExpanded] = useState(false);
     const [feeSettings, setFeeSettings] = useState<FeeSettings>({
         platform_fee_percentage: 0,
         platform_fee_label: "Service Charge",
@@ -84,21 +86,29 @@ export default function CheckoutPage() {
 
     useEffect(() => {
         setMounted(true);
-        supabase
-            .from("store_settings")
-            .select("enable_store_pickup, platform_fee_percentage, platform_fee_label, show_fee_at_checkout")
-            .eq("id", "default")
-            .single()
-            .then(({ data }) => {
-                if (data) {
-                    setEnablePickup(data.enable_store_pickup || false);
-                    setFeeSettings({
-                        platform_fee_percentage: Number(data.platform_fee_percentage) || 0,
-                        platform_fee_label: data.platform_fee_label || "Service Charge",
-                        show_fee_at_checkout: data.show_fee_at_checkout ?? false,
-                    });
-                }
-            });
+        Promise.all([
+            supabase.from("store_settings").select("enable_store_pickup, platform_fee_percentage, platform_fee_label, show_fee_at_checkout").eq("id", "default").single(),
+            supabase.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
+        ]).then(([{ data: store }, { data: ss }]) => {
+            if (store) {
+                // pickup enabled if BOTH store_settings toggle AND site_settings.pickup_enabled are true
+                const pickupOn = (store.enable_store_pickup || false) && (ss?.pickup_enabled ?? true);
+                setEnablePickup(pickupOn);
+                setFeeSettings({
+                    platform_fee_percentage: Number(store.platform_fee_percentage) || 0,
+                    platform_fee_label: store.platform_fee_label || "Service Charge",
+                    show_fee_at_checkout: store.show_fee_at_checkout ?? false,
+                });
+            }
+            if (ss && ss.pickup_enabled) {
+                setPickupDetails({
+                    instructions: ss.pickup_instructions || "",
+                    address: ss.pickup_address || "",
+                    phone: ss.pickup_contact_phone || "",
+                    wait: ss.pickup_estimated_wait || "24 hours",
+                });
+            }
+        });
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -321,6 +331,29 @@ export default function CheckoutPage() {
                                 </label>
                             )}
                         </div>
+                        {/* Inline pickup instructions — shown when pickup is selected */}
+                        {form.deliveryMethod === "pickup" && pickupDetails && pickupDetails.instructions && (
+                            <div className="mt-3 bg-neutral-50 border border-neutral-200 p-4">
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-700 mb-2">Pickup Instructions</p>
+                                <p className={`text-xs text-neutral-600 leading-relaxed ${pickupExpanded ? "" : "line-clamp-2"}`}
+                                   style={{ whiteSpace: "pre-wrap" }}>
+                                    {pickupDetails.instructions}
+                                </p>
+                                {pickupDetails.instructions.length > 120 && (
+                                    <button type="button" onClick={() => setPickupExpanded(v => !v)}
+                                        className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-black mt-1 transition-colors">
+                                        {pickupExpanded ? "Show less" : "Read more"}
+                                    </button>
+                                )}
+                                {(pickupDetails.address || pickupDetails.phone || pickupDetails.wait) && (
+                                    <div className="mt-2 pt-2 border-t border-neutral-200 text-[11px] text-neutral-500 space-y-0.5">
+                                        {pickupDetails.address && <p>📍 {pickupDetails.address}</p>}
+                                        {pickupDetails.phone && <p>📞 {pickupDetails.phone}</p>}
+                                        {pickupDetails.wait && <p>⏱ Ready in: {pickupDetails.wait}</p>}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Street Address */}

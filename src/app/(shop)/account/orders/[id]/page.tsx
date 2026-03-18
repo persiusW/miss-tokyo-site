@@ -150,6 +150,7 @@ export default function OrderDetailPage() {
     const [order, setOrder] = useState<Order | null>(null);
     const [bizName, setBizName] = useState("Miss Tokyo");
     const [bizContact, setBizContact] = useState<{ email?: string; contact?: string; address?: string }>({});
+    const [pickupSettings, setPickupSettings] = useState<{ instructions: string; address: string; phone: string; wait: string } | null>(null);
     const [loading, setLoading] = useState(true);
     const printRef = useRef<HTMLDivElement>(null);
 
@@ -159,7 +160,7 @@ export default function OrderDetailPage() {
         supabase.auth.getUser().then(async ({ data: { user } }) => {
             if (!user) { router.replace("/login"); return; }
 
-            const [{ data: ord }, { data: biz }] = await Promise.all([
+            const [{ data: ord }, { data: biz }, { data: ss }] = await Promise.all([
                 supabase
                     .from("orders")
                     .select("id, created_at, total_amount, status, paystack_reference, items, customer_name, customer_phone, customer_email, shipping_address, delivery_method, discount_code, discount_amount")
@@ -168,12 +169,21 @@ export default function OrderDetailPage() {
                     .or(`customer_id.eq.${user.id},customer_email.eq.${user.email ?? ""}`)
                     .single(),
                 supabase.from("business_settings").select("business_name, email, contact, address").eq("id", "default").single(),
+                supabase.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
             ]);
 
             if (!ord) { router.replace("/account/orders"); return; }
             setOrder(ord);
             if (biz?.business_name) setBizName(biz.business_name);
             setBizContact({ email: biz?.email ?? undefined, contact: biz?.contact ?? undefined, address: biz?.address ?? undefined });
+            if (ss?.pickup_enabled) {
+                setPickupSettings({
+                    instructions: ss.pickup_instructions || "",
+                    address: ss.pickup_address || biz?.address || "",
+                    phone: ss.pickup_contact_phone || biz?.contact || "",
+                    wait: ss.pickup_estimated_wait || "24 hours",
+                });
+            }
             setLoading(false);
         });
     }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -262,6 +272,23 @@ export default function OrderDetailPage() {
                             <p className="text-xs text-neutral-300">Your order is packed and waiting at our store. Please bring your order number when you visit.</p>
                         </div>
                     )}
+
+                    {/* Pickup instructions card */}
+                    {order.delivery_method?.toLowerCase().includes("pickup") && pickupSettings && (
+                        <div className="mt-4" style={{ backgroundColor: "#F7F2EC", padding: "16px", border: "1px solid #E8E4DE" }}>
+                            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: "#171717" }}>
+                                📦 Pickup Instructions
+                            </p>
+                            <p className="text-sm leading-relaxed mb-3" style={{ color: "#404040", whiteSpace: "pre-wrap" }}>
+                                {pickupSettings.instructions}
+                            </p>
+                            <div className="text-xs space-y-1" style={{ borderTop: "1px solid #DDD8D1", paddingTop: "10px", color: "#525252" }}>
+                                {pickupSettings.address && <p>📍 {pickupSettings.address}</p>}
+                                {pickupSettings.phone && <p>📞 {pickupSettings.phone}</p>}
+                                {pickupSettings.wait && <p>⏱ Ready in: {pickupSettings.wait}</p>}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Customer + Delivery */}
@@ -336,6 +363,23 @@ export default function OrderDetailPage() {
                         </table>
                     )}
                 </div>
+
+                {/* Pickup instructions block (print + screen) */}
+                {order.delivery_method?.toLowerCase().includes("pickup") && pickupSettings && (
+                    <div className="mb-8" style={{ backgroundColor: "#F7F2EC", padding: "16px", border: "1px solid #E8E4DE" }}>
+                        <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "10px" }}>
+                            📦 Store Pickup Instructions
+                        </p>
+                        <p style={{ fontSize: "13px", lineHeight: 1.7, color: "#404040", whiteSpace: "pre-wrap", marginBottom: "12px" }}>
+                            {pickupSettings.instructions}
+                        </p>
+                        <div style={{ borderTop: "1px solid #DDD8D1", paddingTop: "10px", fontSize: "12px", color: "#525252", lineHeight: 2 }}>
+                            {pickupSettings.address && <div>📍 {pickupSettings.address}</div>}
+                            {pickupSettings.phone && <div>📞 {pickupSettings.phone}</div>}
+                            {pickupSettings.wait && <div>⏱ Ready in: {pickupSettings.wait}</div>}
+                        </div>
+                    </div>
+                )}
 
                 {/* Total */}
                 <div className="flex justify-end border-t border-neutral-200 pt-4">

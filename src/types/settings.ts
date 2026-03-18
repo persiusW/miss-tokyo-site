@@ -38,6 +38,11 @@ export interface SiteSettings {
   optin_section_enabled: boolean;
   optin_title: string;
   optin_subtitle: string;
+  pickup_enabled: boolean;
+  pickup_instructions: string;
+  pickup_address: string | null;
+  pickup_contact_phone: string | null;
+  pickup_estimated_wait: string;
   updated_at: string;
 }
 
