@@ -4,6 +4,34 @@ import { createClient } from "@/lib/supabaseServer";
 import { sendEmail } from "@/lib/email";
 import { sendSMS } from "@/lib/sms";
 
+// GET /api/admin/invite-team?ids=id1,id2,...
+// Returns which of the given user IDs have never signed in (pending setup)
+export async function GET(req: NextRequest) {
+    const serverClient = await createClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { data: caller } = await supabaseAdmin
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+    if (!caller || !["admin", "owner"].includes(caller.role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const ids = req.nextUrl.searchParams.get("ids")?.split(",").filter(Boolean) ?? [];
+    if (!ids.length) return NextResponse.json({ pendingIds: [] });
+
+    // listUsers may paginate — fetch up to 1000 which is more than enough for a team
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const pendingIds = users
+        .filter(u => ids.includes(u.id) && !u.last_sign_in_at)
+        .map(u => u.id);
+
+    return NextResponse.json({ pendingIds });
+}
+
 export async function POST(req: NextRequest) {
     // Auth check — only admin/owner can invite
     const serverClient = await createClient();

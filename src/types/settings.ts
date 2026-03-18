@@ -43,6 +43,10 @@ export interface SiteSettings {
   pickup_address: string | null;
   pickup_contact_phone: string | null;
   pickup_estimated_wait: string;
+  hours_weekday: string;
+  hours_saturday: string;
+  hours_sunday: string;
+  hours_note: string;
   updated_at: string;
 }
 

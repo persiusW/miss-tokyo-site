@@ -28,10 +28,23 @@ const ROLE_COLORS: Record<string, string> = {
 export function TeamTab() {
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
+    const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+    const [copyingId, setCopyingId] = useState<string | null>(null);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
     const [showModal, setShowModal] = useState(false);
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteRole, setInviteRole] = useState<"admin" | "sales_staff">("sales_staff");
     const [inviting, setInviting] = useState(false);
+
+    const fetchPendingStatus = async (ids: string[]) => {
+        if (!ids.length) return;
+        try {
+            const res = await fetch(`/api/admin/invite-team?ids=${ids.join(",")}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            setPendingIds(new Set(data.pendingIds ?? []));
+        } catch { /* non-fatal */ }
+    };
 
     const fetchTeam = async () => {
         setLoading(true);
@@ -40,8 +53,31 @@ export function TeamTab() {
             .select("id, email, full_name, role, created_at")
             .in("role", ["owner", "admin", "sales_staff"])
             .order("created_at", { ascending: true });
-        setMembers(data ?? []);
+        const list = data ?? [];
+        setMembers(list);
         setLoading(false);
+        fetchPendingStatus(list.map(m => m.id));
+    };
+
+    const handleCopyLink = async (member: TeamMember) => {
+        setCopyingId(member.id);
+        try {
+            const res = await fetch("/api/admin/invite-team/setup-link", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: member.email }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to generate link");
+            await navigator.clipboard.writeText(data.link);
+            setCopiedId(member.id);
+            setTimeout(() => setCopiedId(null), 3000);
+            toast.success("Setup link copied to clipboard");
+        } catch (err: any) {
+            toast.error(err.message);
+        } finally {
+            setCopyingId(null);
+        }
     };
 
     useEffect(() => { fetchTeam(); }, []);
@@ -138,32 +174,69 @@ export function TeamTab() {
                             </tr>
                         </thead>
                         <tbody>
-                            {members.map(member => (
+                            {members.map(member => {
+                                const isPending = pendingIds.has(member.id);
+                                const isCopying = copyingId === member.id;
+                                const isCopied = copiedId === member.id;
+                                return (
                                 <tr key={member.id} className="border-b border-neutral-50 last:border-b-0 hover:bg-neutral-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <p className="text-sm font-semibold">{member.full_name || "—"}</p>
                                         <p className="text-[10px] text-neutral-400 tracking-wide">{member.email}</p>
                                     </td>
                                     <td className="px-4 py-4">
-                                        <span className={`text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-md ${ROLE_COLORS[member.role] || "bg-neutral-100"}`}>
-                                            {ROLE_LABELS[member.role] || member.role}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-md ${ROLE_COLORS[member.role] || "bg-neutral-100"}`}>
+                                                {ROLE_LABELS[member.role] || member.role}
+                                            </span>
+                                            {isPending && (
+                                                <span className="text-[9px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-amber-100 text-amber-700">
+                                                    Pending setup
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-4 text-[11px] text-neutral-500">
                                         {new Date(member.created_at).toLocaleDateString()}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        {member.role === "sales_staff" && (
-                                            <button
-                                                onClick={() => handleRemove(member)}
-                                                className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-rose-600 transition-colors font-semibold"
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
+                                        <div className="flex items-center justify-end gap-3">
+                                            {isPending && (
+                                                <button
+                                                    onClick={() => handleCopyLink(member)}
+                                                    disabled={isCopying}
+                                                    className={`flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-semibold transition-colors disabled:opacity-50 ${
+                                                        isCopied ? "text-green-600" : "text-neutral-500 hover:text-black"
+                                                    }`}
+                                                >
+                                                    {isCopied ? (
+                                                        <>
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                                            Copied
+                                                        </>
+                                                    ) : isCopying ? (
+                                                        "Copying…"
+                                                    ) : (
+                                                        <>
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                            Copy setup link
+                                                        </>
+                                                    )}
+                                                </button>
+                                            )}
+                                            {member.role === "sales_staff" && (
+                                                <button
+                                                    onClick={() => handleRemove(member)}
+                                                    className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-rose-600 transition-colors font-semibold"
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 )}
