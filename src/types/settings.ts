@@ -73,6 +73,8 @@ export interface SiteSettings {
   about_cta_body: string;
   about_cta_btn_label: string;
   about_cta_btn_url: string;
+  // Shop
+  shop_pagination_type: "load_more" | "pagination";
   // Gift cards
   gc_enabled: boolean;
   gc_min_amount: number;
