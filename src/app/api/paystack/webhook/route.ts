@@ -3,9 +3,46 @@ import crypto from "crypto";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { Resend } from "resend";
+import webpush from "web-push";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
+
+// ── Web Push ───────────────────────────────────────────────────────────────────
+
+function initWebPush() {
+    const pub  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const priv = process.env.VAPID_PRIVATE_KEY;
+    const subj = process.env.VAPID_SUBJECT || "mailto:admin@misstokyo.shop";
+    if (pub && priv) webpush.setVapidDetails(subj, pub, priv);
+}
+
+async function sendAdminPushNotifications(title: string, body: string, url = "/sales/orders") {
+    if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return;
+    initWebPush();
+
+    const { data: subs } = await supabaseAdmin
+        .from("admin_push_subscriptions")
+        .select("endpoint, p256dh, auth");
+
+    if (!subs?.length) return;
+
+    const payload = JSON.stringify({ title, body, url, icon: "/favicon-96x96.png" });
+
+    await Promise.allSettled(
+        subs.map(sub =>
+            webpush.sendNotification(
+                { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                payload,
+            ).catch(err => {
+                // Remove stale subscriptions (410 Gone)
+                if (err.statusCode === 410) {
+                    supabaseAdmin.from("admin_push_subscriptions").delete().eq("endpoint", sub.endpoint);
+                }
+            }),
+        ),
+    );
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -443,11 +480,14 @@ export async function POST(req: Request) {
                     await Promise.all([
                         sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
                         trackDiscountUsage(discount_code, discount_amount, discount_tag),
-                        // SMS to customer
                         phone ? sendSMS({
                             to: phone,
                             message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
                         }) : Promise.resolve(),
+                        sendAdminPushNotifications(
+                            "New Order Received!",
+                            `Order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${fullName || customerEmail} has been paid.`,
+                        ),
                     ]);
                 }
             } else if (customerEmail) {
@@ -496,6 +536,10 @@ export async function POST(req: Request) {
                                 to: phone,
                                 message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
                             }) : Promise.resolve(),
+                            sendAdminPushNotifications(
+                                "New Order Received!",
+                                `Order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${fullName || customerEmail} has been paid.`,
+                            ),
                         ]);
                     }
                 }

@@ -2,6 +2,7 @@ import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { fetchOrderStats, fetchRecentActivity } from "@/lib/utils/metrics";
 import { Wallet, Package, CheckCircle, TrendingUp, AlertTriangle } from "lucide-react";
 import { CategoryDonutChart, ConversionFunnelChart } from "@/components/ui/badu/OverviewCharts";
+import { PushNotificationBanner } from "@/components/ui/PushNotificationBanner";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -117,6 +118,8 @@ export default async function DashboardOverviewPage() {
                 <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Overview</h1>
                 <p className="text-neutral-500">Welcome back. Here is what is happening at the atelier today.</p>
             </header>
+
+            <PushNotificationBanner />
 
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

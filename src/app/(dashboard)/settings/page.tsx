@@ -6,6 +6,7 @@ import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 import { toast } from "@/lib/toast";
 import { AssetsTab } from "./AssetsTab";
 import { EmailsTab } from "./EmailsTab";
+import { NotificationsTab } from "./NotificationsTab";
 import { RidersTab } from "./RidersTab";
 import { SizeGuideTab } from "./SizeGuideTab";
 import { TeamTab } from "./TeamTab";
@@ -98,17 +99,18 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "riders" | "size-guide" | "team";
+type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "notifications" | "riders" | "size-guide" | "team";
 
 const TABS: { key: TabKey; label: string }[] = [
-    { key: "business",   label: "Business" },
-    { key: "store",      label: "Store" },
-    { key: "seo",        label: "SEO" },
-    { key: "assets",     label: "Site Assets" },
-    { key: "emails",     label: "Communications" },
-    { key: "riders",     label: "Riders" },
-    { key: "size-guide", label: "Size Guide" },
-    { key: "team",       label: "Team" },
+    { key: "business",      label: "Business" },
+    { key: "store",         label: "Store" },
+    { key: "seo",           label: "SEO" },
+    { key: "assets",        label: "Site Assets" },
+    { key: "emails",        label: "Communications" },
+    { key: "notifications", label: "Notifications" },
+    { key: "riders",        label: "Riders" },
+    { key: "size-guide",    label: "Size Guide" },
+    { key: "team",          label: "Team" },
 ];
 
 export default function SettingsPage() {
@@ -139,6 +141,7 @@ export default function SettingsPage() {
             {activeTab === "seo"            && <SEOTab />}
             {activeTab === "assets"         && <AssetsTab />}
             {activeTab === "emails"         && <EmailsTab />}
+            {activeTab === "notifications"  && <NotificationsTab />}
             {activeTab === "riders"         && <RidersTab />}
             {activeTab === "size-guide"     && <SizeGuideTab />}
             {activeTab === "team"           && <TeamTab />}

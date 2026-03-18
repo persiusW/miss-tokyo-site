@@ -44,8 +44,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
+
   return (
     <html lang="en">
+      <head>
+        <link
+          rel="alternate"
+          type="application/rss+xml"
+          title="Miss Tokyo — New Arrivals"
+          href={`${siteUrl}/rss.xml`}
+        />
+      </head>
       <body
         suppressHydrationWarning
         className={`${geistSans.variable} ${playfairDisplay.variable} ${cinzel.variable} antialiased font-[family-name:var(--font-cinzel)]`}
