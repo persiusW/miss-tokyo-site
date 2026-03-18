@@ -76,6 +76,28 @@ const ALL_EVENTS: EventDef[] = [
         channels: ["email"],
         previewTag: "Finance",
     },
+    {
+        key: "wholesale_approved",
+        label: "Wholesale Approved",
+        description: "Sent to a customer when their account is promoted to wholesale status.",
+        channels: ["email", "sms"],
+        previewTag: "Account",
+    },
+    {
+        key: "wholesale_revoked",
+        label: "Wholesale Revoked",
+        description: "Sent to a customer when their wholesale access is removed.",
+        channels: ["email"],
+        previewTag: "Account",
+    },
+    {
+        key: "team_invite",
+        label: "Team Invitation",
+        description: "Sent to a new team member (admin or sales staff) when they are invited to the platform.",
+        channels: ["email", "sms"],
+        adminOnly: true,
+        previewTag: "Admin",
+    },
 ];
 
 // ── Dummy values injected into template variables for test sends ───────────────
