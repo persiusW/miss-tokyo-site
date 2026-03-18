@@ -8,8 +8,9 @@ import { NavigationTab } from "../settings/NavigationTab";
 import { ReviewsTab } from "../settings/ReviewsTab";
 import { AssetsTab } from "../settings/AssetsTab";
 import { AboutPageTab } from "../settings/AboutPageTab";
+import { GiftCardsTab } from "../settings/GiftCardsTab";
 
-type TabKey = "hero-slides" | "trust-bar" | "homepage" | "navigation" | "reviews" | "assets" | "about";
+type TabKey = "hero-slides" | "trust-bar" | "homepage" | "navigation" | "reviews" | "assets" | "about" | "gift-cards";
 
 const CMS_TAB_GROUPS: { group: string; tabs: { key: TabKey; label: string }[] }[] = [
     {
@@ -25,7 +26,8 @@ const CMS_TAB_GROUPS: { group: string; tabs: { key: TabKey; label: string }[] }[
         tabs: [
             { key: "navigation", label: "Navigation" },
             { key: "reviews",    label: "Reviews" },
-            { key: "about",      label: "About Page" },
+            { key: "about",       label: "About Page" },
+            { key: "gift-cards", label: "Gift Cards" },
             { key: "assets",     label: "Site Assets" },
         ],
     },
@@ -84,6 +86,7 @@ export default function CMSPage() {
                     {activeTab === "navigation"  && <NavigationTab />}
                     {activeTab === "reviews"     && <ReviewsTab />}
                     {activeTab === "about"       && <AboutPageTab />}
+                    {activeTab === "gift-cards"  && <GiftCardsTab />}
                     {activeTab === "assets"      && <AssetsTab />}
                 </div>
             </div>

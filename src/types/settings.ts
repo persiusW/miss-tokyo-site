@@ -73,6 +73,14 @@ export interface SiteSettings {
   about_cta_body: string;
   about_cta_btn_label: string;
   about_cta_btn_url: string;
+  // Gift cards
+  gc_enabled: boolean;
+  gc_min_amount: number;
+  gc_max_amount: number;
+  gc_preset_amounts: number[];
+  gc_never_expires: boolean;
+  gc_validity_days: number;
+  gc_delivery_note: string;
   updated_at: string;
 }
 
