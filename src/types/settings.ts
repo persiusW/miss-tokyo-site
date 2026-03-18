@@ -47,6 +47,32 @@ export interface SiteSettings {
   hours_saturday: string;
   hours_sunday: string;
   hours_note: string;
+  // About page
+  about_eyebrow: string;
+  about_headline_line1: string;
+  about_headline_line2: string;
+  about_manifesto_p1: string;
+  about_manifesto_p2: string;
+  about_manifesto_p3: string;
+  about_stat_1_value: string;
+  about_stat_1_label: string;
+  about_stat_2_value: string;
+  about_stat_2_label: string;
+  about_stat_3_value: string;
+  about_stat_3_label: string;
+  about_story_heading: string;
+  about_story_p1: string;
+  about_story_p2: string;
+  about_quote_text: string;
+  about_quote_author: string;
+  about_timeline: AboutTimelineEntry[];
+  about_values: AboutValue[];
+  about_team: AboutTeamMember[];
+  about_cta_eyebrow: string;
+  about_cta_headline: string;
+  about_cta_body: string;
+  about_cta_btn_label: string;
+  about_cta_btn_url: string;
   updated_at: string;
 }
 
@@ -81,6 +107,26 @@ export interface FeaturedCategory {
     slug: string;
     image_url: string | null;
   } | null;
+}
+
+export interface AboutTimelineEntry {
+  year: string;
+  title: string;
+  body: string;
+}
+
+export interface AboutValue {
+  icon: string;
+  title: string;
+  body: string;
+}
+
+export interface AboutTeamMember {
+  name: string;
+  role: string;
+  bio: string;
+  avatar_color: string;
+  photo_url?: string;
 }
 
 export interface HomepageReview {

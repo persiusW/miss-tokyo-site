@@ -1,90 +1,50 @@
-import Image from "next/image";
-import { supabase } from "@/lib/supabase";
+import type { Metadata } from "next";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { AboutSections } from "./AboutSections";
+import type { AboutTimelineEntry, AboutValue, AboutTeamMember } from "@/types/settings";
 
 export const revalidate = 60;
 
-export const metadata = {
-    title: "About | MISS TOKYO",
-    description: "Our story, our craft, and our vision.",
+export const metadata: Metadata = {
+    title: "About — Miss Tokyo",
+    description:
+        "Learn the story behind Miss Tokyo — Accra's favourite women's fashion destination. Cute, cool, and unmistakably feminine.",
 };
 
-const FALLBACK_HERO    = "https://images.unsplash.com/photo-1534452286302-2f50d8b5e1cd?q=80&w=2070&auto=format&fit=crop";
-const FALLBACK_FOUNDER = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop";
-
 export default async function AboutPage() {
-    const [assetsRes, copyRes] = await Promise.all([
-        supabase.from("site_assets").select("section_key, image_url").in("section_key", ["about_hero", "about_founder"]),
-        supabase.from("site_copy").select("copy_key, value").eq("page_group", "about"),
-    ]);
+    const { data: s } = await supabaseAdmin
+        .from("site_settings")
+        .select("*")
+        .eq("id", "singleton")
+        .single();
 
-    const assets = (assetsRes.data ?? []).reduce((acc: any, a: any) => { acc[a.section_key] = a.image_url; return acc; }, {});
-    const copy   = (copyRes.data  ?? []).reduce((acc: any, r: any) => { acc[r.copy_key]   = r.value;     return acc; }, {});
+    const d = {
+        eyebrow:        s?.about_eyebrow        ?? "Our story",
+        headLine1:      s?.about_headline_line1 ?? "Born in Accra.",
+        headLine2:      s?.about_headline_line2 ?? "Dressed for Everywhere.",
+        p1:             s?.about_manifesto_p1   ?? "",
+        p2:             s?.about_manifesto_p2   ?? "",
+        p3:             s?.about_manifesto_p3   ?? "",
+        stat1Value:     s?.about_stat_1_value   ?? "240+",
+        stat1Label:     s?.about_stat_1_label   ?? "Styles in store",
+        stat2Value:     s?.about_stat_2_value   ?? "2K+",
+        stat2Label:     s?.about_stat_2_label   ?? "Happy customers",
+        stat3Value:     s?.about_stat_3_value   ?? "4.9★",
+        stat3Label:     s?.about_stat_3_label   ?? "Average rating",
+        storyHeading:   s?.about_story_heading  ?? "The Miss Tokyo Story",
+        storyP1:        s?.about_story_p1       ?? "",
+        storyP2:        s?.about_story_p2       ?? "",
+        quoteText:      s?.about_quote_text     ?? "",
+        quoteAuthor:    s?.about_quote_author   ?? "Miss Tokyo Team",
+        timeline:       (s?.about_timeline      ?? []) as AboutTimelineEntry[],
+        values:         (s?.about_values        ?? []) as AboutValue[],
+        team:           (s?.about_team          ?? []) as AboutTeamMember[],
+        ctaEyebrow:     s?.about_cta_eyebrow    ?? "Ready to shop?",
+        ctaHeadline:    s?.about_cta_headline   ?? "Start Your Miss Tokyo Journey",
+        ctaBody:        s?.about_cta_body       ?? "",
+        ctaBtnLabel:    s?.about_cta_btn_label  ?? "Shop Now",
+        ctaBtnUrl:      s?.about_cta_btn_url    ?? "/shop",
+    };
 
-    const heroImage    = assets["about_hero"]    || FALLBACK_HERO;
-    const founderImage = assets["about_founder"] || FALLBACK_FOUNDER;
-
-    const heroTitle     = copy["about_hero_title"]      || "Our Story";
-    const founderTitle  = copy["about_founder_title"]   || "The Founder";
-    const founderP1     = copy["about_founder_p1"]      || "Miss Tokyo began as a vision to merge traditional Ghanaian craftsmanship with a stark, modern aesthetic of visual silence.";
-    const founderP2     = copy["about_founder_p2"]      || "Our director believes that luxury is found in the quiet details—the weight of the leather, the precision of a single stitch, and the enduring quality of a silhouette that transcends seasons.";
-    const founderP3     = copy["about_founder_p3"]      || "Every piece is handcrafted in our Accra atelier, where we preserve heritage techniques while pushing the boundaries of contemporary design.";
-    const philosophyQ   = copy["about_philosophy_quote"]|| "\u201cWe do not create trends; we create archives. Each piece is a testament to the belief that simplicity is the ultimate sophistication.\u201d";
-
-    return (
-        <div className="pb-24">
-            {/* Hero Section */}
-            <section className="relative h-[70vh] w-full overflow-hidden">
-                <Image
-                    src={heroImage}
-                    alt="Miss Tokyo Atelier"
-                    fill
-                    className="object-cover grayscale"
-                    priority
-                />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-6">
-                    <h1 className="text-4xl md:text-6xl text-white font-serif uppercase tracking-[0.25em] text-center max-w-4xl">
-                        {heroTitle}
-                    </h1>
-                </div>
-            </section>
-
-            {/* Founder Section */}
-            <section className="my-24 max-w-7xl mx-auto px-6 md:px-12">
-                <div className="grid md:grid-cols-2 gap-16 md:gap-24 items-center">
-                    {/* Left - Image */}
-                    <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-100">
-                        <Image
-                            src={founderImage}
-                            alt="The Founder"
-                            fill
-                            className="object-cover rounded-none grayscale"
-                        />
-                    </div>
-
-                    {/* Right - Text */}
-                    <div className="max-w-md">
-                        <h2 className="text-2xl md:text-3xl font-serif uppercase tracking-[0.2em] text-black mb-8">
-                            {founderTitle}
-                        </h2>
-                        <div className="space-y-6 text-sm leading-relaxed text-neutral-600 uppercase tracking-wide font-light">
-                            <p>{founderP1}</p>
-                            <p>{founderP2}</p>
-                            <p>{founderP3}</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Philosophy / Secondary Section */}
-            <section className="bg-neutral-50 py-24 px-6 md:px-12 text-center rounded-none">
-                <div className="max-w-3xl mx-auto">
-                    <h2 className="font-serif text-[10px] uppercase tracking-[0.4em] text-neutral-400 mb-8 font-bold">The Philosophy</h2>
-                    <blockquote className="text-xl md:text-2xl font-serif text-black leading-relaxed italic mb-8">
-                        {philosophyQ}
-                    </blockquote>
-                    <div className="h-px w-12 bg-black mx-auto"></div>
-                </div>
-            </section>
-        </div>
-    );
+    return <AboutSections {...d} />;
 }
