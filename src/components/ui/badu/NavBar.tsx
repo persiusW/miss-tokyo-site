@@ -9,14 +9,14 @@ import { CartButton } from "./CartButton";
 import { supabase } from "@/lib/supabase";
 
 const NAV_LINKS = [
-    { href: "/",            label: "Home" },
-    { href: "/shop",        label: "Shop" },
-    { href: "/sale",        label: "Sale" },
-    { href: "/dresses",     label: "Dresses" },
-    { href: "/new-arrivals",label: "New Arrivals" },
-    { href: "/gift-card",   label: "Gift Card" },
-    { href: "/contact",     label: "CONTACT" },
-    { href: "/about",       label: "ABOUT" },
+    { href: "/",             label: "Home",         navKey: "nav_show_home" },
+    { href: "/shop",         label: "Shop",         navKey: "nav_show_shop" },
+    { href: "/sale",         label: "Sale",         navKey: null },
+    { href: "/dresses",      label: "Dresses",      navKey: null },
+    { href: "/new-arrivals", label: "New Arrivals", navKey: "nav_show_new_arrivals" },
+    { href: "/gift-card",    label: "Gift Card",    navKey: "nav_show_gift_card" },
+    { href: "/contact",      label: "CONTACT",      navKey: "nav_show_contact" },
+    { href: "/about",        label: "ABOUT",        navKey: "nav_show_about" },
 ];
 
 const TRENDING_SEARCHES = ["DRESSES", "NEW ARRIVALS", "SALE", "BLACK"];
@@ -26,6 +26,14 @@ export function NavBar() {
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [navSettings, setNavSettings] = useState({
+        nav_show_home: true,
+        nav_show_shop: true,
+        nav_show_new_arrivals: true,
+        nav_show_gift_card: true,
+        nav_show_contact: true,
+        nav_show_about: true,
+    });
     const pathname = usePathname();
     const router = useRouter();
 
@@ -35,6 +43,17 @@ export function NavBar() {
             setIsLoggedIn(!!session?.user);
         });
         return () => subscription.unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        supabase
+            .from("site_settings")
+            .select("nav_show_home, nav_show_shop, nav_show_new_arrivals, nav_show_gift_card, nav_show_contact, nav_show_about")
+            .eq("id", "singleton")
+            .single()
+            .then(({ data }) => {
+                if (data) setNavSettings(data);
+            });
     }, []);
 
     // Prevent body scroll when menu or search is open
@@ -63,15 +82,15 @@ export function NavBar() {
                 </Link>
 
                 <nav className="space-x-4 lg:space-x-8 text-[10px] md:text-xs tracking-[0.2em] font-medium uppercase hidden xl:block">
-                    {NAV_LINKS.map(l => {
+                    {NAV_LINKS.filter(l => !l.navKey || navSettings[l.navKey as keyof typeof navSettings]).map(l => {
                         const isActive = pathname === l.href;
                         return (
-                            <Link 
-                                key={l.href} 
-                                href={l.href} 
+                            <Link
+                                key={l.href}
+                                href={l.href}
                                 className={`transition-colors hover:text-neutral-400 pb-1 ${
-                                    isActive 
-                                    ? "underline underline-offset-8 decoration-1" 
+                                    isActive
+                                    ? "underline underline-offset-8 decoration-1"
                                     : "border-b border-transparent hover:border-white"
                                 }`}
                             >
@@ -191,7 +210,7 @@ export function NavBar() {
 
                     {/* Links */}
                     <nav className="flex-1 flex flex-col items-center justify-center gap-6 pb-16 px-6 overflow-y-auto">
-                        {NAV_LINKS.map(l => (
+                        {NAV_LINKS.filter(l => !l.navKey || navSettings[l.navKey as keyof typeof navSettings]).map(l => (
                             <Link
                                 key={l.href}
                                 href={l.href}

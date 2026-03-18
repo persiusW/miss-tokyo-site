@@ -10,6 +10,12 @@ import { NotificationsTab } from "./NotificationsTab";
 import { RidersTab } from "./RidersTab";
 import { SizeGuideTab } from "./SizeGuideTab";
 import { TeamTab } from "./TeamTab";
+import { BusinessSettingsTab } from "./BusinessSettingsTab";
+import { HeroSlidesTab } from "./HeroSlidesTab";
+import { NavigationTab } from "./NavigationTab";
+import { TrustBarTab } from "./TrustBarTab";
+import { HomepageSectionsTab } from "./HomepageSectionsTab";
+import { ReviewsTab } from "./ReviewsTab";
 
 type BusinessSettings = {
     business_name: string;
@@ -99,7 +105,7 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "notifications" | "riders" | "size-guide" | "team";
+type TabKey = "business" | "store" | "seo" | "assets" | "emails" | "notifications" | "riders" | "size-guide" | "team" | "hero-slides" | "navigation" | "trust-bar" | "homepage" | "reviews";
 
 const TABS: { key: TabKey; label: string }[] = [
     { key: "business",      label: "Business" },
@@ -111,6 +117,11 @@ const TABS: { key: TabKey; label: string }[] = [
     { key: "riders",        label: "Riders" },
     { key: "size-guide",    label: "Size Guide" },
     { key: "team",          label: "Team" },
+    { key: "hero-slides",   label: "Hero Slides" },
+    { key: "navigation",    label: "Navigation" },
+    { key: "trust-bar",     label: "Trust Bar" },
+    { key: "homepage",      label: "Homepage" },
+    { key: "reviews",       label: "Reviews" },
 ];
 
 export default function SettingsPage() {
@@ -136,7 +147,7 @@ export default function SettingsPage() {
                 </div>
             </header>
 
-            {activeTab === "business"       && <BusinessTab />}
+            {activeTab === "business"       && <><BusinessTab /><div className="mt-8"><BusinessSettingsTab /></div></>}
             {activeTab === "store"          && <StoreTab />}
             {activeTab === "seo"            && <SEOTab />}
             {activeTab === "assets"         && <AssetsTab />}
@@ -145,6 +156,11 @@ export default function SettingsPage() {
             {activeTab === "riders"         && <RidersTab />}
             {activeTab === "size-guide"     && <SizeGuideTab />}
             {activeTab === "team"           && <TeamTab />}
+            {activeTab === "hero-slides"    && <HeroSlidesTab />}
+            {activeTab === "navigation"     && <NavigationTab />}
+            {activeTab === "trust-bar"      && <TrustBarTab />}
+            {activeTab === "homepage"       && <HomepageSectionsTab />}
+            {activeTab === "reviews"        && <ReviewsTab />}
         </div>
     );
 }

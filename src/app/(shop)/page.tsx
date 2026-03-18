@@ -1,97 +1,111 @@
 import { supabase } from "@/lib/supabase";
-import Link from "next/link";
-import Image from "next/image";
-import { HeroSection } from "@/components/ui/miss-tokyo/HeroSection";
-import { SplitCategories } from "@/components/ui/miss-tokyo/SplitCategories";
-import { LatestDropCarousel } from "@/components/ui/miss-tokyo/LatestDropCarousel";
+import { TrustBar } from "@/components/public/TrustBar";
+import { HeroSlider } from "@/components/public/HeroSlider";
+import { CategoryGrid } from "@/components/public/CategoryGrid";
+import { NewArrivalsSection } from "@/components/public/NewArrivalsSection";
+import { ReviewGrid } from "@/components/public/ReviewGrid";
+import { OptInSection } from "@/components/public/OptInSection";
+import { InstagramFeed } from "@/components/public/InstagramFeed";
+import type { SiteSettings, HeroSlide, FeaturedCategory, HomepageReview, TrustBarItem } from "@/types/settings";
 
 export const revalidate = 60;
 
-const FALLBACK_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f5f5f5'/%3E%3C/svg%3E";
-
 export default async function HomePage() {
-    const [
-        { data: assetsData },
-        { data: copyData },
-        { data: featuredCategories },
-    ] = await Promise.all([
-        supabase.from("site_assets").select("*"),
-        supabase.from("site_copy").select("copy_key, value"),
-        supabase.from("categories")
-            .select("id, name, slug, image_url")
-            .eq("is_featured", true)
-            .eq("is_active", true)
-            .limit(2),
-    ]);
+  const [
+    { data: settingsData },
+    { data: heroSlidesData },
+    { data: featuredCatsData },
+    { data: reviewsData },
+  ] = await Promise.all([
+    supabase
+      .from("site_settings")
+      .select("*")
+      .eq("id", "singleton")
+      .maybeSingle(),
+    supabase
+      .from("hero_slides")
+      .select("*")
+      .eq("enabled", true)
+      .order("position", { ascending: true }),
+    supabase
+      .from("featured_categories")
+      .select("*, category:categories(name, slug, image_url)")
+      .eq("enabled", true)
+      .order("position", { ascending: true }),
+    supabase
+      .from("homepage_reviews")
+      .select("*")
+      .eq("enabled", true)
+      .order("position", { ascending: true }),
+  ]);
 
-    const siteAssets = (assetsData || []).reduce((acc: Record<string, any>, asset: any) => {
-        acc[asset.section_key] = asset;
-        return acc;
-    }, {});
+  const settings = settingsData as SiteSettings | null;
+  const heroSlides = (heroSlidesData || []) as HeroSlide[];
+  const reviews = (reviewsData || []) as HomepageReview[];
+  const featuredCats = (featuredCatsData || []) as FeaturedCategory[];
 
-    const copy = (copyData || []).reduce((acc: Record<string, string>, row: any) => {
-        acc[row.copy_key] = row.value;
-        return acc;
-    }, {});
+  // Fetch item counts for featured categories
+  const categoriesWithCounts = await Promise.all(
+    featuredCats.map(async (fc) => {
+      if (fc.item_count_override !== null) {
+        return { ...fc, itemCount: fc.item_count_override };
+      }
+      const categoryName = fc.category?.name ?? "";
+      if (!categoryName) return { ...fc, itemCount: 0 };
+      const { count } = await supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("category_type", categoryName)
+        .eq("is_active", true);
+      return { ...fc, itemCount: count || 0 };
+    })
+  );
 
-    const heroImageUrl    = siteAssets["home_hero"]?.image_url || FALLBACK_IMAGE;
-    const heroTitle       = copy["hero_title"]       || "Crafted in Ghana.\nDesigned for Everywhere.";
-    const heroCtaText     = copy["hero_cta_text"]    || "Shop the Collection";
-    const manifestoTitle  = copy["handmade_title"]   || "We Design\nFor the Bold.";
-    const manifestoBody   = copy["handmade_body"]    || "Crafted by artisans who have honed their skills over generations. We source the finest local materials to create pieces that only get better with time.";
-    const manifestoCtaText = copy["handmade_cta_text"] || "The Process";
-    const manifestoImage  = siteAssets["about_founder"]?.image_url || null;
+  // Trust bar data
+  const trustBarEnabled = settings?.trust_bar_enabled ?? false;
+  const trustBarItems: TrustBarItem[] = settings?.trust_bar_items ?? [];
 
-    return (
-        <>
-            {/* 1. Cinematic Hero */}
-            <HeroSection
-                title={heroTitle}
-                imageUrl={heroImageUrl}
-                ctaText={heroCtaText}
-                ctaLink="/shop"
-            />
+  // Opt-in data
+  const optInEnabled = settings?.optin_section_enabled ?? true;
+  const optInTitle = settings?.optin_title ?? "Get 10% Off Your First Order";
+  const optInSubtitle =
+    settings?.optin_subtitle ??
+    "Subscribe to our newsletter and receive an exclusive discount on your first purchase.";
+  const couponEnabled = settings?.welcome_coupon_enabled ?? true;
+  const couponCode = settings?.welcome_coupon_code ?? "FIRST10";
 
-            {/* 2. Split Lookbook — featured categories */}
-            {featuredCategories && featuredCategories.length > 0 && (
-                <SplitCategories categories={featuredCategories} />
-            )}
+  return (
+    <>
+      {/* 1. Hero Slider */}
+      <HeroSlider slides={heroSlides} />
 
-            {/* 3. Latest Drop Carousel — fully client-side, self-fetching */}
-            <LatestDropCarousel />
+      {/* 2. Trust Bar (below hero) */}
+      <TrustBar enabled={trustBarEnabled} items={trustBarItems} />
 
-            {/* 4. Brand Manifesto */}
-            <section className="py-32 bg-white">
-                <div className="max-w-7xl mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 gap-16 md:gap-24 items-center">
-                    <div>
-                        <h2 className="font-serif text-4xl md:text-5xl lg:text-6xl tracking-[0.05em] uppercase mb-10 text-black leading-tight">
-                            {manifestoTitle.split("\n").map((line: string, i: number, arr: string[]) => (
-                                <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
-                            ))}
-                        </h2>
-                        <p className="text-neutral-500 tracking-wide leading-relaxed mb-12 text-sm max-w-md">
-                            {manifestoBody}
-                        </p>
-                        <Link
-                            href="/craft"
-                            className="inline-block bg-black text-white px-10 py-4 text-[10px] font-bold uppercase tracking-[0.3em] border border-black hover:bg-white hover:text-black transition-all duration-500 rounded-none"
-                        >
-                            {manifestoCtaText}
-                        </Link>
-                    </div>
+      {/* 3. Category Grid */}
+      <CategoryGrid categories={categoriesWithCounts} />
 
-                    {manifestoImage && (
-                        <div className="relative aspect-[3/4] w-full overflow-hidden">
-                            <Image
-                                src={manifestoImage}
-                                alt="Brand manifesto"
-                                fill
-                                className="object-cover object-center"
-                            />
-                        </div>
-                    )}
-                </div>
-            </section>
-        </>
-    );
+      {/* 4. New Arrivals */}
+      <NewArrivalsSection />
+
+      {/* 5. Review Grid */}
+      <ReviewGrid reviews={reviews} />
+
+      {/* 6. Email Opt-In */}
+      <OptInSection
+        enabled={optInEnabled}
+        title={optInTitle}
+        subtitle={optInSubtitle}
+        couponEnabled={couponEnabled}
+        couponCode={couponCode}
+      />
+
+      {/* 7. Instagram Feed */}
+      <InstagramFeed
+        instagramUrl={settings?.social_instagram ?? null}
+        accessToken={settings?.instagram_access_token ?? null}
+      />
+
+    </>
+  );
 }

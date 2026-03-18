@@ -9,6 +9,70 @@
   --font-cinzel: var(--font-cinzel);
 }
 
+/* ─── Design System Variables ─── */
+:root {
+  --ink: #141210;
+  --sand: #F7F2EC;
+  --sand-dark: #EDE8E0;
+  --gold: #C8A97A;
+  --gold-light: #E2C99A;
+  --accent: #E8485A;
+  --muted: #8C8479;
+  --border: #E8E4DE;
+  --font-display: var(--font-playfair-display);
+  --font-body: var(--font-geist-sans);
+}
+
+/* ─── Section Layout Utilities ─── */
+.section-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 80px 32px;
+}
+@media (max-width: 768px) {
+  .section-wrap { padding: 56px 20px; }
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 48px;
+}
+
+.section-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 300;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.section-title em {
+  font-style: italic;
+  color: var(--gold);
+}
+
+.view-all {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 2px;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+.view-all:hover { opacity: 0.5; }
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);

@@ -1,0 +1,155 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import type { HeroSlide } from "@/types/settings";
+
+interface HeroSliderProps {
+  slides: HeroSlide[];
+}
+
+const FALLBACK_SLIDE: HeroSlide = {
+  id: "fallback",
+  position: 1,
+  enabled: true,
+  image_url: null,
+  overlay_opacity: 0.55,
+  eyebrow: "New Collection",
+  headline_line1: "Made for",
+  headline_line2: "the Bold",
+  headline_line3: "",
+  body_text: "Explore our latest curated collection — crafted for those who dare to stand out.",
+  cta_primary_label: "Shop Now",
+  cta_primary_url: "/shop",
+  cta_secondary_label: "New Arrivals",
+  cta_secondary_url: "/new-arrivals",
+} as HeroSlide;
+
+export function HeroSlider({ slides }: HeroSliderProps) {
+  const activeSlides = slides.length > 0 ? slides : [FALLBACK_SLIDE];
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    if (activeSlides.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % activeSlides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [activeSlides.length]);
+
+  return (
+    <section
+      className="relative overflow-hidden"
+      style={{ height: "calc(100vh - 120px)" }}
+      aria-live="polite"
+      aria-label="Hero slideshow"
+    >
+      {activeSlides.map((slide, index) => (
+        <div
+          key={slide.id}
+          className="absolute inset-0 transition-opacity duration-1000"
+          style={{ opacity: index === current ? 1 : 0 }}
+          aria-hidden={index !== current}
+        >
+          {/* Background image or gradient fallback */}
+          {slide.image_url ? (
+            <Image
+              src={slide.image_url}
+              alt={slide.headline_line1}
+              fill
+              className="object-cover object-center"
+              priority={index === 0}
+              sizes="100vw"
+            />
+          ) : (
+            <div
+              className="absolute inset-0"
+              style={{ background: "linear-gradient(135deg, #1a1208 0%, #2d1f0e 40%, #141210 100%)" }}
+            />
+          )}
+
+          {/* Dark overlay */}
+          <div
+            className="absolute inset-0 bg-black"
+            style={{ opacity: slide.overlay_opacity }}
+          />
+
+          {/* Content */}
+          <div className="absolute inset-0 flex flex-col justify-end pb-16 pl-12 md:pl-20 lg:pl-32">
+            {/* Eyebrow */}
+            {slide.eyebrow && (
+              <p className="text-white/70 text-[10px] tracking-[0.3em] uppercase mb-4">
+                — {slide.eyebrow}
+              </p>
+            )}
+
+            {/* Headline */}
+            <h1 className="font-serif text-6xl md:text-7xl lg:text-8xl leading-none mb-4">
+              {slide.headline_line1 && (
+                <span className="block text-white">{slide.headline_line1}</span>
+              )}
+              {slide.headline_line2 && (
+                <span className="block italic" style={{ color: "var(--gold, #C8A97A)" }}>
+                  {slide.headline_line2}
+                </span>
+              )}
+              {slide.headline_line3 && (
+                <span className="block text-white">{slide.headline_line3}</span>
+              )}
+            </h1>
+
+            {/* Body text */}
+            {slide.body_text && (
+              <p className="text-white/80 text-sm max-w-sm mt-4 leading-relaxed mb-8">
+                {slide.body_text}
+              </p>
+            )}
+
+            {/* CTA Buttons */}
+            <div className="flex flex-wrap items-center gap-3 mt-2">
+              <Link
+                href={slide.cta_primary_url}
+                className="bg-white text-black px-8 py-3.5 text-[10px] tracking-[0.25em] uppercase font-bold hover:bg-black hover:text-white border border-white transition-all duration-300"
+              >
+                {slide.cta_primary_label}
+              </Link>
+              {slide.cta_secondary_label && slide.cta_secondary_url && (
+                <Link
+                  href={slide.cta_secondary_url}
+                  className="border border-white text-white px-8 py-3.5 text-[10px] tracking-[0.25em] uppercase hover:bg-white hover:text-black transition-all duration-300"
+                >
+                  {slide.cta_secondary_label}
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Scroll indicator */}
+      <div className="absolute bottom-8 left-12 text-white/50 text-[9px] tracking-[0.4em] uppercase flex items-center gap-3 pointer-events-none">
+        <span>—</span>
+        <span>SCROLL</span>
+      </div>
+
+      {/* Dot navigation */}
+      {activeSlides.length > 1 && (
+        <div className="absolute bottom-8 right-12 flex items-center gap-2">
+          {activeSlides.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrent(index)}
+              aria-label={`Go to slide ${index + 1}`}
+              className={`transition-all duration-300 ${
+                index === current
+                  ? "w-8 h-[2px] bg-white"
+                  : "w-2 h-[2px] bg-white/40 hover:bg-white/70"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
