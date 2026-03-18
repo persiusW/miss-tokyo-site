@@ -23,11 +23,13 @@ function getResend() {
 export async function sendEmail(payload: EmailPayload): Promise<{ ok: boolean; error?: string }> {
     if (!process.env.RESEND_API_KEY) {
         console.warn("[email] RESEND_API_KEY not set — email skipped.");
-        return { ok: false, error: "No API key" };
+        return { ok: false, error: "RESEND_API_KEY is not set in environment variables" };
     }
 
-    const fromName  = process.env.BIZ_NAME   || "Miss Tokyo";
-    const fromAddr  = process.env.BIZ_EMAIL  || "orders@misstokyo.shop";
+    const fromName  = process.env.BIZ_NAME        || "Miss Tokyo";
+    // RESEND_FROM_EMAIL must be a domain verified in your Resend dashboard.
+    // Falls back to Resend's shared sender (works without verification, good for dev).
+    const fromAddr  = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
     const from      = payload.from ?? `${fromName} <${fromAddr}>`;
 
     try {
@@ -42,7 +44,10 @@ export async function sendEmail(payload: EmailPayload): Promise<{ ok: boolean; e
 
         if (error) {
             console.error("[email] Resend error:", error);
-            return { ok: false, error: String(error) };
+            // Resend returns an error object — extract readable message
+            const msg = (error as any)?.message || (error as any)?.name
+                || JSON.stringify(error);
+            return { ok: false, error: msg };
         }
 
         return { ok: true };

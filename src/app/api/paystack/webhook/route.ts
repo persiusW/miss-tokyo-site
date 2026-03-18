@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { Resend } from "resend";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function parseItems(cartItems: unknown): any[] {
     if (!cartItems) return [];
@@ -17,21 +20,22 @@ function parseItems(cartItems: unknown): any[] {
 
 /**
  * Ensures a Supabase auth user exists for customerEmail.
- * Creates one if not found, then upserts a profile row.
- * Returns the user ID and a setup link if the account was newly created.
+ * Returns userId + setupLink (only when a NEW user is created = first-time buyer).
  */
-async function ensureCustomerAccount(customerEmail: string, fullName?: string | null): Promise<{ userId: string; setupLink?: string }> {
-    // Check if user already exists
+async function ensureCustomerAccount(
+    customerEmail: string,
+    fullName?: string | null,
+): Promise<{ userId: string; setupLink?: string; isNewUser: boolean }> {
     const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
     const found = existing?.users?.find(u => u.email === customerEmail);
 
     if (found) {
-        // Upsert profile in case it's missing
-        await supabaseAdmin.from("profiles").upsert({ id: found.id, full_name: fullName || null }, { onConflict: "id" });
-        return { userId: found.id };
+        await supabaseAdmin
+            .from("profiles")
+            .upsert({ id: found.id, full_name: fullName || null }, { onConflict: "id" });
+        return { userId: found.id, isNewUser: false };
     }
 
-    // Create new auth user (no password — they set it via the recovery link)
     const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
         email: customerEmail,
         email_confirm: true,
@@ -39,15 +43,14 @@ async function ensureCustomerAccount(customerEmail: string, fullName?: string | 
 
     if (error || !newUser?.user) {
         console.error("[webhook] Failed to create auth user:", error);
-        return { userId: "" };
+        return { userId: "", isNewUser: false };
     }
 
     const userId = newUser.user.id;
+    await supabaseAdmin
+        .from("profiles")
+        .upsert({ id: userId, full_name: fullName || null }, { onConflict: "id" });
 
-    // Create profile
-    await supabaseAdmin.from("profiles").upsert({ id: userId, full_name: fullName || null }, { onConflict: "id" });
-
-    // Generate password setup link
     let setupLink: string | undefined;
     try {
         const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
@@ -56,13 +59,17 @@ async function ensureCustomerAccount(customerEmail: string, fullName?: string | 
         });
         setupLink = (linkData as any)?.properties?.action_link || undefined;
     } catch {
-        // Non-fatal — order confirmation still sends without it
+        // Non-fatal
     }
 
-    return { userId, setupLink };
+    return { userId, setupLink, isNewUser: true };
 }
 
-async function trackDiscountUsage(discountCode: string | undefined, discountAmount: unknown, discountTag: string | undefined) {
+async function trackDiscountUsage(
+    discountCode: string | undefined,
+    discountAmount: unknown,
+    discountTag: string | undefined,
+) {
     if (!discountCode) return;
     const code = discountCode.trim().toUpperCase();
 
@@ -91,49 +98,117 @@ async function trackDiscountUsage(discountCode: string | undefined, discountAmou
             const newBalance = Math.max(0, Number(card.remaining_value) - Number(discountAmount));
             await supabaseAdmin
                 .from("gift_cards")
-                .update({ remaining_value: newBalance, ...(newBalance === 0 ? { is_active: false } : {}) })
+                .update({
+                    remaining_value: newBalance,
+                    ...(newBalance === 0 ? { is_active: false } : {}),
+                })
                 .eq("id", card.id);
         }
     }
 }
 
-async function sendOrderConfirmation(
-    customerEmail: string,
-    orderRef: string,
-    amount: number,
-    bizName: string,
-    bizAddress: string,
-    feeAmount?: number,
-    feeLabel?: string,
-    setupLink?: string,
-    discountCode?: string,
-    discountAmount?: number,
-) {
+// ── Receipt HTML builders ──────────────────────────────────────────────────────
+
+function buildLineItemsHtml(items: any[]): string {
+    if (!items.length) return "";
+    const rows = items
+        .map(item => {
+            const unitPrice = Number(item.price || 0);
+            const qty = Number(item.quantity || 1);
+            const lineTotal = unitPrice * qty;
+            const variant = [item.size, item.color, item.stitching].filter(Boolean).join(" · ");
+            return `
+      <tr style="border-bottom: 1px solid #f5f5f5;">
+        <td style="padding: 10px 0; font-size: 13px; color: #171717;">
+          ${item.name || "Item"}
+          ${variant ? `<div style="font-size: 11px; color: #737373; margin-top: 2px;">${variant} × ${qty}</div>` : `<div style="font-size: 11px; color: #737373; margin-top: 2px;">× ${qty}</div>`}
+        </td>
+        <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${lineTotal.toFixed(2)}</td>
+      </tr>`;
+        })
+        .join("");
+
+    return `
+    <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373; margin: 20px 0 6px;">Items Ordered</p>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+      ${rows}
+    </table>`;
+}
+
+// ── Send order confirmation email ──────────────────────────────────────────────
+
+async function sendOrderConfirmation(opts: {
+    customerEmail: string;
+    orderRef: string;
+    amount: number;
+    bizName: string;
+    bizAddress: string;
+    items?: any[];
+    feeAmount?: number;
+    feeLabel?: string;
+    setupLink?: string;
+    isFirstTimeBuyer?: boolean;
+    discountCode?: string;
+    discountAmount?: number;
+}) {
     if (!process.env.RESEND_API_KEY) return;
+
+    const {
+        customerEmail, orderRef, amount, bizName, bizAddress,
+        items = [], feeAmount, feeLabel, setupLink, isFirstTimeBuyer,
+        discountCode, discountAmount,
+    } = opts;
 
     const hasDiscount = discountAmount && discountAmount > 0;
     const hasFee = feeAmount && feeAmount > 0;
-    const subtotal = hasFee ? amount - feeAmount : amount;
+    const subtotal = hasFee ? amount - feeAmount! : amount;
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
 
     const discountRow = hasDiscount ? `
       <tr style="border-bottom: 1px solid #f5f5f5;">
-        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Subtotal</td>
-        <td style="padding: 12px 0; font-size: 13px; text-align: right;">GH&#8373; ${(amount + discountAmount).toFixed(2)}</td>
+        <td style="padding: 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Subtotal</td>
+        <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${(amount + discountAmount!).toFixed(2)}</td>
       </tr>
       <tr style="border-bottom: 1px solid #f5f5f5;">
-        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Discount${discountCode ? ` (${discountCode})` : ""}</td>
-        <td style="padding: 12px 0; font-size: 13px; text-align: right; color: #16a34a;">-GH&#8373; ${discountAmount.toFixed(2)}</td>
+        <td style="padding: 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Discount${discountCode ? ` (${discountCode})` : ""}</td>
+        <td style="padding: 10px 0; font-size: 13px; text-align: right; color: #16a34a;">-GH&#8373; ${discountAmount!.toFixed(2)}</td>
       </tr>` : "";
 
     const feeRow = hasFee ? `
       <tr style="border-bottom: 1px solid #f5f5f5;">
-        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Subtotal</td>
-        <td style="padding: 12px 0; font-size: 13px; text-align: right;">GH&#8373; ${subtotal.toFixed(2)}</td>
+        <td style="padding: 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Subtotal</td>
+        <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${subtotal.toFixed(2)}</td>
       </tr>
       <tr style="border-bottom: 1px solid #f5f5f5;">
-        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">${feeLabel || "Service Charge"}</td>
-        <td style="padding: 12px 0; font-size: 13px; text-align: right;">GH&#8373; ${feeAmount.toFixed(2)}</td>
+        <td style="padding: 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">${feeLabel || "Service Charge"}</td>
+        <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${feeAmount!.toFixed(2)}</td>
       </tr>` : "";
+
+    // First-time buyer prominent CTA block
+    const firstTimeBuyerBlock = isFirstTimeBuyer && setupLink ? `
+    <div style="background: #171717; padding: 28px; margin-bottom: 32px; text-align: center;">
+      <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: #a3a3a3; margin: 0 0 8px;">Welcome to Miss Tokyo</p>
+      <p style="font-size: 14px; color: white; margin: 0 0 6px; line-height: 1.6; font-weight: 600;">
+        You're now part of the atelier.
+      </p>
+      <p style="font-size: 13px; color: #d4d4d4; margin: 0 0 20px; line-height: 1.6;">
+        Set up your account to track this order and manage future purchases.
+      </p>
+      <a href="${setupLink}" style="display: inline-block; background: white; color: #171717; text-decoration: none; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; padding: 14px 32px; font-weight: 700;">
+        Set Up My Account →
+      </a>
+    </div>` : setupLink ? `
+    <div style="background: #f9f9f9; border: 1px solid #e5e5e5; padding: 20px; margin-bottom: 32px; text-align: center;">
+      <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: #737373; margin: 0 0 12px;">Track Your Order</p>
+      <a href="${setupLink}" style="display: inline-block; background: #171717; color: white; text-decoration: none; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; padding: 14px 28px; font-weight: 600;">
+        Set Up Your Password to Track Your Order
+      </a>
+    </div>` : "";
+
+    const viewOrderBtn = `
+    <a href="${baseUrl}/account/orders" style="display: block; border: 1px solid #e5e5e5; padding: 14px; text-align: center; text-decoration: none; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: #171717; margin-bottom: 32px;">
+      View Order Status →
+    </a>`;
 
     await getResend().emails.send({
         from: `${bizName} <${process.env.RESEND_FROM_EMAIL || "no-reply@resend.dev"}>`,
@@ -146,35 +221,40 @@ async function sendOrderConfirmation(
   <div style="max-width: 560px; margin: 0 auto; background: white; border: 1px solid #e5e5e5; padding: 48px;">
     <h1 style="font-size: 24px; letter-spacing: 0.15em; text-transform: uppercase; margin: 0 0 8px;">${bizName}</h1>
     <p style="color: #737373; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; margin: 0 0 40px;">Order Confirmed</p>
+
     <h2 style="font-size: 16px; font-weight: normal; color: #171717; margin: 0 0 24px; letter-spacing: 0.05em;">
       Thank you. Your order has been received.
     </h2>
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 32px;">
+
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
       <tr style="border-bottom: 1px solid #f5f5f5;">
         <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Order Reference</td>
         <td style="padding: 12px 0; font-size: 13px; text-align: right; font-family: monospace; font-weight: 600;">#${orderRef}</td>
       </tr>
+    </table>
+
+    ${buildLineItemsHtml(items)}
+
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 32px;">
       ${discountRow}
       ${feeRow}
       <tr style="border-bottom: 1px solid #f5f5f5;">
-        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Total Paid</td>
-        <td style="padding: 12px 0; font-size: 13px; text-align: right; font-weight: 600;">GH&#8373; ${amount.toFixed(2)}</td>
+        <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373; font-weight: 700;">Total Paid</td>
+        <td style="padding: 12px 0; font-size: 15px; text-align: right; font-weight: 700;">GH&#8373; ${amount.toFixed(2)}</td>
       </tr>
       <tr>
         <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Status</td>
         <td style="padding: 12px 0; font-size: 13px; text-align: right; color: #15803d; font-weight: 600;">Confirmed</td>
       </tr>
     </table>
+
+    ${firstTimeBuyerBlock}
+    ${viewOrderBtn}
+
     <p style="font-size: 13px; color: #525252; line-height: 1.8; margin: 0 0 32px;">
       Your piece is now being prepared with care. We will notify you once it has been dispatched. Questions? Reply to this email.
     </p>
-    ${setupLink ? `
-    <div style="background: #f9f9f9; border: 1px solid #e5e5e5; padding: 24px; margin-bottom: 32px; text-align: center;">
-      <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: #737373; margin: 0 0 12px;">Track Your Order</p>
-      <a href="${setupLink}" style="display: inline-block; background: #171717; color: white; text-decoration: none; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; padding: 14px 28px; font-weight: 600;">
-        Set Up Your Password to Track Your Order
-      </a>
-    </div>` : ""}
+
     <div style="border-top: 1px solid #e5e5e5; padding-top: 24px; margin-top: 24px;">
       <p style="font-size: 11px; color: #a3a3a3; text-transform: uppercase; letter-spacing: 0.15em; margin: 0;">
         ${bizName}${bizAddress ? ` · ${bizAddress.replace(/\n/g, ", ")}` : ""}
@@ -185,6 +265,8 @@ async function sendOrderConfirmation(
 </html>`,
     });
 }
+
+// ── Webhook handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
     try {
@@ -211,10 +293,12 @@ export async function POST(req: Request) {
             console.log("Paystack Charge Success Event Received");
             const data = event.data;
             const metadata = data.metadata || {};
-            const { orderId, requestId, productId, fullName, phone, address, country, region,
-                    whatsapp, instagram, snapchat, deliveryMethod, cartItems,
-                    platform_fee_amount, platform_fee_label,
-                    discount_code, discount_amount, discount_tag } = metadata;
+            const {
+                orderId, requestId, productId, fullName, phone, address, country, region,
+                whatsapp, instagram, snapchat, deliveryMethod, cartItems,
+                platform_fee_amount, platform_fee_label,
+                discount_code, discount_amount, discount_tag,
+            } = metadata;
             const customerEmail: string = data.customer?.email || "";
             const amountGHS = Number(data.amount) / 100;
             const paystackRef: string = data.reference || "";
@@ -227,6 +311,32 @@ export async function POST(req: Request) {
 
             const bizName = biz?.business_name || "Miss Tokyo";
             const bizAddress = biz?.address || "";
+
+            // Fetch SMS template for order_confirmed (used below for both order paths)
+            const { data: smsTpl } = await supabaseAdmin
+                .from("communication_templates")
+                .select("body_text, greeting")
+                .eq("channel", "sms")
+                .eq("event_type", "order_confirmed")
+                .single();
+
+            function buildOrderSms(orderRef: string, firstName: string, isNew: boolean): string {
+                const vars: Record<string, string> = {
+                    order_id:      orderRef,
+                    customer_name: firstName,
+                    amount:        `GH₵ ${amountGHS.toFixed(2)}`,
+                    rider_name:    "",
+                    rider_phone:   "",
+                };
+                if (smsTpl?.body_text) {
+                    const greeting = smsTpl.greeting ? injectSmsVars(smsTpl.greeting, vars) + " " : "";
+                    return greeting + injectSmsVars(smsTpl.body_text, vars);
+                }
+                // Default fallback
+                return isNew
+                    ? `Hi ${firstName}, your ${bizName} order #${orderRef} is confirmed! Check your email for your receipt and to set up your account. Thank you!`
+                    : `Hi ${firstName}, your ${bizName} order #${orderRef} is confirmed! Check your email for the full receipt. Thank you!`;
+            }
 
             if (requestId) {
                 await supabaseAdmin
@@ -271,15 +381,17 @@ export async function POST(req: Request) {
             // Auto-create/link customer account
             let customerId: string | undefined;
             let setupLink: string | undefined;
+            let isFirstTimeBuyer = false;
             if (customerEmail) {
                 const account = await ensureCustomerAccount(customerEmail, fullName);
                 if (account.userId) {
                     customerId = account.userId;
                     setupLink = account.setupLink;
+                    isFirstTimeBuyer = account.isNewUser;
                 }
             }
 
-            // Auto-archive any pay link that matches this Paystack reference
+            // Auto-archive any pay link matching this reference
             if (paystackRef) {
                 await supabaseAdmin
                     .from("pay_links")
@@ -288,8 +400,20 @@ export async function POST(req: Request) {
                     .eq("status", "active");
             }
 
+            const confirmEmailOpts = {
+                customerEmail,
+                bizName,
+                bizAddress,
+                items: parsedItems,
+                feeAmount: Number(platform_fee_amount) || undefined,
+                feeLabel: platform_fee_label || undefined,
+                setupLink,
+                isFirstTimeBuyer,
+                discountCode: discount_code || undefined,
+                discountAmount: Number(discount_amount) || undefined,
+            };
+
             if (orderId) {
-                // Order was pre-created at initialization — update it to paid
                 const { error } = await supabaseAdmin
                     .from("orders")
                     .update({
@@ -297,11 +421,17 @@ export async function POST(req: Request) {
                         paystack_reference: paystackRef,
                         customer_name: fullName || null,
                         customer_phone: phone || null,
-                        shipping_address: address ? { text: address, country: country || null, region: region || null } : null,
+                        shipping_address: address
+                            ? { text: address, country: country || null, region: region || null }
+                            : null,
                         delivery_method: deliveryMethod || null,
                         discount_code: discount_code || null,
                         discount_amount: Number(discount_amount) || 0,
-                        customer_metadata: { whatsapp: whatsapp || null, instagram: instagram || null, snapchat: snapchat || null },
+                        customer_metadata: {
+                            whatsapp: whatsapp || null,
+                            instagram: instagram || null,
+                            snapchat: snapchat || null,
+                        },
                         ...(customerId ? { customer_id: customerId } : {}),
                     })
                     .eq("id", orderId);
@@ -309,11 +439,19 @@ export async function POST(req: Request) {
                 if (error) {
                     console.error("Webhook: Failed to update order:", error);
                 } else {
-                    await sendOrderConfirmation(customerEmail, orderId.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined, setupLink, discount_code || undefined, Number(discount_amount) || undefined);
-                    await trackDiscountUsage(discount_code, discount_amount, discount_tag);
+                    const orderRef = orderId.substring(0, 8).toUpperCase();
+                    await Promise.all([
+                        sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
+                        trackDiscountUsage(discount_code, discount_amount, discount_tag),
+                        // SMS to customer
+                        phone ? sendSMS({
+                            to: phone,
+                            message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
+                        }) : Promise.resolve(),
+                    ]);
                 }
             } else if (customerEmail) {
-                // Fallback: create a new order if no pre-created one exists
+                // Fallback: create order if none pre-created
                 const { data: existing } = await supabaseAdmin
                     .from("orders")
                     .select("id")
@@ -327,7 +465,9 @@ export async function POST(req: Request) {
                             customer_email: customerEmail,
                             customer_name: fullName || null,
                             customer_phone: phone || null,
-                            shipping_address: address ? { text: address, country: country || null, region: region || null } : null,
+                            shipping_address: address
+                                ? { text: address, country: country || null, region: region || null }
+                                : null,
                             delivery_method: deliveryMethod || null,
                             total_amount: amountGHS,
                             status: "paid",
@@ -335,7 +475,11 @@ export async function POST(req: Request) {
                             items: parsedItems,
                             discount_code: discount_code || null,
                             discount_amount: Number(discount_amount) || 0,
-                            customer_metadata: { whatsapp: whatsapp || null, instagram: instagram || null, snapchat: snapchat || null },
+                            customer_metadata: {
+                                whatsapp: whatsapp || null,
+                                instagram: instagram || null,
+                                snapchat: snapchat || null,
+                            },
                             ...(customerId ? { customer_id: customerId } : {}),
                         }])
                         .select("id")
@@ -344,8 +488,15 @@ export async function POST(req: Request) {
                     if (error) {
                         console.error("Webhook: Failed to create order:", error);
                     } else if (newOrder) {
-                        await sendOrderConfirmation(customerEmail, newOrder.id.substring(0, 8).toUpperCase(), amountGHS, bizName, bizAddress, Number(platform_fee_amount) || undefined, platform_fee_label || undefined, setupLink, discount_code || undefined, Number(discount_amount) || undefined);
-                        await trackDiscountUsage(discount_code, discount_amount, discount_tag);
+                        const orderRef = newOrder.id.substring(0, 8).toUpperCase();
+                        await Promise.all([
+                            sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
+                            trackDiscountUsage(discount_code, discount_amount, discount_tag),
+                            phone ? sendSMS({
+                                to: phone,
+                                message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
+                            }) : Promise.resolve(),
+                        ]);
                     }
                 }
             }
