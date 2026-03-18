@@ -136,6 +136,113 @@ export async function getCategories(): Promise<ShopCategory[]> {
     return (data ?? []) as ShopCategory[];
 }
 
+// ─── PDP interfaces ────────────────────────────────────────────────────────
+
+export interface ProductDetail extends ShopProduct {
+    category_type: string | null;
+    sku: string | null;
+    features_list: string[] | null;
+    care_instructions: string[] | null;
+    rating_average: number;
+    review_count: number;
+}
+
+export interface ProductReview {
+    id: string;
+    rating: number;
+    comment: string | null;
+    author_name: string | null;
+    author_initials: string | null;
+    avatar_color: string | null;
+    location: string | null;
+    is_verified: boolean;
+    created_at: string;
+}
+
+export interface RatingDistribution {
+    star: number;
+    count: number;
+    pct: number;
+}
+
+export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+    const { data } = await supabaseAdmin
+        .from("products")
+        .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
+             image_urls, is_featured, category_type,
+             available_colors, available_sizes, color_variants, size_variants,
+             bundle_label, badge, is_sale, discount_value, inventory_count,
+             sku, features_list, care_instructions, rating_average, review_count, created_at`)
+        .eq("slug", slug)
+        .eq("is_active", true)
+        .maybeSingle();
+
+    if (!data) return null;
+
+    const { data: allCats } = await supabaseAdmin.from("categories").select("name, slug");
+    const catMap = new Map((allCats || []).map((c: any) => [c.name.toLowerCase(), c]));
+    const matchedCat = data.category_type ? catMap.get(data.category_type.toLowerCase()) : null;
+
+    return {
+        ...data,
+        category_id: null,
+        is_featured: data.is_featured ?? false,
+        is_sale: data.is_sale ?? false,
+        discount_value: data.discount_value ?? 0,
+        inventory_count: data.inventory_count ?? 0,
+        rating_average: Number(data.rating_average ?? 0),
+        review_count: Number(data.review_count ?? 0),
+        category_name: matchedCat?.name ?? data.category_type ?? null,
+        category_slug: matchedCat?.slug ?? null,
+    } as ProductDetail;
+}
+
+export async function getRelatedProducts(categoryType: string, currentSlug: string): Promise<ShopProduct[]> {
+    if (!categoryType) return [];
+    const { data } = await supabaseAdmin
+        .from("products")
+        .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
+             image_urls, is_featured, category_type,
+             available_colors, available_sizes, color_variants, size_variants,
+             bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
+        .eq("is_active", true)
+        .ilike("category_type", categoryType)
+        .neq("slug", currentSlug)
+        .order("created_at", { ascending: false })
+        .limit(4);
+
+    return (data || []).map((p: any) => ({
+        ...p,
+        category_id: null,
+        is_featured: p.is_featured ?? false,
+        is_sale: p.is_sale ?? false,
+        discount_value: p.discount_value ?? 0,
+        inventory_count: p.inventory_count ?? 0,
+        category_name: p.category_type ?? null,
+        category_slug: null,
+    }));
+}
+
+export async function getProductReviews(productId: string): Promise<{
+    reviews: ProductReview[];
+    distribution: RatingDistribution[];
+}> {
+    const { data } = await supabaseAdmin
+        .from("product_reviews")
+        .select("id, rating, comment, author_name, author_initials, avatar_color, location, is_verified, created_at")
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false });
+
+    const all = (data || []) as ProductReview[];
+    const total = all.length;
+    const distribution: RatingDistribution[] = [5, 4, 3, 2, 1].map(star => {
+        const count = all.filter(r => r.rating === star).length;
+        return { star, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 };
+    });
+
+    return { reviews: all, distribution };
+}
+
 /** Derive all unique color names from a product list. */
 export function deriveColors(products: ShopProduct[]): string[] {
     const set = new Set<string>();

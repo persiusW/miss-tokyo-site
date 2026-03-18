@@ -1,234 +1,273 @@
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { createClient } from "@/lib/supabaseServer";
-import { AnimatedProductView } from "@/components/ui/badu/AnimatedProductView";
-import { ProductCheckoutForm } from "@/components/ui/badu/ProductCheckoutForm";
-import { ProductImageCarousel } from "@/components/ui/badu/ProductImageCarousel";
-import { RelatedProducts } from "@/components/ui/miss-tokyo/RelatedProducts";
-import { RecentlyViewed } from "@/components/ui/miss-tokyo/RecentlyViewed";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
-import { ChevronRight } from "lucide-react";
-import { WholesaleData } from "@/lib/wholesale";
+import Link from "next/link";
+import Image from "next/image";
+import { getProductBySlug, getRelatedProducts, getProductReviews } from "@/lib/products";
+import { ProductGallery } from "@/components/ui/miss-tokyo/ProductGallery";
+import { ProductOptions } from "@/components/ui/miss-tokyo/ProductOptions";
+import { ProductAccordions } from "@/components/ui/miss-tokyo/ProductAccordions";
+import { ReviewsSection } from "@/components/ui/miss-tokyo/ReviewsSection";
 
 export const revalidate = 60;
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+const COLOR_HEX: Record<string, string> = {
+    Black: "#141210", White: "#FAFAFA", Red: "#E8485A", Pink: "#F5A7B3",
+    Blue: "#3B82F6", Navy: "#1E3A5F", Green: "#10B981", Turquoise: "#14B8A6",
+    Purple: "#8B5CF6", Yellow: "#FBBF24", Orange: "#F97316", Beige: "#E8D5C4",
+    Brown: "#8B5E3C", Grey: "#9CA3AF", Maroon: "#7F1D1D", Gold: "#C9A96E",
+};
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
     const { slug } = await params;
-    const { data: product } = await supabase
-        .from("products")
-        .select("name, description, image_urls")
-        .eq("slug", slug)
-        .single();
-
-    if (product) {
-        return {
-            title: `${product.name} | Miss Tokyo`,
-            description: product.description || `Our signature piece. Minimalist design featuring premium Ghanaian leather. Discover the ${product.name}.`,
-            openGraph: {
-                images: product.image_urls?.[0] ? [{ url: product.image_urls[0] }] : [],
-            }
-        };
-    }
-
-    return { title: "Product | Miss Tokyo" };
+    const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
+    const product = await getProductBySlug(slug);
+    if (!product) return { title: "Product — Miss Tokyo" };
+    return {
+        title: `${product.name} — Miss Tokyo`,
+        description: (product.description ?? `Shop ${product.name} at Miss Tokyo.`).slice(0, 150),
+        openGraph: {
+            images: product.image_urls?.[0] ? [{ url: product.image_urls[0] }] : [],
+        },
+        alternates: { canonical: `${BASE}/products/${slug}` },
+    };
 }
 
-export default async function ProductPage({ params }: { params: { slug: string } }) {
+export default async function ProductPage({
+    params,
+}: {
+    params: Promise<{ slug: string }>;
+}) {
     const { slug } = await params;
-
-    // Get the current user's session (cookie-based, server-side)
-    const serverClient = await createClient();
-    const { data: { user } } = await serverClient.auth.getUser();
-
-    const [{ data: product }, { data: storeSettings }, profileResult] = await Promise.all([
-        supabase.from("products").select("*").eq("slug", slug).single(),
-        supabase.from("store_settings").select("*").eq("id", "default").single(),
-        user
-            ? supabaseAdmin.from("profiles").select("role").eq("id", user.id).single()
-            : Promise.resolve({ data: null }),
-    ]);
-
+    const product = await getProductBySlug(slug);
     if (!product) notFound();
 
-    const isWholesale = profileResult?.data?.role === "wholesale";
-    const wholesaleEnabled = storeSettings?.wholesale_enabled === true;
+    const [related, { reviews, distribution }] = await Promise.all([
+        getRelatedProducts(product.category_type ?? "", slug),
+        getProductReviews(product.id),
+    ]);
 
-    let wholesaleData: WholesaleData | null = null;
-    if (isWholesale && wholesaleEnabled) {
-        const globalTiers = {
-            tier1Min: storeSettings?.wholesale_tier_1_min ?? 3,
-            tier1Max: storeSettings?.wholesale_tier_1_max ?? 5,
-            tier2Min: storeSettings?.wholesale_tier_2_min ?? 8,
-            tier2Max: storeSettings?.wholesale_tier_2_max ?? 10,
-            tier3Min: storeSettings?.wholesale_tier_3_min ?? 12,
-            tier3Max: storeSettings?.wholesale_tier_3_max ?? 24,
-        };
+    const isSale = product.is_sale && (product.discount_value ?? 0) > 0;
+    const ageMs = Date.now() - new Date(product.created_at).getTime();
+    const isNew = ageMs < 14 * 24 * 60 * 60 * 1000;
+    const badgeLabel = product.badge || (isSale ? null : isNew ? "New" : null);
 
-        // Tier 1 — Product-level override takes priority
-        const hasProductOverride = product.wholesale_override === true && (
-            product.wholesale_price_tier_1 != null ||
-            product.wholesale_price_tier_2 != null ||
-            product.wholesale_price_tier_3 != null
-        );
+    const ratingAvg = Number(product.rating_average ?? 0);
+    const reviewCount = Number(product.review_count ?? 0);
 
-        let prices = { tier1: null as number | null, tier2: null as number | null, tier3: null as number | null };
+    const effectivePrice = isSale && (product.discount_value ?? 0) > 0
+        ? product.price_ghs * (1 - (product.discount_value ?? 0) / 100)
+        : product.price_ghs;
 
-        if (hasProductOverride) {
-            prices = {
-                tier1: product.wholesale_price_tier_1 ?? null,
-                tier2: product.wholesale_price_tier_2 ?? null,
-                tier3: product.wholesale_price_tier_3 ?? null,
-            };
-        } else {
-            // Tier 2 — Inherit from assigned wholesale category
-            const categoryIds: string[] = product.category_ids ?? [];
-            if (categoryIds.length > 0) {
-                const { data: wholesaleCat } = await supabaseAdmin
-                    .from("categories")
-                    .select("wholesale_tier_1_price, wholesale_tier_2_price, wholesale_tier_3_price")
-                    .eq("is_wholesale", true)
-                    .in("id", categoryIds)
-                    .limit(1)
-                    .single();
-                if (wholesaleCat) {
-                    prices = {
-                        tier1: wholesaleCat.wholesale_tier_1_price ?? null,
-                        tier2: wholesaleCat.wholesale_tier_2_price ?? null,
-                        tier3: wholesaleCat.wholesale_tier_3_price ?? null,
-                    };
-                }
-            }
-            // Tier 3 — If no category pricing, prices stay null and resolveWholesalePrice falls back to retail
-        }
+    // Title: last word in italic gold
+    const words = product.name.split(" ");
+    const nameHead = words.slice(0, -1).join(" ");
+    const nameLast = words[words.length - 1];
 
-        wholesaleData = { enabled: true, prices, tiers: globalTiers };
-    }
-
-    // Fetch related products
-    const { data: relatedRaw } = await supabase
-        .from("products")
-        .select("slug, name, price_ghs, image_urls, is_sale, discount_value")
-        .eq("is_active", true)
-        .eq("category_type", product.category_type)
-        .neq("slug", slug)
-        .order("created_at", { ascending: false })
-        .limit(4);
-
-    const enableWhitelabel = storeSettings?.enable_whitelabel ?? true;
-    const colors = product.available_colors || ["Noir", "Cognac", "Sand"];
-    const stitching = product.available_stitching || ["Tonal", "Contrast White"];
-    const availableSizes = product.available_sizes || null;
-    const imageUrl = product.image_urls?.[0] || "";
-    const priceStr = `GH₵ ${Number(product.price_ghs || 0).toFixed(2)}`;
-
-    // Stock status
-    const trackInventory = product.track_inventory === true;
-    const stockQty: number = product.stock_quantity ?? null;
-    const isSoldOut = trackInventory && stockQty === 0;
-    const isLowStock = trackInventory && stockQty !== null && stockQty > 0 && stockQty <= 5;
-
-    const categoryLabel = product.category_type
-        ? product.category_type.charAt(0).toUpperCase() + product.category_type.slice(1)
-        : "Shop";
+    // JSON-LD Product schema
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: product.name,
+        image: product.image_urls?.[0] ?? "",
+        description: product.description ?? "",
+        sku: product.sku ?? product.id,
+        offers: {
+            "@type": "Offer",
+            price: effectivePrice.toFixed(2),
+            priceCurrency: "GHS",
+            availability: (product.inventory_count ?? 0) > 0
+                ? "https://schema.org/InStock"
+                : "https://schema.org/OutOfStock",
+        },
+        ...(reviewCount > 0 && {
+            aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: ratingAvg.toFixed(1),
+                reviewCount,
+            },
+        }),
+    };
 
     return (
-        <div
-            className="pt-6 pb-32 px-4 md:px-12 max-w-7xl mx-auto"
-            style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}
-        >
-            {/* Breadcrumb */}
-            <nav className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-neutral-400 mb-8">
-                <Link href="/" className="hover:text-black transition-colors">Home</Link>
-                <ChevronRight size={10} />
-                <Link href="/shop" className="hover:text-black transition-colors">Shop</Link>
-                {product.category_type && (
-                    <>
-                        <ChevronRight size={10} />
-                        <Link href={`/shop?category=${product.category_type}`} className="hover:text-black transition-colors">
-                            {categoryLabel}
-                        </Link>
-                    </>
-                )}
-                <ChevronRight size={10} />
-                <span className="text-black font-medium truncate max-w-[160px]">{product.name}</span>
-            </nav>
+        <>
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
 
-            <AnimatedProductView>
-                {/* Product Images */}
-                <div className="w-full md:w-1/2">
-                    <ProductImageCarousel
-                        images={product.image_urls || (imageUrl ? [imageUrl] : [])}
-                        name={product.name}
-                    />
-                </div>
+            <div style={{ background: "var(--sand, #F7F2EC)", minHeight: "100vh" }}>
 
-                {/* Product Info */}
-                <div className="w-full md:w-1/2 md:sticky md:top-32 h-fit">
-                    <h1 className="font-serif text-4xl md:text-5xl tracking-widest uppercase mb-3">{product.name}</h1>
-
-                    {/* Price + Stock */}
-                    <div className="flex items-baseline gap-4 mb-2">
-                        {/* Hide retail price for wholesale users */}
-                        {!isWholesale && (
-                            <p className="text-xl text-neutral-600">{priceStr}</p>
-                        )}
-                        {isWholesale && (
-                            <p className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">
-                                RRP <span className="line-through">{priceStr}</span>
-                            </p>
-                        )}
-                        {isSoldOut && (
-                            <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 border border-neutral-300 px-2 py-0.5">
-                                Sold Out
-                            </span>
-                        )}
-                        {isLowStock && (
-                            <span className="text-[10px] uppercase tracking-widest font-bold text-red-500">
-                                Only {stockQty} left
-                            </span>
-                        )}
-                    </div>
-
-                    <p className="text-neutral-600 leading-relaxed mb-10">
-                        {product.description || "Our signature piece. Minimalist design featuring premium Ghanaian craftsmanship. Unlined for natural comfort that molds to your body over time."}
-                    </p>
-
-                    <ProductCheckoutForm
-                        productId={product.id}
-                        productName={product.name}
-                        productSlug={product.slug}
-                        productImageUrl={imageUrl}
-                        priceNum={product.price_ghs || 0}
-                        price={priceStr}
-                        colors={colors}
-                        stitching={stitching}
-                        availableSizes={availableSizes}
-                        wholesale={wholesaleData}
-                    />
-
-                    {enableWhitelabel && !isWholesale && (
-                        <div className="border-t border-neutral-200 pt-8 mt-8 pb-8">
-                            <Link href={`/whitelabel?ref=${product.slug}`} className="flex justify-between items-center group">
-                                <span className="text-sm uppercase tracking-widest font-semibold group-hover:text-neutral-500 transition-colors">
-                                    Request White Label Version
-                                </span>
-                                <span className="text-xl group-hover:-translate-x-1 transition-transform">→</span>
+                {/* Breadcrumb */}
+                <div style={{ maxWidth: 1440, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--muted, #7A7167)", letterSpacing: "0.04em", flexWrap: "wrap" }}>
+                    <Link href="/" style={{ color: "var(--muted, #7A7167)" }}>Home</Link>
+                    <span style={{ opacity: 0.4, fontSize: 10 }}>›</span>
+                    <Link href="/shop" style={{ color: "var(--muted, #7A7167)" }}>Shop</Link>
+                    {product.category_name && (
+                        <>
+                            <span style={{ opacity: 0.4, fontSize: 10 }}>›</span>
+                            <Link
+                                href={`/shop?category=${product.category_slug || product.category_type}`}
+                                style={{ color: "var(--muted, #7A7167)" }}
+                            >
+                                {product.category_name}
                             </Link>
-                            <p className="text-xs text-neutral-500 mt-2">
-                                Looking for a specific leather, color, or modification? Contact our atelier.
-                            </p>
-                        </div>
+                        </>
                     )}
+                    <span style={{ opacity: 0.4, fontSize: 10 }}>›</span>
+                    <span style={{ color: "var(--ink, #141210)" }}>{product.name}</span>
                 </div>
-            </AnimatedProductView>
 
-            {/* Related Products */}
-            <RelatedProducts products={relatedRaw || []} />
+                {/* Product layout */}
+                <div
+                    className="pdp-layout"
+                    style={{ maxWidth: 1440, margin: "0 auto", padding: "0 24px 80px", display: "grid", gridTemplateColumns: "1fr 480px", gap: 48, alignItems: "start" }}
+                >
+                    {/* Gallery */}
+                    <ProductGallery
+                        images={product.image_urls ?? []}
+                        name={product.name}
+                        badge={badgeLabel}
+                        isSale={isSale}
+                    />
 
-            {/* Recently Viewed */}
-            <RecentlyViewed currentSlug={slug} />
-        </div>
+                    {/* Info panel */}
+                    <div style={{ paddingTop: 4 }}>
+                        {/* Meta top: category + SKU */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                            {product.category_name && (
+                                <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted, #7A7167)" }}>
+                                    {product.category_name}
+                                </span>
+                            )}
+                            {product.sku && (
+                                <span style={{ fontSize: 10, color: "var(--muted, #7A7167)", letterSpacing: "0.08em" }}>
+                                    SKU {product.sku}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Title with italic last word */}
+                        <h1 style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: "clamp(32px, 3.5vw, 48px)", fontWeight: 300, lineHeight: 1.05, marginBottom: 16 }}>
+                            {nameHead && `${nameHead} `}
+                            <em style={{ fontStyle: "italic", color: "var(--gold, #C9A96E)" }}>{nameLast}</em>
+                        </h1>
+
+                        {/* Interactive options (colour, size, qty, CTA, wishlist, trust) */}
+                        <ProductOptions
+                            productId={product.id}
+                            name={product.name}
+                            slug={product.slug}
+                            price={product.price_ghs}
+                            compareAtPrice={product.compare_at_price_ghs}
+                            bundleLabel={product.bundle_label}
+                            colorVariants={product.color_variants as any}
+                            sizeVariants={product.size_variants as any}
+                            availableColors={product.available_colors}
+                            availableSizes={product.available_sizes}
+                            inventoryCount={product.inventory_count ?? 0}
+                            ratingAverage={ratingAvg}
+                            reviewCount={reviewCount}
+                            imageUrl={product.image_urls?.[0] ?? ""}
+                            isSale={isSale}
+                            discountValue={product.discount_value ?? 0}
+                        />
+
+                        {/* Accordions */}
+                        <ProductAccordions
+                            description={product.description}
+                            featuresList={product.features_list}
+                            careInstructions={product.care_instructions}
+                            sku={product.sku}
+                        />
+                    </div>
+                </div>
+
+                {/* You May Also Like */}
+                {related.length > 0 && (
+                    <section style={{ background: "#fff", borderTop: "1px solid rgba(20,18,16,0.1)", padding: "64px 0" }}>
+                        <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 24px" }}>
+                            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 40, gap: 16 }}>
+                                <div>
+                                    <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--muted, #7A7167)", marginBottom: 10 }}>
+                                        Complete your look
+                                    </div>
+                                    <h2 style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: "clamp(28px, 3vw, 40px)", fontWeight: 300, lineHeight: 1 }}>
+                                        You May Also <em style={{ fontStyle: "italic", color: "var(--gold, #C9A96E)" }}>Like</em>
+                                    </h2>
+                                </div>
+                                <Link href="/shop" style={{ fontSize: 12, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink, #141210)", borderBottom: "1px solid var(--ink, #141210)", paddingBottom: 2, whiteSpace: "nowrap", textDecoration: "none" }}>
+                                    View All
+                                </Link>
+                            </div>
+
+                            <div className="pdp-related-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px 16px" }}>
+                                {related.map(p => {
+                                    const pSale = p.is_sale && (p.discount_value ?? 0) > 0;
+                                    const displayPrice = pSale ? p.price_ghs * (1 - (p.discount_value ?? 0) / 100) : p.price_ghs;
+                                    const origPrice = pSale ? p.price_ghs : null;
+                                    const pAge = Date.now() - new Date(p.created_at).getTime();
+                                    const pBadge = p.badge || (pSale ? "Sale" : (pAge < 14 * 24 * 60 * 60 * 1000 ? "New" : null));
+                                    return (
+                                        <Link key={p.slug} href={`/products/${p.slug}`} style={{ textDecoration: "none", color: "inherit" }}>
+                                            <div style={{ position: "relative", aspectRatio: "3/4", borderRadius: 4, overflow: "hidden", background: "var(--blush, #E8D5C4)", marginBottom: 11 }}>
+                                                {p.image_urls?.[0] && (
+                                                    <Image
+                                                        src={p.image_urls[0]}
+                                                        alt={p.name}
+                                                        fill
+                                                        sizes="(max-width: 768px) 50vw, 25vw"
+                                                        loading="lazy"
+                                                        style={{ objectFit: "cover" }}
+                                                    />
+                                                )}
+                                                {pBadge && (
+                                                    <span style={{ position: "absolute", top: 10, left: 10, fontSize: 9, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 2, background: pSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)", color: "#fff" }}>
+                                                        {pBadge}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted, #7A7167)", marginBottom: 3 }}>
+                                                {p.category_name}
+                                            </div>
+                                            <div style={{ fontSize: 13, fontWeight: 400, color: "var(--ink, #141210)", marginBottom: 4, lineHeight: 1.3 }}>{p.name}</div>
+                                            <div style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                                                {origPrice && (
+                                                    <span style={{ fontSize: 12, color: "var(--muted, #7A7167)", textDecoration: "line-through", fontWeight: 400 }}>
+                                                        GH₵{origPrice.toFixed(2)}
+                                                    </span>
+                                                )}
+                                                <span style={{ color: pSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)" }}>
+                                                    GH₵{displayPrice.toFixed(2)}
+                                                </span>
+                                            </div>
+                                            {(p.available_colors ?? []).length > 0 && (
+                                                <div style={{ display: "flex", gap: 5, marginTop: 6 }}>
+                                                    {(p.available_colors ?? []).slice(0, 5).map((c, ci) => (
+                                                        <div key={ci} style={{ width: 11, height: 11, borderRadius: "50%", background: COLOR_HEX[c] || "#E8D5C4", border: "1px solid rgba(20,18,16,0.15)" }} />
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                {/* Reviews */}
+                <ReviewsSection
+                    reviews={reviews}
+                    distribution={distribution}
+                    reviewCount={reviewCount}
+                    ratingAverage={ratingAvg}
+                />
+
+            </div>
+        </>
     );
 }
