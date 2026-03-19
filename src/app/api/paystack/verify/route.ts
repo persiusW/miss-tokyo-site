@@ -112,21 +112,30 @@ export async function GET(req: Request) {
             return NextResponse.json({ status: orderStatus });
         }
 
-        // Deduct inventory only for successful payments
+        // Deduct inventory only for successful payments — batch fetch then concurrent updates
         if (newOrder && paystackTxStatus === "success" && parsedItems.length > 0) {
-            for (const item of parsedItems) {
-                if (!item.productId) continue;
-                const { data: product } = await supabase
-                    .from("products")
-                    .select("inventory_count")
-                    .eq("id", item.productId)
-                    .single();
-                if (product && product.inventory_count >= item.quantity) {
-                    await supabase
-                        .from("products")
-                        .update({ inventory_count: product.inventory_count - item.quantity })
-                        .eq("id", item.productId);
-                }
+            const productIds = [...new Set(parsedItems.map((i: any) => i.productId).filter(Boolean))];
+            const { data: products } = await supabase
+                .from("products")
+                .select("id, inventory_count")
+                .in("id", productIds);
+
+            if (products) {
+                const stockMap = new Map(products.map(p => [p.id, p.inventory_count as number]));
+                await Promise.allSettled(
+                    parsedItems
+                        .filter((item: any) => item.productId && stockMap.has(item.productId))
+                        .map((item: any) => {
+                            const stock = stockMap.get(item.productId) ?? 0;
+                            if (typeof stock === "number" && stock >= item.quantity) {
+                                return supabase
+                                    .from("products")
+                                    .update({ inventory_count: stock - item.quantity })
+                                    .eq("id", item.productId);
+                            }
+                            return Promise.resolve();
+                        })
+                );
             }
         }
 

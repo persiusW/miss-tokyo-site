@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'persiuswilder@gmail.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Killdecat1';
-const AUTH_SECRET = process.env.AUTH_SECRET || 'badu-default-session-token-change-in-production';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const AUTH_SECRET = process.env.AUTH_SECRET || '';
 
 export async function POST(request: Request) {
     try {

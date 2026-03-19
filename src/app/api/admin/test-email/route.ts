@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { sendEmail } from "@/lib/email";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
 
 // Dummy values substituted for template variables in test sends
 const DUMMY_VARS: Record<string, string> = {
@@ -19,6 +21,14 @@ function injectVars(text: string): string {
 
 export async function POST(req: Request) {
     try {
+        const serverClient = await createClient();
+        const { data: { user } } = await serverClient.auth.getUser();
+        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+        if (!caller || !["admin", "owner"].includes(caller.role)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         const { email, eventType, eventLabel, subject, greeting, bodyText } = await req.json();
         if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 

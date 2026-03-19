@@ -40,6 +40,12 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
     try {
+        const supabase = await createClient();
+        const { data: { user }, error: authErr } = await supabase.auth.getUser();
+        if (authErr || !user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const { endpoint } = await req.json();
         if (!endpoint) return NextResponse.json({ error: "endpoint required" }, { status: 400 });
 

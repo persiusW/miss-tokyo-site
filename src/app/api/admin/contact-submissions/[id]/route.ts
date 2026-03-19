@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
 
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const serverClient = await createClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const { id } = await params;
     let body: any;
     try { body = await req.json(); } catch { body = {}; }

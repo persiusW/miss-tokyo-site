@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
+  try {
   const { email } = await req.json();
 
   // Validate email
@@ -86,4 +87,8 @@ export async function POST(req: NextRequest) {
     couponCode: couponEnabled ? couponCode : null,
     couponEnabled,
   });
+  } catch (err: any) {
+    console.error("[newsletter/subscribe]", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
 }

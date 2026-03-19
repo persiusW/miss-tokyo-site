@@ -63,14 +63,20 @@ async function ensureCustomerAccount(
     customerEmail: string,
     fullName?: string | null,
 ): Promise<{ userId: string; setupLink?: string; isNewUser: boolean }> {
-    const { data: existing } = await supabaseAdmin.auth.admin.listUsers();
-    const found = existing?.users?.find(u => u.email === customerEmail);
+    // O(1) lookup via indexed profiles.email — avoids listUsers() full-table scan
+    const { data: existingProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("email", customerEmail)
+        .maybeSingle();
 
-    if (found) {
-        await supabaseAdmin
-            .from("profiles")
-            .upsert({ id: found.id, full_name: fullName || null }, { onConflict: "id" });
-        return { userId: found.id, isNewUser: false };
+    if (existingProfile) {
+        if (fullName) {
+            await supabaseAdmin
+                .from("profiles")
+                .upsert({ id: existingProfile.id, full_name: fullName }, { onConflict: "id" });
+        }
+        return { userId: existingProfile.id, isNewUser: false };
     }
 
     const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
@@ -86,7 +92,7 @@ async function ensureCustomerAccount(
     const userId = newUser.user.id;
     await supabaseAdmin
         .from("profiles")
-        .upsert({ id: userId, full_name: fullName || null }, { onConflict: "id" });
+        .upsert({ id: userId, email: customerEmail, full_name: fullName || null }, { onConflict: "id" });
 
     let setupLink: string | undefined;
     try {
@@ -412,19 +418,30 @@ export async function POST(req: Request) {
 
             const parsedItems = parseItems(cartItems);
 
-            // Decrement inventory for each cart item
-            for (const item of parsedItems) {
-                if (!item.productId) continue;
-                const { data: product } = await supabaseAdmin
+            // Decrement inventory — batch fetch then concurrent updates
+            if (parsedItems.length > 0) {
+                const productIds = [...new Set(parsedItems.map(i => i.productId).filter(Boolean))];
+                const { data: products } = await supabaseAdmin
                     .from("products")
-                    .select("inventory_count")
-                    .eq("id", item.productId)
-                    .single();
-                if (product && typeof product.inventory_count === "number" && product.inventory_count >= item.quantity) {
-                    await supabaseAdmin
-                        .from("products")
-                        .update({ inventory_count: product.inventory_count - item.quantity })
-                        .eq("id", item.productId);
+                    .select("id, inventory_count")
+                    .in("id", productIds);
+
+                if (products) {
+                    const stockMap = new Map(products.map(p => [p.id, p.inventory_count as number]));
+                    await Promise.allSettled(
+                        parsedItems
+                            .filter(item => item.productId && stockMap.has(item.productId))
+                            .map(item => {
+                                const stock = stockMap.get(item.productId) ?? 0;
+                                if (typeof stock === "number" && stock >= item.quantity) {
+                                    return supabaseAdmin
+                                        .from("products")
+                                        .update({ inventory_count: stock - item.quantity })
+                                        .eq("id", item.productId);
+                                }
+                                return Promise.resolve();
+                            })
+                    );
                 }
             }
 
@@ -506,7 +523,7 @@ export async function POST(req: Request) {
                     console.error("Webhook: Failed to update order:", error);
                 } else {
                     const orderRef = orderId.substring(0, 8).toUpperCase();
-                    await Promise.all([
+                    await Promise.allSettled([
                         sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
                         trackDiscountUsage(discount_code, discount_amount, discount_tag),
                         phone ? sendSMS({
@@ -558,7 +575,7 @@ export async function POST(req: Request) {
                         console.error("Webhook: Failed to create order:", error);
                     } else if (newOrder) {
                         const orderRef = newOrder.id.substring(0, 8).toUpperCase();
-                        await Promise.all([
+                        await Promise.allSettled([
                             sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
                             trackDiscountUsage(discount_code, discount_amount, discount_tag),
                             phone ? sendSMS({

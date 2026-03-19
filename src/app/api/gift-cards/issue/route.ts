@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
 
 function genCode(): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -10,6 +11,14 @@ function genCode(): string {
 
 export async function POST(req: NextRequest) {
     try {
+        const serverClient = await createClient();
+        const { data: { user } } = await serverClient.auth.getUser();
+        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+        if (!caller || !["admin", "owner"].includes(caller.role)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         const { recipient_email, recipient_name, sender_name, message, initial_value } = await req.json();
 
         if (!recipient_email || !initial_value) {
