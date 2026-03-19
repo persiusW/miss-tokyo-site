@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         userRole = profile?.role ?? null;
     }
 
-    const isFullAccess = !userRole || userRole === "admin" || userRole === "owner";
+    const isFullAccess = userRole === "admin" || userRole === "owner";
     const showCustomRequests = storeSettings?.enable_custom_requests ?? true;
     const businessName = businessSettings?.business_name ?? "Miss Tokyo";
 

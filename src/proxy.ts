@@ -1,14 +1,27 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from "next/server";
 
-const SESSION_COOKIE = 'badu_session';
+// Supabase SSR stores the session cookie as:  sb-<project-ref>-auth-token
+// Checking for its presence is sufficient for the proxy guard.
+// Full JWT validation (and token refresh) happens inside the dashboard layout
+// via createClient().auth.getUser(), which runs on every page render.
+function hasSupabaseSession(request: NextRequest): boolean {
+    return request.cookies.getAll().some(
+        (c) => c.name.startsWith("sb-") && c.name.endsWith("-auth-token") && !!c.value
+    );
+}
 
 export function proxy(request: NextRequest) {
-    const session = request.cookies.get(SESSION_COOKIE);
-    const expectedToken = process.env.AUTH_SECRET || 'badu-default-session-token-change-in-production';
+    const { pathname } = request.nextUrl;
 
-    if (!session?.value || session.value !== expectedToken) {
-        return NextResponse.redirect(new URL('/login', request.url));
+    if (!hasSupabaseSession(request)) {
+        const loginUrl = new URL("/admin/login", request.url);
+        loginUrl.searchParams.set("next", pathname);
+        return NextResponse.redirect(loginUrl);
+    }
+
+    // Already authenticated — skip the login page
+    if (pathname === "/admin/login") {
+        return NextResponse.redirect(new URL("/overview", request.url));
     }
 
     return NextResponse.next();
@@ -16,12 +29,15 @@ export function proxy(request: NextRequest) {
 
 export const config = {
     matcher: [
-        '/overview/:path*',
-        '/sales/:path*',
-        '/catalog/:path*',
-        '/customers/:path*',
-        '/finance/:path*',
-        '/seo/:path*',
-        '/settings/:path*',
+        "/overview/:path*",
+        "/sales/:path*",
+        "/catalog/:path*",
+        "/customers/:path*",
+        "/finance/:path*",
+        "/seo/:path*",
+        "/settings/:path*",
+        "/cms/:path*",
+        "/communications/:path*",
+        "/team/:path*",
     ],
 };

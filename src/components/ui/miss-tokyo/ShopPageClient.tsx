@@ -44,7 +44,19 @@ function ShopProductCard({
     const [wishlist, setWishlist] = useState(false);
     const [imgSrc, setImgSrc] = useState(product.image_urls?.[0] || FALLBACK_IMG);
     const badge = getBadge(product);
-    const isOnSale = !!(product.compare_at_price_ghs && product.compare_at_price_ghs > product.price_ghs);
+    // Mirror the "You May Also Like" logic from the PDP:
+    // Prefer compare_at_price_ghs; fall back to is_sale + discount_value percentage.
+    const hasSaleFromCompare = !!(product.compare_at_price_ghs && product.compare_at_price_ghs > product.price_ghs);
+    const hasSaleFromDiscount = !!(product.is_sale && (product.discount_value ?? 0) > 0);
+    const isOnSale = hasSaleFromCompare || hasSaleFromDiscount;
+    const displayPrice = hasSaleFromDiscount && !hasSaleFromCompare
+        ? product.price_ghs * (1 - (product.discount_value ?? 0) / 100)
+        : product.price_ghs;
+    const origPrice = hasSaleFromCompare
+        ? product.compare_at_price_ghs!
+        : hasSaleFromDiscount
+            ? product.price_ghs
+            : null;
     const colors = product.available_colors ?? [];
 
     useEffect(() => {
@@ -128,13 +140,13 @@ function ShopProductCard({
                 <div className="flex items-center gap-[6px] flex-wrap text-[13px] font-medium">
                     {isOnSale ? (
                         <>
-                            <span style={{ color: "#E8485A" }}>GH₵{product.price_ghs.toFixed(2)}</span>
                             <span className="line-through text-[12px] font-normal" style={{ color: "#7A7167" }}>
-                                GH₵{product.compare_at_price_ghs!.toFixed(2)}
+                                GH₵{origPrice!.toFixed(2)}
                             </span>
+                            <span style={{ color: "#E8485A" }}>GH₵{displayPrice.toFixed(2)}</span>
                         </>
                     ) : (
-                        <span style={{ color: "#141210" }}>GH₵{product.price_ghs.toFixed(2)}</span>
+                        <span style={{ color: "#141210" }}>GH₵{displayPrice.toFixed(2)}</span>
                     )}
                 </div>
                 {product.bundle_label && (

@@ -52,8 +52,11 @@ export default function AdminLoginPage() {
         return;
       }
 
-      // Success - redirect to dashboard using full refresh to ensure middleware picks up cookies
-      window.location.href = "/admin";
+      // Full-page reload so middleware picks up the new session cookie,
+      // then sends the user to the dashboard (or whatever they were trying to reach)
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next") || "/overview";
+      window.location.href = next;
     } catch (err: any) {
       console.error("Login unexpected error:", err);
       setError("An unexpected error occurred. Please try again.");

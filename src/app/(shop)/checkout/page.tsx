@@ -359,9 +359,9 @@ export default function CheckoutPage() {
                     {/* Street Address */}
                     {form.deliveryMethod === "delivery" && (
                         <div>
-                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Street Address / Landmark</label>
+                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">City</label>
                             <input type="text" name="address" value={form.address} onChange={handleChange}
-                                className={inputClass("address")} placeholder="123 Osu Oxford Street, near ..." />
+                                className={inputClass("address")} placeholder="Dome / East Legon" />
                             {errors.address && <p className="mt-1 text-[11px] text-red-500">{errors.address}</p>}
                         </div>
                     )}
