@@ -76,6 +76,11 @@ export function NavBar() {
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
 
+    // Sync nav visibility to CSS custom property so sticky children can track it
+    useEffect(() => {
+        document.documentElement.style.setProperty("--nav-h", navVisible ? "80px" : "0px");
+    }, [navVisible]);
+
     // Prevent body scroll when menu or search is open
     useEffect(() => {
         if (menuOpen || searchOpen) {
@@ -96,7 +101,7 @@ export function NavBar() {
 
     return (
         <>
-            <header className={`h-20 w-full flex items-center justify-between px-6 md:px-12 bg-black text-white fixed top-0 left-0 z-50 border-b border-gray-900 shadow-sm transition-transform duration-300 ease-in-out ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
+            <header className={`h-20 w-full flex items-center justify-between px-6 md:px-12 bg-black text-white fixed top-0 left-0 z-[150] border-b border-gray-900 shadow-sm transition-transform duration-300 ease-in-out ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
                 <Link href="/" className="font-serif text-2xl md:text-3xl tracking-[0.15em] uppercase hover:opacity-80 transition-opacity">
                     MISS TOKYO
                 </Link>
@@ -209,7 +214,7 @@ export function NavBar() {
 
             {/* Full-screen mobile overlay */}
             {menuOpen && (
-                <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col xl:hidden animate-in fade-in duration-500">
+                <div className="fixed inset-0 z-[160] bg-black text-white flex flex-col xl:hidden animate-in fade-in duration-500">
                     {/* Top bar */}
                     <div className="flex items-center justify-between px-6 h-20 flex-shrink-0 border-b border-gray-900">
                         <Link

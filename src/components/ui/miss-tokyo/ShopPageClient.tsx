@@ -602,7 +602,7 @@ export function ShopPageClient({
             </div>
 
             {/* Filter Bar */}
-            <div className="sticky z-[190]" style={{ top: 80, background: "#F7F2EC", borderBottom: "1px solid rgba(20,18,16,0.1)" }}>
+            <div className="sticky z-[50]" style={{ top: "var(--nav-h, 80px)", transition: "top 300ms ease-in-out", background: "#F7F2EC", borderBottom: "1px solid rgba(20,18,16,0.1)" }}>
                 <div className="max-w-[1440px] mx-auto px-6 h-[52px] flex items-center gap-2">
                     {/* Mobile filter button */}
                     <button onClick={() => setDrawerOpen(true)}
@@ -670,7 +670,7 @@ export function ShopPageClient({
             {/* Shop Layout */}
             <div className="max-w-[1440px] mx-auto px-6 pb-20 flex gap-8 items-start">
                 {/* Desktop Sidebar */}
-                <aside className="hidden xl:block flex-shrink-0 pt-7" style={{ width: 268, position: "sticky", top: 132, maxHeight: "calc(100vh - 152px)", overflowY: "auto" }}>
+                <aside className="hidden xl:block flex-shrink-0 pt-7" style={{ width: 268, position: "sticky", top: "calc(var(--nav-h, 80px) + 52px)", transition: "top 300ms ease-in-out", maxHeight: "calc(100vh - var(--nav-h, 80px) - 72px)", overflowY: "auto" }}>
                     <SidebarContent />
                 </aside>
 
@@ -742,9 +742,9 @@ export function ShopPageClient({
             {/* Mobile Filter Drawer */}
             {drawerOpen && (
                 <>
-                    <div className="fixed inset-0 z-[300]" style={{ background: "rgba(20,18,16,0.5)", backdropFilter: "blur(2px)" }}
+                    <div className="fixed inset-0 z-[250]" style={{ background: "rgba(20,18,16,0.5)", backdropFilter: "blur(2px)" }}
                         onClick={() => setDrawerOpen(false)} />
-                    <div className="fixed inset-0 z-[301] flex flex-col"
+                    <div className="fixed inset-0 z-[260] flex flex-col"
                         style={{ background: "#F7F2EC", transition: "transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
                         <div className="flex items-center justify-between px-5 py-[18px] flex-shrink-0" style={{ borderBottom: "1px solid rgba(20,18,16,0.1)" }}>
                             <span className="text-[13px] font-medium tracking-[0.08em] uppercase" style={{ color: "#141210" }}>Filters</span>
