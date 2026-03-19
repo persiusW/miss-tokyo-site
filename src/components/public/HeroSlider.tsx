@@ -29,6 +29,14 @@ const FALLBACK_SLIDE: HeroSlide = {
 export function HeroSlider({ slides }: HeroSliderProps) {
   const activeSlides = slides.length > 0 ? slides : [FALLBACK_SLIDE];
   const [current, setCurrent] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then(r => r.json())
+      .then(({ isAdmin }) => { if (isAdmin) setIsAdmin(true); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (activeSlides.length <= 1) return;
@@ -149,6 +157,31 @@ export function HeroSlider({ slides }: HeroSliderProps) {
             />
           ))}
         </div>
+      )}
+
+      {/* Admin edit shortcut */}
+      {isAdmin && (
+        <Link
+          href="/cms?tab=hero-slides"
+          style={{
+            position: "absolute", top: 16, right: 16, zIndex: 10,
+            display: "flex", alignItems: "center", gap: 6,
+            background: "rgba(20,18,16,0.75)", backdropFilter: "blur(6px)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            color: "#fff", fontSize: 10, letterSpacing: "0.15em",
+            textTransform: "uppercase", padding: "7px 14px", borderRadius: 3,
+            textDecoration: "none", transition: "background 0.15s",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = "rgba(20,18,16,0.95)")}
+          onMouseLeave={e => (e.currentTarget.style.background = "rgba(20,18,16,0.75)")}
+          aria-label="Edit hero slides"
+        >
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+          Edit Slides
+        </Link>
       )}
     </section>
   );

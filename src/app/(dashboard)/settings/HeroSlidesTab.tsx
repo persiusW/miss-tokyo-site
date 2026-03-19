@@ -65,7 +65,17 @@ export function HeroSlidesTab() {
             .select("*")
             .order("position", { ascending: true })
             .then(({ data }) => {
-                setSlides(data ?? []);
+                const STRING_FIELDS: (keyof HeroSlide)[] = [
+                    "eyebrow", "headline_line1", "headline_line2", "headline_line3",
+                    "body_text", "cta_primary_label", "cta_primary_url",
+                    "cta_secondary_label", "cta_secondary_url", "image_url",
+                ];
+                const normalized = (data ?? []).map((s: any) => {
+                    const slide = { ...s };
+                    STRING_FIELDS.forEach(f => { if (slide[f] == null) slide[f] = ""; });
+                    return slide as HeroSlide;
+                });
+                setSlides(normalized);
                 setLoading(false);
             });
     }, []);

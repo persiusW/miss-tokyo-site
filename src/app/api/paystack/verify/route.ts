@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 
+const ORDER_FIELDS = "id, customer_name, customer_email, customer_phone, shipping_address, delivery_method, total_amount, items, discount_code, discount_amount, status, paystack_reference";
+
+async function fetchOrderForReceipt(orderId: string) {
+    const { data } = await supabase.from("orders").select(ORDER_FIELDS).eq("id", orderId).single();
+    return data;
+}
+
 function parseCartItems(cartItems: unknown): any[] {
     if (!cartItems) return [];
     try {
@@ -66,7 +73,8 @@ export async function GET(req: Request) {
                     delivery_method: deliveryMethod || null,
                 })
                 .eq("id", metaOrderId);
-            return NextResponse.json({ status: orderStatus, orderId: metaOrderId });
+            const order = await fetchOrderForReceipt(metaOrderId);
+            return NextResponse.json({ status: orderStatus, orderId: metaOrderId, order });
         }
 
         // Check if order already exists for this reference
@@ -81,7 +89,8 @@ export async function GET(req: Request) {
             if (paystackTxStatus === "success" && existingOrder.status !== "paid") {
                 await supabase.from("orders").update({ status: "paid" }).eq("id", existingOrder.id);
             }
-            return NextResponse.json({ status: orderStatus, orderId: existingOrder.id });
+            const order = await fetchOrderForReceipt(existingOrder.id);
+            return NextResponse.json({ status: orderStatus, orderId: existingOrder.id, order });
         }
 
         // Only create an order record if we have a customer email
@@ -139,7 +148,8 @@ export async function GET(req: Request) {
             }
         }
 
-        return NextResponse.json({ status: orderStatus, orderId: newOrder?.id, created: true });
+        const order = newOrder ? await fetchOrderForReceipt(newOrder.id) : null;
+        return NextResponse.json({ status: orderStatus, orderId: newOrder?.id, order, created: true });
     } catch (err) {
         console.error("Verify Error:", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

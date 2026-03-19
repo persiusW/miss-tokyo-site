@@ -79,6 +79,8 @@ export function ProductOptions(props: Props) {
     const [qty, setQty] = useState(1);
     const [wishlisted, setWishlisted] = useState(false);
     const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+    const [addedToBag, setAddedToBag] = useState(false);
+    const setCartOpen = useCart(s => s.setIsOpen);
 
     useEffect(() => {
         try {
@@ -124,8 +126,11 @@ export function ProductOptions(props: Props) {
     };
 
     const handleAddToBag = () => {
+        if (addedToBag) return;
         if (doAddToCart()) {
-            toast.success(`✓ Added ${qty > 1 ? `${qty}× ` : ""}${name}${selectedSize ? ` (${selectedSize})` : ""}`);
+            setAddedToBag(true);
+            setCartOpen(true);
+            setTimeout(() => setAddedToBag(false), 2000);
         }
     };
 
@@ -305,20 +310,34 @@ export function ProductOptions(props: Props) {
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
                 <button
                     onClick={handleAddToBag}
+                    disabled={addedToBag}
                     style={{
                         width: "100%", padding: "15px 24px",
-                        background: "var(--ink, #141210)", color: "#fff",
+                        background: addedToBag ? "#059669" : "var(--ink, #141210)",
+                        color: "#fff",
                         border: "none", borderRadius: 2,
                         fontSize: 12, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase",
-                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                        transition: "background 0.18s",
+                        cursor: addedToBag ? "default" : "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        transition: "background 0.25s",
                     }}
                 >
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                    </svg>
-                    Add to Bag
+                    {addedToBag ? (
+                        <>
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            Added to Bag ✓
+                        </>
+                    ) : (
+                        <>
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                            </svg>
+                            Add to Bag
+                        </>
+                    )}
                 </button>
                 <button
                     onClick={handleBuyNow}

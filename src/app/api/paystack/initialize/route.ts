@@ -79,7 +79,8 @@ export async function POST(request: Request) {
         const orderId = pendingOrder?.id || null;
 
         const amountInPesewas = amountInGHS * 100;
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+        const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+        const siteUrl = rawSiteUrl.replace(/\/+$/, "");
 
         // --- SPLIT GROUP (SPL_xxx) — active for testing ---
         const paystackSplitCode = process.env.PAYSTACK_SPLIT_CODE;
