@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { ChevronDown, ChevronUp, Plus, Trash2, GripVertical } from "lucide-react";
 import type { AboutTimelineEntry, AboutValue, AboutTeamMember } from "@/types/settings";
+import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 
 // ── Accordion wrapper ─────────────────────────────────────────────────────────
 function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
@@ -399,9 +400,17 @@ export function AboutPageTab() {
                                             </div>
                                         </div>
                                     </Field>
-                                    <Field label="Photo URL (optional)">
-                                        <input className={inputCls} value={member.photo_url ?? ""} onChange={e => updateTeam(i, "photo_url", e.target.value)} placeholder="https://…" />
-                                    </Field>
+                                    <div>
+                                        <ImageUploader
+                                            bucket="site-assets"
+                                            folder="about/team"
+                                            currentUrl={member.photo_url || null}
+                                            onUpload={(url) => updateTeam(i, "photo_url", url)}
+                                            onRemove={() => updateTeam(i, "photo_url", "")}
+                                            aspectRatio="square"
+                                            label="Photo (optional)"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             <button type="button" onClick={() => removeTeamMember(i)} className="text-neutral-300 hover:text-rose-500 transition-colors mt-2 shrink-0">

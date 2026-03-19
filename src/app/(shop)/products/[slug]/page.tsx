@@ -3,6 +3,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { getProductBySlug, getRelatedProducts, getProductReviews } from "@/lib/products";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { ProductGallery } from "@/components/ui/miss-tokyo/ProductGallery";
 import { ProductOptions } from "@/components/ui/miss-tokyo/ProductOptions";
 import { ProductAccordions } from "@/components/ui/miss-tokyo/ProductAccordions";
@@ -45,10 +46,22 @@ export default async function ProductPage({
     const product = await getProductBySlug(slug);
     if (!product) notFound();
 
-    const [related, { reviews, distribution }] = await Promise.all([
+    const [related, { reviews, distribution }, pdpSettings] = await Promise.all([
         getRelatedProducts(product.category_type ?? "", slug),
         getProductReviews(product.id),
+        supabaseAdmin
+            .from("site_settings")
+            .select("pdp_show_trust_strip, pdp_show_reviews, pdp_show_product_details, pdp_show_care_instructions, pdp_show_delivery_returns")
+            .eq("id", "singleton")
+            .single()
+            .then(({ data }) => data ?? {}),
     ]);
+
+    const showTrustStrip = (pdpSettings as any)?.pdp_show_trust_strip ?? true;
+    const showReviews = (pdpSettings as any)?.pdp_show_reviews ?? true;
+    const showProductDetails = (pdpSettings as any)?.pdp_show_product_details ?? true;
+    const showCare = (pdpSettings as any)?.pdp_show_care_instructions ?? true;
+    const showDelivery = (pdpSettings as any)?.pdp_show_delivery_returns ?? true;
 
     const isSale = product.is_sale && (product.discount_value ?? 0) > 0;
     const ageMs = Date.now() - new Date(product.created_at).getTime();
@@ -174,6 +187,7 @@ export default async function ProductPage({
                             imageUrl={product.image_urls?.[0] ?? ""}
                             isSale={isSale}
                             discountValue={product.discount_value ?? 0}
+                            showTrustStrip={showTrustStrip}
                         />
 
                         {/* Accordions */}
@@ -182,6 +196,9 @@ export default async function ProductPage({
                             featuresList={product.features_list}
                             careInstructions={product.care_instructions}
                             sku={product.sku}
+                            showProductDetails={showProductDetails}
+                            showCare={showCare}
+                            showDelivery={showDelivery}
                         />
                     </div>
                 </div>
@@ -260,12 +277,14 @@ export default async function ProductPage({
                 )}
 
                 {/* Reviews */}
-                <ReviewsSection
-                    reviews={reviews}
-                    distribution={distribution}
-                    reviewCount={reviewCount}
-                    ratingAverage={ratingAvg}
-                />
+                {showReviews && (
+                    <ReviewsSection
+                        reviews={reviews}
+                        distribution={distribution}
+                        reviewCount={reviewCount}
+                        ratingAverage={ratingAvg}
+                    />
+                )}
 
             </div>
         </>

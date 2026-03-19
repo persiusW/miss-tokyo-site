@@ -32,7 +32,7 @@ const inputStyle: React.CSSProperties = {
     width: "100%",
     border: "1px solid #ddd8d0",
     background: "#fff",
-    fontSize: 14,
+    fontSize: 16,
     padding: "10px 12px",
     outline: "none",
     borderRadius: 0,
@@ -392,7 +392,7 @@ export function GiftCardPageClient({ config }: { config: Config }) {
                 1. HERO
             ══════════════════════════════════════════════════════════════════ */}
             <section style={{ background: "#141210", padding: "72px 48px 80px" }}>
-                <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
+                <div className="gc-hero-grid" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
                     {/* Left */}
                     <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
@@ -436,7 +436,7 @@ export function GiftCardPageClient({ config }: { config: Config }) {
                     {success ? (
                         <SuccessCard data={success} onReset={handleReset} />
                     ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 56, alignItems: "start" }}>
+                        <div className="gc-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 56, alignItems: "start" }}>
 
                             {/* ── Form ─────────────────────────────────────── */}
                             <form onSubmit={handleSubmit} noValidate>
@@ -467,7 +467,7 @@ export function GiftCardPageClient({ config }: { config: Config }) {
                                 </p>
 
                                 {/* Preset grid */}
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 20 }}>
+                                <div className="gc-preset-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 20 }}>
                                     {config.presetAmounts.map(val => (
                                         <button
                                             key={val}
@@ -561,7 +561,7 @@ export function GiftCardPageClient({ config }: { config: Config }) {
                                     {/* Recipient fields */}
                                     {deliveryMode === "email" && (
                                         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
-                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                                            <div className="gc-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                                 <div>
                                                     <label style={labelStyle}>Recipient Name</label>
                                                     <input
@@ -614,7 +614,7 @@ export function GiftCardPageClient({ config }: { config: Config }) {
                                 </div>
 
                                 {/* Your details */}
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: deliveryMode === "self" ? 8 : 0 }}>
+                                <div className="gc-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: deliveryMode === "self" ? 8 : 0 }}>
                                     <div>
                                         <label style={labelStyle}>Your Name</label>
                                         <input
@@ -641,7 +641,7 @@ export function GiftCardPageClient({ config }: { config: Config }) {
                             </form>
 
                             {/* ── Order Summary ─────────────────────────────── */}
-                            <div style={{ position: "sticky", top: 24 }}>
+                            <div className="gc-hide-on-mobile" style={{ position: "sticky", top: 24 }}>
                                 <div style={{ background: "#fff", border: "1px solid #e0dbd3" }}>
                                     {/* Header */}
                                     <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f0ece6" }}>
@@ -729,7 +729,7 @@ export function GiftCardPageClient({ config }: { config: Config }) {
                         </h2>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 40, textAlign: "center" }}>
+                    <div className="gc-how-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 40, textAlign: "center" }}>
                         {[
                             { icon: <ShieldCheck size={20} color="#8C8479" />, n: "01", title: "Choose an amount", body: `Pick from GH₵${config.minAmount} to GH₵${config.maxAmount} or enter a custom value that feels right.` },
                             { icon: <Mail size={20} color="#8C8479" />, n: "02", title: "Personalise it", body: "Add their name, a message, and choose when you'd like it delivered." },
@@ -748,6 +748,41 @@ export function GiftCardPageClient({ config }: { config: Config }) {
                     </div>
                 </div>
             </section>
+
+            {/* ══════════════════════════════════════════════════════════════════
+                MOBILE STICKY CTA (hidden on desktop via CSS)
+            ══════════════════════════════════════════════════════════════════ */}
+            <div className="gc-sticky-cta" style={{
+                display: "none",
+                position: "fixed", bottom: 0, left: 0, right: 0,
+                background: "#fff", borderTop: "1px solid #e0dbd3",
+                padding: "12px 20px", zIndex: 100,
+                alignItems: "center", gap: 16,
+            }}>
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: "#8C8479", letterSpacing: "0.1em", textTransform: "uppercase" }}>Total</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "#141210" }}>
+                        GH₵{displayAmount > 0 ? displayAmount.toFixed(2) : "—"}
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => handleSubmit()}
+                    disabled={submitting}
+                    style={{
+                        flex: 1, background: submitting ? "#666" : "#141210",
+                        color: "#fff", border: "none",
+                        padding: "14px 0",
+                        fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase",
+                        fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer",
+                        borderRadius: 0, transition: "background 0.15s",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    }}
+                >
+                    <CreditCard size={13} />
+                    {submitting ? "Processing…" : "Purchase Gift Card"}
+                </button>
+            </div>
 
             {/* ══════════════════════════════════════════════════════════════════
                 4. FAQ

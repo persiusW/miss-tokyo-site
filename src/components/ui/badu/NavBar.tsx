@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { X, Search } from "lucide-react";
@@ -26,6 +26,8 @@ export function NavBar() {
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [navVisible, setNavVisible] = useState(true);
+    const lastScrollY = useRef(0);
     const [navSettings, setNavSettings] = useState({
         nav_show_home: true,
         nav_show_shop: true,
@@ -56,6 +58,24 @@ export function NavBar() {
             });
     }, []);
 
+    // Hide on scroll down, show on scroll up
+    useEffect(() => {
+        const onScroll = () => {
+            const currentY = window.scrollY;
+            const prev = lastScrollY.current;
+            if (currentY < 10) {
+                setNavVisible(true);
+            } else if (currentY > prev + 6) {
+                setNavVisible(false);
+            } else if (currentY < prev - 6) {
+                setNavVisible(true);
+            }
+            lastScrollY.current = currentY;
+        };
+        window.addEventListener("scroll", onScroll, { passive: true });
+        return () => window.removeEventListener("scroll", onScroll);
+    }, []);
+
     // Prevent body scroll when menu or search is open
     useEffect(() => {
         if (menuOpen || searchOpen) {
@@ -76,7 +96,7 @@ export function NavBar() {
 
     return (
         <>
-            <header className="h-20 w-full flex items-center justify-between px-6 md:px-12 bg-black text-white sticky top-0 z-50 rounded-none border-b border-gray-900 shadow-sm">
+            <header className={`h-20 w-full flex items-center justify-between px-6 md:px-12 bg-black text-white fixed top-0 left-0 z-50 border-b border-gray-900 shadow-sm transition-transform duration-300 ease-in-out ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
                 <Link href="/" className="font-serif text-2xl md:text-3xl tracking-[0.15em] uppercase hover:opacity-80 transition-opacity">
                     MISS TOKYO
                 </Link>

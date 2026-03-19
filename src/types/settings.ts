@@ -75,6 +75,12 @@ export interface SiteSettings {
   about_cta_btn_url: string;
   // Shop
   shop_pagination_type: "load_more" | "pagination";
+  // Product page section toggles
+  pdp_show_trust_strip: boolean;
+  pdp_show_reviews: boolean;
+  pdp_show_product_details: boolean;
+  pdp_show_care_instructions: boolean;
+  pdp_show_delivery_returns: boolean;
   // Gift cards
   gc_enabled: boolean;
   gc_min_amount: number;

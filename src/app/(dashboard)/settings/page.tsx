@@ -11,6 +11,7 @@ import { SizeGuideTab } from "./SizeGuideTab";
 import { TeamTab } from "./TeamTab";
 import { BusinessSettingsTab } from "./BusinessSettingsTab";
 import { ShippingTab } from "./ShippingTab";
+import { ProductPageTab } from "./ProductPageTab";
 
 type BusinessSettings = {
     business_name: string;
@@ -100,7 +101,7 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "shipping" | "seo" | "emails" | "notifications" | "riders" | "size-guide" | "team";
+type TabKey = "business" | "store" | "shipping" | "seo" | "emails" | "notifications" | "riders" | "size-guide" | "team" | "product-page";
 
 const SETTINGS_TAB_GROUPS: { group: string; tabs: { key: TabKey; label: string }[] }[] = [
     {
@@ -109,7 +110,8 @@ const SETTINGS_TAB_GROUPS: { group: string; tabs: { key: TabKey; label: string }
             { key: "business",  label: "Business" },
             { key: "store",     label: "Store" },
             { key: "shipping",  label: "Shipping" },
-            { key: "seo",       label: "SEO" },
+            { key: "seo",          label: "SEO" },
+            { key: "product-page", label: "Product Page" },
         ],
     },
     {
@@ -181,6 +183,7 @@ export default function SettingsPage() {
                     {activeTab === "riders"         && <RidersTab />}
                     {activeTab === "size-guide"     && <SizeGuideTab />}
                     {activeTab === "team"           && <TeamTab />}
+                    {activeTab === "product-page"  && <ProductPageTab />}
                 </div>
             </div>
         </div>

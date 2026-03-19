@@ -21,6 +21,8 @@ const COLOR_HEX: Record<string, string> = {
     Chocolate:"#3d1c02", Mustard:"#e1ad01",
 };
 
+const getHex = (c: string) => COLOR_HEX[c] ?? COLOR_HEX[c.charAt(0).toUpperCase() + c.slice(1).toLowerCase()] ?? "#ccc";
+
 const FALLBACK_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='133'%3E%3Crect width='100' height='133' fill='%23E8D5C4'/%3E%3C/svg%3E";
 const PAGE_SIZE = 24;
 
@@ -144,7 +146,7 @@ function ShopProductCard({
                     <div className="flex gap-[5px] mt-[7px]">
                         {colors.slice(0, 6).map(c => (
                             <span key={c} className="w-[11px] h-[11px] rounded-full flex-shrink-0"
-                                style={{ background: COLOR_HEX[c] || "#ccc", border: "1px solid rgba(20,18,16,0.15)" }}
+                                style={{ background: getHex(c), border: "1px solid rgba(20,18,16,0.15)" }}
                                 title={c}
                             />
                         ))}
@@ -157,7 +159,7 @@ function ShopProductCard({
 
 // ── Quick Add Modal ───────────────────────────────────────────────────────────
 function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: () => void }) {
-    const { addItem, setIsOpen } = useCart();
+    const { addItem } = useCart();
     const [selectedColor, setSelectedColor] = useState(product.available_colors?.[0] || "");
     const [selectedSize, setSelectedSize] = useState("");
     const [adding, setAdding] = useState(false);
@@ -189,7 +191,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
         });
         setAdding(false);
         setAdded(true);
-        setTimeout(() => { onClose(); setIsOpen(true); }, 1200);
+        setTimeout(onClose, 1400);
     };
 
     return (
@@ -246,7 +248,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
                                     <button key={c} onClick={() => setSelectedColor(c)}
                                         className="w-7 h-7 rounded-full transition-all"
                                         style={{
-                                            background: COLOR_HEX[c] || "#ccc",
+                                            background: getHex(c),
                                             border: "2px solid transparent",
                                             boxShadow: selectedColor === c ? "0 0 0 2px #fff, 0 0 0 3.5px #141210" : "none",
                                         }}
@@ -351,10 +353,10 @@ function PriceRangeSlider({ min, max, valueMin, valueMax, onChange }: {
 }
 
 // ── Collapsible sidebar section ───────────────────────────────────────────────
-function SidebarSection({ title, children, hasFilter, onClear }: {
-    title: string; children: React.ReactNode; hasFilter?: boolean; onClear?: () => void;
+function SidebarSection({ title, children, hasFilter, onClear, defaultOpen = false }: {
+    title: string; children: React.ReactNode; hasFilter?: boolean; onClear?: () => void; defaultOpen?: boolean;
 }) {
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(defaultOpen);
     return (
         <div className="pb-5 mb-5" style={{ borderBottom: "1px solid rgba(20,18,16,0.1)" }}>
             <div className="flex items-center justify-between mb-[14px] cursor-pointer" onClick={() => setOpen(o => !o)}>
@@ -384,11 +386,12 @@ interface ShopPageClientProps {
     minPrice: number;
     maxPrice: number;
     paginationType: "load_more" | "pagination";
+    mobileCols?: 1 | 2;
 }
 
 export function ShopPageClient({
     initialProducts, categories, allColors, allSizes,
-    total, minPrice, maxPrice, paginationType,
+    total, minPrice, maxPrice, paginationType, mobileCols = 2,
 }: ShopPageClientProps) {
     const router = useRouter();
     const pathname = usePathname();
@@ -507,7 +510,8 @@ export function ShopPageClient({
 
     const clearAll = () => updateParams({ category: null, color: null, size: null, min: null, max: null, q: null, sort: null });
 
-    const gridClass = gridCols === 2 ? "grid-cols-2" : gridCols === 3 ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-2 xl:grid-cols-4";
+    const mobileColClass = mobileCols === 1 ? "grid-cols-1" : "grid-cols-2";
+    const gridClass = gridCols === 2 ? mobileColClass : gridCols === 3 ? `${mobileColClass} md:grid-cols-3` : `${mobileColClass} md:grid-cols-2 xl:grid-cols-4`;
 
     // Sidebar content (shared between desktop + drawer)
     const SidebarContent = () => (
@@ -516,7 +520,7 @@ export function ShopPageClient({
                 <PriceRangeSlider min={minPrice} max={maxPrice} valueMin={priceMin} valueMax={priceMax} onChange={handlePriceChange} />
             </SidebarSection>
 
-            <SidebarSection title="Category" hasFilter={!!activeCategory} onClear={() => updateParams({ category: null })}>
+            <SidebarSection title="Category" hasFilter={!!activeCategory} onClear={() => updateParams({ category: null })} defaultOpen>
                 <div className="flex flex-col gap-[9px]">
                     {categories.map(cat => (
                         <label key={cat.id} className="flex items-center gap-[9px] cursor-pointer">
@@ -545,7 +549,7 @@ export function ShopPageClient({
                             <button key={c} onClick={() => updateParams({ color: activeColor === c ? null : c })}
                                 className="w-6 h-6 rounded-full transition-all hover:scale-110"
                                 style={{
-                                    background: COLOR_HEX[c] || "#ccc",
+                                    background: getHex(c),
                                     border: "2px solid transparent",
                                     boxShadow: activeColor === c ? "0 0 0 2px #fff, 0 0 0 3.5px #141210" : "none",
                                 }}
@@ -698,7 +702,7 @@ export function ShopPageClient({
                     {/* Grid */}
                     {products.length > 0 ? (
                         <>
-                            <div className={`grid gap-[20px_16px] ${gridClass}`}>
+                            <div key={searchParams.toString()} className={`grid gap-[20px_16px] ${gridClass} shop-grid-animate`}>
                                 {products.map((p, i) => (
                                     <ShopProductCard key={p.id} product={p} onQuickAdd={setQuickAddProduct} priority={i < 4} />
                                 ))}
@@ -740,8 +744,8 @@ export function ShopPageClient({
                 <>
                     <div className="fixed inset-0 z-[300]" style={{ background: "rgba(20,18,16,0.5)", backdropFilter: "blur(2px)" }}
                         onClick={() => setDrawerOpen(false)} />
-                    <div className="fixed top-0 left-0 bottom-0 z-[301] flex flex-col"
-                        style={{ width: "min(340px, 90vw)", background: "#F7F2EC", transform: "translateX(0)", transition: "transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
+                    <div className="fixed inset-0 z-[301] flex flex-col"
+                        style={{ background: "#F7F2EC", transition: "transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)" }}>
                         <div className="flex items-center justify-between px-5 py-[18px] flex-shrink-0" style={{ borderBottom: "1px solid rgba(20,18,16,0.1)" }}>
                             <span className="text-[13px] font-medium tracking-[0.08em] uppercase" style={{ color: "#141210" }}>Filters</span>
                             <button onClick={() => setDrawerOpen(false)} className="w-8 h-8 flex items-center justify-center" style={{ border: "none", background: "none", cursor: "pointer" }}>

@@ -25,6 +25,7 @@ interface Props {
     imageUrl: string;
     isSale: boolean;
     discountValue: number;
+    showTrustStrip?: boolean;
 }
 
 const COLOR_HEX: Record<string, string> = {
@@ -59,6 +60,7 @@ export function ProductOptions(props: Props) {
         productId, name, slug, price, compareAtPrice, bundleLabel,
         colorVariants, sizeVariants, availableColors, availableSizes,
         inventoryCount, ratingAverage, reviewCount, imageUrl, isSale, discountValue,
+        showTrustStrip = true,
     } = props;
 
     const router = useRouter();
@@ -381,7 +383,7 @@ export function ProductOptions(props: Props) {
             </div>
 
             {/* Trust strip */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", border: "1px solid rgba(20,18,16,0.1)", borderRadius: 4, overflow: "hidden", marginBottom: 28 }}>
+            {showTrustStrip && <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", border: "1px solid rgba(20,18,16,0.1)", borderRadius: 4, overflow: "hidden", marginBottom: 28 }}>
                 {[
                     {
                         label: "Free Delivery", sub: "Orders GH₵150+",
@@ -407,7 +409,7 @@ export function ProductOptions(props: Props) {
                         <div style={{ fontSize: 9, color: "var(--muted, #7A7167)", letterSpacing: "0.02em" }}>{t.sub}</div>
                     </div>
                 ))}
-            </div>
+            </div>}
 
             {/* Size Guide Modal */}
             {sizeGuideOpen && (

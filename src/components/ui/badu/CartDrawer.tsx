@@ -18,7 +18,7 @@ export function CartDrawer() {
     const total = items.reduce((sum, item) => sum + getEffectivePrice(item) * item.quantity, 0);
 
     return (
-        <div className="fixed inset-0 z-[60] flex justify-end">
+        <div className="fixed inset-0 z-[260] flex justify-end">
             <div
                 className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
                 onClick={() => setIsOpen(false)}

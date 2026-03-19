@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Eye, EyeOff, Tag, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
@@ -28,6 +29,7 @@ type WholesaleCategory = {
 };
 
 export default function CatalogProductsPage() {
+    const router = useRouter();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -259,8 +261,12 @@ export default function CatalogProductsPage() {
                                 const firstSku = product.product_variants?.[0]?.sku || "—";
 
                                 return (
-                                    <tr key={product.id} className={`hover:bg-neutral-50 transition-colors ${!product.is_active ? "opacity-50" : ""}`}>
-                                        <td className="px-6 py-4 text-center">
+                                    <tr
+                                        key={product.id}
+                                        className={`hover:bg-neutral-50 transition-colors cursor-pointer ${!product.is_active ? "opacity-50" : ""}`}
+                                        onClick={() => router.push(`/catalog/products/${product.id}/edit`)}
+                                    >
+                                        <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                                             <input
                                                 type="checkbox"
                                                 className="w-4 h-4 accent-black align-middle cursor-pointer"
@@ -306,7 +312,7 @@ export default function CatalogProductsPage() {
                                         <td className="px-6 py-4 text-right font-medium">
                                             GH₵ {product.price_ghs}
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                             {isConfirming ? (
                                                 <div className="flex items-center gap-3 justify-end">
                                                     <span className="text-xs text-neutral-500">Delete?</span>

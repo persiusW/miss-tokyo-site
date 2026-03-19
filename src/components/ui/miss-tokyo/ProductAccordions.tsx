@@ -55,60 +55,69 @@ interface Props {
     featuresList: string[] | null;
     careInstructions: string[] | null;
     sku: string | null;
+    showProductDetails?: boolean;
+    showCare?: boolean;
+    showDelivery?: boolean;
 }
 
-export function ProductAccordions({ description, featuresList, careInstructions, sku }: Props) {
+export function ProductAccordions({ description, featuresList, careInstructions, sku, showProductDetails = true, showCare = true, showDelivery = true }: Props) {
     return (
         <div style={{ borderTop: "1px solid rgba(20,18,16,0.1)" }}>
-            <AccItem label="Product Details" defaultOpen>
-                {description && <p style={{ marginBottom: featuresList?.length ? 10 : 0 }}>{description}</p>}
-                {featuresList && featuresList.length > 0 && (
-                    <ul style={{ paddingLeft: 16, marginTop: description ? 6 : 0 }}>
-                        {featuresList.map((f, i) => (
-                            <li key={i} style={{ marginBottom: 5 }} dangerouslySetInnerHTML={{ __html: f }} />
-                        ))}
-                    </ul>
-                )}
-                {sku && (
-                    <ul style={{ paddingLeft: 16, marginTop: 6 }}>
-                        <li style={{ marginBottom: 5 }}>
-                            <strong style={{ color: "var(--ink, #141210)", fontWeight: 500 }}>SKU:</strong> {sku}
-                        </li>
-                    </ul>
-                )}
-            </AccItem>
+            {showProductDetails && (
+                <AccItem label="Product Details" defaultOpen>
+                    {description && <p style={{ marginBottom: featuresList?.length ? 10 : 0 }}>{description}</p>}
+                    {featuresList && featuresList.length > 0 && (
+                        <ul style={{ paddingLeft: 16, marginTop: description ? 6 : 0 }}>
+                            {featuresList.map((f, i) => (
+                                <li key={i} style={{ marginBottom: 5 }} dangerouslySetInnerHTML={{ __html: f }} />
+                            ))}
+                        </ul>
+                    )}
+                    {sku && (
+                        <ul style={{ paddingLeft: 16, marginTop: 6 }}>
+                            <li style={{ marginBottom: 5 }}>
+                                <strong style={{ color: "var(--ink, #141210)", fontWeight: 500 }}>SKU:</strong> {sku}
+                            </li>
+                        </ul>
+                    )}
+                </AccItem>
+            )}
 
-            <AccItem label="Care Instructions">
-                {careInstructions && careInstructions.length > 0 ? (
-                    <ul style={{ paddingLeft: 16 }}>
-                        {careInstructions.map((c, i) => <li key={i} style={{ marginBottom: 5 }}>{c}</li>)}
-                    </ul>
-                ) : (
-                    <ul style={{ paddingLeft: 16 }}>
-                        <li style={{ marginBottom: 5 }}>Machine wash cold (30°C) on gentle cycle</li>
-                        <li style={{ marginBottom: 5 }}>Turn inside out before washing to protect the print</li>
-                        <li style={{ marginBottom: 5 }}>Do not tumble dry — air dry flat</li>
-                        <li style={{ marginBottom: 5 }}>Do not bleach or iron directly on print</li>
-                        <li style={{ marginBottom: 5 }}>Wash with similar colours</li>
-                    </ul>
-                )}
-            </AccItem>
+            {showCare && (
+                <AccItem label="Care Instructions">
+                    {careInstructions && careInstructions.length > 0 ? (
+                        <ul style={{ paddingLeft: 16 }}>
+                            {careInstructions.map((c, i) => <li key={i} style={{ marginBottom: 5 }}>{c}</li>)}
+                        </ul>
+                    ) : (
+                        <ul style={{ paddingLeft: 16 }}>
+                            <li style={{ marginBottom: 5 }}>Machine wash cold (30°C) on gentle cycle</li>
+                            <li style={{ marginBottom: 5 }}>Turn inside out before washing to protect the print</li>
+                            <li style={{ marginBottom: 5 }}>Do not tumble dry — air dry flat</li>
+                            <li style={{ marginBottom: 5 }}>Do not bleach or iron directly on print</li>
+                            <li style={{ marginBottom: 5 }}>Wash with similar colours</li>
+                        </ul>
+                    )}
+                </AccItem>
+            )}
 
-            <AccItem label="Delivery & Returns">
-                <p>
-                    <strong style={{ color: "var(--ink, #141210)", fontWeight: 500 }}>Delivery in Accra:</strong>{" "}
-                    1–2 business days · Free on orders over GH₵150
-                </p>
-                <p style={{ marginTop: 8 }}>
-                    <strong style={{ color: "var(--ink, #141210)", fontWeight: 500 }}>Nationwide delivery:</strong>{" "}
-                    3–5 business days · Standard rates apply
-                </p>
-                <p style={{ marginTop: 8 }}>
-                    <strong style={{ color: "var(--ink, #141210)", fontWeight: 500 }}>Returns:</strong>{" "}
-                    Accepted within 7 days of delivery for unworn, unwashed items in original condition.
-                    Email orders@misstokyo.shop to start a return.
-                </p>
-            </AccItem>
+            {showDelivery && (
+                <AccItem label="Delivery & Returns">
+                    <p>
+                        <strong style={{ color: "var(--ink, #141210)", fontWeight: 500 }}>Delivery in Accra:</strong>{" "}
+                        1–2 business days · Free on orders over GH₵150
+                    </p>
+                    <p style={{ marginTop: 8 }}>
+                        <strong style={{ color: "var(--ink, #141210)", fontWeight: 500 }}>Nationwide delivery:</strong>{" "}
+                        3–5 business days · Standard rates apply
+                    </p>
+                    <p style={{ marginTop: 8 }}>
+                        <strong style={{ color: "var(--ink, #141210)", fontWeight: 500 }}>Returns:</strong>{" "}
+                        Accepted within 7 days of delivery for unworn, unwashed items in original condition.
+                        Email orders@misstokyo.shop to start a return.
+                    </p>
+                </AccItem>
+            )}
         </div>
     );
 }

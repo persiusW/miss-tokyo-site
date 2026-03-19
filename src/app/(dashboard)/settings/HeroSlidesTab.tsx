@@ -13,6 +13,7 @@ import {
     ArrowDown,
     Plus,
 } from "lucide-react";
+import { ImageUploader } from "@/components/ui/badu/ImageUploader";
 
 type HeroSlide = {
     id: string;
@@ -451,19 +452,16 @@ export function HeroSlidesTab() {
                                     />
                                 </div>
 
-                                {/* Image URL */}
-                                <div>
-                                    <label className={LABEL_CLASS}>Image URL</label>
-                                    <input
-                                        type="text"
-                                        value={slide.image_url}
-                                        onChange={(e) =>
-                                            updateSlide(slide.id, "image_url", e.target.value)
-                                        }
-                                        className={INPUT_CLASS}
-                                        placeholder="https://..."
-                                    />
-                                </div>
+                                {/* Slide Image */}
+                                <ImageUploader
+                                    bucket="site-assets"
+                                    folder="hero-slides"
+                                    currentUrl={slide.image_url || null}
+                                    onUpload={(url) => updateSlide(slide.id, "image_url", url)}
+                                    aspectRatio="video"
+                                    label="Slide Image"
+                                    acceptVideo
+                                />
 
                                 <div className="flex justify-end pt-2">
                                     <button

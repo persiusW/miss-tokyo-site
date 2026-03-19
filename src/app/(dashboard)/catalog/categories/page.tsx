@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/badu/ImageUploader";
-import { Pencil, Trash2, X, Check, Star, Tag, Copy } from "lucide-react";
+import { Pencil, Trash2, X, Check, Star, Tag, Copy, Search } from "lucide-react";
 import { toast } from "@/lib/toast";
 
 type Category = {
@@ -82,6 +82,7 @@ export default function CategoriesPage() {
     const [editIsWholesale, setEditIsWholesale] = useState(false);
     const [editWholesalePrices, setEditWholesalePrices] = useState({ t1: "", t2: "", t3: "" });
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [search, setSearch] = useState("");
 
     const fetchCategories = async () => {
         setLoading(true);
@@ -250,7 +251,7 @@ export default function CategoriesPage() {
 
     return (
         <div className="space-y-12">
-            <header className="flex items-center justify-between">
+            <header className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Categories</h1>
                     <p className="text-neutral-500">
@@ -260,12 +261,24 @@ export default function CategoriesPage() {
                         </span>
                     </p>
                 </div>
-                <button
-                    onClick={() => setIsAdding(!isAdding)}
-                    className="bg-black text-white px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
-                >
-                    {isAdding ? "Cancel" : "New Category"}
-                </button>
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Search categories…"
+                            className="pl-9 pr-4 py-2.5 border border-neutral-200 bg-white text-sm outline-none focus:border-black transition-colors w-56 rounded-none"
+                        />
+                    </div>
+                    <button
+                        onClick={() => setIsAdding(!isAdding)}
+                        className="bg-black text-white px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors whitespace-nowrap"
+                    >
+                        {isAdding ? "Cancel" : "New Category"}
+                    </button>
+                </div>
             </header>
 
             {isAdding && (
@@ -342,7 +355,15 @@ export default function CategoriesPage() {
                             <tr><td colSpan={8} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td></tr>
                         ) : categories.length === 0 ? (
                             <tr><td colSpan={8} className="px-6 py-16 text-center text-neutral-500 italic font-serif">No categories yet. Add your first above.</td></tr>
-                        ) : categories.map((cat) => (
+                        ) : (() => {
+                            const q = search.trim().toLowerCase();
+                            const filtered = q
+                                ? categories.filter(c => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q) || (c.description ?? "").toLowerCase().includes(q))
+                                : categories;
+                            if (filtered.length === 0) return (
+                                <tr><td colSpan={8} className="px-6 py-12 text-center text-neutral-400 text-sm">No categories match &ldquo;{search}&rdquo;</td></tr>
+                            );
+                            return filtered.map((cat) => (
                             editingId === cat.id ? (
                                 <tr key={cat.id} className="bg-neutral-50">
                                     <td className="px-6 py-4">
@@ -483,7 +504,8 @@ export default function CategoriesPage() {
                                     </td>
                                 </tr>
                             )
-                        ))}
+                        ));
+                        })()}
                     </tbody>
                 </table>
             </div>

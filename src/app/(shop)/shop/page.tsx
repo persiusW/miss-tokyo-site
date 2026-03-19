@@ -55,7 +55,7 @@ export default async function ShopPage({
 }) {
     const params = await searchParams;
 
-    const [{ products, total, minPrice, maxPrice }, categories, paginationSetting] = await Promise.all([
+    const [{ products, total, minPrice, maxPrice }, categories, paginationSetting, mobileCols] = await Promise.all([
         getProducts({
             category: params.category,
             sort:     params.sort,
@@ -73,23 +73,51 @@ export default async function ShopPage({
             .eq("id", "singleton")
             .maybeSingle()
             .then(({ data }) => (data?.shop_pagination_type as "load_more" | "pagination") || "load_more"),
+        supabaseAdmin
+            .from("store_settings")
+            .select("shop_mobile_cols")
+            .eq("id", "default")
+            .maybeSingle()
+            .then(({ data }) => (data?.shop_mobile_cols as 1 | 2) || 2),
     ]);
 
-    // Derive all unique colors and sizes across the FULL (unfiltered) active product set
-    // to populate sidebar swatches/pills even when a filter is active
-    const { data: allProductsForFilters } = await supabaseAdmin
-        .from("products")
-        .select("available_colors, available_sizes")
-        .eq("is_active", true);
+    // Resolve category slug → name once (reused for both filter queries)
+    let categoryName: string | null = null;
+    if (params.category) {
+        const { data: cat } = await supabaseAdmin
+            .from("categories")
+            .select("name")
+            .eq("slug", params.category)
+            .maybeSingle();
+        categoryName = cat?.name
+            ?? params.category.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    }
 
-    const allForFilters = (allProductsForFilters || []).map((p: any) => ({
-        ...p,
-        color_variants: null,
-        size_variants: null,
-    }));
+    // Faceted filter queries:
+    // • allColors = colors available within the current category + size selection
+    // • allSizes  = sizes  available within the current category + color selection
+    const buildBase = () =>
+        supabaseAdmin.from("products").select("available_colors, available_sizes").eq("is_active", true);
 
-    const allColors = deriveColors(allForFilters as any);
-    const allSizes  = deriveSizes(allForFilters as any);
+    let colorsQ = buildBase();
+    let sizesQ  = buildBase();
+
+    if (categoryName) {
+        colorsQ = colorsQ.ilike("category_type", categoryName) as typeof colorsQ;
+        sizesQ  = sizesQ.ilike("category_type",  categoryName) as typeof sizesQ;
+    }
+    // Colors are constrained by the active size filter
+    if (params.size)  colorsQ = colorsQ.contains("available_sizes",  [params.size])  as typeof colorsQ;
+    // Sizes are constrained by the active color filter
+    if (params.color) sizesQ  = sizesQ.contains("available_colors", [params.color]) as typeof sizesQ;
+
+    const [{ data: colorsData }, { data: sizesData }] = await Promise.all([colorsQ, sizesQ]);
+
+    const toFilterRows = (rows: any[] | null) =>
+        (rows || []).map((p: any) => ({ ...p, color_variants: null, size_variants: null }));
+
+    const allColors = deriveColors(toFilterRows(colorsData) as any);
+    const allSizes  = deriveSizes(toFilterRows(sizesData)  as any);
 
     return (
         <Suspense fallback={null}>
@@ -102,6 +130,7 @@ export default async function ShopPage({
                 minPrice={minPrice}
                 maxPrice={maxPrice}
                 paginationType={paginationSetting}
+                mobileCols={mobileCols}
             />
         </Suspense>
     );

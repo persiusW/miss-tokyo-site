@@ -29,7 +29,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
     return (
         <>
-            <div className="min-h-screen bg-neutral-50 font-sans flex text-neutral-900">
+            <div className="h-screen overflow-hidden bg-neutral-50 font-sans flex text-neutral-900">
                 <AdminSidebar
                     isFullAccess={isFullAccess}
                     showCustomRequests={showCustomRequests}
