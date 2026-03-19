@@ -11,9 +11,9 @@ import { supabase } from "@/lib/supabase";
 const NAV_LINKS = [
     { href: "/",             label: "Home",         navKey: "nav_show_home" },
     { href: "/shop",         label: "Shop",         navKey: "nav_show_shop" },
-    { href: "/sale",         label: "Sale",         navKey: null },
-    { href: "/dresses",      label: "Dresses",      navKey: null },
-    { href: "/new-arrivals", label: "New Arrivals", navKey: "nav_show_new_arrivals" },
+    { href: "/shop?sale=true", label: "Sale",         navKey: null },
+    { href: "/shop?category=dresses", label: "Dresses", navKey: null },
+    { href: "/shop",         label: "New Arrivals", navKey: "nav_show_new_arrivals" },
     { href: "/gift-cards",   label: "Gift Cards",   navKey: "nav_show_gift_card" },
     { href: "/contact",      label: "CONTACT",      navKey: "nav_show_contact" },
     { href: "/about",        label: "ABOUT",        navKey: "nav_show_about" },
@@ -93,7 +93,7 @@ export function NavBar() {
 
     const handleSearch = (query: string) => {
         if (query.trim()) {
-            router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+            router.push(`/shop?q=${encodeURIComponent(query.trim())}`);
             setSearchOpen(false);
             setSearchQuery("");
         }
@@ -108,7 +108,8 @@ export function NavBar() {
 
                 <nav className="space-x-4 lg:space-x-8 text-[10px] md:text-xs tracking-[0.2em] font-medium uppercase hidden xl:block">
                     {NAV_LINKS.filter(l => !l.navKey || navSettings[l.navKey as keyof typeof navSettings]).map(l => {
-                        const isActive = pathname === l.href;
+                        const linkPath = l.href.split("?")[0];
+                        const isActive = pathname === linkPath && (linkPath !== "/shop" || l.href === "/shop");
                         return (
                             <Link
                                 key={l.href}
@@ -235,18 +236,22 @@ export function NavBar() {
 
                     {/* Links */}
                     <nav className="flex-1 flex flex-col items-center justify-center gap-6 pb-16 px-6 overflow-y-auto">
-                        {NAV_LINKS.filter(l => !l.navKey || navSettings[l.navKey as keyof typeof navSettings]).map(l => (
-                            <Link
-                                key={l.href}
-                                href={l.href}
-                                onClick={() => setMenuOpen(false)}
-                                className={`font-serif text-3xl sm:text-4xl tracking-[0.1em] uppercase hover:text-neutral-400 transition-colors py-2 ${
-                                    pathname === l.href ? "text-white" : "text-neutral-500"
-                                }`}
-                            >
-                                {l.label}
-                            </Link>
-                        ))}
+                        {NAV_LINKS.filter(l => !l.navKey || navSettings[l.navKey as keyof typeof navSettings]).map(l => {
+                            const linkPath = l.href.split("?")[0];
+                            const isActive = pathname === linkPath && (linkPath !== "/shop" || l.href === "/shop");
+                            return (
+                                <Link
+                                    key={l.href}
+                                    href={l.href}
+                                    onClick={() => setMenuOpen(false)}
+                                    className={`font-serif text-3xl sm:text-4xl tracking-[0.1em] uppercase hover:text-neutral-400 transition-colors py-2 ${
+                                        isActive ? "text-white" : "text-neutral-500"
+                                    }`}
+                                >
+                                    {l.label}
+                                </Link>
+                            );
+                        })}
                     </nav>
                 </div>
             )}

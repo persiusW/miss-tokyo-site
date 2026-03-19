@@ -416,6 +416,7 @@ export function ShopPageClient({
     const activeMin      = searchParams.get("min");
     const activeMax      = searchParams.get("max");
     const activeQ        = searchParams.get("q");
+    const activeSale     = searchParams.get("sale") === "true";
 
     const [products, setProducts]         = useState(initialProducts);
     const [totalCount, setTotalCount]     = useState(total);
@@ -484,6 +485,7 @@ export function ShopPageClient({
             query = query.ilike("category_type", categoryName);
         }
         if (activeQ) query = query.ilike("name", `%${activeQ}%`);
+        if (activeSale) query = query.eq("is_sale", true);
         if (activeMin) query = query.gte("price_ghs", parseFloat(activeMin));
         if (activeMax) query = query.lte("price_ghs", parseFloat(activeMax));
         if (activeColor) query = query.contains("available_colors", [activeColor]);

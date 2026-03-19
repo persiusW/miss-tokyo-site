@@ -42,12 +42,13 @@ export interface GetProductsParams {
     page?: number;
     q?: string | null;
     inStock?: boolean;
+    sale?: boolean;
 }
 
 const PAGE_SIZE = 24;
 
 export async function getProducts(params: GetProductsParams) {
-    const { category, sort, color, size, min, max, page = 1, q } = params;
+    const { category, sort, color, size, min, max, page = 1, q, sale } = params;
 
     // Products use category_type (text) not category_id FK.
     // Resolve the category slug → category name for matching against category_type.
@@ -79,6 +80,7 @@ export async function getProducts(params: GetProductsParams) {
     }
 
     if (q) query = query.ilike("name", `%${q}%`);
+    if (sale) query = query.eq("is_sale", true);
     if (min) query = query.gte("price_ghs", parseFloat(min));
     if (max) query = query.lte("price_ghs", parseFloat(max));
     if (color) query = query.contains("available_colors", [color]);

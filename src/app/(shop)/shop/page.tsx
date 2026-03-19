@@ -15,6 +15,7 @@ interface SearchParams {
     max?: string;
     page?: string;
     q?: string;
+    sale?: string;
 }
 
 export async function generateMetadata({
@@ -65,6 +66,7 @@ export default async function ShopPage({
             max:      params.max,
             page:     params.page ? parseInt(params.page) : 1,
             q:        params.q,
+            sale:     params.sale === "true",
         }),
         getCategories(),
         supabaseAdmin
@@ -105,6 +107,10 @@ export default async function ShopPage({
     if (categoryName) {
         colorsQ = colorsQ.ilike("category_type", categoryName) as typeof colorsQ;
         sizesQ  = sizesQ.ilike("category_type",  categoryName) as typeof sizesQ;
+    }
+    if (params.sale === "true") {
+        colorsQ = colorsQ.eq("is_sale", true) as typeof colorsQ;
+        sizesQ  = sizesQ.eq("is_sale",  true) as typeof sizesQ;
     }
     // Colors are constrained by the active size filter
     if (params.size)  colorsQ = colorsQ.contains("available_sizes",  [params.size])  as typeof colorsQ;
