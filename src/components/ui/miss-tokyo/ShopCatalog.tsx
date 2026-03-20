@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { supabase } from "@/lib/supabase";
-import { ShopClient } from "@/components/ui/badu/ShopClient";
+import { ShopClient } from "@/components/ui/miss-tokyo/ShopClient";
 
 interface ShopCatalogProps {
     title?: string;

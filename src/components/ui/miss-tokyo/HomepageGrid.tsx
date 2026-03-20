@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AnimatedProductGrid } from "@/components/ui/badu/AnimatedProductGrid";
-import { QuickViewModal } from "@/components/ui/badu/QuickViewModal";
+import { AnimatedProductGrid } from "@/components/ui/miss-tokyo/AnimatedProductGrid";
+import { QuickViewModal } from "@/components/ui/miss-tokyo/QuickViewModal";
 
 interface Product {
     slug: string;

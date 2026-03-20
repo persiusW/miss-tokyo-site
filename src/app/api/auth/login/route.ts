@@ -13,7 +13,7 @@ export async function POST(request: Request) {
         }
 
         const response = NextResponse.json({ success: true });
-        response.cookies.set('badu_session', AUTH_SECRET, {
+        response.cookies.set('miss_tokyo_session', AUTH_SECRET, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',

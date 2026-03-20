@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { ImageUploader } from "@/components/ui/badu/ImageUploader";
+import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { TextBlocksTab } from "./TextBlocksTab";
 
 type SiteAsset = {

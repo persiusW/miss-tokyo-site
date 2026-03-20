@@ -1,9 +1,9 @@
 {
-  "name": "badu-ecom-website",
+  "name": "miss-tokyo-site",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && next dev",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

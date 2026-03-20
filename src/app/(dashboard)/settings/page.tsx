@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { ImageUploader } from "@/components/ui/badu/ImageUploader";
+import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { toast } from "@/lib/toast";
 import { EmailsTab } from "./EmailsTab";
 import { NotificationsTab } from "./NotificationsTab";
@@ -280,7 +280,7 @@ function BusinessTab() {
                             value={form.email}
                             onChange={handleChange}
                             className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="hello@badu.co"
+                            placeholder="hello@misstokyo.shop"
                         />
                     </div>
 
@@ -1050,7 +1050,7 @@ function SEOTab() {
                             )}
                         </div>
                         <div className="p-4 bg-neutral-50 border-t border-neutral-200 text-left">
-                            <p className="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">badu.co</p>
+                            <p className="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">misstokyo.shop</p>
                             <h3 className="font-medium text-neutral-900 mb-1 truncate">{formData.title || "Page Title"}</h3>
                             <p className="text-xs text-neutral-500 truncate">{formData.description || "Page description..."}</p>
                         </div>

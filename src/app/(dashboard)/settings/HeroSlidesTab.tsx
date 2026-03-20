@@ -13,7 +13,7 @@ import {
     ArrowDown,
     Plus,
 } from "lucide-react";
-import { ImageUploader } from "@/components/ui/badu/ImageUploader";
+import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 
 type HeroSlide = {
     id: string;

@@ -34,8 +34,8 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: "BADU | Minimalist Luxury",
-    description: "Handmade in Ghana. A minimalist collection of luxury footwear.",
+    title: "MISS TOKYO | Minimalist Luxury",
+    description: "Handmade in Ghana. A minimalist collection of luxury fashion.",
   };
 }
 

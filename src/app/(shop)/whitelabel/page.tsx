@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { CustomOrderForm } from "@/components/ui/badu/CustomOrderForm";
+import { CustomOrderForm } from "@/components/ui/miss-tokyo/CustomOrderForm";
 import { Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 

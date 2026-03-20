@@ -1,7 +1,7 @@
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { fetchOrderStats, fetchRecentActivity } from "@/lib/utils/metrics";
 import { Wallet, Package, CheckCircle, TrendingUp, AlertTriangle } from "lucide-react";
-import { CategoryDonutChart, ConversionFunnelChart } from "@/components/ui/badu/OverviewCharts";
+import { CategoryDonutChart, ConversionFunnelChart } from "@/components/ui/miss-tokyo/OverviewCharts";
 import { PushNotificationBanner } from "@/components/ui/PushNotificationBanner";
 
 export const dynamic = "force-dynamic";

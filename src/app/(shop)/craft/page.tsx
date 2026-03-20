@@ -29,7 +29,7 @@ export default async function CraftPage() {
                             {copy['craft_heritage_heading'] || "The Name Is Personal"}
                         </h3>
                         <p className="text-neutral-600 leading-relaxed text-sm md:text-base">
-                            {copy['craft_heritage_body'] || "BADU is more than a label; it is a lineage. Born in Accra, our atelier honors the artisanal legacy of Ghana by refusing the shortcuts of mass production. Every stitch is a deliberate act of preservation."}
+                            {copy['craft_heritage_body'] || "MISS TOKYO is more than a label; it is a lineage. Born in Accra, our atelier honors the artisanal legacy of Ghana by refusing the shortcuts of mass production. Every stitch is a deliberate act of preservation."}
                         </p>
                     </div>
 

@@ -82,6 +82,6 @@ export const useCart = create<CartState>()(
                 return get().items.reduce((total, item) => total + item.quantity, 0);
             },
         }),
-        { name: 'badu-cart-storage' }
+        { name: 'miss-tokyo-cart-storage' }
     )
 );

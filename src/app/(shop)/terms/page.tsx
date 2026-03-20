@@ -21,12 +21,12 @@ export default function TermsPage() {
 
                 <section>
                     <h2 className="text-xs font-semibold uppercase tracking-widest mb-4 text-neutral-400">Intellectual Property</h2>
-                    <p>All designs, images, and content on this site are the exclusive property of BADU. Reproduction without written consent is prohibited.</p>
+                    <p>All designs, images, and content on this site are the exclusive property of MISS TOKYO. Reproduction without written consent is prohibited.</p>
                 </section>
 
                 <section>
                     <h2 className="text-xs font-semibold uppercase tracking-widest mb-4 text-neutral-400">Contact</h2>
-                    <p>For any questions regarding these terms, email <a href="mailto:studio@badu.com" className="border-b border-black hover:text-neutral-500 transition-colors">studio@badu.com</a>.</p>
+                    <p>For any questions regarding these terms, email <a href="mailto:studio@misstokyo.shop" className="border-b border-black hover:text-neutral-500 transition-colors">studio@misstokyo.shop</a>.</p>
                 </section>
             </div>
         </div>

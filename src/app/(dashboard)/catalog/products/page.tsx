@@ -100,24 +100,12 @@ export default function CatalogProductsPage() {
     const handleBulkAssignWholesale = async () => {
         if (!selectedWholesaleCatId) return;
         setAssigning(true);
-        // Fetch current category_ids for each selected product then append
-        const { data: currentProducts } = await supabase
+        const { error } = await supabase
             .from("products")
-            .select("id, category_ids")
+            .update({ category_id: selectedWholesaleCatId })
             .in("id", selectedIds);
-
-        const updates = (currentProducts ?? []).map(p => {
-            const existing: string[] = p.category_ids ?? [];
-            const merged = existing.includes(selectedWholesaleCatId)
-                ? existing
-                : [...existing, selectedWholesaleCatId];
-            return supabase.from("products").update({ category_ids: merged }).eq("id", p.id);
-        });
-
-        const results = await Promise.all(updates);
-        const anyError = results.some(r => r.error);
-        if (anyError) {
-            toast.error("Some products failed to update.");
+        if (error) {
+            toast.error("Failed to assign wholesale category.");
         } else {
             toast.success(`Wholesale category assigned to ${selectedIds.length} product${selectedIds.length !== 1 ? "s" : ""}.`);
             setSelectedIds([]);

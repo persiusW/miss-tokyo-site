@@ -13,7 +13,7 @@ const NAV_LINKS = [
     { href: "/shop",         label: "Shop",         navKey: "nav_show_shop" },
     { href: "/shop?sale=true", label: "Sale",         navKey: null },
     { href: "/shop?category=dresses", label: "Dresses", navKey: null },
-    { href: "/shop",         label: "New Arrivals", navKey: "nav_show_new_arrivals" },
+    { href: "/shop?sort=newest", label: "New Arrivals", navKey: "nav_show_new_arrivals" },
     { href: "/gift-cards",   label: "Gift Cards",   navKey: "nav_show_gift_card" },
     { href: "/contact",      label: "CONTACT",      navKey: "nav_show_contact" },
     { href: "/about",        label: "ABOUT",        navKey: "nav_show_about" },

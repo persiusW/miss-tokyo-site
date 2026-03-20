@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { ChevronDown, ChevronUp, Plus, Trash2, GripVertical } from "lucide-react";
 import type { AboutTimelineEntry, AboutValue, AboutTeamMember } from "@/types/settings";
-import { ImageUploader } from "@/components/ui/badu/ImageUploader";
+import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 
 // ── Accordion wrapper ─────────────────────────────────────────────────────────
 function Accordion({ title, children }: { title: string; children: React.ReactNode }) {

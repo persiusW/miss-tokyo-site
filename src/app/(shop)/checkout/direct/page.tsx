@@ -56,7 +56,7 @@ function DirectPayContent() {
             <div className="w-full max-w-md space-y-12">
                 <header className="text-center">
                     <p className="text-[10px] uppercase tracking-widest text-neutral-400 mb-3">Secure Payment</p>
-                    <h1 className="font-serif text-4xl tracking-widest uppercase mb-2">BADU</h1>
+                    <h1 className="font-serif text-4xl tracking-widest uppercase mb-2">MISS TOKYO</h1>
                 </header>
 
                 <div className="bg-neutral-50 border border-neutral-100 p-8 space-y-4">

@@ -17,14 +17,14 @@ export default function ShippingPage() {
                     <h2 className="text-xs font-semibold uppercase tracking-widest mb-6 text-neutral-400">Returns & Exchanges</h2>
                     <div className="space-y-4 text-sm">
                         <p>As each piece is made to order, we do not accept returns unless the item arrives damaged or defective.</p>
-                        <p>If your order arrives with a manufacturing defect, please contact us within 7 days of receipt at <a href="mailto:studio@badu.com" className="border-b border-black hover:text-neutral-500 transition-colors">studio@badu.com</a>.</p>
+                        <p>If your order arrives with a manufacturing defect, please contact us within 7 days of receipt at <a href="mailto:studio@misstokyo.shop" className="border-b border-black hover:text-neutral-500 transition-colors">studio@misstokyo.shop</a>.</p>
                         <p>Size exchanges are considered on a case-by-case basis. Please reach out before placing your order if you have any sizing questions.</p>
                     </div>
                 </section>
 
                 <section>
                     <h2 className="text-xs font-semibold uppercase tracking-widest mb-6 text-neutral-400">Contact</h2>
-                    <p className="text-sm">For all shipping and returns enquiries, email <a href="mailto:studio@badu.com" className="border-b border-black hover:text-neutral-500 transition-colors">studio@badu.com</a>.</p>
+                    <p className="text-sm">For all shipping and returns enquiries, email <a href="mailto:studio@misstokyo.shop" className="border-b border-black hover:text-neutral-500 transition-colors">studio@misstokyo.shop</a>.</p>
                 </section>
             </div>
         </div>

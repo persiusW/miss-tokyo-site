@@ -194,7 +194,7 @@ export default function CustomersPage() {
     // --- Export Selected ---
     const handleExportSelected = () => {
         const rows = contacts.filter(c => selected.has(c.id));
-        downloadCSV(rows, `badu-contacts-selected-${new Date().toISOString().slice(0, 10)}.csv`);
+        downloadCSV(rows, `miss-tokyo-contacts-selected-${new Date().toISOString().slice(0, 10)}.csv`);
     };
 
     // --- Delete Selected (manual only) ---
@@ -234,7 +234,7 @@ export default function CustomersPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => downloadCSV(contacts, `badu-contacts-${new Date().toISOString().slice(0, 10)}.csv`)}
+                        onClick={() => downloadCSV(contacts, `miss-tokyo-contacts-${new Date().toISOString().slice(0, 10)}.csv`)}
                         className="border border-neutral-300 text-neutral-700 px-5 py-2.5 text-xs uppercase tracking-widest hover:border-black hover:text-black transition-colors"
                     >
                         Export All

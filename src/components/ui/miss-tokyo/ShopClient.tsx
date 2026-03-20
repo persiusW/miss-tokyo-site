@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { AnimatedProductGrid } from "@/components/ui/badu/AnimatedProductGrid";
-import { QuickViewModal } from "@/components/ui/badu/QuickViewModal";
+import { AnimatedProductGrid } from "@/components/ui/miss-tokyo/AnimatedProductGrid";
+import { QuickViewModal } from "@/components/ui/miss-tokyo/QuickViewModal";
 import { ChevronDown, ChevronRight, X, Filter, Plus, Minus } from "lucide-react";
 
 // Module-level: stable reference, unaffected by React Compiler or re-renders

@@ -21,7 +21,7 @@ export default function PrivacyPage() {
 
                 <section>
                     <h2 className="text-xs font-semibold uppercase tracking-widest mb-4 text-neutral-400">Contact</h2>
-                    <p>For any privacy concerns, contact us at <a href="mailto:studio@badu.com" className="border-b border-black hover:text-neutral-500 transition-colors">studio@badu.com</a>.</p>
+                    <p>For any privacy concerns, contact us at <a href="mailto:studio@misstokyo.shop" className="border-b border-black hover:text-neutral-500 transition-colors">studio@misstokyo.shop</a>.</p>
                 </section>
             </div>
         </div>

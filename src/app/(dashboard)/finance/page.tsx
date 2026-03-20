@@ -67,7 +67,7 @@ export default function FinancePage() {
     const copyPayLink = (docId: string, docAmount: number) => {
         // Generate a quick faux-paystack checkout url for the demo.
         // Real flow would hit /api/paystack/initialize to get an actual URL.
-        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://badu.co';
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://misstokyo.shop';
         const fakeLink = `${baseUrl}/checkout/direct?ref=${docId}&amt=${docAmount}`;
         navigator.clipboard.writeText(fakeLink);
         alert("Pay Link copied to clipboard!");

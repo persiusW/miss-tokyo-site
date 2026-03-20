@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogoutButton } from "@/components/ui/badu/LogoutButton";
+import { LogoutButton } from "@/components/ui/miss-tokyo/LogoutButton";
 
 type NavItem = { label: string; href: string; badge?: string };
 

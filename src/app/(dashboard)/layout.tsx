@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
-import { Toaster } from "@/components/ui/badu/Toaster";
-import { RealtimeStockMonitor } from "@/components/ui/badu/RealtimeStockMonitor";
-import { AdminSidebar } from "@/components/ui/badu/AdminSidebar";
+import { redirect } from "next/navigation";
+import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
+import { RealtimeStockMonitor } from "@/components/ui/miss-tokyo/RealtimeStockMonitor";
+import { AdminSidebar } from "@/components/ui/miss-tokyo/AdminSidebar";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 
@@ -12,6 +13,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         supabaseAdmin.from("store_settings").select("enable_custom_requests").eq("id", "default").single(),
         supabaseAdmin.from("business_settings").select("business_name").eq("id", "default").single(),
     ]);
+
+    if (!user) {
+        redirect("/admin/login");
+    }
 
     let userRole: string | null = null;
     if (user) {

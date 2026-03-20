@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { ImageUploader } from "@/components/ui/badu/ImageUploader";
+import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { Pencil, Trash2, X, Check, Star, Tag, Copy, Search } from "lucide-react";
 import { toast } from "@/lib/toast";
 

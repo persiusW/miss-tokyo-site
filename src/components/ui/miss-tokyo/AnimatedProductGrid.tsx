@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, Variants } from "framer-motion";
-import { ProductCard } from "@/components/ui/badu/ProductCard";
+import { ProductCard } from "@/components/ui/miss-tokyo/ProductCard";
 
 interface Product {
     slug: string;

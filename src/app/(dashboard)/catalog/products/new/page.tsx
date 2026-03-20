@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { ImageUploader } from "@/components/ui/badu/ImageUploader";
+import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { toast } from "@/lib/toast";
 
 type Category = { id: string; name: string; slug: string; is_wholesale: boolean };
@@ -236,7 +236,7 @@ export default function NewProductPage() {
                                         onChange={handleChange}
                                         required
                                         className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                                        placeholder="badu-slide-02"
+                                        placeholder="miss-tokyo-slide-02"
                                     />
                                 </div>
                                 <div className="space-y-4">
