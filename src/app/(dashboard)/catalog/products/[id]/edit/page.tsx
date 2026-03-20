@@ -252,8 +252,10 @@ export default function EditProductPage() {
                                                 id="category_type"
                                                 value={formData.category_type}
                                                 onChange={handleChange}
+                                                required
                                                 className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
                                             >
+                                                <option value="" disabled>Select Category</option>
                                                 {categories.filter(c => !c.is_wholesale).map(cat => (
                                                     <option key={cat.id} value={cat.name}>{cat.name}</option>
                                                 ))}

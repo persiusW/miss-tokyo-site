@@ -1,20 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Playfair_Display, Cinzel } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: "../../public/fonts/geist.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  weight: "100 900",
 });
 
-const playfairDisplay = Playfair_Display({
+const playfairDisplay = localFont({
+  src: "../../public/fonts/playfair.woff2",
   variable: "--font-playfair-display",
-  subsets: ["latin"],
+  weight: "400 900",
 });
 
-const cinzel = Cinzel({
+const cinzel = localFont({
+  src: "../../public/fonts/cinzel.woff2",
   variable: "--font-cinzel",
-  subsets: ["latin"],
+  weight: "400 900",
 });
 
 import { supabase } from "@/lib/supabase";

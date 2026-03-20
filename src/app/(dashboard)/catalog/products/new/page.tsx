@@ -42,7 +42,6 @@ export default function NewProductPage() {
         ]).then(([{ data: catData }, { data: storeData }]) => {
             if (catData && catData.length > 0) {
                 setCategories(catData);
-                setFormData(prev => ({ ...prev, category_type: catData[0].name }));
             }
             if (storeData) {
                 if (storeData.global_sizes) {
@@ -218,8 +217,10 @@ export default function NewProductPage() {
                                                 id="category_type"
                                                 value={formData.category_type}
                                                 onChange={handleChange}
+                                                required
                                                 className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
                                             >
+                                                <option value="" disabled>Select Category</option>
                                                 {categories.filter(c => !c.is_wholesale).map(cat => (
                                                     <option key={cat.id} value={cat.name}>{cat.name}</option>
                                                 ))}
