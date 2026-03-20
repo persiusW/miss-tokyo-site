@@ -78,24 +78,25 @@ export default function EditProductPage() {
                 setGlobalStitching(storeData.global_stitching);
                 setSelectedStitching(product.available_stitching || storeData.global_stitching);
             }
-            if (storeData.wholesale_enabled) {
-                setWholesaleTierConfig({
-                    enabled: true,
-                    tier1Min: storeData.wholesale_tier_1_min ?? 3,
-                    tier1Max: storeData.wholesale_tier_1_max ?? 5,
-                    tier2Min: storeData.wholesale_tier_2_min ?? 8,
-                    tier2Max: storeData.wholesale_tier_2_max ?? 10,
-                    tier3Min: storeData.wholesale_tier_3_min ?? 12,
-                    tier3Max: storeData.wholesale_tier_3_max ?? 24,
-                });
-                setSelectedCategoryIds(Array.isArray(product.category_ids) ? product.category_ids : []);
+        setSelectedCategoryIds(Array.isArray(product.category_ids) ? product.category_ids : []);
         setWholesaleOverride(product.wholesale_override === true);
-                setWholesalePrices({
-                    tier1: product.wholesale_price_tier_1 != null ? String(product.wholesale_price_tier_1) : "",
-                    tier2: product.wholesale_price_tier_2 != null ? String(product.wholesale_price_tier_2) : "",
-                    tier3: product.wholesale_price_tier_3 != null ? String(product.wholesale_price_tier_3) : "",
-                });
-            }
+        setWholesalePrices({
+            tier1: product.wholesale_price_tier_1 != null ? String(product.wholesale_price_tier_1) : "",
+            tier2: product.wholesale_price_tier_2 != null ? String(product.wholesale_price_tier_2) : "",
+            tier3: product.wholesale_price_tier_3 != null ? String(product.wholesale_price_tier_3) : "",
+        });
+
+        if (storeData && storeData.wholesale_enabled) {
+            setWholesaleTierConfig({
+                enabled: true,
+                tier1Min: storeData.wholesale_tier_1_min ?? 3,
+                tier1Max: storeData.wholesale_tier_1_max ?? 5,
+                tier2Min: storeData.wholesale_tier_2_min ?? 8,
+                tier2Max: storeData.wholesale_tier_2_max ?? 10,
+                tier3Min: storeData.wholesale_tier_3_min ?? 12,
+                tier3Max: storeData.wholesale_tier_3_max ?? 24,
+            });
+        }
         }
 
         setLoading(false);
