@@ -9,6 +9,8 @@ interface Props {
     name: string;
 }
 
+const isVideo = (url: string) => url?.includes(".mp4") || url?.includes(".webm") || url?.includes(".mov");
+
 export function ProductImageCarousel({ images, name }: Props) {
     const [current, setCurrent] = useState(0);
     const count = images.length;
@@ -28,13 +30,24 @@ export function ProductImageCarousel({ images, name }: Props) {
         <div className="flex flex-col gap-3">
             {/* Main image */}
             <div className="relative aspect-[4/5] w-full bg-neutral-100 overflow-hidden group">
-                <Image
-                    src={images[current]}
-                    alt={`${name} — view ${current + 1}`}
-                    fill
-                    className="object-cover object-center transition-opacity duration-300"
-                    priority={current === 0}
-                />
+                {isVideo(images[current]) ? (
+                    <video
+                        src={images[current]}
+                        autoPlay={true}
+                        muted={true}
+                        loop={true}
+                        playsInline={true}
+                        className="object-cover object-center w-full h-full transition-opacity duration-300 pointer-events-none"
+                    />
+                ) : (
+                    <Image
+                        src={images[current]}
+                        alt={`${name} — view ${current + 1}`}
+                        fill
+                        className="object-cover object-center transition-opacity duration-300"
+                        priority={current === 0}
+                    />
+                )}
 
                 {count > 1 && (
                     <>
@@ -83,12 +96,23 @@ export function ProductImageCarousel({ images, name }: Props) {
                             className={`relative aspect-square bg-neutral-100 overflow-hidden border transition-colors ${i === current ? "border-black" : "border-transparent hover:border-neutral-300"}`}
                             aria-label={`Go to image ${i + 1}`}
                         >
-                            <Image
-                                src={url}
-                                alt={`${name} thumbnail ${i + 1}`}
-                                fill
-                                className="object-cover object-center"
-                            />
+                            {isVideo(url) ? (
+                                <video
+                                    src={url}
+                                    autoPlay={true}
+                                    muted={true}
+                                    loop={true}
+                                    playsInline={true}
+                                    className="object-cover object-center w-full h-full pointer-events-none"
+                                />
+                            ) : (
+                                <Image
+                                    src={url}
+                                    alt={`${name} thumbnail ${i + 1}`}
+                                    fill
+                                    className="object-cover object-center"
+                                />
+                            )}
                         </button>
                     ))}
                 </div>

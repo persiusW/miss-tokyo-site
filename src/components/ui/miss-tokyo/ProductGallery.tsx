@@ -12,6 +12,8 @@ interface Props {
 
 const FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='533'%3E%3Crect width='400' height='533' fill='%23E8D5C4'/%3E%3C/svg%3E";
 
+const isVideo = (url: string) => url?.includes(".mp4") || url?.includes(".webm") || url?.includes(".mov");
+
 export function ProductGallery({ images, name, badge, isSale }: Props) {
     const imgs = images.length > 0 ? images : [FALLBACK];
     const [current, setCurrent] = useState(0);
@@ -56,14 +58,25 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                                 background: "var(--blush, #E8D5C4)", position: "relative", padding: 0,
                             }}
                         >
-                            <Image
-                                src={img}
-                                alt={`${name} ${i + 1}`}
-                                fill
-                                sizes="72px"
-                                loading="lazy"
-                                style={{ objectFit: "cover", transition: "transform 0.3s" }}
-                            />
+                            {isVideo(img) ? (
+                                <video
+                                    src={img}
+                                    autoPlay={true}
+                                    muted={true}
+                                    loop={true}
+                                    playsInline={true}
+                                    style={{ objectFit: "cover", width: "100%", height: "100%", transition: "transform 0.3s" }}
+                                />
+                            ) : (
+                                <Image
+                                    src={img}
+                                    alt={`${name} ${i + 1}`}
+                                    fill
+                                    sizes="72px"
+                                    loading="lazy"
+                                    style={{ objectFit: "cover", transition: "transform 0.3s" }}
+                                />
+                            )}
                         </button>
                     ))}
                 </div>
@@ -81,14 +94,25 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                     tabIndex={0}
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") openLightbox(); }}
                 >
-                    <Image
-                        src={imgs[current]}
-                        alt={name}
-                        fill
-                        priority
-                        sizes="(max-width: 768px) 100vw, 50vw"
-                        style={{ objectFit: "cover", transition: "opacity 0.3s" }}
-                    />
+                    {isVideo(imgs[current]) ? (
+                        <video
+                            src={imgs[current]}
+                            autoPlay={true}
+                            muted={true}
+                            loop={true}
+                            playsInline={true}
+                            style={{ objectFit: "cover", width: "100%", height: "100%", transition: "opacity 0.3s" }}
+                        />
+                    ) : (
+                        <Image
+                            src={imgs[current]}
+                            alt={name}
+                            fill
+                            priority
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                            style={{ objectFit: "cover", transition: "opacity 0.3s" }}
+                        />
+                    )}
 
                     {/* Badge */}
                     {badgeLabel && (
@@ -206,16 +230,33 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                     )}
 
                     {/* Main lightbox image */}
-                    <img
-                        src={imgs[current]}
-                        alt={name}
-                        onClick={e => e.stopPropagation()}
-                        style={{
-                            maxWidth: "100%", maxHeight: "90vh",
-                            objectFit: "contain", borderRadius: 2,
-                            boxShadow: "0 8px 48px rgba(0,0,0,0.5)",
-                        }}
-                    />
+                    {isVideo(imgs[current]) ? (
+                        <video
+                            src={imgs[current]}
+                            autoPlay={true}
+                            muted={true}
+                            loop={true}
+                            playsInline={true}
+                            controls={true}
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                                maxWidth: "100%", maxHeight: "90vh",
+                                objectFit: "contain", borderRadius: 2,
+                                boxShadow: "0 8px 48px rgba(0,0,0,0.5)",
+                            }}
+                        />
+                    ) : (
+                        <img
+                            src={imgs[current]}
+                            alt={name}
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                                maxWidth: "100%", maxHeight: "90vh",
+                                objectFit: "contain", borderRadius: 2,
+                                boxShadow: "0 8px 48px rgba(0,0,0,0.5)",
+                            }}
+                        />
+                    )}
 
                     {/* Lightbox nav arrows */}
                     {imgs.length > 1 && (
