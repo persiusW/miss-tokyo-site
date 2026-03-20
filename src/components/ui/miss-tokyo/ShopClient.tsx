@@ -52,6 +52,7 @@ interface Product {
     imageUrl: string;
     hoverImageUrl?: string;
     category: string;
+    categoryIds: string[];
     colors: string[];
     sizes: string[];
     createdAt: string;
@@ -126,8 +127,10 @@ export function ShopClient({
             const matchedCat = categories.find(c => normalize(c.slug) === normActive);
             result = result.filter(p => {
                 const normCat = normalize(p.category);
-                return normCat === normActive
+                const isPrimaryMatch = normCat === normActive 
                     || (matchedCat && normCat === normalize(matchedCat.name));
+                const isSecondaryMatch = matchedCat && p.categoryIds && p.categoryIds.includes(matchedCat.id);
+                return isPrimaryMatch || isSecondaryMatch;
             });
         }
         if (activeColor) result = result.filter(p => p.colors.includes(activeColor));

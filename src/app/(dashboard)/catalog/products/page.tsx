@@ -12,6 +12,7 @@ type Product = {
     name: string;
     slug: string;
     category_type: string;
+    category_ids: string[] | null;
     price_ghs: number;
     inventory_count: number;
     track_inventory: boolean;
@@ -43,7 +44,7 @@ export default function CatalogProductsPage() {
     const fetchProducts = useCallback(async () => {
         const { data } = await supabase
             .from("products")
-            .select("id, name, slug, category_type, price_ghs, inventory_count, track_inventory, is_active, image_urls, product_variants(sku)")
+            .select("id, name, slug, category_type, category_ids, price_ghs, inventory_count, track_inventory, is_active, image_urls, product_variants(sku)")
             .order("created_at", { ascending: false });
         setProducts(data || []);
         setLoading(false);
@@ -102,7 +103,10 @@ export default function CatalogProductsPage() {
         setAssigning(true);
         const { error } = await supabase
             .from("products")
-            .update({ category_id: selectedWholesaleCatId })
+            .update({ 
+                category_id: selectedWholesaleCatId,
+                category_ids: [selectedWholesaleCatId] 
+            })
             .in("id", selectedIds);
         if (error) {
             toast.error("Failed to assign wholesale category.");
@@ -273,7 +277,14 @@ export default function CatalogProductsPage() {
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-neutral-900">{product.name}</p>
-                                                    <p className="text-xs text-neutral-500 mt-1">{product.category_type}</p>
+                                                    <div className="flex items-center gap-1.5 mt-1">
+                                                        <p className="text-xs text-neutral-500">{product.category_type || "No Primary Category"}</p>
+                                                        {product.category_ids && product.category_ids.length > 0 && (
+                                                            <span className="text-[10px] px-1.5 py-0.5 bg-neutral-100 text-neutral-400 rounded-full font-medium">
+                                                                +{product.category_ids.length}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>

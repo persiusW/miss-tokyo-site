@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { revalidatePath } from "next/cache";
 
 export async function POST(req: NextRequest) {
     // Auth check — only admin/owner can create products
@@ -71,6 +72,9 @@ export async function POST(req: NextRequest) {
         console.error("[admin/products POST]", error);
         return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
     }
+
+    revalidatePath("/shop", "page");
+    revalidatePath("/catalog/products", "page");
 
     return NextResponse.json({ success: true, product: data });
 }
@@ -145,6 +149,9 @@ export async function PATCH(req: NextRequest) {
         console.error("[admin/products PATCH]", error);
         return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
     }
+
+    revalidatePath("/shop", "page");
+    revalidatePath("/catalog/products", "page");
 
     return NextResponse.json({ success: true });
 }

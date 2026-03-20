@@ -85,14 +85,16 @@ export default async function ShopPage({
 
     // Resolve category slug → name once (reused for both filter queries)
     let categoryName: string | null = null;
+    let categoryId: string | null = null;
     if (params.category) {
         const { data: cat } = await supabaseAdmin
             .from("categories")
-            .select("name")
+            .select("id, name")
             .eq("slug", params.category)
             .maybeSingle();
         categoryName = cat?.name
             ?? params.category.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        categoryId = cat?.id || null;
     }
 
     // Faceted filter queries:
@@ -104,7 +106,11 @@ export default async function ShopPage({
     let colorsQ = buildBase();
     let sizesQ  = buildBase();
 
-    if (categoryName) {
+    if (categoryId && categoryName) {
+        const orFilter = `category_type.ilike."${categoryName}",category_id.eq.${categoryId},category_ids.cs.{"${categoryId}"}`;
+        colorsQ = colorsQ.or(orFilter) as typeof colorsQ;
+        sizesQ  = sizesQ.or(orFilter) as typeof sizesQ;
+    } else if (categoryName) {
         colorsQ = colorsQ.ilike("category_type", categoryName) as typeof colorsQ;
         sizesQ  = sizesQ.ilike("category_type",  categoryName) as typeof sizesQ;
     }

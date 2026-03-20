@@ -254,7 +254,7 @@ export default function EditProductPage() {
                                                 className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
                                             >
                                                 {categories.filter(c => !c.is_wholesale).map(cat => (
-                                                    <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                                                    <option key={cat.id} value={cat.name}>{cat.name}</option>
                                                 ))}
                                             </select>
                                         )}

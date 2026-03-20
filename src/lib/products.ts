@@ -50,19 +50,6 @@ const PAGE_SIZE = 24;
 export async function getProducts(params: GetProductsParams) {
     const { category, sort, color, size, min, max, page = 1, q, sale } = params;
 
-    // Products use category_type (text) not category_id FK.
-    // Resolve the category slug → category name for matching against category_type.
-    let categoryName: string | null = null;
-    if (category) {
-        const { data: cat } = await supabaseAdmin
-            .from("categories")
-            .select("name")
-            .eq("slug", category)
-            .maybeSingle();
-        // If no DB match, convert slug to title-case as fallback (e.g. "new-arrivals" → "New Arrivals")
-        categoryName = cat?.name ?? category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-    }
-
     let query = supabaseAdmin
         .from("products")
         .select(
@@ -74,11 +61,25 @@ export async function getProducts(params: GetProductsParams) {
         )
         .eq("is_active", true);
 
-    // Filter by category_type (case-insensitive exact match against category name)
-    if (categoryName) {
-        query = query.ilike("category_type", categoryName);
+    // Products use category_type (text) or category_ids (uuid array).
+    // Resolve the category slug → category name & ID for matching.
+    if (category) {
+        const { data: cat } = await supabaseAdmin
+            .from("categories")
+            .select("id, name")
+            .eq("slug", category)
+            .maybeSingle();
+
+        if (cat) {
+            query = query.or(`category_type.ilike."${cat.name}",category_id.eq.${cat.id},category_ids.cs.{"${cat.id}"}`);
+        } else {
+            const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+            query = query.ilike("category_type", fallbackName);
+        }
     }
 
+    // Filtering by category moved up into the primary query definition to handle complex .or() logic
+    
     if (q) query = query.ilike("name", `%${q}%`);
     if (sale) query = query.eq("is_sale", true);
     if (min) query = query.gte("price_ghs", parseFloat(min));
@@ -171,7 +172,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     const { data } = await supabaseAdmin
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
-             image_urls, is_featured, category_type,
+             image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count,
              sku, features_list, care_instructions, rating_average, review_count, created_at`)
@@ -204,7 +205,7 @@ export async function getRelatedProducts(categoryType: string, currentSlug: stri
     const { data } = await supabaseAdmin
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
-             image_urls, is_featured, category_type,
+             image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
         .eq("is_active", true)

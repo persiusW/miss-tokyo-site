@@ -30,7 +30,17 @@ export default async function ShopCatalog({
     }
 
     if (defaultCategorySlug) {
-        productsQuery = productsQuery.eq("category_type", defaultCategorySlug);
+        const { data: cat } = await supabase.from("categories")
+            .select("id, name")
+            .eq("slug", defaultCategorySlug)
+            .maybeSingle();
+            
+        if (cat) {
+            productsQuery = productsQuery.or(`category_type.ilike."${cat.name}",category_id.eq.${cat.id},category_ids.cs.{"${cat.id}"}`);
+        } else {
+            const fallbackName = defaultCategorySlug.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+            productsQuery = productsQuery.ilike("category_type", fallbackName);
+        }
     }
 
     if (searchQuery) {
@@ -75,6 +85,7 @@ export default async function ShopCatalog({
             imageUrl: p.image_urls?.[0] || FALLBACK_IMAGE,
             hoverImageUrl: p.image_urls?.[1],
             category: p.category_type || "",
+            categoryIds: p.category_ids || [],
             colors: p.available_colors || [],
             sizes: p.available_sizes || [],
             createdAt: p.created_at,
