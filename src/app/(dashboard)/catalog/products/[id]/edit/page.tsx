@@ -13,7 +13,7 @@ import { GripVertical } from "lucide-react";
 
 type Category = { id: string; name: string; slug: string; is_wholesale: boolean };
 
-function SortableImageItem({ id, url, index, onUpload, onRemove, onBeforeUpload }: { id: string, url: string | null, index: number, onUpload: (id: string, url: string) => void, onRemove: (id: string) => void, onBeforeUpload?: (file: File) => boolean }) {
+function SortableImageItem({ id, url, index, onUpload, onRemove }: { id: string, url: string | null, index: number, onUpload: (id: string, url: string) => void, onRemove: (id: string) => void }) {
     const {
         attributes,
         listeners,
@@ -50,8 +50,6 @@ function SortableImageItem({ id, url, index, onUpload, onRemove, onBeforeUpload 
                     currentUrl={url}
                     onUpload={(newUrl) => onUpload(id, newUrl)}
                     onRemove={() => onRemove(id)}
-                    onBeforeUpload={onBeforeUpload}
-                    acceptVideo
                     aspectRatio="video"
                     label={index === 0 ? "Primary Image" : `Media ${index + 1}`}
                 />
@@ -614,7 +612,6 @@ export default function EditProductPage() {
                                                 index={index}
                                                 onUpload={handleImageUpload}
                                                 onRemove={handleImageRemove}
-                                                onBeforeUpload={validateBeforeUpload}
                                             />
                                         ))}
                                     </div>

@@ -481,8 +481,6 @@ export default function NewProductPage() {
                                             currentUrl={slot.url}
                                             onUpload={(url) => handleMediaUpload(slot.id, url)}
                                             onRemove={() => handleMediaRemove(slot.id)}
-                                            onBeforeUpload={validateBeforeUpload}
-                                            acceptVideo
                                             aspectRatio="video"
                                             label={index === 0 ? "Primary Image" : `Media ${index + 1}`}
                                         />

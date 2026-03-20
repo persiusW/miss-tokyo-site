@@ -470,7 +470,6 @@ export function HeroSlidesTab() {
                                     onUpload={(url) => updateSlide(slide.id, "image_url", url)}
                                     aspectRatio="video"
                                     label="Slide Image"
-                                    acceptVideo
                                 />
 
                                 <div className="flex justify-end pt-2">
