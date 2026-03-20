@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
 interface Props {
@@ -12,7 +12,41 @@ interface Props {
 
 const FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='533'%3E%3Crect width='400' height='533' fill='%23E8D5C4'/%3E%3C/svg%3E";
 
-const isVideo = (url: string) => url?.includes(".mp4") || url?.includes(".webm") || url?.includes(".mov");
+const isVideo = (url: string) => {
+    if (!url) return false;
+    const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
+    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.endsWith('.mov') || url.includes('/video/') || url.includes('supabase.co/storage/v1/object/public/product-images/');
+};
+
+// Helper component to handle play/pause reliably
+function ManagedVideo({ src, active, alwaysPlay = false, priority = false }: { src: string; active: boolean; alwaysPlay?: boolean; priority?: boolean }) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    // Initial mount and prop changes
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (active || alwaysPlay) {
+            video.play().catch(() => {});
+        } else {
+            video.pause();
+        }
+    }, [active, alwaysPlay]);
+
+    return (
+        <video
+            ref={videoRef}
+            src={src}
+            muted={true}
+            loop={true}
+            playsInline={true}
+            autoPlay={active || alwaysPlay}
+            preload={priority || active ? "auto" : "metadata"}
+            style={{ objectFit: "cover", width: "100%", height: "100%" }}
+        />
+    );
+}
 
 export function ProductGallery({ images, name, badge, isSale }: Props) {
     const imgs = images.length > 0 ? images : [FALLBACK];
@@ -53,20 +87,13 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                             style={{
                                 width: 72, aspectRatio: "3/4", borderRadius: 3, overflow: "hidden",
                                 cursor: "pointer",
-                                border: `1.5px solid ${i === current ? "var(--ink, #141210)" : "transparent"}`,
+                                border: `2px solid ${i === current ? "var(--ink, #141210)" : "transparent"}`,
                                 transition: "border-color 0.18s", flexShrink: 0,
                                 background: "var(--blush, #E8D5C4)", position: "relative", padding: 0,
                             }}
                         >
                             {isVideo(img) ? (
-                                <video
-                                    src={img}
-                                    autoPlay={true}
-                                    muted={true}
-                                    loop={true}
-                                    playsInline={true}
-                                    style={{ objectFit: "cover", width: "100%", height: "100%", transition: "transform 0.3s" }}
-                                />
+                                <ManagedVideo src={img} active={false} alwaysPlay={true} />
                             ) : (
                                 <Image
                                     src={img}
@@ -104,25 +131,14 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                                         position: "absolute",
                                         inset: 0,
                                         opacity: active ? 1 : 0,
-                                        transition: "opacity 0.4s ease-in-out",
+                                        transition: "opacity 0.2s ease-in-out",
                                         pointerEvents: active ? "auto" : "none",
-                                        zIndex: active ? 1 : 0
+                                        zIndex: active ? 1 : 0,
+                                        visibility: active || Math.abs(current - i) <= 1 ? "visible" : "hidden" // Help with browser background task management
                                     }}
                                 >
                                     {isVideo(img) ? (
-                                        <video
-                                            src={img}
-                                            autoPlay={active}
-                                            muted={true}
-                                            loop={true}
-                                            playsInline={true}
-                                            preload="auto"
-                                            style={{
-                                                objectFit: "cover",
-                                                width: "100%",
-                                                height: "100%"
-                                            }}
-                                        />
+                                        <ManagedVideo src={img} active={active} priority={i === 0} />
                                     ) : (
                                         <Image
                                             src={img}
