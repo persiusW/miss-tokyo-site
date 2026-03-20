@@ -294,7 +294,7 @@ export function HomepageSectionsTab() {
 
         const header = "Email,Subscribed At,Coupon Code,Source";
         const rows = data.map(
-            (s) =>
+            (s: any) =>
                 `"${s.email}","${new Date(s.subscribed_at).toLocaleDateString("en-GB")}","${s.coupon_code ?? ""}","${s.source ?? ""}"`
         );
         const csv = [header, ...rows].join("\n");

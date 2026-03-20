@@ -11,7 +11,7 @@ export function RealtimeStockMonitor() {
             .on(
                 "postgres_changes",
                 { event: "UPDATE", schema: "public", table: "products" },
-                (payload) => {
+                (payload: any) => {
                     const updated = payload.new as { name: string; inventory_count: number; is_active: boolean };
                     if (updated.is_active && typeof updated.inventory_count === "number" && updated.inventory_count < 5) {
                         const msg = updated.inventory_count === 0

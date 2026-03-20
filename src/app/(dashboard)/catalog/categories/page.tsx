@@ -94,7 +94,7 @@ export default function CategoriesPage() {
     useEffect(() => {
         fetchCategories();
         supabase.from("store_settings").select("wholesale_enabled,wholesale_tier_1_min,wholesale_tier_1_max,wholesale_tier_2_min,wholesale_tier_2_max,wholesale_tier_3_min,wholesale_tier_3_max").eq("id", "default").single()
-            .then(({ data }) => {
+            .then(({ data }: { data: { wholesale_enabled: boolean; wholesale_tier_1_min: number; wholesale_tier_1_max: number; wholesale_tier_2_min: number; wholesale_tier_2_max: number; wholesale_tier_3_min: number; wholesale_tier_3_max: number } | null }) => {
                 if (data) {
                     setTierConfig({
                         enabled: data.wholesale_enabled ?? false,
@@ -217,7 +217,7 @@ export default function CategoriesPage() {
             .eq("category_type", cat.slug);
 
         // 3. Append the new wholesale category ID to each product's category_ids
-        const updates = (matchedProducts ?? []).map(p => {
+        const updates = (matchedProducts ?? []).map((p: { id: string; category_ids: string[] | null }) => {
             const existing: string[] = p.category_ids ?? [];
             const merged = existing.includes(newCat.id) ? existing : [...existing, newCat.id];
             return supabase.from("products").update({ category_ids: merged }).eq("id", p.id);

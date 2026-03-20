@@ -23,7 +23,7 @@ export function TrustBarTab() {
             .select("trust_bar_enabled, trust_bar_items")
             .eq("id", "singleton")
             .single()
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data) {
                     setEnabled(data.trust_bar_enabled ?? false);
                     setItems(

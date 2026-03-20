@@ -79,7 +79,7 @@ function RiderPicker({
     useEffect(() => {
         supabase.from("riders").select("id, full_name, phone_number, bike_reg")
             .eq("is_active", true).order("full_name")
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 setRiders(data ?? []);
                 if (data && data.length > 0) setSelectedRider(data[0].id);
                 setLoading(false);
@@ -243,7 +243,7 @@ export default function OrderDetailPage() {
             setOrder(prev => prev ? { ...prev, status: "shipped", assigned_rider_id: riderId } : prev);
             // Load the newly assigned rider for the UI card
             supabase.from("riders").select("full_name, phone_number, bike_reg, image_url").eq("id", riderId).single()
-                .then(({ data: r }) => { if (r) setAssignedRider(r as AssignedRider); });
+                .then(({ data: r }: { data: any }) => { if (r) setAssignedRider(r as AssignedRider); });
             setNotifStatus("sent");
             toast.success("Order dispatched — customer & rider notified via email & SMS.");
         } catch (err: any) {

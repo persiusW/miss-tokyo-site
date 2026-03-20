@@ -18,7 +18,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }) => {
+        supabase.auth.getUser().then(({ data: { user } }: { data: any }) => {
             if (!user) {
                 router.replace(`/login?next=${pathname}`);
             } else {

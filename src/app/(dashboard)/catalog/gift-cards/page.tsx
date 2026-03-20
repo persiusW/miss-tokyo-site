@@ -101,7 +101,7 @@ export default function GiftCardsPage() {
     const fetchStats = useCallback(async () => {
         const { data: all } = await supabase
             .from("gift_cards")
-            .select("initial_value, remaining_value, status, created_at");
+            .select("initial_value, remaining_value, status, created_at") as { data: Pick<GiftCard, "initial_value" | "remaining_value" | "status" | "created_at">[] | null };
         if (!all) return;
         const monthStart = new Date();
         monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);

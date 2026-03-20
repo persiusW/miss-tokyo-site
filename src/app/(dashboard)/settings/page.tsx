@@ -198,7 +198,7 @@ function BusinessTab() {
 
     useEffect(() => {
         supabase.from("business_settings").select("*").eq("id", "default").single()
-            .then(({ data: bData }) => {
+            .then(({ data: bData }: { data: any }) => {
                 setForm({
                     business_name: bData?.business_name || "",
                     email: bData?.email || "",
@@ -329,7 +329,7 @@ function StoreTab() {
 
     useEffect(() => {
         supabase.from("store_settings").select("*").eq("id", "default").single()
-            .then(({ data: sData }) => {
+            .then(({ data: sData }: { data: any }) => {
                 if (sData) {
                     setForm({
                         global_sizes: sData.global_sizes || DEFAULT_STORE.global_sizes,
@@ -1090,7 +1090,7 @@ function CommunicationsTab() {
         supabase
             .from("communication_templates")
             .select("*")
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 setTemplates(data ?? []);
                 setLoading(false);
             });

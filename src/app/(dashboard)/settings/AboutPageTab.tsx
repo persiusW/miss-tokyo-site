@@ -109,7 +109,7 @@ export function AboutPageTab() {
             .select("*")
             .eq("id", "singleton")
             .single()
-            .then(({ data: s }) => {
+            .then(({ data: s }: { data: any }) => {
                 if (!s) return;
                 setEyebrow(s.about_eyebrow ?? "");
                 setHeadLine1(s.about_headline_line1 ?? "");

@@ -64,7 +64,7 @@ export function HeroSlidesTab() {
             .from("hero_slides")
             .select("*")
             .order("position", { ascending: true })
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 const STRING_FIELDS: (keyof HeroSlide)[] = [
                     "eyebrow", "headline_line1", "headline_line2", "headline_line3",
                     "body_text", "cta_primary_label", "cta_primary_url",

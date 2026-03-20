@@ -25,7 +25,7 @@ export function Footer() {
             .select("store_email, store_phone, store_address, store_name, social_instagram, social_tiktok, social_facebook, social_twitter, social_pinterest, social_youtube, social_snapchat, social_threads")
             .eq("id", "singleton")
             .single()
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data) setSettings(prev => ({ ...prev, ...data }));
             });
     }, []);

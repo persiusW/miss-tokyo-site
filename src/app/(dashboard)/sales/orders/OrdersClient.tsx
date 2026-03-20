@@ -115,7 +115,11 @@ function DispatchModal({
 
     useEffect(() => {
         supabase.from("riders").select("*").eq("is_active", true).order("full_name")
-            .then(({ data }) => {
+            .then(({ data, error }: { data: any, error: any }) => {
+                if (error) {
+                    console.error("Failed to load riders:", error);
+                    toast.error("Failed to load active riders for dispatch.");
+                }
                 setRiders(data ?? []);
                 if (data && data.length > 0) setSelectedRider(data[0].id);
                 setLoading(false);

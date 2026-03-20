@@ -44,7 +44,7 @@ export function NavigationTab() {
             )
             .eq("id", "singleton")
             .single()
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data) {
                     setSettings({
                         nav_show_home: data.nav_show_home ?? true,

@@ -155,7 +155,7 @@ export default function AccountOrdersPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        supabase.auth.getUser().then(async ({ data: { user } }) => {
+        supabase.auth.getUser().then(async ({ data: { user } }: { data: any }) => {
             if (!user) return;
 
             const SELECT = "id, created_at, total_amount, status, assigned_rider_id, paystack_reference, delivery_method";
@@ -188,7 +188,7 @@ export default function AccountOrdersPage() {
                     .select("id, full_name, phone_number")
                     .in("id", riderIds);
                 const map: Record<string, Rider> = {};
-                (riderData ?? []).forEach(r => { map[r.id] = r; });
+                (riderData ?? []).forEach((r: any) => { map[r.id] = r; });
                 setRiders(map);
             }
 

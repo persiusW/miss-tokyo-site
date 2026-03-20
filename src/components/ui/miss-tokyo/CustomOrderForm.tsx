@@ -31,7 +31,7 @@ export function CustomOrderForm() {
     useEffect(() => {
         if (refSlug) {
             supabase.from("products").select("name, slug, image_urls").eq("slug", refSlug).single()
-                .then(({ data }) => {
+                .then(({ data }: { data: any }) => {
                     if (data) {
                         setRefProduct(data);
                         setFormData(prev => ({ ...prev, referenceProduct: data.name, requestType: "modification" }));

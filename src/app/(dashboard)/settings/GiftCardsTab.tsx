@@ -24,7 +24,7 @@ export function GiftCardsTab() {
             .select("gc_enabled, gc_min_amount, gc_max_amount, gc_preset_amounts, gc_never_expires, gc_validity_days, gc_delivery_note")
             .eq("id", "singleton")
             .single()
-            .then(({ data: s }) => {
+            .then(({ data: s }: { data: any }) => {
                 if (!s) return;
                 setEnabled(s.gc_enabled ?? true);
                 setMinAmount(Number(s.gc_min_amount ?? 20));

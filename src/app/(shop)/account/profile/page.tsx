@@ -12,7 +12,7 @@ export default function AccountProfilePage() {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        supabase.auth.getUser().then(async ({ data: { user } }) => {
+        supabase.auth.getUser().then(async ({ data: { user } }: { data: any }) => {
             if (!user) return;
             setEmail(user.email ?? "");
             const { data: profile } = await supabase

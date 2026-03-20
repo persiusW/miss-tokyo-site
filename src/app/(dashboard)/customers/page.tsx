@@ -140,8 +140,9 @@ export default function CustomersPage() {
 
             setContacts(Array.from(emailMap.values()));
             setSelected(new Set());
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            toast.error(err.message || "Failed to load customers data.");
         } finally {
             setLoading(false);
         }

@@ -74,13 +74,13 @@ export default async function ShopPage({
             .select("shop_pagination_type")
             .eq("id", "singleton")
             .maybeSingle()
-            .then(({ data }) => (data?.shop_pagination_type as "load_more" | "pagination") || "load_more"),
+            .then(({ data }: { data: any }) => (data?.shop_pagination_type as "load_more" | "pagination") || "load_more"),
         supabaseAdmin
             .from("store_settings")
             .select("shop_mobile_cols")
             .eq("id", "default")
             .maybeSingle()
-            .then(({ data }) => (data?.shop_mobile_cols as 1 | 2) || 2),
+            .then(({ data }: { data: any }) => (data?.shop_mobile_cols as 1 | 2) || 2),
     ]);
 
     // Resolve category slug → name once (reused for both filter queries)

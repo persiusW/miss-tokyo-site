@@ -34,7 +34,7 @@ export function RecentlyViewed({ currentSlug }: { currentSlug: string }) {
             .select("slug, name, price_ghs, image_urls")
             .in("slug", others)
             .eq("is_active", true)
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (!data || data.length === 0) return;
                 // Preserve recently-viewed order
                 const sorted = others

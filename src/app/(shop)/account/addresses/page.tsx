@@ -34,7 +34,7 @@ export default function AccountAddressesPage() {
     const [userId, setUserId] = useState<string | null>(null);
 
     useEffect(() => {
-        supabase.auth.getUser().then(async ({ data: { user } }) => {
+        supabase.auth.getUser().then(async ({ data: { user } }: { data: any }) => {
             if (!user) return;
             setUserId(user.id);
             const { data } = await supabase

@@ -73,7 +73,7 @@ export default function InvoicesPage() {
             .select("tax_rate")
             .eq("id", "default")
             .single()
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data?.tax_rate) {
                     const rate = Number(data.tax_rate);
                     setDefaultTaxRate(rate);
@@ -85,7 +85,7 @@ export default function InvoicesPage() {
             .select("id, name, price_ghs")
             .eq("is_active", true)
             .order("name")
-            .then(({ data }) => { if (data) setProducts(data as Product[]); });
+            .then(({ data }: { data: any }) => { if (data) setProducts(data as Product[]); });
     }, []);
 
     const openCreate = () => {

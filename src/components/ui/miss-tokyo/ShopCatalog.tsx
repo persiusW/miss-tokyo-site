@@ -62,7 +62,7 @@ export default async function ShopCatalog({
     const shopShowTitle = storeSettingsData?.shop_show_title ?? true;
     const shopImageStretch = storeSettingsData?.shop_image_stretch ?? false;
 
-    const formattedProducts = (products || []).map((p) => {
+    const formattedProducts = (products || []).map((p: any) => {
         const isOnSale = p.is_sale === true;
         const salePrice = isOnSale && p.discount_value > 0
             ? `GH₵ ${(p.price_ghs * (1 - p.discount_value / 100)).toFixed(2)}`
@@ -98,7 +98,7 @@ export default async function ShopCatalog({
             <Suspense fallback={null}>
                 <ShopClient
                     products={formattedProducts}
-                    categories={(categories || []).map(c => ({
+                    categories={(categories || []).map((c: any) => ({
                         id: c.id,
                         name: c.name,
                         slug: c.slug,

@@ -56,7 +56,7 @@ export function TeamTab() {
         const list = data ?? [];
         setMembers(list);
         setLoading(false);
-        fetchPendingStatus(list.map(m => m.id));
+        fetchPendingStatus(list.map((m: any) => m.id));
     };
 
     const handleCopyLink = async (member: TeamMember) => {

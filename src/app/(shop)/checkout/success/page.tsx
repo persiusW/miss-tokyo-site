@@ -111,7 +111,7 @@ function Receipt({ order, orderRef }: { order: Order; orderRef: string }) {
     const [guestModalOpen, setGuestModalOpen] = useState(false);
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(({ data: { session } }: { data: any }) => {
             setIsLoggedIn(!!session?.user);
         });
     }, []);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { toast } from "@/lib/toast";
 
 type Submission = {
     id: string;
@@ -69,7 +70,10 @@ export default function FormSubmissionsPage() {
         }
 
         const { data, count, error } = await q;
-        if (!error && data) {
+        if (error) {
+            console.error(error);
+            toast.error("Failed to load contact submissions.");
+        } else if (data) {
             setRows(data as Submission[]);
             setTotal(count ?? 0);
         }

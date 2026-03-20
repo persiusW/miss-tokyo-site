@@ -62,7 +62,7 @@ export function ReviewsTab() {
             .from("homepage_reviews")
             .select("*")
             .order("position", { ascending: true })
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 setReviews(data ?? []);
                 setLoading(false);
             });

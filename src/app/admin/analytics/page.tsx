@@ -27,7 +27,7 @@ export default function AnalyticsPage() {
                     .order("created_at", { ascending: true });
 
                 if (orders) {
-                    const grouped = orders.reduce((acc: any, order) => {
+                    const grouped = orders.reduce((acc: any, order: any) => {
                         const date = new Date(order.created_at).toLocaleDateString();
                         acc[date] = (acc[date] || 0) + order.total_amount;
                         return acc;
@@ -39,7 +39,7 @@ export default function AnalyticsPage() {
                 // Fetch sales by category (simplified mock for now until we have proper joins)
                 const { data: categories } = await supabase.from("categories").select("name");
                 if (categories) {
-                    setCategoryData(categories.map(c => ({
+                    setCategoryData(categories.map((c: any) => ({
                         name: c.name,
                         value: Math.floor(Math.random() * 100) + 20 // Simulated data
                     })));

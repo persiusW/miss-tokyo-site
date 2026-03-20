@@ -78,7 +78,7 @@ export function NotificationsTab() {
             .select("title, body")
             .eq("id", "default")
             .maybeSingle()
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data) setTemplate({ title: data.title || DEFAULT_TITLE, body: data.body || DEFAULT_BODY });
             });
     }, []);

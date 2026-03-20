@@ -37,7 +37,7 @@ export function SizeGuideTab() {
             .select("value")
             .eq("copy_key", "size_guide_rows")
             .single()
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data?.value) {
                     try { setRows(JSON.parse(data.value)); } catch { /* use defaults */ }
                 }

@@ -30,7 +30,7 @@ export function NewArrivalsSection() {
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(16)
-      .then(({ data }) => {
+      .then(({ data }: { data: any }) => {
         setProducts(data || []);
         setLoading(false);
       });

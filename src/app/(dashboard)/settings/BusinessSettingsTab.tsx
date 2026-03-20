@@ -67,7 +67,7 @@ export function BusinessSettingsTab() {
             .select("*")
             .eq("id", "singleton")
             .single()
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data) {
                     setForm({
                         store_name: data.store_name || "",

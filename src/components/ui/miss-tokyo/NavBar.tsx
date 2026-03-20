@@ -40,8 +40,8 @@ export function NavBar() {
     const router = useRouter();
 
     useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }) => setIsLoggedIn(!!user));
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+        supabase.auth.getUser().then(({ data: { user } }: { data: any }) => setIsLoggedIn(!!user));
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_: any, session: any) => {
             setIsLoggedIn(!!session?.user);
         });
         return () => subscription.unsubscribe();
@@ -53,7 +53,7 @@ export function NavBar() {
             .select("nav_show_home, nav_show_shop, nav_show_new_arrivals, nav_show_gift_card, nav_show_contact, nav_show_about")
             .eq("id", "singleton")
             .single()
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data) setNavSettings(data);
             });
     }, []);

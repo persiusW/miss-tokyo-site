@@ -157,7 +157,7 @@ export default function OrderDetailPage() {
     useEffect(() => { window.scrollTo({ top: 0 }); }, []);
 
     useEffect(() => {
-        supabase.auth.getUser().then(async ({ data: { user } }) => {
+        supabase.auth.getUser().then(async ({ data: { user } }: { data: any }) => {
             if (!user) { router.replace("/login"); return; }
 
             const [{ data: ord }, { data: biz }, { data: ss }] = await Promise.all([

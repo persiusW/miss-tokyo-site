@@ -7,13 +7,13 @@ export default async function PaymentsPage() {
         .eq("status", "paid")
         .order("created_at", { ascending: false });
 
-    const total = (payments || []).reduce((sum, p) => sum + Number(p.total_amount), 0);
+    const total = (payments || []).reduce((sum: number, p: any) => sum + Number(p.total_amount), 0);
     const thisMonth = new Date();
     thisMonth.setDate(1);
     thisMonth.setHours(0, 0, 0, 0);
     const monthlyTotal = (payments || [])
-        .filter(p => new Date(p.created_at) >= thisMonth)
-        .reduce((sum, p) => sum + Number(p.total_amount), 0);
+        .filter((p: any) => new Date(p.created_at) >= thisMonth)
+        .reduce((sum: number, p: any) => sum + Number(p.total_amount), 0);
 
     return (
         <div className="space-y-12">
@@ -58,7 +58,7 @@ export default async function PaymentsPage() {
                                 </td>
                             </tr>
                         ) : (
-                            payments.map((p) => (
+                            payments.map((p: any) => (
                                 <tr key={p.id} className="hover:bg-neutral-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <span className="font-mono text-xs text-neutral-600 bg-neutral-50 px-2 py-1 rounded">

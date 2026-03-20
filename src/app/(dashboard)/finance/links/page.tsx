@@ -47,7 +47,7 @@ export default function PayLinksPage() {
             .select("email")
             .eq("id", "default")
             .single()
-            .then(({ data }) => {
+            .then(({ data }: { data: any }) => {
                 if (data?.email) {
                     setForm(prev => ({ ...prev, email: prev.email || data.email }));
                 }
