@@ -94,25 +94,51 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                     tabIndex={0}
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") openLightbox(); }}
                 >
-                    {isVideo(imgs[current]) ? (
-                        <video
-                            src={imgs[current]}
-                            autoPlay={true}
-                            muted={true}
-                            loop={true}
-                            playsInline={true}
-                            style={{ objectFit: "cover", width: "100%", height: "100%", transition: "opacity 0.3s" }}
-                        />
-                    ) : (
-                        <Image
-                            src={imgs[current]}
-                            alt={name}
-                            fill
-                            priority
-                            sizes="(max-width: 768px) 100vw, 50vw"
-                            style={{ objectFit: "cover", transition: "opacity 0.3s" }}
-                        />
-                    )}
+                    <div className="relative w-full h-full">
+                        {imgs.map((img, i) => {
+                            const active = i === current;
+                            return (
+                                <div
+                                    key={i}
+                                    style={{
+                                        position: "absolute",
+                                        inset: 0,
+                                        opacity: active ? 1 : 0,
+                                        transition: "opacity 0.4s ease-in-out",
+                                        pointerEvents: active ? "auto" : "none",
+                                        zIndex: active ? 1 : 0
+                                    }}
+                                >
+                                    {isVideo(img) ? (
+                                        <video
+                                            src={img}
+                                            autoPlay={active}
+                                            muted={true}
+                                            loop={true}
+                                            playsInline={true}
+                                            preload="auto"
+                                            style={{
+                                                objectFit: "cover",
+                                                width: "100%",
+                                                height: "100%"
+                                            }}
+                                        />
+                                    ) : (
+                                        <Image
+                                            src={img}
+                                            alt={name}
+                                            fill
+                                            priority={i === 0}
+                                            sizes="(max-width: 768px) 100vw, 50vw"
+                                            style={{
+                                                objectFit: "cover"
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
 
                     {/* Badge */}
                     {badgeLabel && (
