@@ -3,6 +3,23 @@
 import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { compressToWebP } from "@/lib/utils/imageCompression";
+import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+    DragOverlay,
+    DragStartEvent,
+} from "@dnd-kit/core";
+import {
+    SortableContext,
+    useSortable,
+    arrayMove,
+    rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // Single-URL mode: currentUrl + onUpload(url: string)
 interface SingleUploaderProps {
@@ -11,6 +28,7 @@ interface SingleUploaderProps {
     currentUrl?: string | null;
     onUpload: (url: string) => void;
     onRemove?: () => void;
+    onUploading?: (isUploading: boolean) => void;
     maxFiles?: never;
     currentUrls?: never;
     aspectRatio?: "square" | "video" | "banner" | "og";
@@ -24,6 +42,7 @@ interface MultiUploaderProps {
     currentUrls: string[];
     onUpload: (urls: string[]) => void;
     onRemove?: () => void;
+    onUploading?: (isUploading: boolean) => void;
     maxFiles?: number;
     currentUrl?: never;
     aspectRatio?: "square" | "video" | "banner" | "og";
@@ -47,6 +66,73 @@ function isMultiMode(props: ImageUploaderProps): props is MultiUploaderProps {
     return "currentUrls" in props && props.currentUrls !== undefined;
 }
 
+// ── Sortable image tile ────────────────────────────────────────────────────────
+interface SortableImageProps {
+    url: string;
+    index: number;
+    isPrimary: boolean;
+    onRemove: () => void;
+}
+
+function SortableImage({ url, index, isPrimary, onRemove }: SortableImageProps) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+        useSortable({ id: url });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+    };
+
+    const isVideo = url.endsWith(".mp4");
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className="relative group aspect-square overflow-hidden bg-neutral-100 border border-neutral-200 touch-none"
+        >
+            {/* Drag handle — entire card is draggable */}
+            <div
+                {...attributes}
+                {...listeners}
+                className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing"
+            />
+
+            {isVideo ? (
+                <video src={url} className="w-full h-full object-cover" muted />
+            ) : (
+                <img src={url} alt="" className="w-full h-full object-cover" />
+            )}
+
+            {isPrimary && (
+                <span className="absolute top-1 left-1 z-20 bg-black/70 text-white text-[8px] uppercase tracking-widest px-1.5 py-0.5 pointer-events-none">
+                    Primary
+                </span>
+            )}
+
+            {/* Drag hint */}
+            <span className="absolute bottom-1 right-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <svg className="w-4 h-4 text-white drop-shadow" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 4.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 7.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 7.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM18 4.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 7.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 7.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
+                </svg>
+            </span>
+
+            {/* Remove overlay */}
+            <div className="absolute inset-0 z-20 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center pointer-events-none">
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                    className="pointer-events-auto opacity-0 group-hover:opacity-100 text-white text-[9px] uppercase tracking-widest font-bold border border-white px-2 py-1 z-30 relative"
+                >
+                    Remove
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 export function ImageUploader(props: ImageUploaderProps) {
     const { bucket, folder = "", aspectRatio = "video", label } = props;
 
@@ -60,11 +146,18 @@ export function ImageUploader(props: ImageUploaderProps) {
 
     const [previews, setPreviews] = useState<string[]>(initialUrls);
     const [uploading, setUploading] = useState(false);
+    const [uploadCount, setUploadCount] = useState(0);
     const [error, setError] = useState<string | null>(null);
+    const [activeUrl, setActiveUrl] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
     const maxFiles = multiMode ? (props.maxFiles ?? 1) : 1;
 
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    );
+
+    // ── Upload helpers ─────────────────────────────────────────────────────────
     const uploadFile = async (rawFile: File): Promise<string | null> => {
         const isVideo = rawFile.type === "video/mp4";
 
@@ -106,23 +199,21 @@ export function ImageUploader(props: ImageUploaderProps) {
     const handleFiles = async (files: FileList | null) => {
         if (!files || files.length === 0) return;
         setError(null);
-        setUploading(true);
 
         const remaining = maxFiles - previews.length;
         const toUpload = Array.from(files).slice(0, remaining);
+        if (toUpload.length === 0) return;
 
-        const newUrls: string[] = [];
-        for (const file of toUpload) {
-            const url = await uploadFile(file);
-            if (url) {
-                newUrls.push(url);
-            }
-        }
+        setUploading(true);
+        setUploadCount(toUpload.length);
+        props.onUploading?.(true);
+
+        const results = await Promise.all(toUpload.map(uploadFile));
+        const newUrls = results.filter((u): u is string => u !== null);
 
         if (newUrls.length > 0) {
             const updated = [...previews, ...newUrls].slice(0, maxFiles);
             setPreviews(updated);
-
             if (multiMode) {
                 (props as MultiUploaderProps).onUpload(updated);
             } else {
@@ -131,12 +222,13 @@ export function ImageUploader(props: ImageUploaderProps) {
         }
 
         setUploading(false);
+        setUploadCount(0);
+        props.onUploading?.(false);
     };
 
     const handleRemove = (index: number) => {
         const updated = previews.filter((_, i) => i !== index);
         setPreviews(updated);
-
         if (multiMode) {
             (props as MultiUploaderProps).onUpload(updated);
         } else {
@@ -145,7 +237,33 @@ export function ImageUploader(props: ImageUploaderProps) {
         }
     };
 
+    // ── Drag handlers ──────────────────────────────────────────────────────────
+    const handleDragStart = (event: DragStartEvent) => {
+        setActiveUrl(event.active.id as string);
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        setActiveUrl(null);
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = previews.indexOf(active.id as string);
+        const newIndex = previews.indexOf(over.id as string);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const updated = arrayMove(previews, oldIndex, newIndex);
+        setPreviews(updated);
+        if (multiMode) {
+            (props as MultiUploaderProps).onUpload(updated);
+        }
+    };
+
+    // ── Render ─────────────────────────────────────────────────────────────────
     const showDropzone = previews.length < maxFiles;
+    const loadingLabel = uploadCount > 1 ? `Uploading ${uploadCount} files...` : "Uploading...";
+
+    // Active drag preview tile
+    const activeIsVideo = activeUrl?.endsWith(".mp4");
 
     return (
         <div className="space-y-2">
@@ -169,34 +287,60 @@ export function ImageUploader(props: ImageUploaderProps) {
                 </div>
             )}
 
-            {/* Preview grid */}
+            {/* Preview grid — sortable in multi mode */}
             {previews.length > 0 && (
-                <div className={`grid gap-2 ${maxFiles > 1 ? "grid-cols-3" : ""}`}>
-                    {previews.map((url, idx) => {
-                        const isVideo = url.endsWith(".mp4");
-                        return (
-                            <div
-                                key={idx}
-                                className={`relative group overflow-hidden bg-neutral-100 border border-neutral-200 ${maxFiles === 1 ? ASPECT_CLASSES[aspectRatio] : "aspect-square"}`}
-                            >
-                                {isVideo ? (
-                                    <video src={url} className="w-full h-full object-cover" muted />
-                                ) : (
-                                    <img src={url} alt="" className="w-full h-full object-cover" />
-                                )}
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemove(idx)}
-                                        className="opacity-0 group-hover:opacity-100 text-white text-[9px] uppercase tracking-widest font-bold border border-white px-2 py-1"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
+                multiMode ? (
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext items={previews} strategy={rectSortingStrategy}>
+                            <div className="grid grid-cols-3 gap-2">
+                                {previews.map((url, idx) => (
+                                    <SortableImage
+                                        key={url}
+                                        url={url}
+                                        index={idx}
+                                        isPrimary={idx === 0}
+                                        onRemove={() => handleRemove(idx)}
+                                    />
+                                ))}
                             </div>
-                        );
-                    })}
-                </div>
+                        </SortableContext>
+
+                        <DragOverlay>
+                            {activeUrl && (
+                                <div className="aspect-square overflow-hidden border-2 border-black shadow-2xl opacity-90">
+                                    {activeIsVideo ? (
+                                        <video src={activeUrl} className="w-full h-full object-cover" muted />
+                                    ) : (
+                                        <img src={activeUrl} alt="" className="w-full h-full object-cover" />
+                                    )}
+                                </div>
+                            )}
+                        </DragOverlay>
+                    </DndContext>
+                ) : (
+                    // Single mode — plain preview, no DnD
+                    <div className={`relative group overflow-hidden bg-neutral-100 border border-neutral-200 ${ASPECT_CLASSES[aspectRatio]}`}>
+                        {previews[0].endsWith(".mp4") ? (
+                            <video src={previews[0]} className="w-full h-full object-cover" muted />
+                        ) : (
+                            <img src={previews[0]} alt="" className="w-full h-full object-cover" />
+                        )}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
+                            <button
+                                type="button"
+                                onClick={() => handleRemove(0)}
+                                className="opacity-0 group-hover:opacity-100 text-white text-[9px] uppercase tracking-widest font-bold border border-white px-2 py-1"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                )
             )}
 
             {/* Dropzone */}
@@ -214,13 +358,14 @@ export function ImageUploader(props: ImageUploaderProps) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                         <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500 text-center">
-                            {uploading ? "Uploading..." : "Click or drag to upload"}
+                            {uploading ? loadingLabel : maxFiles > 1 ? "Click or drag to upload (multiple)" : "Click or drag to upload"}
                         </p>
                     </div>
 
                     {uploading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/80">
                             <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                            <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-700">{loadingLabel}</p>
                         </div>
                     )}
                 </div>

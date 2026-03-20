@@ -12,14 +12,8 @@ type Category = { id: string; name: string; slug: string; is_wholesale: boolean 
 export default function NewProductPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
-
-    type MediaSlot = { id: string; url: string | null; type: "image" | "video" };
-    const [mediaSlots, setMediaSlots] = useState<MediaSlot[]>([
-        { id: "s0", url: null, type: "image" },
-        { id: "s1", url: null, type: "image" },
-        { id: "s2", url: null, type: "image" },
-        { id: "s3", url: null, type: "image" },
-    ]);
+    const [imageUrls, setImageUrls] = useState<string[]>([]);
+    const [uploadingMedia, setUploadingMedia] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
     const [globalSizes, setGlobalSizes] = useState<string[]>([]);
@@ -91,36 +85,6 @@ export default function NewProductPage() {
         }
     };
 
-    const handleMediaUpload = (id: string, url: string) => {
-        const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(url);
-        setMediaSlots(prev => prev.map(s => s.id === id ? { ...s, url, type: isVideo ? "video" : "image" } : s));
-    };
-
-    const handleMediaRemove = (id: string) => {
-        setMediaSlots(prev => prev.map(s => s.id === id ? { ...s, url: null, type: "image" } : s));
-    };
-
-    const addMediaSlot = () => {
-        setMediaSlots(prev => {
-            if (prev.length >= 10) return prev;
-            return [...prev, { id: `s${Date.now()}`, url: null, type: "image" as const }];
-        });
-    };
-
-    const validateBeforeUpload = (file: File): boolean => {
-        const isVideo = file.type.startsWith("video/");
-        const filledCount = mediaSlots.filter(s => s.url !== null).length;
-        const videoCount = mediaSlots.filter(s => s.type === "video").length;
-        if (filledCount >= 10) {
-            toast.error("Maximum 10 media files allowed per product.");
-            return false;
-        }
-        if (isVideo && videoCount >= 1) {
-            toast.error("Only 1 video allowed per product. Remove the existing video first.");
-            return false;
-        }
-        return true;
-    };
 
     const toggleSize = (size: string) => {
         setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]);
@@ -139,9 +103,10 @@ export default function NewProductPage() {
         setLoading(true);
 
         try {
-            const uploadedUrls = mediaSlots.filter(s => s.url !== null).map(s => s.url as string);
-            const { error } = await supabase.from("products").insert([
-                {
+            const res = await fetch("/api/admin/products", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
                     name: formData.name,
                     slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
                     price_ghs: Number(formData.price_ghs),
@@ -150,24 +115,25 @@ export default function NewProductPage() {
                     description: formData.description,
                     category_type: formData.category_type,
                     category_ids: selectedCategoryIds,
-                    image_urls: uploadedUrls,
+                    image_urls: imageUrls,
                     available_sizes: selectedSizes,
                     available_colors: selectedColors,
                     available_stitching: selectedStitching,
-                    is_active: true,
                     wholesale_override: wholesaleOverride,
                     wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
                     wholesale_price_tier_2: wholesaleOverride && wholesalePrices.tier2 ? Number(wholesalePrices.tier2) : null,
                     wholesale_price_tier_3: wholesaleOverride && wholesalePrices.tier3 ? Number(wholesalePrices.tier3) : null,
-                }
-            ]);
+                }),
+            });
 
-            if (error) throw error;
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Failed to create product");
+
             router.push("/catalog/products");
             router.refresh();
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            toast.error("Failed to create product.");
+            toast.error(err?.message || "Failed to create product.");
         } finally {
             setLoading(false);
         }
@@ -196,7 +162,7 @@ export default function NewProductPage() {
                     <button
                         type="submit"
                         form="product-form"
-                        disabled={loading}
+                        disabled={loading || uploadingMedia}
                         className="px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
                     >
                         {loading ? "Saving..." : "Save Product"}
@@ -470,32 +436,17 @@ export default function NewProductPage() {
                         <div className="bg-white p-6 border border-neutral-200 space-y-4">
                             <div>
                                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Media</h2>
-                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 10 files — images or 1 video. First is primary display.</p>
+                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 10 files — select multiple at once. First image is the primary display.</p>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                {mediaSlots.map((slot, index) => (
-                                    <div key={slot.id}>
-                                        <ImageUploader
-                                            bucket="product-images"
-                                            folder="products"
-                                            currentUrl={slot.url}
-                                            onUpload={(url) => handleMediaUpload(slot.id, url)}
-                                            onRemove={() => handleMediaRemove(slot.id)}
-                                            aspectRatio="video"
-                                            label={index === 0 ? "Primary Image" : `Media ${index + 1}`}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                            {mediaSlots.length < 10 && (
-                                <button
-                                    type="button"
-                                    onClick={addMediaSlot}
-                                    className="w-full py-3 border border-dashed border-neutral-300 text-[10px] uppercase tracking-widest text-neutral-400 hover:border-black hover:text-black transition-colors"
-                                >
-                                    + Add Media Slot
-                                </button>
-                            )}
+                            <ImageUploader
+                                bucket="product-images"
+                                folder="products"
+                                currentUrls={imageUrls}
+                                onUpload={setImageUrls}
+                                onUploading={setUploadingMedia}
+                                maxFiles={10}
+                                label="Product Media"
+                            />
                         </div>
                     </div>
                 </div>

@@ -6,70 +6,15 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { toast } from "@/lib/toast";
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from "lucide-react";
-
 type Category = { id: string; name: string; slug: string; is_wholesale: boolean };
-
-function SortableImageItem({ id, url, index, onUpload, onRemove }: { id: string, url: string | null, index: number, onUpload: (id: string, url: string) => void, onRemove: (id: string) => void }) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging
-    } = useSortable({ id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 50 : 1,
-        position: (isDragging ? "relative" : "static") as any,
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} className={`bg-neutral-50 border border-neutral-200 flex flex-col transition-all duration-200 ${isDragging ? "shadow-2xl opacity-90 scale-105 z-50 relative" : ""}`}>
-            <div
-                className="w-full flex items-center justify-between p-3 border-b border-neutral-200 bg-white cursor-grab active:cursor-grabbing z-10"
-                style={{ touchAction: 'none' }}
-                {...attributes}
-                {...listeners}
-            >
-                <div className="flex items-center gap-2 text-neutral-500 hover:text-black transition-colors">
-                    <GripVertical size={16} />
-                    <span className="text-[10px] uppercase font-semibold tracking-widest leading-none mt-[2px]">Drag to reorder</span>
-                </div>
-            </div>
-            <div className="p-4 bg-neutral-50">
-                <ImageUploader
-                    bucket="product-images"
-                    folder="products"
-                    currentUrl={url}
-                    onUpload={(newUrl) => onUpload(id, newUrl)}
-                    onRemove={() => onRemove(id)}
-                    aspectRatio="video"
-                    label={index === 0 ? "Primary Image" : `Media ${index + 1}`}
-                />
-            </div>
-        </div>
-    );
-}
 
 export default function EditProductPage() {
     const { id } = useParams<{ id: string }>();
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    type MediaSlot = { id: string; url: string | null; type: "image" | "video" };
-    const [imageSlots, setImageSlots] = useState<MediaSlot[]>([
-        { id: 'slot-0', url: null, type: "image" },
-        { id: 'slot-1', url: null, type: "image" },
-        { id: 'slot-2', url: null, type: "image" },
-        { id: 'slot-3', url: null, type: "image" },
-    ]);
+    const [imageUrls, setImageUrls] = useState<string[]>([]);
+    const [uploadingMedia, setUploadingMedia] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
     const [globalSizes, setGlobalSizes] = useState<string[]>([]);
@@ -118,23 +63,7 @@ export default function EditProductPage() {
             is_active: product.is_active ?? true,
         });
 
-        const baseSlots: { id: string; url: string | null; type: "image" | "video" }[] = [
-            { id: 'slot-0', url: null, type: "image" },
-            { id: 'slot-1', url: null, type: "image" },
-            { id: 'slot-2', url: null, type: "image" },
-            { id: 'slot-3', url: null, type: "image" },
-        ];
-        if (product.image_urls) {
-            product.image_urls.forEach((url: string, i: number) => {
-                const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(url);
-                if (i < baseSlots.length) {
-                    baseSlots[i] = { ...baseSlots[i], url, type: isVideo ? "video" : "image" };
-                } else {
-                    baseSlots.push({ id: `slot-${i}`, url, type: isVideo ? "video" : "image" });
-                }
-            });
-        }
-        setImageSlots(baseSlots);
+        setImageUrls(product.image_urls || []);
 
         if (storeData) {
             if (storeData.global_sizes) {
@@ -182,53 +111,6 @@ export default function EditProductPage() {
         }));
     };
 
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-    );
-
-    const handleImageUpload = (id: string, url: string) => {
-        const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(url);
-        setImageSlots(prev => prev.map(slot => slot.id === id ? { ...slot, url, type: isVideo ? "video" : "image" } : slot));
-    };
-
-    const handleImageRemove = (id: string) => {
-        setImageSlots(prev => prev.map(slot => slot.id === id ? { ...slot, url: null, type: "image" as const } : slot));
-    };
-
-    const addMediaSlot = () => {
-        setImageSlots(prev => {
-            if (prev.length >= 10) return prev;
-            return [...prev, { id: `slot-${Date.now()}`, url: null, type: "image" as const }];
-        });
-    };
-
-    const validateBeforeUpload = (file: File): boolean => {
-        const isVideo = file.type.startsWith("video/");
-        const filledCount = imageSlots.filter(s => s.url !== null).length;
-        const videoCount = imageSlots.filter(s => s.type === "video").length;
-        if (filledCount >= 10) {
-            toast.error("Maximum 10 media files allowed per product.");
-            return false;
-        }
-        if (isVideo && videoCount >= 1) {
-            toast.error("Only 1 video allowed per product. Remove the existing video first.");
-            return false;
-        }
-        return true;
-    };
-
-    const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (active.id !== over?.id && over) {
-            setImageSlots((items) => {
-                const oldIndex = items.findIndex(item => item.id === active.id);
-                const newIndex = items.findIndex(item => item.id === over.id);
-                return arrayMove(items, oldIndex, newIndex);
-            });
-        }
-    };
-
     const toggleSize = (size: string) => {
         setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]);
     };
@@ -246,34 +128,40 @@ export default function EditProductPage() {
         setSaving(true);
 
         try {
-            const uploadedUrls = imageSlots.map(s => s.url).filter((u): u is string => !!u);
-            const { error } = await supabase.from("products").update({
-                name: formData.name,
-                slug: formData.slug,
-                price_ghs: Number(formData.price_ghs),
-                inventory_count: trackInventory ? Number(formData.inventory_count) : 9999,
-                track_inventory: trackInventory,
-                description: formData.description,
-                category_type: formData.category_type,
-                category_ids: selectedCategoryIds,
-                image_urls: uploadedUrls,
-                available_sizes: selectedSizes,
-                available_colors: selectedColors,
-                available_stitching: selectedStitching,
-                is_active: formData.is_active,
-                wholesale_override: wholesaleOverride,
-                wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
-                wholesale_price_tier_2: wholesaleOverride && wholesalePrices.tier2 ? Number(wholesalePrices.tier2) : null,
-                wholesale_price_tier_3: wholesaleOverride && wholesalePrices.tier3 ? Number(wholesalePrices.tier3) : null,
-            }).eq("id", id);
+            const res = await fetch("/api/admin/products", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id,
+                    name: formData.name,
+                    slug: formData.slug,
+                    price_ghs: Number(formData.price_ghs),
+                    inventory_count: trackInventory ? Number(formData.inventory_count) : 9999,
+                    track_inventory: trackInventory,
+                    description: formData.description,
+                    category_type: formData.category_type,
+                    category_ids: selectedCategoryIds,
+                    image_urls: imageUrls,
+                    available_sizes: selectedSizes,
+                    available_colors: selectedColors,
+                    available_stitching: selectedStitching,
+                    is_active: formData.is_active,
+                    wholesale_override: wholesaleOverride,
+                    wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
+                    wholesale_price_tier_2: wholesaleOverride && wholesalePrices.tier2 ? Number(wholesalePrices.tier2) : null,
+                    wholesale_price_tier_3: wholesaleOverride && wholesalePrices.tier3 ? Number(wholesalePrices.tier3) : null,
+                }),
+            });
 
-            if (error) throw error;
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Failed to update product");
+
             toast.success("Product updated.");
             router.push("/catalog/products");
             router.refresh();
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            toast.error("Failed to update product.");
+            toast.error(err?.message || "Failed to update product.");
         } finally {
             setSaving(false);
         }
@@ -310,7 +198,7 @@ export default function EditProductPage() {
                     <button
                         type="submit"
                         form="product-form"
-                        disabled={saving}
+                        disabled={saving || uploadingMedia}
                         className="px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
                     >
                         {saving ? "Saving..." : "Update Product"}
@@ -591,41 +479,17 @@ export default function EditProductPage() {
                         <div className="bg-white p-6 border border-neutral-200 space-y-4">
                             <div>
                                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Media</h2>
-                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 10 files — images or 1 video. First is primary. Drag to reorder.</p>
+                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 10 files — select multiple at once. First image is the primary display.</p>
                             </div>
-
-                            <DndContext
-                                sensors={sensors}
-                                collisionDetection={closestCenter}
-                                onDragEnd={handleDragEnd}
-                            >
-                                <SortableContext
-                                    items={imageSlots.map(s => s.id)}
-                                    strategy={rectSortingStrategy}
-                                >
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {imageSlots.map((slot, index) => (
-                                            <SortableImageItem
-                                                key={slot.id}
-                                                id={slot.id}
-                                                url={slot.url}
-                                                index={index}
-                                                onUpload={handleImageUpload}
-                                                onRemove={handleImageRemove}
-                                            />
-                                        ))}
-                                    </div>
-                                </SortableContext>
-                            </DndContext>
-                            {imageSlots.length < 10 && (
-                                <button
-                                    type="button"
-                                    onClick={addMediaSlot}
-                                    className="w-full py-3 border border-dashed border-neutral-300 text-[10px] uppercase tracking-widest text-neutral-400 hover:border-black hover:text-black transition-colors"
-                                >
-                                    + Add Media Slot
-                                </button>
-                            )}
+                            <ImageUploader
+                                bucket="product-images"
+                                folder="products"
+                                currentUrls={imageUrls}
+                                onUpload={setImageUrls}
+                                onUploading={setUploadingMedia}
+                                maxFiles={10}
+                                label="Product Media"
+                            />
                         </div>
                     </div>
                 </div>
