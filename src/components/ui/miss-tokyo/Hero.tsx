@@ -16,6 +16,7 @@ export function Hero({ title, subtitle, imageUrl, ctaText, ctaLink }: HeroProps)
                     src={imageUrl}
                     alt={title}
                     fill
+                    sizes="100vw"
                     className="object-cover object-center"
                     priority
                 />

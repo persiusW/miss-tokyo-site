@@ -353,8 +353,8 @@ export async function POST(req: Request) {
         const event = JSON.parse(rawBody);
 
         if (event.event === "charge.success") {
-            console.log("Paystack Charge Success Event Received");
             const data = event.data;
+            const paystackRef: string = data.reference || "";
             const metadata = data.metadata || {};
             const {
                 orderId, requestId, productId, fullName, phone, address, country, region,
@@ -362,9 +362,38 @@ export async function POST(req: Request) {
                 platform_fee_amount, platform_fee_label,
                 discount_code, discount_amount, discount_tag,
             } = metadata;
+
+            // ── Idempotency Check ─────────────────────────────────────────────
+            // Verify if this transaction has already been processed to prevent double inventory/logic
+            if (orderId) {
+                const { data: existingOrder } = await supabaseAdmin
+                    .from("orders")
+                    .select("status, paystack_reference")
+                    .eq("id", orderId)
+                    .single();
+                
+                if (existingOrder && (existingOrder.status === "paid" || existingOrder.status === "confirmed" || existingOrder.paystack_reference === paystackRef)) {
+                    console.log(`[webhook] Order ${orderId} already processed. Skipping.`);
+                    return NextResponse.json({ status: "already_processed" });
+                }
+            } else if (paystackRef) {
+                const { data: existingOrder } = await supabaseAdmin
+                    .from("orders")
+                    .select("id")
+                    .eq("paystack_reference", paystackRef)
+                    .maybeSingle();
+
+                if (existingOrder) {
+                    console.log(`[webhook] Reference ${paystackRef} already exists. Skipping.`);
+                    return NextResponse.json({ status: "already_processed" });
+                }
+            }
+            // ─────────────────────────────────────────────────────────────────
+
+            console.log("Paystack Charge Success Event Received");
             const customerEmail: string = data.customer?.email || "";
             const amountGHS = Number(data.amount) / 100;
-            const paystackRef: string = data.reference || "";
+            // paystackRef is already declared above
 
             const [{ data: biz }, { data: pickupSettings }] = await Promise.all([
                 supabaseAdmin.from("business_settings").select("business_name, address, contact").eq("id", "default").single(),

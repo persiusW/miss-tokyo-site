@@ -219,6 +219,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
                         src={product.image_urls?.[0] || FALLBACK_IMG}
                         alt={product.name}
                         fill
+                        sizes="(max-width: 780px) 45vw, 350px"
                         className="object-cover"
                     />
                     <button onClick={onClose}
