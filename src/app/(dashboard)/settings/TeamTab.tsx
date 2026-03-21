@@ -31,6 +31,10 @@ type ActivityLog = {
     user_role: string;
     action_type: string;
     resource: string;
+    details?: {
+       resource_name?: string;
+       changes?: Record<string, { from: any; to: any }>;
+    };
     created_at: string;
     profiles?: { full_name: string; email: string };
 };
@@ -62,6 +66,11 @@ export function TeamTab() {
     const [inviteRole, setInviteRole] = useState("sales_staff");
     const [inviting, setInviting] = useState(false);
 
+    // Filter states
+    const [filterUserId, setFilterUserId] = useState<string>("all");
+    const [filterAction, setFilterAction] = useState<string>("all");
+    const [allStaff, setAllStaff] = useState<{ id: string, full_name: string }[]>([]);
+
     const fetchData = async () => {
         setLoading(true);
         if (activeTab === "members") {
@@ -69,7 +78,10 @@ export function TeamTab() {
                 .from("profiles")
                 .select("id, email, full_name, role, created_at")
                 .order("created_at", { ascending: true });
-            if (data) setMembers(data);
+            if (data) {
+                setMembers(data);
+                setAllStaff(data.map((d: any) => ({ id: d.id, full_name: d.full_name || d.email })));
+            }
         } else if (activeTab === "pending") {
             const { data } = await supabase
                 .from("team_invitations")
@@ -78,11 +90,20 @@ export function TeamTab() {
                 .order("created_at", { ascending: false });
             if (data) setInvites(data);
         } else if (activeTab === "logs") {
-            const { data } = await supabase
+            let query = supabase
                 .from("activity_logs")
                 .select("*, profiles(full_name, email)")
                 .order("created_at", { ascending: false })
-                .limit(50);
+                .limit(100);
+
+            if (filterUserId !== "all") {
+                query = query.eq("user_id", filterUserId);
+            }
+            if (filterAction !== "all") {
+                query = query.eq("action_type", filterAction);
+            }
+
+            const { data } = await query;
             if (data) setLogs(data as any);
         }
         setLoading(false);
@@ -90,7 +111,7 @@ export function TeamTab() {
 
     useEffect(() => {
         fetchData();
-    }, [activeTab]);
+    }, [activeTab, filterUserId, filterAction]);
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -307,44 +328,109 @@ export function TeamTab() {
 
                 {/* ACTIVITY LOGS TAB */}
                 {activeTab === "logs" && (
-                    <div className="overflow-x-auto">
-                        {loading ? (
-                            <p className="px-8 py-10 text-neutral-400 italic">Loading activity logs...</p>
-                        ) : logs.length === 0 ? (
-                            <p className="px-8 py-10 text-neutral-400 italic">No recent activity logged by staff.</p>
-                        ) : (
-                            <table className="w-full text-left bg-white">
-                                <thead className="bg-neutral-50 border-b border-neutral-100">
-                                    <tr>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Timestamp</th>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Staff Member</th>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Action</th>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Resource</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-neutral-50 text-sm">
-                                    {logs.map(log => (
-                                        <tr key={log.id} className="hover:bg-neutral-50 transition-colors">
-                                            <td className="px-6 py-4 text-neutral-500 text-[11px]">
-                                                {new Date(log.created_at).toLocaleString()}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="font-semibold text-neutral-900">{log.profiles?.full_name || "Unknown"}</div>
-                                                <div className="text-[10px] text-neutral-400 uppercase tracking-widest mt-0.5">{ROLE_LABELS[log.user_role] || log.user_role}</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="font-mono text-xs font-semibold px-2 py-1 bg-neutral-100 rounded text-neutral-700 uppercase tracking-wider">
-                                                    {log.action_type}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-neutral-600 font-medium">
-                                                {log.resource}
-                                            </td>
-                                        </tr>
+                    <div className="space-y-4">
+                        {/* Filters Bar */}
+                        <div className="px-8 py-4 bg-neutral-50 border-b border-neutral-100 flex flex-wrap items-center gap-6">
+                            <div className="flex items-center gap-2">
+                                <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Staff:</label>
+                                <select 
+                                    value={filterUserId} 
+                                    onChange={e => setFilterUserId(e.target.value)}
+                                    className="bg-transparent text-sm border-b border-neutral-300 outline-none focus:border-black py-1 cursor-pointer"
+                                >
+                                    <option value="all">All Members</option>
+                                    {allStaff.map(s => (
+                                        <option key={s.id} value={s.id}>{s.full_name}</option>
                                     ))}
-                                </tbody>
-                            </table>
-                        )}
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Action:</label>
+                                <select 
+                                    value={filterAction} 
+                                    onChange={e => setFilterAction(e.target.value)}
+                                    className="bg-transparent text-sm border-b border-neutral-300 outline-none focus:border-black py-1 cursor-pointer"
+                                >
+                                    <option value="all">All Actions</option>
+                                    <option value="CREATE">Created</option>
+                                    <option value="UPDATE">Updated</option>
+                                    <option value="DELETE">Deleted</option>
+                                    <option value="INVITE">Invited</option>
+                                    <option value="REMOVE_MEMBER">Removed</option>
+                                </select>
+                            </div>
+                            <button 
+                                onClick={() => { setFilterUserId("all"); setFilterAction("all"); }}
+                                className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 hover:text-black transition-colors"
+                            >
+                                Reset Filters
+                            </button>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            {loading ? (
+                                <p className="px-8 py-10 text-neutral-400 italic">Updating log view...</p>
+                            ) : logs.length === 0 ? (
+                                <p className="px-8 py-10 text-neutral-400 italic">No logs found matching your criteria.</p>
+                            ) : (
+                                <table className="w-full text-left bg-white">
+                                    <thead className="bg-neutral-50/50 border-b border-neutral-100">
+                                        <tr>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Timestamp</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Staff Member</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Action</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-neutral-50 text-sm">
+                                        {logs.map(log => (
+                                            <tr key={log.id} className="hover:bg-neutral-50 transition-colors align-top">
+                                                <td className="px-6 py-4 text-neutral-500 text-[11px] whitespace-nowrap">
+                                                    {new Date(log.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="font-semibold text-neutral-900">{log.profiles?.full_name || "Unknown"}</div>
+                                                    <div className="text-[10px] text-neutral-400 uppercase tracking-widest mt-0.5">{ROLE_LABELS[log.user_role] || log.user_role}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`font-mono text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${
+                                                        log.action_type === 'CREATE' ? 'bg-green-50 text-green-700' :
+                                                        log.action_type === 'DELETE' ? 'bg-red-50 text-red-700' :
+                                                        log.action_type === 'UPDATE' ? 'bg-blue-50 text-blue-700' :
+                                                        'bg-neutral-100 text-neutral-700'
+                                                    }`}>
+                                                        {log.action_type}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 min-w-[300px]">
+                                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                                        <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">{log.resource}:</span>
+                                                        <span className="font-medium text-neutral-900">{log.details?.resource_name || "—"}</span>
+                                                    </div>
+                                                    
+                                                    {log.details?.changes && (
+                                                        <div className="space-y-1.5 mt-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100">
+                                                            {Object.entries(log.details.changes).map(([field, delta]: [string, any]) => (
+                                                                <div key={field} className="text-[11px] flex flex-wrap items-center gap-x-2">
+                                                                    <span className="font-semibold text-neutral-500 capitalize">{field.replace(/_/g, ' ')}:</span>
+                                                                    <span className="text-red-500 line-through decoration-red-300 opacity-60">
+                                                                        {typeof delta.from === 'object' ? 'Data' : String(delta.from ?? 'null')}
+                                                                    </span>
+                                                                    <span className="text-neutral-400">→</span>
+                                                                    <span className="text-green-600 font-medium">
+                                                                        {typeof delta.to === 'object' ? 'Data' : String(delta.to ?? 'null')}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

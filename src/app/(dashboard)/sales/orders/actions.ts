@@ -22,6 +22,9 @@ export async function updateOrderStatus(orderId: string, newStatus: string, deta
         updateData.packed_by = user.id;
     }
 
+    // Fetch old record for diffing
+    const { data: oldData } = await supabase.from("orders").select("*").eq("id", orderId).single();
+
     const { error } = await supabase.from("orders").update(updateData).eq("id", orderId);
     
     if (error) {
@@ -36,7 +39,9 @@ export async function updateOrderStatus(orderId: string, newStatus: string, deta
         actionType: "UPDATE_STATUS",
         resource: "order",
         resourceId: orderId,
-        details: { status: newStatus, ...details }
+        oldData,
+        newData: updateData,
+        details: { resource_name: `Order #${orderId.slice(0, 8)}`, ...details }
     });
 
     revalidatePath(`/sales/orders/${orderId}`, "page");

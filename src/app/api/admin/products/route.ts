@@ -133,28 +133,38 @@ export async function PATCH(req: NextRequest) {
         wholesale_price_tier_3,
     } = fields;
 
+    // 1. Fetch current record for diffing
+    const { data: oldData } = await supabaseAdmin
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+    const updateFields = {
+        name,
+        slug,
+        price_ghs: Number(price_ghs),
+        inventory_count: track_inventory ? Number(inventory_count) : 9999,
+        track_inventory: track_inventory ?? true,
+        description,
+        category_type,
+        category_ids: category_ids ?? [],
+        image_urls: image_urls ?? [],
+        available_sizes: available_sizes ?? [],
+        available_colors: available_colors ?? [],
+        available_stitching: available_stitching ?? [],
+        is_active: is_active ?? true,
+        wholesale_override: wholesale_override ?? false,
+        wholesale_price_tier_1: wholesale_override && wholesale_price_tier_1 ? Number(wholesale_price_tier_1) : null,
+        wholesale_price_tier_2: wholesale_override && wholesale_price_tier_2 ? Number(wholesale_price_tier_2) : null,
+        wholesale_price_tier_3: wholesale_override && wholesale_price_tier_3 ? Number(wholesale_price_tier_3) : null,
+    };
+
     const { error } = await supabaseAdmin
         .from("products")
-        .update({
-            name,
-            slug,
-            price_ghs: Number(price_ghs),
-            inventory_count: track_inventory ? Number(inventory_count) : 9999,
-            track_inventory: track_inventory ?? true,
-            description,
-            category_type,
-            category_ids: category_ids ?? [],
-            image_urls: image_urls ?? [],
-            available_sizes: available_sizes ?? [],
-            available_colors: available_colors ?? [],
-            available_stitching: available_stitching ?? [],
-            is_active: is_active ?? true,
-            wholesale_override: wholesale_override ?? false,
-            wholesale_price_tier_1: wholesale_override && wholesale_price_tier_1 ? Number(wholesale_price_tier_1) : null,
-            wholesale_price_tier_2: wholesale_override && wholesale_price_tier_2 ? Number(wholesale_price_tier_2) : null,
-            wholesale_price_tier_3: wholesale_override && wholesale_price_tier_3 ? Number(wholesale_price_tier_3) : null,
-        })
+        .update(updateFields)
         .eq("id", id);
+
 
     if (error) {
         console.error("[admin/products PATCH]", error);
@@ -168,7 +178,8 @@ export async function PATCH(req: NextRequest) {
         actionType: "UPDATE",
         resource: "product",
         resourceId: id,
-        details: { name: name, slug: slug }
+        oldData,
+        newData: updateFields
     });
 
     revalidatePath("/shop", "page");

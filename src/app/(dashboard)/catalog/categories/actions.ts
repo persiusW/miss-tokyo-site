@@ -21,7 +21,7 @@ export async function createCategory(data: any) {
         actionType: "CREATE",
         resource: "category",
         resourceId: newCat.id,
-        details: { name: newCat.name }
+        newData: data
     });
 
     revalidatePath("/catalog/categories");
@@ -36,6 +36,9 @@ export async function updateCategory(id: string, data: any) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
     if (!profile) return { success: false, error: "Profile not found" };
 
+    // Fetch old record for diffing
+    const { data: oldData } = await supabase.from("categories").select("*").eq("id", id).single();
+
     const { error } = await supabase.from("categories").update(data).eq("id", id);
     if (error) return { success: false, error: error.message };
 
@@ -45,7 +48,8 @@ export async function updateCategory(id: string, data: any) {
         actionType: "UPDATE",
         resource: "category",
         resourceId: id,
-        details: { name: data.name }
+        oldData,
+        newData: data
     });
 
     revalidatePath("/catalog/categories");
@@ -60,6 +64,8 @@ export async function deleteCategory(id: string, name: string) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
     if (!profile) return { success: false, error: "Profile not found" };
 
+    const { data: oldData } = await supabase.from("categories").select("*").eq("id", id).single();
+
     const { error } = await supabase.from("categories").delete().eq("id", id);
     if (error) return { success: false, error: error.message };
 
@@ -69,7 +75,7 @@ export async function deleteCategory(id: string, name: string) {
         actionType: "DELETE",
         resource: "category",
         resourceId: id,
-        details: { name }
+        oldData
     });
 
     revalidatePath("/catalog/categories");
