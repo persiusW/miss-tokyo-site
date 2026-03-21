@@ -219,12 +219,6 @@ function StoreTab() {
                         home_product_limit: sData.home_product_limit || 4,
                     });
                 }
-                // Fetch all active categories to allow selection
-                const { data: catData } = await supabase.from("categories").select("id, name, is_wholesale").eq("is_active", true).order("name");
-                if (catData) {
-                    setAllCategories(catData);
-                    setWholesaleCatIds(new Set(catData.filter((c: any) => c.is_wholesale).map((c: any) => c.id)));
-                }
             } catch (err) {
                 console.error("Fetch store settings error:", err);
             } finally {
@@ -257,14 +251,6 @@ function StoreTab() {
             }, { onConflict: "id" });
             
             if (sError) throw sError;
-
-            // Update categories wholesale status
-            for (const cat of allCategories) {
-                const isWholesale = wholesaleCatIds.has(cat.id);
-                if (isWholesale !== cat.is_wholesale) {
-                    await supabase.from("categories").update({ is_wholesale: isWholesale }).eq("id", cat.id);
-                }
-            }
 
             toast.success("Store configuration saved.");
         } catch (error: any) {
