@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Plus, ChevronLeft, Volume2, VolumeX, Loader2 } from "lucide-react";
+import { Plus, ChevronLeft, Volume2, VolumeX, Loader2, Check } from "lucide-react";
 import { QuickViewModal } from "@/components/ui/miss-tokyo/QuickViewModal";
+import { useCart } from "@/store/useCart";
+import { toast } from "@/lib/toast";
 
 interface GalleryClientProps {
     products: any[];
@@ -23,6 +25,9 @@ function VideoCard({
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
+    const [isAdding, setIsAdding] = useState(false);
+    const [justAdded, setJustAdded] = useState(false);
+    const addItem = useCart(s => s.addItem);
 
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -44,56 +49,137 @@ function VideoCard({
         return () => observer.disconnect();
     }, []);
 
+    const handleQuickAdd = async () => {
+        // If product has variants, trigger selection drawer instead
+        if ((product.available_sizes?.length || 0) > 0 || (product.available_colors?.length || 0) > 0) {
+            onOpenModal(product.slug);
+            return;
+        }
+
+        setIsAdding(true);
+        // Simulate a small backend delay for the premium feel
+        await new Promise(r => setTimeout(r, 600));
+
+        addItem({
+            id: `${product.id}-default`,
+            productId: product.id,
+            name: product.name,
+            slug: product.slug,
+            price: product.price_ghs,
+            size: "One size",
+            quantity: 1,
+            imageUrl: product.image_urls?.[0] || "",
+        }, false); // Suppress opening the drawer
+
+        setIsAdding(false);
+        setJustAdded(true);
+        setTimeout(() => setJustAdded(false), 2000);
+    };
+
     return (
-        <div className="relative h-full w-full snap-start overflow-hidden bg-neutral-900">
-            {/* Loading Overlay */}
-            {!isLoaded && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-900/50 backdrop-blur-sm">
-                    <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
+        <div className="relative h-full w-full snap-start overflow-hidden bg-neutral-950 flex flex-col lg:flex-row">
+            {/* Desktop: Split Screen. Mobile: Full Cover. */}
+            
+            {/* Split 1: Media Column */}
+            <div className="relative w-full h-full lg:w-[60%] bg-neutral-900 group">
+                {!isLoaded && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-900/50 backdrop-blur-sm">
+                        <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
+                    </div>
+                )}
+                <video
+                    ref={videoRef}
+                    src={product.video_url}
+                    poster={product.image_urls?.[0]}
+                    muted={isMuted}
+                    loop
+                    playsInline
+                    preload={priority ? "auto" : "metadata"}
+                    onCanPlayThrough={() => setIsLoaded(true)}
+                    className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-700 ${isLoaded ? "opacity-100" : "opacity-0"}`}
+                />
+                
+                {/* Mobile Overlay: Details (Hidden on lg) */}
+                <div className="lg:hidden absolute bottom-0 left-0 w-full p-8 z-10 bg-gradient-to-t from-black/95 via-black/40 to-transparent text-white">
+                    <div className="flex flex-col gap-2 mb-6">
+                        <span className="text-[9px] uppercase tracking-[0.2em] text-white/60 font-medium">
+                            {product.category_name || "New Arrival"}
+                        </span>
+                        <h2 className="font-serif text-2xl tracking-widest uppercase leading-tight">
+                            {product.name}
+                        </h2>
+                        <p className="text-sm font-light tracking-widest opacity-90">
+                            GH₵{product.price_ghs.toFixed(2)}
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={handleQuickAdd}
+                            disabled={isAdding || justAdded}
+                            className={`flex-1 text-[10px] font-bold uppercase tracking-[0.2em] py-4 rounded-none transition-all flex items-center justify-center gap-2 ${
+                                justAdded ? "bg-emerald-500 text-white scale-[1.02]" : "bg-white text-black hover:bg-neutral-100"
+                            }`}
+                        >
+                            {isAdding ? <Loader2 size={14} className="animate-spin" /> : justAdded ? <Check size={14} /> : <Plus size={14} />}
+                            {isAdding ? "Adding..." : justAdded ? "Added!" : "Add to Bag"}
+                        </button>
+                        <Link 
+                            href={`/products/${product.slug}`}
+                            className="w-14 h-14 border border-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white hover:text-black transition-all"
+                        >
+                            <span className="text-[10px] font-black uppercase tracking-tighter">View</span>
+                        </Link>
+                    </div>
                 </div>
-            )}
+            </div>
 
-            {/* Video Layer */}
-            <video
-                ref={videoRef}
-                src={product.video_url}
-                poster={product.image_urls?.[0]}
-                muted={isMuted}
-                loop
-                playsInline
-                preload={priority ? "auto" : "metadata"}
-                onCanPlayThrough={() => setIsLoaded(true)}
-                className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-700 ${isLoaded ? "opacity-100" : "opacity-0"}`}
-            />
-
-            {/* Shoppable Overlay */}
-            <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 z-10 bg-gradient-to-t from-black/95 via-black/40 to-transparent text-white">
-                <div className="flex flex-col gap-2 mb-6">
-                    <span className="text-[9px] uppercase tracking-[0.2em] text-white/60 font-medium">
-                        {product.category_name || "New Arrival"}
+            {/* Split 2: Desktop Detail Column (lg Only) */}
+            <div className="hidden lg:flex w-[40%] h-full bg-white flex-col justify-center p-16 xl:p-24 relative">
+                <div className="max-w-md">
+                    <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-400 font-bold mb-4 block">
+                        {product.category_name || "MISS TOKYO EXCLUSIVE"}
                     </span>
-                    <h2 className="font-serif text-2xl md:text-3xl tracking-widest uppercase leading-tight max-w-[80%]">
+                    <h2 className="font-serif text-5xl xl:text-6xl tracking-widest uppercase leading-[1.1] mb-8 text-neutral-900">
                         {product.name}
                     </h2>
-                    <p className="text-sm font-light tracking-widest opacity-90">
+                    
+                    <div className="h-[1px] w-20 bg-neutral-200 mb-8" />
+                    
+                    <p className="text-sm text-neutral-500 font-light tracking-widest leading-relaxed mb-10 line-clamp-4">
+                        {product.description || "Indulge in the latest couture-inspired silhouette from Miss Tokyo. A perfect blend of contemporary elegance and timeless craftsmanship."}
+                    </p>
+
+                    <p className="text-2xl font-serif tracking-widest text-neutral-900 mb-12">
                         GH₵{product.price_ghs.toFixed(2)}
                     </p>
+
+                    <div className="flex flex-col gap-4">
+                        <button
+                            onClick={handleQuickAdd}
+                            disabled={isAdding || justAdded}
+                            className={`w-full text-[11px] font-bold uppercase tracking-[0.3em] py-5 rounded-none transition-all duration-300 flex items-center justify-center gap-3 border shadow-sm ${
+                                justAdded 
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-200 scale-105" 
+                                : "bg-black text-white border-black hover:bg-neutral-800"
+                            }`}
+                        >
+                            {isAdding ? <Loader2 size={16} className="animate-spin" /> : justAdded ? <Check size={16} /> : <Plus size={16} />}
+                            {isAdding ? "Syncing..." : justAdded ? "Included in Bag" : "Buy this Piece"}
+                        </button>
+                        
+                        <Link 
+                            href={`/products/${product.slug}`}
+                            className="w-full text-[11px] font-bold uppercase tracking-[0.3em] py-5 text-neutral-400 text-center hover:text-black transition-colors"
+                        >
+                            View Full Product Detail →
+                        </Link>
+                    </div>
                 </div>
 
-                {/* Action Row */}
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => onOpenModal(product.slug)}
-                        className="flex-1 bg-white text-black text-[10px] font-bold uppercase tracking-[0.2em] py-4 rounded-none hover:bg-neutral-100 transition-all flex items-center justify-center gap-2"
-                    >
-                        <Plus size={14} /> Add to Bag
-                    </button>
-                    <Link 
-                        href={`/products/${product.slug}`}
-                        className="w-14 h-14 border border-white/20 backdrop-blur-md flex items-center justify-center group hover:bg-white hover:text-black transition-all"
-                    >
-                        <span className="text-[10px] font-black uppercase tracking-tighter">View</span>
-                    </Link>
+                {/* Desktop Global Mute Toggle is in Header, but we could put more info here if needed */}
+                <div className="absolute bottom-12 left-16 xl:left-24 text-[9px] uppercase tracking-[0.2em] text-neutral-300 font-medium">
+                    Scroll to Explore • Snap Mandatory
                 </div>
             </div>
         </div>
@@ -103,6 +189,12 @@ function VideoCard({
 export function GalleryClient({ products }: GalleryClientProps) {
     const [isMuted, setIsMuted] = useState(true);
     const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+    const [hasMounted, setHasMounted] = useState(false);
+    const totalItems = useCart(s => s.totalItems());
+
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
 
     if (!products || products.length === 0) {
         return (
@@ -124,11 +216,19 @@ export function GalleryClient({ products }: GalleryClientProps) {
                 </Link>
                 
                 <div className="flex items-center gap-4 pointer-events-auto">
-                    <h1 className="text-white font-serif uppercase tracking-[0.4em] text-[10px] md:text-xs">Gallery Feed</h1>
+                    {/* Cart Counter Overlay (Visual Feedback for Part 3) */}
+                    <Link href="/shop" className="text-white bg-black/20 backdrop-blur-lg px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 hover:bg-white hover:text-black transition-all">
+                        <span className="text-[10px] font-bold tracking-widest uppercase">Cart</span>
+                        {hasMounted && (
+                            <span className="w-5 h-5 bg-white text-black text-[9px] font-black rounded-full flex items-center justify-center animate-in zoom-in-50 duration-300" key={totalItems}>
+                                {totalItems}
+                            </span>
+                        )}
+                    </Link>
+
                     <button 
                         onClick={() => setIsMuted(!isMuted)}
                         className="text-white bg-black/20 backdrop-blur-lg p-3 rounded-full border border-white/10 hover:bg-white hover:text-black transition-all shadow-xl"
-                        title={isMuted ? "Unmute" : "Mute"}
                     >
                         {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                     </button>

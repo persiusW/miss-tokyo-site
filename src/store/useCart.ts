@@ -36,7 +36,7 @@ type CartState = {
     items: CartItem[];
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
-    addItem: (item: CartItem) => void;
+    addItem: (item: CartItem, openDrawer?: boolean) => void;
     removeItem: (id: string) => void;
     updateQuantity: (id: string, quantity: number) => void;
     clearCart: () => void;
@@ -50,7 +50,7 @@ export const useCart = create<CartState>()(
             items: [],
             isOpen: false,
             setIsOpen: (isOpen) => set({ isOpen }),
-            addItem: (item) => {
+            addItem: (item, openDrawer = true) => {
                 set((state) => {
                     const existingItem = state.items.find(i => i.id === item.id);
                     if (existingItem) {
@@ -58,10 +58,10 @@ export const useCart = create<CartState>()(
                             items: state.items.map(i =>
                                 i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
                             ),
-                            isOpen: true,
+                            isOpen: openDrawer ? true : state.isOpen,
                         };
                     }
-                    return { items: [...state.items, item], isOpen: true };
+                    return { items: [...state.items, item], isOpen: openDrawer ? true : state.isOpen };
                 });
             },
             removeItem: (id) => set((state) => ({
