@@ -73,10 +73,16 @@ export function TeamTab() {
     // Filter states
     const [filterUserId, setFilterUserId] = useState<string>("all");
     const [filterAction, setFilterAction] = useState<string>("all");
+    const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [allStaff, setAllStaff] = useState<{ id: string, full_name: string }[]>([]);
 
-    const fetchData = async () => {
-        setLoading(true);
+    // Pagination states
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const PAGE_SIZE = 50;
+
+    const fetchData = async (isLoadMore = false) => {
+        if (!isLoadMore) setLoading(true);
         if (activeTab === "members") {
             const { data } = await supabase
                 .from("profiles")
@@ -94,11 +100,16 @@ export function TeamTab() {
                 .order("created_at", { ascending: false });
             if (data) setInvites(data);
         } else if (activeTab === "logs") {
+            const startOfDay = `${filterDate}T00:00:00.000Z`;
+            const endOfDay = `${filterDate}T23:59:59.999Z`;
+
             let query = supabase
                 .from("activity_logs")
                 .select("*, profiles(full_name, email)")
+                .gte("created_at", startOfDay)
+                .lte("created_at", endOfDay)
                 .order("created_at", { ascending: false })
-                .limit(100);
+                .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
             if (filterUserId !== "all") {
                 query = query.eq("user_id", filterUserId);
@@ -108,14 +119,29 @@ export function TeamTab() {
             }
 
             const { data } = await query;
-            if (data) setLogs(data as any);
+            if (data) {
+                if (isLoadMore) {
+                    setLogs(prev => [...prev, ...data as any]);
+                } else {
+                    setLogs(data as any);
+                }
+                setHasMore(data.length === PAGE_SIZE);
+            }
         }
-        setLoading(false);
+        if (!isLoadMore) setLoading(false);
     };
 
     useEffect(() => {
+        setPage(0); // Reset page on filter change
         fetchData();
-    }, [activeTab, filterUserId, filterAction]);
+    }, [activeTab, filterUserId, filterAction, filterDate]);
+
+    // Handle Load More
+    useEffect(() => {
+        if (page > 0) {
+            fetchData(true);
+        }
+    }, [page]);
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -336,6 +362,15 @@ export function TeamTab() {
                         {/* Filters Bar */}
                         <div className="px-8 py-4 bg-neutral-50 border-b border-neutral-100 flex flex-wrap items-center gap-6">
                             <div className="flex items-center gap-2">
+                                <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Date:</label>
+                                <input 
+                                    type="date"
+                                    value={filterDate}
+                                    onChange={e => setFilterDate(e.target.value)}
+                                    className="bg-transparent text-sm border-b border-neutral-300 outline-none focus:border-black py-1 cursor-pointer"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
                                 <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Staff:</label>
                                 <select 
                                     value={filterUserId} 
@@ -359,12 +394,20 @@ export function TeamTab() {
                                     <option value="CREATE">Created</option>
                                     <option value="UPDATE">Updated</option>
                                     <option value="DELETE">Deleted</option>
+                                    <option value="PACKED_ORDER">Packed</option>
+                                    <option value="DISPATCHED_ORDER">Dispatched</option>
+                                    <option value="DELIVERED_ORDER">Delivered</option>
+                                    <option value="ASSIGNED_RIDER">Rider Assigned</option>
                                     <option value="INVITE">Invited</option>
                                     <option value="REMOVE_MEMBER">Removed</option>
                                 </select>
                             </div>
                             <button 
-                                onClick={() => { setFilterUserId("all"); setFilterAction("all"); }}
+                                onClick={() => { 
+                                    setFilterUserId("all"); 
+                                    setFilterAction("all");
+                                    setFilterDate(new Date().toISOString().split('T')[0]);
+                                }}
                                 className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 hover:text-black transition-colors"
                             >
                                 Reset Filters
@@ -445,6 +488,17 @@ export function TeamTab() {
                                         ))}
                                     </tbody>
                                 </table>
+                            )}
+
+                            {hasMore && logs.length >= PAGE_SIZE && (
+                                <div className="p-6 border-t border-neutral-50 flex justify-center">
+                                    <button
+                                        onClick={() => setPage(prev => prev + 1)}
+                                        className="px-6 py-2 border border-neutral-200 text-[10px] uppercase tracking-widest font-semibold hover:bg-neutral-50 transition-colors rounded-lg"
+                                    >
+                                        Load More
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
