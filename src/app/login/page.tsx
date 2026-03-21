@@ -29,7 +29,7 @@ export default function LoginPage() {
             }
 
             if (data.user) {
-                router.push("/overview");
+                router.push("/account");
                 router.refresh();
             }
         } catch (err) {
@@ -70,7 +70,7 @@ export default function LoginPage() {
                             onChange={(e) => setEmail(e.target.value)}
                             autoComplete="email"
                             className="w-full bg-transparent border-b border-neutral-200 text-black text-sm py-4 focus:outline-none focus:border-black transition-all rounded-none"
-                            placeholder="STUDIO@CLIENT.COM"
+                            placeholder="email@example.com"
                         />
                     </div>
 
@@ -102,7 +102,7 @@ export default function LoginPage() {
                             disabled={loading}
                             className="w-full bg-black text-white py-5 text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-neutral-900 transition-all duration-500 rounded-none shadow-sm disabled:opacity-50"
                         >
-                            {loading ? "Authenticating..." : "Enter the Atelier"}
+                            {loading ? "SIGNING IN..." : "SIGN IN"}
                         </button>
                         
                         <div className="text-center">

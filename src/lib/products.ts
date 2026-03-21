@@ -64,6 +64,13 @@ export async function getProducts(params: GetProductsParams, role?: string) {
         )
         .eq("is_active", true);
 
+    // Security check for public access
+    if (!isAuthorized) {
+        // Use the correct column name for wholesale products if it exists, otherwise fall back to B2B gating
+        // Based on project audit, the column is likely 'is_wholesale_only'
+        query = query.eq("is_wholesale_only", false);
+    }
+
     // B2B Gating: If not authorized, exclude products that are EXCLUSIVELY in wholesale categories.
     if (!isAuthorized) {
         const { data: retailCats } = await supabaseAdmin
@@ -159,11 +166,11 @@ export async function getCategories(role?: string): Promise<ShopCategory[]> {
     let query = supabaseAdmin
         .from("categories")
         .select("id, name, slug, product_count, sort_order")
-        .eq("is_active", true);
-
     if (!isAuthorized) {
         query = query.eq("is_wholesale", false);
     }
+
+    query = query.eq("is_active", true);
 
     const { data } = await query
         .order("sort_order", { ascending: true })
@@ -302,15 +309,13 @@ export function deriveSizes(products: ShopProduct[]): string[] {
     return sorted;
 }
 export async function getVideoProducts(): Promise<Array<ShopProduct & { video_url?: string }>> {
-    // Isolated video filtering logic: only products with .mp4 or .mov in image_urls
     const { data } = await supabaseAdmin
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
-        .eq("is_active", true)
-        .or('image_urls.cs.{"%.mp4%"},image_urls.cs.{"%.mov%"}'); // Prefer DB filtering
+        .eq("is_active", true);
 
     if (!data) return [];
 

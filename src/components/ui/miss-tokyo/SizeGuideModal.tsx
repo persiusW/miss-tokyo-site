@@ -32,7 +32,7 @@ export function SizeGuideModal() {
             .from("site_copy")
             .select("value")
             .eq("copy_key", "size_guide_rows")
-            .single();
+            .maybeSingle();
         if (data?.value) {
             try { setRows(JSON.parse(data.value)); } catch { /* use defaults */ }
         }

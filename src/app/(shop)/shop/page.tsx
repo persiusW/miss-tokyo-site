@@ -59,13 +59,21 @@ export default async function ShopPage({
 }) {
     const params = await searchParams;
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
     
-    // Fetch role if authenticated
+    // Auth Hardening: Catch stale sessions/403s gracefully to ensure public access
+    let user = null;
     let role: string | undefined;
-    if (user) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-        role = profile?.role;
+    
+    try {
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+        if (!authError && authUser) {
+            user = authUser;
+            // Fetch profile using the authenticated client
+            const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+            role = profile?.role;
+        }
+    } catch (err) {
+        console.warn("[Auth Hardening] Session verification failed, proceeding as public user:", err);
     }
     const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
 

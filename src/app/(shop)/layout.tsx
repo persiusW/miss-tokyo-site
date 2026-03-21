@@ -3,13 +3,14 @@ import { Footer } from "@/components/ui/miss-tokyo/Footer";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
 import { CartDrawer } from "@/components/ui/miss-tokyo/CartDrawer";
 import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export default async function ShopLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const { data } = await supabase.from("store_settings").select("maintenance_mode").eq("id", "default").single();
+    const { data } = await supabaseAdmin.from("store_settings").select("maintenance_mode").eq("id", "default").maybeSingle();
     const isMaintenanceMode = data?.maintenance_mode || false;
 
     if (isMaintenanceMode) {

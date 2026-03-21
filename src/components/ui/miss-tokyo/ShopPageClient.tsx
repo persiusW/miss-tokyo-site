@@ -472,39 +472,54 @@ export function ShopPageClient({
     const loadMore = async () => {
         setLoadingMore(true);
         const nextPage = loadPage + 1;
-        const p = new URLSearchParams(searchParams.toString());
-        p.set("page", String(nextPage));
         const from = (nextPage - 1) * PAGE_SIZE;
-        let query = supabase.from("products").select(
-            `id, name, slug, description, price_ghs, compare_at_price_ghs, image_urls, is_featured, is_active, category_type, available_colors, available_sizes, color_variants, size_variants, bundle_label, badge, is_sale, discount_value, inventory_count, created_at`,
-            { count: "exact" }
-        ).eq("is_active", true);
 
-        if (activeCategory) {
-            const { data: cat } = await supabase.from("categories").select("name").eq("slug", activeCategory).maybeSingle();
-            const categoryName = cat?.name ?? activeCategory.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-            query = query.ilike("category_type", categoryName);
+        try {
+            let query = supabase.from("products").select(
+                `id, name, slug, description, price_ghs, compare_at_price_ghs, image_urls, is_featured, is_active, category_type, available_colors, available_sizes, color_variants, size_variants, bundle_label, badge, is_sale, discount_value, inventory_count, created_at`,
+                { count: "exact" }
+            ).eq("is_active", true);
+
+            if (activeCategory) {
+                const { data: cat } = await supabase.from("categories").select("name").eq("slug", activeCategory).maybeSingle();
+                const categoryName = cat?.name ?? activeCategory.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+                query = query.ilike("category_type", categoryName);
+            }
+            
+            if (activeQ) query = query.ilike("name", `%${activeQ}%`);
+            if (activeSale) query = query.eq("is_sale", true);
+            if (activeMin) query = query.gte("price_ghs", parseFloat(activeMin));
+            if (activeMax) query = query.lte("price_ghs", parseFloat(activeMax));
+            if (activeColor) query = query.contains("available_colors", [activeColor]);
+            if (activeSize) query = query.contains("available_sizes", [activeSize]);
+
+            switch (activeSort) {
+                case "price-asc":  query = query.order("price_ghs",  { ascending: true });  break;
+                case "price-desc": query = query.order("price_ghs",  { ascending: false }); break;
+                case "name-asc":   query = query.order("name",       { ascending: true });  break;
+                default:           query = query.order("created_at", { ascending: false }); break;
+            }
+
+            query = query.range(from, from + PAGE_SIZE - 1);
+            const { data, count, error } = await query;
+            if (error) throw error;
+
+            const newProds: ShopProduct[] = (data || []).map((p: any) => ({ 
+                ...p, 
+                category_name: p.category_type ?? null, 
+                category_slug: activeCategory ?? null 
+            }));
+            
+            setProducts(prev => [...prev, ...newProds]);
+            setLoadPage(nextPage);
+            setTotalCount(count ?? totalCount);
+            setHasMore(from + newProds.length < (count ?? totalCount));
+        } catch (err) {
+            console.error("[Client Resilience] loadMore failed:", err);
+            setHasMore(false);
+        } finally {
+            setLoadingMore(false);
         }
-        if (activeQ) query = query.ilike("name", `%${activeQ}%`);
-        if (activeSale) query = query.eq("is_sale", true);
-        if (activeMin) query = query.gte("price_ghs", parseFloat(activeMin));
-        if (activeMax) query = query.lte("price_ghs", parseFloat(activeMax));
-        if (activeColor) query = query.contains("available_colors", [activeColor]);
-        if (activeSize) query = query.contains("available_sizes", [activeSize]);
-        switch (activeSort) {
-            case "price-asc":  query = query.order("price_ghs",  { ascending: true });  break;
-            case "price-desc": query = query.order("price_ghs",  { ascending: false }); break;
-            case "name-asc":   query = query.order("name",       { ascending: true });  break;
-            default:           query = query.order("created_at", { ascending: false }); break;
-        }
-        query = query.range(from, from + PAGE_SIZE - 1);
-        const { data, count } = await query;
-        const newProds: ShopProduct[] = (data || []).map((p: any) => ({ ...p, category_name: p.category_type ?? null, category_slug: activeCategory ?? null }));
-        setProducts(prev => [...prev, ...newProds]);
-        setLoadPage(nextPage);
-        setTotalCount(count ?? totalCount);
-        setHasMore(from + newProds.length < (count ?? totalCount));
-        setLoadingMore(false);
     };
 
     // Active filter count

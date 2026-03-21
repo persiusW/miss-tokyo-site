@@ -91,7 +91,7 @@ export default async function ProductPage({
             .from("site_settings")
             .select("pdp_show_trust_strip, pdp_show_reviews, pdp_show_product_details, pdp_show_care_instructions, pdp_show_delivery_returns")
             .eq("id", "singleton")
-            .single()
+            .maybeSingle()
             .then(({ data }: { data: any }) => data ?? {}),
     ]);
 
