@@ -76,7 +76,13 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
 
     return (
         <>
-            <div className="pdp-gallery" style={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: 10, position: "sticky", top: "calc(64px + 16px)" }}>
+            <div className="pdp-gallery" style={{ 
+                display: "grid", 
+                gridTemplateColumns: "var(--pdp-cols, 72px 1fr)", 
+                gap: 10, 
+                position: "sticky", 
+                top: "calc(64px + 16px)" 
+            }}>
                 {/* Thumbnail column */}
                 <div className="pdp-thumb-col" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {imgs.map((img, i) => (
@@ -146,6 +152,7 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                                             fill
                                             priority={i === 0}
                                             sizes="(max-width: 768px) 100vw, 50vw"
+                                            unoptimized={true}
                                             style={{
                                                 objectFit: "cover"
                                             }}
