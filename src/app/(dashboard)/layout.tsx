@@ -28,6 +28,11 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         userRole = profile?.role ?? null;
     }
 
+    const isAuthorized = ["admin", "owner", "sales_staff"].includes(userRole || "");
+    if (!isAuthorized) {
+        redirect("/admin/login?error=unauthorized");
+    }
+
     const isFullAccess = userRole === "admin" || userRole === "owner";
     const showCustomRequests = storeSettings?.enable_custom_requests ?? true;
     const businessName = businessSettings?.business_name ?? "Miss Tokyo";

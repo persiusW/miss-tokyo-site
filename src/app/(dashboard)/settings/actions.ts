@@ -43,6 +43,18 @@ export async function inviteTeamMember(data: InviteData) {
 
     const message = `You have been invited to collaborate on Miss Tokyo as a ${data.role}. Join here: ${inviteLink}`;
 
+    // 1. Format Phone Number (Ghana standard +233)
+    let formattedPhone = data.phone;
+    if (formattedPhone) {
+        formattedPhone = formattedPhone.replace(/\D/g, "");
+        if (formattedPhone.startsWith("0")) {
+            formattedPhone = "233" + formattedPhone.slice(1);
+        } else if (!formattedPhone.startsWith("233")) {
+            formattedPhone = "233" + formattedPhone;
+        }
+        formattedPhone = "+" + formattedPhone;
+    }
+
     try {
         await resend.emails.send({
             from: process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop",
@@ -52,13 +64,55 @@ export async function inviteTeamMember(data: InviteData) {
             html: `<p>You have been invited to collaborate on Miss Tokyo as a <strong>${data.role}</strong>.</p><p><a href="${inviteLink}">Click here to accept your invitation</a></p>`,
         });
 
-        if (data.phone) {
-            await sendSMS({ to: data.phone, message });
+        if (formattedPhone) {
+            try {
+                await sendSMS({ to: formattedPhone, message });
+            } catch (smsErr) {
+                console.error("SMS failed, but email sent:", smsErr);
+                return { success: true, warning: 'Email sent, but SMS failed.' };
+            }
         }
 
         return { success: true };
     } catch (err: any) {
-        console.error("Failed to send invite emails/sms:", err);
+        console.error("Failed to send invite emails:", err);
         return { success: false, error: "Invitation saved, but failed to dispatch communications." };
     }
+}
+
+export async function removeTeamMember(userId: string) {
+    const supabase = await createClient();
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !userData?.user) {
+        return { success: false, error: "Unauthorized" };
+    }
+
+    // CRITICAL SECURITY: Verify caller is an admin or owner
+    const { data: callerData } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userData.user.id)
+        .single();
+        
+    if (!callerData || (callerData.role !== 'admin' && callerData.role !== 'owner')) {
+        return { success: false, error: "Forbidden: Only admins and owners can remove members." };
+    }
+
+    // Use Service Role to delete the user from Auth fully (which cascades to profiles)
+    const { createClient: createServiceClient } = await import("@supabase/supabase-js");
+    const supabaseAdmin = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    
+    if (deleteError) {
+        console.error("Failed to delete user ID", userId, deleteError);
+        return { success: false, error: "Failed to delete from Auth layer." };
+    }
+
+    return { success: true };
 }

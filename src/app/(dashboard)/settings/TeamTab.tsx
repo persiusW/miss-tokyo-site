@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { X, Mail, UserPlus, CheckCircle, Clock } from "lucide-react";
-import { inviteTeamMember } from "@/app/(dashboard)/settings/actions";
+import { inviteTeamMember, removeTeamMember } from "@/app/(dashboard)/settings/actions";
 
 type TeamMember = {
     id: string;
@@ -37,22 +38,17 @@ type ActivityLog = {
 const ROLE_LABELS: Record<string, string> = {
     owner: "Owner",
     admin: "Admin",
-    sales_staff: "Sales Staff",
-    rider: "Rider",
-    support: "Support",
-    content_editor: "Content Editor"
+    sales_staff: "Sales Staff"
 };
 
 const ROLE_COLORS: Record<string, string> = {
-    owner: "bg-neutral-900 text-white",
+    owner: "bg-black text-white",
     admin: "bg-neutral-800 text-white",
-    sales_staff: "bg-neutral-100 text-neutral-700",
-    rider: "bg-blue-100 text-blue-700",
-    support: "bg-purple-100 text-purple-700",
-    content_editor: "bg-emerald-100 text-emerald-700"
+    sales_staff: "bg-neutral-100 text-neutral-700"
 };
 
 export function TeamTab() {
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState<"members" | "pending" | "logs">("members");
     const [members, setMembers] = useState<TeamMember[]>([]);
     const [invites, setInvites] = useState<PendingInvite[]>([]);
@@ -84,10 +80,7 @@ export function TeamTab() {
         } else if (activeTab === "logs") {
             const { data } = await supabase
                 .from("activity_logs")
-                .select(`
-                    id, user_id, user_role, action_type, resource, created_at,
-                    profiles:user_id ( full_name, email )
-                `)
+                .select("*, profiles(full_name, email)")
                 .order("created_at", { ascending: false })
                 .limit(50);
             if (data) setLogs(data as any);
@@ -103,24 +96,34 @@ export function TeamTab() {
         e.preventDefault();
         setInviting(true);
         
-        const res = await inviteTeamMember({
-            fullName: inviteName,
-            email: inviteEmail,
-            phone: invitePhone || undefined,
-            role: inviteRole
-        });
+        try {
+            const res = await inviteTeamMember({
+                fullName: inviteName,
+                email: inviteEmail,
+                phone: invitePhone || undefined,
+                role: inviteRole
+            });
 
-        if (!res.success) {
-            toast.error(res.error || "Invite failed");
-        } else {
-            toast.success(`Invitation sent to ${inviteEmail}`);
-            setShowModal(false);
-            setInviteEmail("");
-            setInviteName("");
-            setInvitePhone("");
-            if (activeTab === "pending") fetchData();
+            if (!res.success) {
+                toast.error(res.error || "Invite failed");
+            } else {
+                if (res.warning) {
+                    toast.error(res.warning); // the custom toast component maps this as an error/alert visually
+                } else {
+                    toast.success(`Invitation sent to ${inviteEmail}`);
+                }
+                setShowModal(false);
+                setInviteEmail("");
+                setInviteName("");
+                setInvitePhone("");
+                if (activeTab === "pending") fetchData();
+            }
+        } catch (err: any) {
+            toast.error("An unexpected error occurred while sending the invite.");
+            console.error(err);
+        } finally {
+            setInviting(false);
         }
-        setInviting(false);
     };
 
     const handleRevoke = async (id: string, email: string) => {
@@ -134,19 +137,31 @@ export function TeamTab() {
         fetchData();
     };
 
+    const [removingId, setRemovingId] = useState<string | null>(null);
+
     const handleRemove = async (member: TeamMember) => {
         if (member.role === "owner" || member.role === "admin") {
             toast.error("Admin and owner accounts cannot be removed.");
             return;
         }
         if (!confirm(`Remove ${member.email} from the team? They will lose dashboard access.`)) return;
-        const { error } = await supabase
-            .from("profiles")
-            .update({ role: null })
-            .eq("id", member.id);
-        if (error) { toast.error("Failed to remove member."); return; }
-        toast.success("Team member removed.");
-        fetchData();
+        
+        setRemovingId(member.id);
+        try {
+            const res = await removeTeamMember(member.id);
+            if (!res.success) {
+                toast.error(res.error || "Failed to remove member.");
+            } else {
+                toast.success("Team member removed.");
+                router.refresh();
+                fetchData();
+            }
+        } catch (err: any) {
+            toast.error("An unexpected error occurred.");
+            console.error(err);
+        } finally {
+            setRemovingId(null);
+        }
     };
 
     return (
@@ -224,9 +239,10 @@ export function TeamTab() {
                                                 {(member.role !== "owner" && member.role !== "admin") && (
                                                     <button 
                                                         onClick={() => handleRemove(member)}
-                                                        className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors"
+                                                        disabled={removingId === member.id}
+                                                        className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50"
                                                     >
-                                                        Remove
+                                                        {removingId === member.id ? "Removing..." : "Remove"}
                                                     </button>
                                                 )}
                                             </td>
@@ -381,13 +397,11 @@ export function TeamTab() {
                                 <select
                                     value={inviteRole}
                                     onChange={e => setInviteRole(e.target.value)}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors appearance-none"
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors cursor-pointer appearance-none"
                                 >
-                                    <option value="admin">Admin</option>
                                     <option value="sales_staff">Sales Staff</option>
-                                    <option value="rider">Rider</option>
-                                    <option value="content_editor">Content Editor</option>
-                                    <option value="support">Support</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="owner">Owner</option>
                                 </select>
                             </div>
                             <div className="flex items-center gap-3 pt-4">

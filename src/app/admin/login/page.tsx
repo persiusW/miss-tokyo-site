@@ -15,6 +15,16 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Handle unauthorized redirects from the dashboard
+  useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('error') === 'unauthorized') {
+        setError("Access denied. Your role does not have dashboard permissions.");
+      }
+    }
+  });
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);

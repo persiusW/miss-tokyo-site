@@ -173,17 +173,19 @@ export default async function ProductPage({
                 </div>
 
                 {/* Product layout */}
-                <div className="max-w-[1440px] mx-auto pb-20 grid grid-cols-1 md:grid-cols-[1fr_480px] gap-0 md:gap-12 items-start pdp-layout-tw">
-                    {/* Gallery */}
-                    <ProductGallery
-                        images={product.image_urls ?? []}
-                        name={product.name}
-                        badge={badgeLabel}
-                        isSale={isSale}
-                    />
+                <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12 grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-start">
+                    {/* Gallery column */}
+                    <div className="w-full">
+                        <ProductGallery
+                            images={product.image_urls ?? []}
+                            name={product.name}
+                            badge={badgeLabel}
+                            isSale={isSale}
+                        />
+                    </div>
 
-                    {/* Info panel */}
-                    <div className="px-4 md:px-0 pt-4 pb-8">
+                    {/* Info panel - STICKY on desktop */}
+                    <div className="md:sticky md:top-24 h-fit">
                         {/* Meta top: category + SKU */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                             {product.category_name && (

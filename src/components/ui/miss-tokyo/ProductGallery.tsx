@@ -81,11 +81,10 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
              * the correct order, and on md+ we switch to the sidebar grid
              * via the .pdp-gallery class in globals.css.
              */}
-            <div className="pdp-gallery flex flex-col gap-2 w-full min-w-0">
-
+            <div className="flex flex-col gap-4 w-full">
                 {/* ── Main image ── */}
                 <div
-                    className="relative w-full aspect-[3/4] overflow-hidden rounded-none md:rounded-sm bg-[var(--blush,#E8D5C4)] cursor-zoom-in"
+                    className="relative w-full aspect-[3/4] md:aspect-[4/5] overflow-hidden rounded-lg bg-gray-50 cursor-zoom-in"
                     onClick={openLightbox}
                     role="button"
                     aria-label="Tap to zoom image"
@@ -150,7 +149,7 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                             <button
                                 onClick={e => { e.stopPropagation(); prev(); }}
                                 aria-label="Previous image"
-                                className="absolute top-1/2 left-3 -translate-y-1/2 z-[2] w-9 h-9 rounded-full bg-white/88 flex items-center justify-center cursor-pointer border-none"
+                                className="absolute top-1/2 left-3 -translate-y-1/2 z-[2] w-9 h-9 rounded-full bg-white/88 flex items-center justify-center cursor-pointer border-none shadow-sm"
                                 style={{ background: "rgba(255,255,255,0.88)" }}
                             >
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#141210" strokeWidth="2" strokeLinecap="round">
@@ -160,7 +159,7 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                             <button
                                 onClick={e => { e.stopPropagation(); next(); }}
                                 aria-label="Next image"
-                                className="absolute top-1/2 right-3 -translate-y-1/2 z-[2] w-9 h-9 rounded-full flex items-center justify-center cursor-pointer border-none"
+                                className="absolute top-1/2 right-3 -translate-y-1/2 z-[2] w-9 h-9 rounded-full flex items-center justify-center cursor-pointer border-none shadow-sm"
                                 style={{ background: "rgba(255,255,255,0.88)" }}
                             >
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#141210" strokeWidth="2" strokeLinecap="round">
@@ -172,17 +171,14 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                 </div>
 
                 {/* ── Thumbnail strip ── */}
-                <div className="flex flex-row overflow-x-auto gap-2 px-4 md:px-0 md:flex-col hide-scrollbar w-full">
+                <div className="flex flex-row overflow-x-auto snap-x gap-3 w-full hide-scrollbar">
                     {imgs.map((img, i) => (
                         <button
                             key={i}
                             onClick={() => setCurrent(i)}
                             aria-label={`View image ${i + 1}`}
-                            className="flex-shrink-0 relative overflow-hidden rounded-sm p-0 cursor-pointer transition-all duration-150"
+                            className="w-20 h-24 flex-shrink-0 relative overflow-hidden rounded-md cursor-pointer transition-all duration-150 bg-gray-100 snap-start"
                             style={{
-                                width: 60,
-                                aspectRatio: "3/4",
-                                background: "var(--blush, #E8D5C4)",
                                 border: `2px solid ${i === current ? "var(--ink, #141210)" : "transparent"}`,
                             }}
                         >
@@ -193,7 +189,7 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                                     src={img}
                                     alt={`${name} ${i + 1}`}
                                     fill
-                                    sizes="64px"
+                                    sizes="80px"
                                     loading="lazy"
                                     unoptimized={true}
                                     className="object-cover"
