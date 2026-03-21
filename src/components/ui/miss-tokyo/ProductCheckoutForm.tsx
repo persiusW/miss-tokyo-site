@@ -70,11 +70,7 @@ export function ProductCheckoutForm({
             stitching: selectedStitching,
             quantity,
             imageUrl: productImageUrl,
-            ...(isWholesale && wholesale ? {
-                isWholesale: true,
-                wholesalePrices: wholesale.prices,
-                wholesaleTiers: wholesale.tiers,
-            } : {}),
+            ...(isWholesale ? { isWholesale: true } : {}),
         }, openDrawerOnAdd ?? true);
 
         onAddedToCart?.();

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { resolveWholesalePrice, WholesalePrices, WholesaleTiers } from '@/lib/wholesale';
+import { resolveWholesalePrice, WholesaleTiers } from '@/lib/wholesale';
 
 export type CartItem = {
     id: string; // productId + "-" + size + "-" + color
@@ -15,17 +15,15 @@ export type CartItem = {
     imageUrl: string;
     // Wholesale fields — only present for wholesale users
     isWholesale?: boolean;
-    wholesalePrices?: WholesalePrices;
     wholesaleTiers?: WholesaleTiers;
 };
 
 /** Computes the effective per-unit price for a cart item (wholesale-aware). */
 export function getEffectivePrice(item: CartItem): number {
-    if (item.isWholesale && item.wholesalePrices && item.wholesaleTiers) {
+    if (item.isWholesale && item.wholesaleTiers) {
         return resolveWholesalePrice(
             item.quantity,
             item.price,
-            item.wholesalePrices,
             item.wholesaleTiers
         );
     }

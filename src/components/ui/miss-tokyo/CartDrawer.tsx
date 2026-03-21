@@ -74,23 +74,50 @@ export function CartDrawer() {
                                         )}
 
                                         <div className="flex items-center justify-between mt-auto">
-                                            <div className="flex items-center border border-neutral-200">
-                                                <button
-                                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                                    aria-label="Decrease quantity"
-                                                    className="flex items-center justify-center w-10 h-10 text-neutral-500 hover:text-black hover:bg-neutral-50"
-                                                >
-                                                    <Minus size={12} />
-                                                </button>
-                                                <span className="px-2 text-xs w-8 text-center">{item.quantity}</span>
-                                                <button
-                                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                                    aria-label="Increase quantity"
-                                                    className="flex items-center justify-center w-10 h-10 text-neutral-500 hover:text-black hover:bg-neutral-50"
-                                                >
-                                                    <Plus size={12} />
-                                                </button>
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center border border-neutral-200">
+                                                    <button
+                                                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                                        aria-label="Decrease quantity"
+                                                        className="flex items-center justify-center w-10 h-10 text-neutral-500 hover:text-black hover:bg-neutral-50"
+                                                    >
+                                                        <Minus size={12} />
+                                                    </button>
+                                                    <span className="px-2 text-xs w-8 text-center">{item.quantity}</span>
+                                                    <button
+                                                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                        aria-label="Increase quantity"
+                                                        className="flex items-center justify-center w-10 h-10 text-neutral-500 hover:text-black hover:bg-neutral-50"
+                                                    >
+                                                        <Plus size={12} />
+                                                    </button>
+                                                </div>
+
+                                                {item.isWholesale && item.wholesaleTiers && (
+                                                    <div className="mt-1">
+                                                        {(() => {
+                                                            const { tier1_min, tier2_min, tier3_min } = item.wholesaleTiers;
+                                                            let nextTierMin = null;
+                                                            let nextTierNum = null;
+
+                                                            if (item.quantity < tier1_min) { nextTierMin = tier1_min; nextTierNum = 1; }
+                                                            else if (item.quantity < tier2_min) { nextTierMin = tier2_min; nextTierNum = 2; }
+                                                            else if (item.quantity < tier3_min) { nextTierMin = tier3_min; nextTierNum = 3; }
+
+                                                            if (nextTierMin) {
+                                                                const diff = nextTierMin - item.quantity;
+                                                                return (
+                                                                    <p className="text-[9px] text-emerald-600 font-medium tracking-wide">
+                                                                        Add {diff} more to unlock Tier {nextTierNum} pricing!
+                                                                    </p>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        })()}
+                                                    </div>
+                                                )}
                                             </div>
+
                                             <div className="text-right">
                                                 {isWholesaleDiscounted && (
                                                     <p className="text-[10px] text-neutral-400 line-through">

@@ -65,9 +65,9 @@ export default async function ShopPage({
     let role: string | undefined;
     
     try {
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-        if (!authError && authUser) {
-            user = authUser;
+        const { data, error: authError } = await supabase.auth.getUser();
+        if (!authError && data?.user) {
+            user = data.user;
             // Fetch profile using the authenticated client
             const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
             role = profile?.role;
@@ -90,7 +90,35 @@ export default async function ShopPage({
         }
     }
 
-    const [{ products, total, minPrice, maxPrice }, categories, paginationSetting, mobileCols] = await Promise.all([
+    // Phase 3 & 4: Defensive settings fetch with robust fallbacks
+    let paginationSetting: "load_more" | "pagination" = "load_more";
+    let mobileCols: 1 | 2 = 2;
+
+    try {
+        const [paginationRes, mobileColsRes] = await Promise.all([
+            supabaseAdmin
+                .from("site_settings")
+                .select("shop_pagination_type")
+                .eq("id", "singleton")
+                .maybeSingle(),
+            supabaseAdmin
+                .from("store_settings")
+                .select("shop_mobile_cols")
+                .eq("id", "default")
+                .maybeSingle(),
+        ]);
+
+        if (paginationRes.data?.shop_pagination_type) {
+            paginationSetting = paginationRes.data.shop_pagination_type as any;
+        }
+        if (mobileColsRes.data?.shop_mobile_cols) {
+            mobileCols = Number(mobileColsRes.data.shop_mobile_cols) as 1 | 2;
+        }
+    } catch (err) {
+        console.warn("[Defensive Fetch] Settings retrieval failed, using fallbacks:", err);
+    }
+
+    const [{ products, total, minPrice, maxPrice }, categories] = await Promise.all([
         getProducts({
             category: params.category,
             sort:     params.sort,
@@ -103,18 +131,6 @@ export default async function ShopPage({
             sale:     params.sale === "true",
         }, role),
         getCategories(role),
-        supabaseAdmin
-            .from("site_settings")
-            .select("shop_pagination_type")
-            .eq("id", "singleton")
-            .maybeSingle()
-            .then(({ data }: { data: any }) => (data?.shop_pagination_type as "load_more" | "pagination") || "load_more"),
-        supabaseAdmin
-            .from("store_settings")
-            .select("shop_mobile_cols")
-            .eq("id", "default")
-            .maybeSingle()
-            .then(({ data }: { data: any }) => (data?.shop_mobile_cols as 1 | 2) || 2),
     ]);
 
     // Resolve category slug → name once (reused for both filter queries)

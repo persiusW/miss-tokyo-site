@@ -48,12 +48,18 @@ export default async function ProductPage({
     if (!product) notFound();
 
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    let authUser = null;
+    try {
+        const { data } = await supabase.auth.getUser();
+        authUser = data?.user || null;
+    } catch (err) {
+        console.warn("[Auth Hardening] PDP session check failed:", err);
+    }
     
     // Fetch role if authenticated
     let role: string | undefined;
-    if (user) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    if (authUser) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", authUser.id).maybeSingle();
         role = profile?.role;
     }
     const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
@@ -84,16 +90,43 @@ export default async function ProductPage({
         notFound();
     }
 
-    const [related, { reviews, distribution }, pdpSettings] = await Promise.all([
+    // Phase 3 & 4: Defensive settings fetch for PDP
+    let pdpSettings: any = {};
+    let wholesaleTiersData: any = null;
+
+    try {
+        const [settingsRes, tiersRes] = await Promise.all([
+            supabaseAdmin
+                .from("site_settings")
+                .select("pdp_show_trust_strip, pdp_show_reviews, pdp_show_product_details, pdp_show_care_instructions, pdp_show_delivery_returns")
+                .eq("id", "singleton")
+                .maybeSingle(),
+            supabaseAdmin
+                .from("site_copy")
+                .select("value")
+                .eq("copy_key", "wholesale_tiers")
+                .maybeSingle(),
+        ]);
+        pdpSettings = settingsRes.data || {};
+        try {
+            wholesaleTiersData = tiersRes.data?.value ? JSON.parse(tiersRes.data.value) : null;
+        } catch {
+            wholesaleTiersData = null;
+        }
+    } catch (err) {
+        console.warn("[PDP Defensive Fetch] Failed to load settings:", err);
+    }
+
+    const [related, { reviews, distribution }] = await Promise.all([
         getRelatedProducts(product.category_type ?? "", slug),
         getProductReviews(product.id),
-        supabaseAdmin
-            .from("site_settings")
-            .select("pdp_show_trust_strip, pdp_show_reviews, pdp_show_product_details, pdp_show_care_instructions, pdp_show_delivery_returns")
-            .eq("id", "singleton")
-            .maybeSingle()
-            .then(({ data }: { data: any }) => data ?? {}),
     ]);
+
+    const wholesaleTiers = wholesaleTiersData || {
+        tier1_min: 3, tier1_max: 5, tier1_discount: 10,
+        tier2_min: 6, tier2_max: 10, tier2_discount: 15,
+        tier3_min: 11, tier3_max: 999, tier3_discount: 20
+    };
 
     const showTrustStrip = (pdpSettings as any)?.pdp_show_trust_strip ?? true;
     const showReviews = (pdpSettings as any)?.pdp_show_reviews ?? true;
@@ -225,6 +258,8 @@ export default async function ProductPage({
                             isSale={isSale}
                             discountValue={product.discount_value ?? 0}
                             showTrustStrip={showTrustStrip}
+                            isWholesaler={!!isAuthorized}
+                            wholesaleTiers={wholesaleTiers}
                         />
 
                         {/* Accordions */}

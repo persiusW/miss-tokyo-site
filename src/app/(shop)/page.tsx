@@ -1,4 +1,5 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { TrustBar } from "@/components/public/TrustBar";
 import { HeroSlider } from "@/components/public/HeroSlider";
 import { CategoryGrid } from "@/components/public/CategoryGrid";
@@ -17,22 +18,22 @@ export default async function HomePage() {
     { data: featuredCatsData },
     { data: reviewsData },
   ] = await Promise.all([
-    supabase
+    supabaseAdmin
       .from("site_settings")
       .select("*")
       .eq("id", "singleton")
       .maybeSingle(),
-    supabase
+    supabaseAdmin
       .from("hero_slides")
       .select("*")
       .eq("enabled", true)
       .order("position", { ascending: true }),
-    supabase
+    supabaseAdmin
       .from("featured_categories")
       .select("*, category:categories(name, slug, image_url)")
       .eq("enabled", true)
       .order("position", { ascending: true }),
-    supabase
+    supabaseAdmin
       .from("homepage_reviews")
       .select("*")
       .eq("enabled", true)
@@ -52,7 +53,7 @@ export default async function HomePage() {
       }
       const categoryName = fc.category?.name ?? "";
       if (!categoryName) return { ...fc, itemCount: 0 };
-      const { count } = await supabase
+      const { count } = await supabaseAdmin
         .from("products")
         .select("id", { count: "exact", head: true })
         .eq("category_type", categoryName)

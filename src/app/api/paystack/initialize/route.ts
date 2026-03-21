@@ -21,19 +21,64 @@ export async function POST(request: Request) {
         let amountInGHS = 0;
         if (customAmount && Number(customAmount) > 0) {
             amountInGHS = Number(customAmount);
-        } else if (cartArr.length > 0) {
-            amountInGHS = cartArr.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-        } else if (productId) {
-            const { data: product } = await supabaseAdmin
+        } else if (cartArr.length > 0 || productId) {
+            // Priority 2: Recalculate Cart Total or Single Product server-side
+            const { data: userProfile } = await supabaseAdmin
+                .from("profiles")
+                .select("role")
+                .eq("email", email)
+                .maybeSingle();
+
+            const isWholesaler = !!(userProfile?.role && ["admin", "owner", "wholesale", "wholesaler"].includes(userProfile.role.toLowerCase()));
+
+            // Fetch wholesale tiers if wholesaler
+            let tiers: any = null;
+            if (isWholesaler) {
+                const { data: tiersCopy } = await supabaseAdmin
+                    .from("site_copy")
+                    .select("value")
+                    .eq("copy_key", "wholesale_tiers")
+                    .maybeSingle();
+                try {
+                    tiers = tiersCopy?.value ? JSON.parse(tiersCopy.value) : {
+                        tier1_min: 3, tier1_max: 5, tier1_discount: 10,
+                        tier2_min: 6, tier2_max: 10, tier2_discount: 15,
+                        tier3_min: 11, tier3_max: 999, tier3_discount: 20
+                    };
+                } catch { tiers = null; }
+            }
+
+            // Fetch prices from DB
+            const pIds = cartArr.length > 0 ? cartArr.map(i => i.productId) : [productId];
+            const { data: dbProducts } = await supabaseAdmin
                 .from("products")
-                .select("price_ghs")
-                .eq("id", productId)
-                .single();
-            if (product?.price_ghs) amountInGHS = Number(product.price_ghs);
+                .select("id, price_ghs, is_sale, discount_value")
+                .in("id", pIds);
+
+            const dbPriceMap = (dbProducts || []).reduce((acc: any, p: any) => {
+                const base = p.is_sale && p.discount_value > 0 ? p.price_ghs * (1 - p.discount_value / 100) : p.price_ghs;
+                acc[p.id] = base;
+                return acc;
+            }, {});
+
+            const { resolveWholesalePrice } = await import("@/lib/wholesale");
+
+            if (cartArr.length > 0) {
+                amountInGHS = cartArr.reduce((acc, item) => {
+                    const baseDbPrice = dbPriceMap[item.productId] || 0;
+                    const unitPrice = (isWholesaler && tiers)
+                        ? resolveWholesalePrice(item.quantity, baseDbPrice, tiers)
+                        : baseDbPrice;
+                    return acc + (unitPrice * item.quantity);
+                }, 0);
+            } else {
+                const baseDbPrice = dbPriceMap[productId] || 0;
+                amountInGHS = baseDbPrice;
+            }
         }
 
         if (amountInGHS <= 0) {
-            return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+            return NextResponse.json({ error: "Invalid amount calculation" }, { status: 400 });
         }
 
         const paystackSecret = process.env.PAYSTACK_SECRET_KEY || "";

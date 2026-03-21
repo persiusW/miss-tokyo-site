@@ -53,6 +53,7 @@ export async function getProducts(params: GetProductsParams, role?: string) {
 
     const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
 
+    // Phase 4 & 5: Bulletproof Fetcher
     let query = supabaseAdmin
         .from("products")
         .select(
@@ -61,54 +62,54 @@ export async function getProducts(params: GetProductsParams, role?: string) {
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, created_at`,
             { count: "exact" }
-        )
-        .eq("is_active", true);
+        );
 
-    // Security check for public access
-    if (!isAuthorized) {
-        // Use the correct column name for wholesale products if it exists, otherwise fall back to B2B gating
-        // Based on project audit, the column is likely 'is_wholesale_only'
-        query = query.eq("is_wholesale_only", false);
-    }
+    // Filter by active status (Safe handle for nulls)
+    query = query.or("is_active.eq.true,is_active.is.null");
 
-    // B2B Gating: If not authorized, exclude products that are EXCLUSIVELY in wholesale categories.
+    // B2B Gating: Exclude products in Wholesale Categories for Retail users
     if (!isAuthorized) {
-        const { data: retailCats } = await supabaseAdmin
+        // Find all wholesale categories
+        const { data: wholesaleCats } = await supabaseAdmin
             .from("categories")
             .select("id, name")
-            .eq("is_wholesale", false)
-            .eq("is_active", true);
+            .eq("is_wholesale", true);
         
-        const rIds = (retailCats || []).map(c => c.id);
-        const rNames = (retailCats || []).map(c => c.name);
+        const restrictedIds = (wholesaleCats || []).map(c => c.id);
+        const restrictedNames = (wholesaleCats || []).map(c => c.name);
 
-        const retailConditions = [
-            "category_id.is.null",
-            "category_type.is.null"
-        ];
+        // Action 1: Empty Array Trap Fix + NULL Trap Fix
+        // CRITICAL: In PostgreSQL, `NULL NOT IN (...)` and `NOT (NULL @> ARRAY[...])` both
+        // return NULL (not TRUE), so rows with NULL columns get excluded by .not() filters.
+        // We use .or() to explicitly allow NULL values through — only exclude rows that
+        // have a confirmed match to a wholesale category.
+        if (restrictedIds.length > 0) {
+            // Exclude by Primary Category ID — allow NULL category_id through
+            query = query.or(`category_id.is.null,category_id.not.in.(${restrictedIds.join(",")})`);
 
-        if (rIds.length > 0) {
-            retailConditions.push(`category_id.in.(${rIds.join(",")})`);
-            retailConditions.push(`category_ids.overlaps.{${rIds.join(",")}}`);
+            // Exclude by Category Array — allow NULL category_ids through
+            const formattedIds = restrictedIds.map(id => `"${id}"`).join(",");
+            query = query.or(`category_ids.is.null,category_ids.not.ov.{${formattedIds}}`);
         }
-        if (rNames.length > 0) {
-            retailConditions.push(`category_type.in.(${rNames.map(n => `"${n}"`).join(",")})`);
-        }
 
-        query = query.or(retailConditions.join(","));
+        if (restrictedNames.length > 0) {
+            // Exclude by Category Name — allow NULL category_type through
+            query = query.or(`category_type.is.null,category_type.not.in.(${restrictedNames.join(",")})`);
+        }
     }
 
-    // Category Filter
+    // Category Filter (Inclusion)
     if (category) {
         const { data: cat } = await supabaseAdmin
             .from("categories")
-            .select("id, name, is_wholesale")
+            .select("id, name")
             .eq("slug", category)
             .maybeSingle();
 
         if (cat) {
-            query = query.or(`category_type.ilike."${cat.name}",category_id.eq.${cat.id},category_ids.cs.{"${cat.id}"}`);
+            query = query.or(`category_id.eq.${cat.id},category_type.ilike."${cat.name}",category_ids.cs.{"${cat.id}"}`);
         } else {
+            // Fallback for direct URL slugs that don't match slug exactly
             const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
             query = query.ilike("category_type", fallbackName);
         }
@@ -131,7 +132,8 @@ export async function getProducts(params: GetProductsParams, role?: string) {
     const from = (page - 1) * PAGE_SIZE;
     query = query.range(from, from + PAGE_SIZE - 1);
 
-    const { data, count } = await query;
+    const { data, count, error } = await query;
+    if (error) console.error("[getProducts] Supabase Error:", error);
 
     const { data: bounds } = await supabaseAdmin
         .from("products")
@@ -167,7 +169,7 @@ export async function getCategories(role?: string): Promise<ShopCategory[]> {
         .from("categories")
         .select("id, name, slug, product_count, sort_order")
     if (!isAuthorized) {
-        query = query.eq("is_wholesale", false);
+        query = query.or("is_wholesale.eq.false,is_wholesale.is.null");
     }
 
     query = query.eq("is_active", true);

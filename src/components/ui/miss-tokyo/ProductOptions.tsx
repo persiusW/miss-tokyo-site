@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/store/useCart";
 import { toast } from "@/lib/toast";
+import { resolveWholesalePrice, WholesaleTiers } from "@/lib/wholesale";
 
 export interface ColorVariant { name: string; hex: string; in_stock: boolean; }
 export interface SizeVariant { label: string; in_stock: boolean; }
@@ -26,6 +27,8 @@ interface Props {
     isSale: boolean;
     discountValue: number;
     showTrustStrip?: boolean;
+    isWholesaler?: boolean;
+    wholesaleTiers?: WholesaleTiers;
 }
 
 const COLOR_HEX: Record<string, string> = {
@@ -61,6 +64,8 @@ export function ProductOptions(props: Props) {
         colorVariants, sizeVariants, availableColors, availableSizes,
         inventoryCount, ratingAverage, reviewCount, imageUrl, isSale, discountValue,
         showTrustStrip = true,
+        isWholesaler = false,
+        wholesaleTiers,
     } = props;
 
     const router = useRouter();
@@ -104,7 +109,13 @@ export function ProductOptions(props: Props) {
         toast.success("Link copied to clipboard");
     };
 
-    const effectivePrice = isSale && discountValue > 0 ? price * (1 - discountValue / 100) : price;
+    const baseProductPrice = isSale && discountValue > 0 ? price * (1 - discountValue / 100) : price;
+
+    const unitPrice = (isWholesaler && wholesaleTiers)
+        ? resolveWholesalePrice(qty, baseProductPrice, wholesaleTiers)
+        : baseProductPrice;
+
+    const effectivePrice = unitPrice;
 
     const doAddToCart = (): boolean => {
         if (sizes.length > 0 && !selectedSize) {
@@ -116,11 +127,13 @@ export function ProductOptions(props: Props) {
             productId,
             name,
             slug,
-            price: effectivePrice,
+            price: baseProductPrice, // store base price
             size: selectedSize || "One size",
             color: selectedColor || undefined,
             quantity: qty,
             imageUrl,
+            isWholesale: isWholesaler,
+            wholesaleTiers,
         });
         return true;
     };
@@ -175,7 +188,49 @@ export function ProductOptions(props: Props) {
                         GH₵{compareAtPrice.toFixed(2)}
                     </span>
                 )}
+                {isWholesaler && (
+                    <span style={{ fontSize: 10, color: "#059669", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginLeft: "auto" }}>
+                        Wholesale Rate
+                    </span>
+                )}
             </div>
+
+            {/* Volume Pricing Grid for Wholesalers */}
+            {isWholesaler && wholesaleTiers && (
+                <div style={{ 
+                    background: "rgba(5, 150, 105, 0.04)", 
+                    border: "1px solid rgba(5, 150, 105, 0.15)",
+                    padding: "16px",
+                    borderRadius: 4,
+                    marginBottom: 24
+                }}>
+                    <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#059669", marginBottom: 12 }}>
+                        Volume Pricing
+                    </p>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                        {[1, 2, 3].map(t => {
+                            const min = (wholesaleTiers as any)[`tier${t}_min`];
+                            const max = (wholesaleTiers as any)[`tier${t}_max`];
+                            const disc = (wholesaleTiers as any)[`tier${t}_discount`];
+                            const isActive = qty >= min && (t === 3 || qty <= max);
+                            
+                            return (
+                                <div key={t} style={{ 
+                                    padding: "10px 8px", 
+                                    background: isActive ? "#059669" : "transparent",
+                                    border: isActive ? "1px solid #059669" : "1px solid rgba(5, 150, 105, 0.2)",
+                                    textAlign: "center",
+                                    borderRadius: 2,
+                                    transition: "all 0.2s"
+                                }}>
+                                    <div style={{ fontSize: 9, fontWeight: 700, color: isActive ? "#fff" : "#059669" }}>{min}{t === 3 ? "+" : `-${max}`}</div>
+                                    <div style={{ fontSize: 10, color: isActive ? "#fff" : "#059669", opacity: 0.8 }}>{disc}% OFF</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Bundle tag */}
             {bundleLabel && (
