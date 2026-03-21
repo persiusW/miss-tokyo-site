@@ -21,6 +21,7 @@ export interface ShopProduct {
     is_sale: boolean;
     discount_value: number;
     inventory_count: number;
+    category_ids: string[] | null;
     created_at: string;
 }
 
@@ -47,30 +48,62 @@ export interface GetProductsParams {
 
 const PAGE_SIZE = 24;
 
-export async function getProducts(params: GetProductsParams) {
+export async function getProducts(params: GetProductsParams, role?: string) {
     const { category, sort, color, size, min, max, page = 1, q, sale } = params;
+
+    const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
 
     let query = supabaseAdmin
         .from("products")
         .select(
             `id, name, slug, description, price_ghs, compare_at_price_ghs,
-             image_urls, is_featured, is_active, category_id, category_type,
+             image_urls, is_featured, is_active, category_id, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, created_at`,
             { count: "exact" }
         )
         .eq("is_active", true);
 
+    // B2B Gating: If not authorized, exclude products that are EXCLUSIVELY in wholesale categories.
+    // We achieve this by requiring at least one retail category OR no category associations at all.
+    if (!isAuthorized) {
+        const { data: retailCats } = await supabaseAdmin
+            .from("categories")
+            .select("id, name")
+            .eq("is_wholesale", false)
+            .eq("is_active", true);
+        
+        const rIds = (retailCats || []).map(c => c.id);
+        const rNames = (retailCats || []).map(c => c.name);
+
+        const retailConditions = [
+            "category_id.is.null",
+            "category_type.is.null"
+        ];
+
+        if (rIds.length > 0) {
+            retailConditions.push(`category_id.in.(${rIds.join(",")})`);
+            retailConditions.push(`category_ids.overlaps.{${rIds.join(",")}}`);
+        }
+        if (rNames.length > 0) {
+            retailConditions.push(`category_type.in.(${rNames.map(n => `"${n}"`).join(",")})`);
+        }
+
+        query = query.or(retailConditions.join(","));
+    }
+
     // Products use category_type (text) or category_ids (uuid array).
     // Resolve the category slug → category name & ID for matching.
     if (category) {
         const { data: cat } = await supabaseAdmin
             .from("categories")
-            .select("id, name")
+            .select("id, name, is_wholesale")
             .eq("slug", category)
             .maybeSingle();
 
         if (cat) {
+            // Direct URL protection for categories is handled at the page level, 
+            // but we ensure the query respects the specific category requested.
             query = query.or(`category_type.ilike."${cat.name}",category_id.eq.${cat.id},category_ids.cs.{"${cat.id}"}`);
         } else {
             const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -129,11 +162,19 @@ export async function getProducts(params: GetProductsParams) {
     return { products, total: count ?? 0, minPrice, maxPrice };
 }
 
-export async function getCategories(): Promise<ShopCategory[]> {
-    const { data } = await supabaseAdmin
+export async function getCategories(role?: string): Promise<ShopCategory[]> {
+    const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
+    
+    let query = supabaseAdmin
         .from("categories")
         .select("id, name, slug, product_count, sort_order")
-        .eq("is_active", true)
+        .eq("is_active", true);
+
+    if (!isAuthorized) {
+        query = query.eq("is_wholesale", false);
+    }
+
+    const { data } = await query
         .order("sort_order", { ascending: true })
         .order("name",       { ascending: true });
     return (data ?? []) as ShopCategory[];

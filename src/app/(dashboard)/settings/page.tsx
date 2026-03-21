@@ -326,6 +326,8 @@ function StoreTab() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [allCategories, setAllCategories] = useState<{ id: string; name: string; is_wholesale: boolean }[]>([]);
+    const [wholesaleCatIds, setWholesaleCatIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         supabase.from("store_settings").select("*").eq("id", "default").single()
@@ -363,6 +365,15 @@ function StoreTab() {
                 }
                 setLoading(false);
             });
+
+        // Fetch all active categories to allow selection
+        supabase.from("categories").select("id, name, is_wholesale").eq("is_active", true).order("name")
+            .then(({ data: catData }: { data: any[] | null }) => {
+                if (catData) {
+                    setAllCategories(catData);
+                    setWholesaleCatIds(new Set(catData.filter((c: any) => c.is_wholesale).map((c: any) => c.id)));
+                }
+            });
     }, []);
 
     const handleSave = async (e: React.FormEvent) => {
@@ -372,6 +383,15 @@ function StoreTab() {
             { id: "default", ...form },
             { onConflict: "id" }
         );
+
+        // Update categories wholesale status
+        for (const cat of allCategories) {
+            const isWholesale = wholesaleCatIds.has(cat.id);
+            if (isWholesale !== cat.is_wholesale) {
+                await supabase.from("categories").update({ is_wholesale: isWholesale }).eq("id", cat.id);
+            }
+        }
+
         setSaving(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
@@ -677,11 +697,43 @@ function StoreTab() {
                             onChange={(e) => setForm(p => ({ ...p, wholesale_enabled: e.target.checked }))}
                             className="w-4 h-4 accent-black"
                         />
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Wholesale Pricing</span>
+                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Global Tier-Based Pricing</span>
                     </label>
                     <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">
-                        When on, users with the Wholesale role see tier-based pricing on all product pages.
+                        When on, users with the Wholesale role see tier-based pricing on product pages.
                     </p>
+                </div>
+
+                <div className="pt-6 border-t border-neutral-100 space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-[10px] uppercase tracking-[0.1em] font-bold text-black">Wholesale Exclusive Categories</h3>
+                        <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded">Access Protection</span>
+                    </div>
+                    <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
+                        Toggle categories that should be restricted to wholesale users only. Products assigned ONLY to these will be hidden from retail customers.
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {allCategories.map(cat => (
+                            <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => {
+                                    const next = new Set(wholesaleCatIds);
+                                    if (next.has(cat.id)) next.delete(cat.id);
+                                    else next.add(cat.id);
+                                    setWholesaleCatIds(next);
+                                }}
+                                className={`flex items-center gap-3 px-3 py-2.5 border text-[9px] font-bold uppercase tracking-widest transition-all ${
+                                    wholesaleCatIds.has(cat.id)
+                                        ? "bg-black text-white border-black"
+                                        : "bg-white text-neutral-400 border-neutral-100 hover:border-neutral-200"
+                                }`}
+                            >
+                                <div className={`w-1.5 h-1.5 rounded-full ${wholesaleCatIds.has(cat.id) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-neutral-100"}`} />
+                                {cat.name}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {form.wholesale_enabled && (
@@ -721,7 +773,7 @@ function StoreTab() {
                         </div>
                     </div>
                 )}
-            </div>
+</div>
 
             <div className="flex justify-end items-center gap-6">
                 {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved successfully</span>}

@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { getProducts, getCategories, deriveColors, deriveSizes } from "@/lib/products";
 import { ShopPageClient } from "@/components/ui/miss-tokyo/ShopPageClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
+import { notFound } from "next/navigation";
 
 export const revalidate = 60;
 
@@ -55,6 +57,29 @@ export default async function ShopPage({
     searchParams: Promise<SearchParams>;
 }) {
     const params = await searchParams;
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    // Fetch role if authenticated
+    let role: string | undefined;
+    if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        role = profile?.role;
+    }
+    const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
+
+    // Part 3: Direct URL Protection (Category)
+    if (params.category) {
+        const { data: cat } = await supabaseAdmin
+            .from("categories")
+            .select("is_wholesale")
+            .eq("slug", params.category)
+            .maybeSingle();
+        
+        if (cat?.is_wholesale && !isAuthorized) {
+            notFound();
+        }
+    }
 
     const [{ products, total, minPrice, maxPrice }, categories, paginationSetting, mobileCols] = await Promise.all([
         getProducts({
@@ -67,8 +92,8 @@ export default async function ShopPage({
             page:     params.page ? parseInt(params.page) : 1,
             q:        params.q,
             sale:     params.sale === "true",
-        }),
-        getCategories(),
+        }, role),
+        getCategories(role),
         supabaseAdmin
             .from("site_settings")
             .select("shop_pagination_type")

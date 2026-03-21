@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getProductBySlug, getRelatedProducts, getProductReviews } from "@/lib/products";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
 import { ProductGallery } from "@/components/ui/miss-tokyo/ProductGallery";
 import { ProductOptions } from "@/components/ui/miss-tokyo/ProductOptions";
 import { ProductAccordions } from "@/components/ui/miss-tokyo/ProductAccordions";
@@ -45,6 +46,43 @@ export default async function ProductPage({
     const { slug } = await params;
     const product = await getProductBySlug(slug);
     if (!product) notFound();
+
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    // Fetch role if authenticated
+    let role: string | undefined;
+    if (user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+        role = profile?.role;
+    }
+    const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
+
+    // Part 3: Direct URL Protection (PDP Gating)
+    // Check if the product belongs to any retail categories.
+    // If it belongs ONLY to wholesale categories, prevent retail access.
+    const productCatIds = product.category_ids ? [...product.category_ids] : [];
+    if (product.category_id) productCatIds.push(product.category_id);
+    
+    let isWholesaleOnly = false;
+    
+    if (productCatIds.length > 0 || product.category_type) {
+        const orConditions = [];
+        if (productCatIds.length > 0) orConditions.push(`id.in.(${productCatIds.join(",")})`);
+        if (product.category_type) orConditions.push(`name.ilike."${product.category_type}"`);
+
+        const { data: activeProductCats } = await supabaseAdmin
+            .from("categories")
+            .select("is_wholesale")
+            .or(orConditions.join(","));
+        
+        isWholesaleOnly = (activeProductCats || []).length > 0 && 
+                          (activeProductCats || []).every(c => c.is_wholesale === true);
+    }
+
+    if (isWholesaleOnly && !isAuthorized) {
+        notFound();
+    }
 
     const [related, { reviews, distribution }, pdpSettings] = await Promise.all([
         getRelatedProducts(product.category_type ?? "", slug),
