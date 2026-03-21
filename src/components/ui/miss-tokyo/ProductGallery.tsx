@@ -15,7 +15,7 @@ const FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' w
 const isVideo = (url: string) => {
     if (!url) return false;
     const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
-    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.endsWith('.mov') || url.includes('/video/') || url.includes('supabase.co/storage/v1/object/public/product-images/');
+    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.endsWith('.mov') || cleanUrl.endsWith('.m4v');
 };
 
 // Helper component to handle play/pause reliably
