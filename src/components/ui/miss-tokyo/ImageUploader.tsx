@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { compressToWebP } from "@/lib/utils/imageCompression";
+import { convertToMp4 } from "@/lib/utils/videoConversion";
 import {
     DndContext,
     closestCenter,
@@ -58,9 +59,9 @@ const ASPECT_CLASSES = {
     og: "aspect-[1200/630]",
 };
 
-const MAX_SIZE_MB = 10;
-const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4"];
-const ACCEPTED_ATTR = "image/jpeg,image/png,image/webp,image/gif,video/mp4";
+const MAX_SIZE_MB = 100; // Increased to 100MB for video transcoding
+const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/quicktime", "video/x-msvideo", "video/mpeg"];
+const ACCEPTED_ATTR = "image/*,video/mp4,video/quicktime,video/x-msvideo,video/mpeg";
 
 function isMultiMode(props: ImageUploaderProps): props is MultiUploaderProps {
     return "currentUrls" in props && props.currentUrls !== undefined;
@@ -147,6 +148,8 @@ export function ImageUploader(props: ImageUploaderProps) {
     const [previews, setPreviews] = useState<string[]>(initialUrls);
     const [uploading, setUploading] = useState(false);
     const [uploadCount, setUploadCount] = useState(0);
+    const [isConverting, setIsConverting] = useState(false);
+    const [conversionProgress, setConversionProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [activeUrl, setActiveUrl] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -159,7 +162,7 @@ export function ImageUploader(props: ImageUploaderProps) {
 
     // ── Upload helpers ─────────────────────────────────────────────────────────
     const uploadFile = async (rawFile: File): Promise<string | null> => {
-        const isVideo = rawFile.type === "video/mp4";
+        const isVideo = rawFile.type.startsWith("video/");
 
         if (!ACCEPTED.includes(rawFile.type)) {
             setError("Please upload a JPEG, PNG, WebP, GIF image, or MP4 video.");
@@ -176,6 +179,19 @@ export function ImageUploader(props: ImageUploaderProps) {
                 file = await compressToWebP(rawFile);
             } catch {
                 file = rawFile;
+            }
+        } else if (rawFile.type !== "video/mp4") {
+            // Transcode non-mp4 videos
+            try {
+                setIsConverting(true);
+                setConversionProgress(0);
+                file = await convertToMp4(rawFile, (p) => setConversionProgress(p));
+            } catch (err: any) {
+                setError(err.message || "Video optimization failed.");
+                setIsConverting(false);
+                return null;
+            } finally {
+                setIsConverting(false);
             }
         }
 
@@ -362,8 +378,20 @@ export function ImageUploader(props: ImageUploaderProps) {
                         </p>
                     </div>
 
-                    {uploading && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/80">
+                    {isConverting && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/95 z-50">
+                            <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                            <div className="text-center space-y-1">
+                                <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-black">Optimizing Video...</p>
+                                <p className="text-[9px] text-neutral-400 uppercase tracking-widest font-bold font-mono italic">
+                                    {conversionProgress}% Complete — Please wait
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {uploading && !isConverting && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/80 z-40">
                             <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
                             <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-700">{loadingLabel}</p>
                         </div>
