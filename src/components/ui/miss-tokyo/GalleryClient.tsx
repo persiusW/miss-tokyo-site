@@ -100,8 +100,8 @@ function VideoCard({
                 />
                 
                 {/* Mobile Overlay: Details (Hidden on lg) */}
-                <div className="lg:hidden absolute bottom-0 left-0 w-full p-8 z-10 bg-gradient-to-t from-black/95 via-black/40 to-transparent text-white">
-                    <div className="flex flex-col gap-2 mb-6">
+                <div className="lg:hidden absolute bottom-0 left-0 w-full p-6 pb-28 md:pb-12 z-10 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white">
+                    <div className="flex flex-col gap-2 mb-6 text-left">
                         <span className="text-[9px] uppercase tracking-[0.2em] text-white/60 font-medium">
                             {product.category_name || "New Arrival"}
                         </span>
@@ -208,9 +208,9 @@ export function GalleryClient({ products }: GalleryClientProps) {
     }
 
     return (
-        <div className="relative bg-black h-[100dvh] overflow-hidden overscroll-none">
+        <div className="relative bg-black h-[100dvh] overflow-hidden overscroll-none translate-z-0">
             {/* Header: Global UI */}
-            <div className="absolute top-0 left-0 w-full z-30 p-6 md:p-10 flex items-center justify-between pointer-events-none">
+            <div className="absolute top-0 left-0 w-full z-30 p-6 flex items-center justify-between pointer-events-none">
                 <Link href="/shop" className="text-white p-2 pointer-events-auto bg-black/20 backdrop-blur-lg rounded-full border border-white/10 hover:bg-white hover:text-black transition-all">
                     <ChevronLeft size={20} />
                 </Link>
