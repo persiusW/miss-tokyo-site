@@ -173,10 +173,7 @@ export default async function ProductPage({
                 </div>
 
                 {/* Product layout */}
-                <div
-                    className="pdp-layout"
-                    style={{ maxWidth: 1440, margin: "0 auto", padding: "0 24px 80px", display: "grid", gridTemplateColumns: "1fr 480px", gap: 48, alignItems: "start" }}
-                >
+                <div className="max-w-[1440px] mx-auto pb-20 grid grid-cols-1 md:grid-cols-[1fr_480px] gap-0 md:gap-12 items-start pdp-layout-tw">
                     {/* Gallery */}
                     <ProductGallery
                         images={product.image_urls ?? []}
@@ -186,7 +183,7 @@ export default async function ProductPage({
                     />
 
                     {/* Info panel */}
-                    <div style={{ paddingTop: 4 }}>
+                    <div className="px-4 md:px-0 pt-4 pb-8">
                         {/* Meta top: category + SKU */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                             {product.category_name && (
@@ -244,31 +241,36 @@ export default async function ProductPage({
                 {/* You May Also Like */}
                 {related.length > 0 && (
                     <section style={{ background: "#fff", borderTop: "1px solid rgba(20,18,16,0.1)", padding: "64px 0" }}>
-                        <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 24px" }}>
-                            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 40, gap: 16 }}>
+                        <div className="max-w-[1440px] mx-auto px-4 md:px-6">
+                            <div className="flex justify-between items-end mb-6 md:mb-10 lg:mb-12">
                                 <div>
-                                    <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--muted, #7A7167)", marginBottom: 10 }}>
+                                    <div className="text-[10px] md:text-xs font-medium tracking-[0.2em] uppercase text-[var(--muted,#7A7167)] mb-2 md:mb-3">
                                         Complete your look
                                     </div>
-                                    <h2 style={{ fontFamily: "var(--font-display, Georgia, serif)", fontSize: "clamp(28px, 3vw, 40px)", fontWeight: 300, lineHeight: 1 }}>
-                                        You May Also <em style={{ fontStyle: "italic", color: "var(--gold, #C9A96E)" }}>Like</em>
+                                    <h2 className="font-display text-[clamp(28px,3vw,40px)] font-light leading-none text-[#141210]">
+                                        You May Also <em className="italic text-[var(--gold,#C9A96E)]">Like</em>
                                     </h2>
                                 </div>
-                                <Link href="/shop" style={{ fontSize: 12, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink, #141210)", borderBottom: "1px solid var(--ink, #141210)", paddingBottom: 2, whiteSpace: "nowrap", textDecoration: "none" }}>
+                                <Link 
+                                    href="/shop" 
+                                    className="text-xs md:text-sm font-semibold uppercase tracking-widest text-[#141210] underline underline-offset-4 whitespace-nowrap mb-1 md:mb-2 hover:text-[#7A7167] transition-colors"
+                                >
                                     View All
                                 </Link>
                             </div>
 
-                            <div className="pdp-related-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "20px 16px" }}>
-                                {related.map(p => {
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                                {related.slice(0, 4).map(p => {
                                     const pSale = p.is_sale && (p.discount_value ?? 0) > 0;
                                     const displayPrice = pSale ? p.price_ghs * (1 - (p.discount_value ?? 0) / 100) : p.price_ghs;
                                     const origPrice = pSale ? p.price_ghs : null;
                                     const pAge = Date.now() - new Date(p.created_at).getTime();
                                     const pBadge = p.badge || (pSale ? "Sale" : (pAge < 14 * 24 * 60 * 60 * 1000 ? "New" : null));
+                                    
                                     return (
-                                        <Link key={p.slug} href={`/products/${p.slug}`} style={{ textDecoration: "none", color: "inherit" }}>
-                                            <div style={{ position: "relative", aspectRatio: "3/4", borderRadius: 4, overflow: "hidden", background: "var(--blush, #E8D5C4)", marginBottom: 11 }}>
+                                        <Link key={p.slug} href={`/products/${p.slug}`} className="group block no-underline text-inherit outline-none">
+                                            {/* Image Container */}
+                                            <div className="relative w-full aspect-[3/4] rounded md:rounded-sm overflow-hidden bg-[var(--blush,#E8D5C4)] mb-3">
                                                 {p.image_urls?.[0] && (
                                                     <Image
                                                         src={p.image_urls[0]}
@@ -276,36 +278,52 @@ export default async function ProductPage({
                                                         fill
                                                         sizes="(max-width: 768px) 50vw, 25vw"
                                                         loading="lazy"
-                                                        style={{ objectFit: "cover" }}
+                                                        unoptimized={true}
+                                                        className="object-cover transition-transform duration-700 group-hover:scale-105"
                                                     />
                                                 )}
                                                 {pBadge && (
-                                                    <span style={{ position: "absolute", top: 10, left: 10, fontSize: 9, fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 2, background: pSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)", color: "#fff" }}>
+                                                    <span 
+                                                        className="absolute top-2.5 left-2.5 text-[9px] md:text-[10px] font-medium tracking-widest uppercase px-2 py-1 rounded-[2px] text-white shadow-sm z-10"
+                                                        style={{ background: pSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)" }}
+                                                    >
                                                         {pBadge}
                                                     </span>
                                                 )}
                                             </div>
-                                            <div style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted, #7A7167)", marginBottom: 3 }}>
-                                                {p.category_name}
-                                            </div>
-                                            <div style={{ fontSize: 13, fontWeight: 400, color: "var(--ink, #141210)", marginBottom: 4, lineHeight: 1.3 }}>{p.name}</div>
-                                            <div style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
-                                                {origPrice && (
-                                                    <span style={{ fontSize: 12, color: "var(--muted, #7A7167)", textDecoration: "line-through", fontWeight: 400 }}>
-                                                        GH₵{origPrice.toFixed(2)}
-                                                    </span>
-                                                )}
-                                                <span style={{ color: pSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)" }}>
-                                                    GH₵{displayPrice.toFixed(2)}
-                                                </span>
-                                            </div>
-                                            {(p.available_colors ?? []).length > 0 && (
-                                                <div style={{ display: "flex", gap: 5, marginTop: 6 }}>
-                                                    {(p.available_colors ?? []).slice(0, 5).map((c, ci) => (
-                                                        <div key={ci} style={{ width: 11, height: 11, borderRadius: "50%", background: COLOR_HEX[c] || "#E8D5C4", border: "1px solid rgba(20,18,16,0.15)" }} />
-                                                    ))}
+                                            
+                                            {/* Details */}
+                                            <div className="flex flex-col">
+                                                <div className="text-[10px] md:text-[11px] tracking-[0.1em] uppercase text-[var(--muted,#7A7167)] mb-[2px] md:mb-1 truncate">
+                                                    {p.category_name}
                                                 </div>
-                                            )}
+                                                <div className="text-sm md:text-[15px] font-normal text-[#141210] mb-1 leading-snug truncate">
+                                                    {p.name}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {origPrice && (
+                                                        <span className="text-xs md:text-sm text-[var(--muted,#7A7167)] line-through font-normal">
+                                                            GH₵{origPrice.toFixed(2)}
+                                                        </span>
+                                                    )}
+                                                    <span className={`text-sm md:text-[15px] font-medium ${pSale ? "text-[var(--accent,#E8485A)]" : "text-[#141210]"}`}>
+                                                        GH₵{displayPrice.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                                
+                                                {/* Colors */}
+                                                {(p.available_colors ?? []).length > 0 && (
+                                                    <div className="flex gap-1.5 mt-2 md:mt-2.5">
+                                                        {(p.available_colors ?? []).slice(0, 5).map((c, ci) => (
+                                                            <div 
+                                                                key={ci} 
+                                                                className="w-3 h-3 md:w-3.5 md:h-3.5 rounded-full border border-black/15 shadow-sm"
+                                                                style={{ background: COLOR_HEX[c] || "#E8D5C4" }} 
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </Link>
                                     );
                                 })}
