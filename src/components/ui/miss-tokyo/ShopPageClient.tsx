@@ -7,7 +7,6 @@ import Link from "next/link";
 import { ShoppingBag, Heart, X, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useCart } from "@/store/useCart";
 import type { ShopProduct, ShopCategory } from "@/lib/products";
-import { supabase } from "@/lib/supabase";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const COLOR_HEX: Record<string, string> = {
@@ -472,50 +471,30 @@ export function ShopPageClient({
     const loadMore = async () => {
         setLoadingMore(true);
         const nextPage = loadPage + 1;
-        const from = (nextPage - 1) * PAGE_SIZE;
 
         try {
-            let query = supabase.from("products").select(
-                `id, name, slug, description, price_ghs, compare_at_price_ghs, image_urls, is_featured, is_active, category_type, available_colors, available_sizes, color_variants, size_variants, bundle_label, badge, is_sale, discount_value, inventory_count, created_at`,
-                { count: "exact" }
-            ).eq("is_active", true);
+            const qs = new URLSearchParams();
+            qs.set("page", String(nextPage));
+            if (activeCategory) qs.set("category", activeCategory);
+            if (activeSort)     qs.set("sort", activeSort);
+            if (activeColor)    qs.set("color", activeColor);
+            if (activeSize)     qs.set("size", activeSize);
+            if (activeMin)      qs.set("min", activeMin);
+            if (activeMax)      qs.set("max", activeMax);
+            if (activeQ)        qs.set("q", activeQ);
+            if (activeSale)     qs.set("sale", "true");
 
-            if (activeCategory) {
-                const { data: cat } = await supabase.from("categories").select("name").eq("slug", activeCategory).maybeSingle();
-                const categoryName = cat?.name ?? activeCategory.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-                query = query.ilike("category_type", categoryName);
-            }
-            
-            if (activeQ) query = query.ilike("name", `%${activeQ}%`);
-            if (activeSale) query = query.eq("is_sale", true);
-            if (activeMin) query = query.gte("price_ghs", parseFloat(activeMin));
-            if (activeMax) query = query.lte("price_ghs", parseFloat(activeMax));
-            if (activeColor) query = query.contains("available_colors", [activeColor]);
-            if (activeSize) query = query.contains("available_sizes", [activeSize]);
+            const res = await fetch(`/api/products?${qs.toString()}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const { products: newProds, total: newTotal }: { products: ShopProduct[]; total: number } = await res.json();
 
-            switch (activeSort) {
-                case "price-asc":  query = query.order("price_ghs",  { ascending: true });  break;
-                case "price-desc": query = query.order("price_ghs",  { ascending: false }); break;
-                case "name-asc":   query = query.order("name",       { ascending: true });  break;
-                default:           query = query.order("created_at", { ascending: false }); break;
-            }
-
-            query = query.range(from, from + PAGE_SIZE - 1);
-            const { data, count, error } = await query;
-            if (error) throw error;
-
-            const newProds: ShopProduct[] = (data || []).map((p: any) => ({ 
-                ...p, 
-                category_name: p.category_type ?? null, 
-                category_slug: activeCategory ?? null 
-            }));
-            
+            const updatedCount = products.length + newProds.length;
             setProducts(prev => [...prev, ...newProds]);
             setLoadPage(nextPage);
-            setTotalCount(count ?? totalCount);
-            setHasMore(from + newProds.length < (count ?? totalCount));
+            setTotalCount(newTotal);
+            setHasMore(updatedCount < newTotal);
         } catch (err) {
-            console.error("[Client Resilience] loadMore failed:", err);
+            console.error("[loadMore] failed:", err);
             setHasMore(false);
         } finally {
             setLoadingMore(false);

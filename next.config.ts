@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     turbopackFileSystemCacheForDev: false,
   },
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
