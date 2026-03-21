@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { X, Mail, UserPlus } from "lucide-react";
+import { X, Mail, UserPlus, CheckCircle, Clock } from "lucide-react";
+import { inviteTeamMember } from "@/app/(dashboard)/settings/actions";
 
 type TeamMember = {
     id: string;
@@ -13,96 +14,124 @@ type TeamMember = {
     created_at: string;
 };
 
+type PendingInvite = {
+    id: string;
+    full_name: string;
+    email: string;
+    phone: string | null;
+    role: string;
+    status: string;
+    created_at: string;
+};
+
+type ActivityLog = {
+    id: string;
+    user_id: string;
+    user_role: string;
+    action_type: string;
+    resource: string;
+    created_at: string;
+    profiles?: { full_name: string; email: string };
+};
+
 const ROLE_LABELS: Record<string, string> = {
     owner: "Owner",
     admin: "Admin",
     sales_staff: "Sales Staff",
+    rider: "Rider",
+    support: "Support",
+    content_editor: "Content Editor"
 };
 
 const ROLE_COLORS: Record<string, string> = {
     owner: "bg-neutral-900 text-white",
     admin: "bg-neutral-800 text-white",
     sales_staff: "bg-neutral-100 text-neutral-700",
+    rider: "bg-blue-100 text-blue-700",
+    support: "bg-purple-100 text-purple-700",
+    content_editor: "bg-emerald-100 text-emerald-700"
 };
 
 export function TeamTab() {
+    const [activeTab, setActiveTab] = useState<"members" | "pending" | "logs">("members");
     const [members, setMembers] = useState<TeamMember[]>([]);
+    const [invites, setInvites] = useState<PendingInvite[]>([]);
+    const [logs, setLogs] = useState<ActivityLog[]>([]);
     const [loading, setLoading] = useState(true);
-    const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
-    const [copyingId, setCopyingId] = useState<string | null>(null);
-    const [copiedId, setCopiedId] = useState<string | null>(null);
+    
     const [showModal, setShowModal] = useState(false);
     const [inviteEmail, setInviteEmail] = useState("");
-    const [inviteRole, setInviteRole] = useState<"admin" | "sales_staff">("sales_staff");
+    const [inviteName, setInviteName] = useState("");
+    const [invitePhone, setInvitePhone] = useState("");
+    const [inviteRole, setInviteRole] = useState("sales_staff");
     const [inviting, setInviting] = useState(false);
 
-    const fetchPendingStatus = async (ids: string[]) => {
-        if (!ids.length) return;
-        try {
-            const res = await fetch(`/api/admin/invite-team?ids=${ids.join(",")}`);
-            if (!res.ok) return;
-            const data = await res.json();
-            setPendingIds(new Set(data.pendingIds ?? []));
-        } catch { /* non-fatal */ }
-    };
-
-    const fetchTeam = async () => {
+    const fetchData = async () => {
         setLoading(true);
-        const { data } = await supabase
-            .from("profiles")
-            .select("id, email, full_name, role, created_at")
-            .in("role", ["owner", "admin", "sales_staff"])
-            .order("created_at", { ascending: true });
-        const list = data ?? [];
-        setMembers(list);
-        setLoading(false);
-        fetchPendingStatus(list.map((m: any) => m.id));
-    };
-
-    const handleCopyLink = async (member: TeamMember) => {
-        setCopyingId(member.id);
-        try {
-            const res = await fetch("/api/admin/invite-team/setup-link", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: member.email }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to generate link");
-            await navigator.clipboard.writeText(data.link);
-            setCopiedId(member.id);
-            setTimeout(() => setCopiedId(null), 3000);
-            toast.success("Setup link copied to clipboard");
-        } catch (err: any) {
-            toast.error(err.message);
-        } finally {
-            setCopyingId(null);
+        if (activeTab === "members") {
+            const { data } = await supabase
+                .from("profiles")
+                .select("id, email, full_name, role, created_at")
+                .order("created_at", { ascending: true });
+            if (data) setMembers(data);
+        } else if (activeTab === "pending") {
+            const { data } = await supabase
+                .from("team_invitations")
+                .select("*")
+                .eq("status", "pending")
+                .order("created_at", { ascending: false });
+            if (data) setInvites(data);
+        } else if (activeTab === "logs") {
+            const { data } = await supabase
+                .from("activity_logs")
+                .select(`
+                    id, user_id, user_role, action_type, resource, created_at,
+                    profiles:user_id ( full_name, email )
+                `)
+                .order("created_at", { ascending: false })
+                .limit(50);
+            if (data) setLogs(data as any);
         }
+        setLoading(false);
     };
 
-    useEffect(() => { fetchTeam(); }, []);
+    useEffect(() => {
+        fetchData();
+    }, [activeTab]);
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
         setInviting(true);
-        try {
-            const res = await fetch("/api/admin/invite-team", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Invite failed");
+        
+        const res = await inviteTeamMember({
+            fullName: inviteName,
+            email: inviteEmail,
+            phone: invitePhone || undefined,
+            role: inviteRole
+        });
+
+        if (!res.success) {
+            toast.error(res.error || "Invite failed");
+        } else {
             toast.success(`Invitation sent to ${inviteEmail}`);
             setShowModal(false);
             setInviteEmail("");
-            setInviteRole("sales_staff");
-            fetchTeam();
-        } catch (err: any) {
-            toast.error(err.message);
-        } finally {
-            setInviting(false);
+            setInviteName("");
+            setInvitePhone("");
+            if (activeTab === "pending") fetchData();
         }
+        setInviting(false);
+    };
+
+    const handleRevoke = async (id: string, email: string) => {
+        if (!confirm(`Revoke invitation for ${email}?`)) return;
+        const { error } = await supabase
+            .from("team_invitations")
+            .update({ status: "revoked" })
+            .eq("id", id);
+        if (error) { toast.error("Failed to revoke invite."); return; }
+        toast.success("Invitation revoked.");
+        fetchData();
     };
 
     const handleRemove = async (member: TeamMember) => {
@@ -117,128 +146,190 @@ export function TeamTab() {
             .eq("id", member.id);
         if (error) { toast.error("Failed to remove member."); return; }
         toast.success("Team member removed.");
-        fetchTeam();
+        fetchData();
     };
 
     return (
-        <div className="space-y-8 max-w-4xl">
-            {/* Permission Levels */}
-            <div className="bg-white rounded-2xl shadow-sm p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-1">Permission Levels</h2>
-                        <p className="text-[10px] text-neutral-400 uppercase tracking-wider">Role-based access control for your atelier console</p>
-                    </div>
+        <div className="space-y-8 max-w-5xl">
+            {/* Header / Tabs */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-100 pb-4">
+                <div className="flex items-center gap-6">
+                    <button 
+                        onClick={() => setActiveTab("members")}
+                        className={`text-xs uppercase tracking-widest font-semibold pb-4 border-b-2 transition-colors ${activeTab === 'members' ? 'border-black text-black' : 'border-transparent text-neutral-400 hover:text-black'}`}
+                    >
+                        Active Members
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab("pending")}
+                        className={`text-xs uppercase tracking-widest font-semibold pb-4 border-b-2 transition-colors ${activeTab === 'pending' ? 'border-black text-black' : 'border-transparent text-neutral-400 hover:text-black'}`}
+                    >
+                        Pending Invites
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab("logs")}
+                        className={`text-xs uppercase tracking-widest font-semibold pb-4 border-b-2 transition-colors ${activeTab === 'logs' ? 'border-black text-black' : 'border-transparent text-neutral-400 hover:text-black'}`}
+                    >
+                        Activity Logs
+                    </button>
+                </div>
+                
+                {(activeTab === "members" || activeTab === "pending") && (
                     <button
                         onClick={() => setShowModal(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors rounded-lg"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-[10px] md:text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors rounded-lg whitespace-nowrap"
                     >
                         <UserPlus size={14} />
                         Invite Member
                     </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {[
-                        { role: "Owner", desc: "Full system access. Cannot be removed.", badge: "bg-neutral-900 text-white" },
-                        { role: "Admin", desc: "Full access to all sections and settings. Cannot be removed.", badge: "bg-neutral-800 text-white" },
-                        { role: "Sales Staff", desc: "Access to Products, Sales, and Customers only.", badge: "bg-neutral-100 text-neutral-700" },
-                    ].map(({ role, desc, badge }) => (
-                        <div key={role} className="p-4 rounded-xl bg-neutral-50 space-y-2">
-                            <span className={`inline-block text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-md ${badge}`}>{role}</span>
-                            <p className="text-[10px] text-neutral-400 tracking-wider leading-relaxed uppercase">{desc}</p>
-                        </div>
-                    ))}
-                </div>
+                )}
             </div>
 
-            {/* Team table */}
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">
-                        {members.length} {members.length === 1 ? "member" : "members"}
-                    </p>
-                </div>
-
-                {loading ? (
-                    <p className="px-8 py-10 text-neutral-400 italic font-serif">Loading team...</p>
-                ) : members.length === 0 ? (
-                    <p className="px-8 py-10 text-neutral-400 italic font-serif">No team members yet.</p>
-                ) : (
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b border-neutral-100 bg-neutral-50">
-                                <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Member</th>
-                                <th className="px-4 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Role</th>
-                                <th className="px-4 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Joined</th>
-                                <th className="px-6 py-3" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {members.map(member => {
-                                const isPending = pendingIds.has(member.id);
-                                const isCopying = copyingId === member.id;
-                                const isCopied = copiedId === member.id;
-                                return (
-                                <tr key={member.id} className="border-b border-neutral-50 last:border-b-0 hover:bg-neutral-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <p className="text-sm font-semibold">{member.full_name || "—"}</p>
-                                        <p className="text-[10px] text-neutral-400 tracking-wide">{member.email}</p>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-md ${ROLE_COLORS[member.role] || "bg-neutral-100"}`}>
-                                                {ROLE_LABELS[member.role] || member.role}
-                                            </span>
-                                            {isPending && (
-                                                <span className="text-[9px] uppercase tracking-widest font-bold px-2 py-1 rounded-md bg-amber-100 text-amber-700">
-                                                    Pending setup
+            {/* Content areas based on tab */}
+            <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden">
+                
+                {/* ACTIVE MEMBERS TAB */}
+                {activeTab === "members" && (
+                    <div className="overflow-x-auto">
+                        {loading ? (
+                            <p className="px-8 py-10 text-neutral-400 italic">Loading active members...</p>
+                        ) : members.length === 0 ? (
+                            <p className="px-8 py-10 text-neutral-400 italic">No team members yet.</p>
+                        ) : (
+                            <table className="w-full text-left bg-white">
+                                <thead className="bg-neutral-50 border-b border-neutral-100">
+                                    <tr>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">User</th>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Role</th>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Joined</th>
+                                        <th className="px-6 py-4 text-right"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-50 text-sm">
+                                    {members.map(member => (
+                                        <tr key={member.id} className="hover:bg-neutral-50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="font-semibold text-neutral-900">{member.full_name || "—"}</div>
+                                                <div className="text-[11px] text-neutral-500 font-mono tracking-tight mt-0.5">{member.email}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-md ${ROLE_COLORS[member.role] || "bg-neutral-100 text-neutral-700"}`}>
+                                                    {ROLE_LABELS[member.role] || member.role}
                                                 </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-4 text-[11px] text-neutral-500">
-                                        {new Date(member.created_at).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-3">
-                                            {isPending && (
-                                                <button
-                                                    onClick={() => handleCopyLink(member)}
-                                                    disabled={isCopying}
-                                                    className={`flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-semibold transition-colors disabled:opacity-50 ${
-                                                        isCopied ? "text-green-600" : "text-neutral-500 hover:text-black"
-                                                    }`}
+                                            </td>
+                                            <td className="px-6 py-4 text-neutral-500 text-[11px]">
+                                                {new Date(member.created_at).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {(member.role !== "owner" && member.role !== "admin") && (
+                                                    <button 
+                                                        onClick={() => handleRemove(member)}
+                                                        className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                )}
+
+                {/* PENDING INVITES TAB */}
+                {activeTab === "pending" && (
+                    <div className="overflow-x-auto">
+                        {loading ? (
+                            <p className="px-8 py-10 text-neutral-400 italic">Loading pending invitations...</p>
+                        ) : invites.length === 0 ? (
+                            <p className="px-8 py-10 text-neutral-400 italic">No pending invitations.</p>
+                        ) : (
+                            <table className="w-full text-left bg-white">
+                                <thead className="bg-neutral-50 border-b border-neutral-100">
+                                    <tr>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Invitee</th>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Role</th>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Sent on</th>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-50 text-sm">
+                                    {invites.map(invite => (
+                                        <tr key={invite.id} className="hover:bg-neutral-50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="font-semibold text-neutral-900 flex items-center gap-2">
+                                                    {invite.full_name}
+                                                    <span className="flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                                                </div>
+                                                <div className="text-[11px] text-neutral-500 font-mono tracking-tight mt-0.5">{invite.email}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-md ${ROLE_COLORS[invite.role] || "bg-neutral-100 text-neutral-700"}`}>
+                                                    {ROLE_LABELS[invite.role] || invite.role}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-neutral-500 text-[11px]">
+                                                {new Date(invite.created_at).toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button 
+                                                    onClick={() => handleRevoke(invite.id, invite.email)}
+                                                    className="text-[10px] font-semibold uppercase tracking-widest text-rose-500 hover:text-rose-700 transition-colors bg-rose-50 px-3 py-1.5 rounded-md"
                                                 >
-                                                    {isCopied ? (
-                                                        <>
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                                            Copied
-                                                        </>
-                                                    ) : isCopying ? (
-                                                        "Copying…"
-                                                    ) : (
-                                                        <>
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                                            Copy setup link
-                                                        </>
-                                                    )}
+                                                    Revoke
                                                 </button>
-                                            )}
-                                            {member.role === "sales_staff" && (
-                                                <button
-                                                    onClick={() => handleRemove(member)}
-                                                    className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-rose-600 transition-colors font-semibold"
-                                                >
-                                                    Remove
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                )}
+
+                {/* ACTIVITY LOGS TAB */}
+                {activeTab === "logs" && (
+                    <div className="overflow-x-auto">
+                        {loading ? (
+                            <p className="px-8 py-10 text-neutral-400 italic">Loading activity logs...</p>
+                        ) : logs.length === 0 ? (
+                            <p className="px-8 py-10 text-neutral-400 italic">No recent activity logged by staff.</p>
+                        ) : (
+                            <table className="w-full text-left bg-white">
+                                <thead className="bg-neutral-50 border-b border-neutral-100">
+                                    <tr>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Timestamp</th>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Staff Member</th>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Action</th>
+                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Resource</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-50 text-sm">
+                                    {logs.map(log => (
+                                        <tr key={log.id} className="hover:bg-neutral-50 transition-colors">
+                                            <td className="px-6 py-4 text-neutral-500 text-[11px]">
+                                                {new Date(log.created_at).toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-semibold text-neutral-900">{log.profiles?.full_name || "Unknown"}</div>
+                                                <div className="text-[10px] text-neutral-400 uppercase tracking-widest mt-0.5">{ROLE_LABELS[log.user_role] || log.user_role}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="font-mono text-xs font-semibold px-2 py-1 bg-neutral-100 rounded text-neutral-700 uppercase tracking-wider">
+                                                    {log.action_type}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-neutral-600 font-medium">
+                                                {log.resource}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
                 )}
             </div>
 
@@ -247,12 +338,23 @@ export function TeamTab() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
                     <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl">
                         <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
-                            <h2 className="font-serif text-lg tracking-widest uppercase">Invite Team Member</h2>
+                            <h2 className="font-serif text-lg tracking-widest uppercase">Invite New Member</h2>
                             <button onClick={() => setShowModal(false)} className="text-neutral-400 hover:text-black">
                                 <X size={18} />
                             </button>
                         </div>
                         <form onSubmit={handleInvite} className="p-8 space-y-6">
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Full Name</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={inviteName}
+                                    onChange={e => setInviteName(e.target.value)}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
+                                    placeholder="Ama Staff"
+                                />
+                            </div>
                             <div>
                                 <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Email Address</label>
                                 <input
@@ -261,26 +363,34 @@ export function TeamTab() {
                                     value={inviteEmail}
                                     onChange={e => setInviteEmail(e.target.value)}
                                     className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
-                                    placeholder="staff@misstokyo.com"
+                                    placeholder="ama@misstokyo.com"
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Role</label>
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Phone Number (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={invitePhone}
+                                    onChange={e => setInvitePhone(e.target.value)}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
+                                    placeholder="+233..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Role Assignment</label>
                                 <select
                                     value={inviteRole}
-                                    onChange={e => setInviteRole(e.target.value as "admin" | "sales_staff")}
+                                    onChange={e => setInviteRole(e.target.value)}
                                     className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors appearance-none"
                                 >
-                                    <option value="sales_staff">Sales Staff</option>
                                     <option value="admin">Admin</option>
+                                    <option value="sales_staff">Sales Staff</option>
+                                    <option value="rider">Rider</option>
+                                    <option value="content_editor">Content Editor</option>
+                                    <option value="support">Support</option>
                                 </select>
-                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">
-                                    {inviteRole === "sales_staff"
-                                        ? "Access to Products, Sales, and Customers only."
-                                        : "Full access to all sections and settings."}
-                                </p>
                             </div>
-                            <div className="flex items-center gap-3 pt-2">
+                            <div className="flex items-center gap-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={() => setShowModal(false)}

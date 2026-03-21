@@ -194,11 +194,18 @@ export default function OrderDetailPage() {
     const updateStatus = async (newStatus: string) => {
         if (!order) return;
         setUpdating(true);
-        const { error } = await supabase.from("orders").update({ status: newStatus }).eq("id", order.id);
+        
+        let updateData: any = { status: newStatus };
+        if (newStatus === "packed") {
+            const { data } = await supabase.auth.getUser();
+            if (data?.user?.id) updateData.packed_by = data.user.id;
+        }
+
+        const { error } = await supabase.from("orders").update(updateData).eq("id", order.id);
         if (error) {
             toast.error("Failed to update status.");
         } else {
-            setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
+            setOrder(prev => prev ? { ...prev, ...updateData } : prev);
             toast.success(`Status updated to ${newStatus}.`);
         }
         setUpdating(false);

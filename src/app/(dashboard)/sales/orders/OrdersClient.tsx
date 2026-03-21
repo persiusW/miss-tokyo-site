@@ -264,12 +264,19 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     const bulkUpdate = async (status: string) => {
         setBulkLoading(true);
         const ids = [...selected];
-        const { error } = await supabase.from("orders").update({ status }).in("id", ids);
+        
+        let updateData: any = { status };
+        if (status === "packed") {
+            const { data } = await supabase.auth.getUser();
+            if (data?.user?.id) updateData.packed_by = data.user.id;
+        }
+
+        const { error } = await supabase.from("orders").update(updateData).in("id", ids);
         if (error) {
             toast.error("Failed to update orders.");
         } else {
             toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} → ${status}.`);
-            setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, status } : o));
+            setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, ...updateData } : o));
             setSelected(new Set());
         }
         setBulkLoading(false);
