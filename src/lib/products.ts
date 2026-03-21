@@ -65,7 +65,6 @@ export async function getProducts(params: GetProductsParams, role?: string) {
         .eq("is_active", true);
 
     // B2B Gating: If not authorized, exclude products that are EXCLUSIVELY in wholesale categories.
-    // We achieve this by requiring at least one retail category OR no category associations at all.
     if (!isAuthorized) {
         const { data: retailCats } = await supabaseAdmin
             .from("categories")
@@ -92,8 +91,7 @@ export async function getProducts(params: GetProductsParams, role?: string) {
         query = query.or(retailConditions.join(","));
     }
 
-    // Products use category_type (text) or category_ids (uuid array).
-    // Resolve the category slug → category name & ID for matching.
+    // Category Filter
     if (category) {
         const { data: cat } = await supabaseAdmin
             .from("categories")
@@ -102,16 +100,12 @@ export async function getProducts(params: GetProductsParams, role?: string) {
             .maybeSingle();
 
         if (cat) {
-            // Direct URL protection for categories is handled at the page level, 
-            // but we ensure the query respects the specific category requested.
             query = query.or(`category_type.ilike."${cat.name}",category_id.eq.${cat.id},category_ids.cs.{"${cat.id}"}`);
         } else {
             const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
             query = query.ilike("category_type", fallbackName);
         }
     }
-
-    // Filtering by category moved up into the primary query definition to handle complex .or() logic
     
     if (q) query = query.ilike("name", `%${q}%`);
     if (sale) query = query.eq("is_sale", true);
@@ -132,7 +126,6 @@ export async function getProducts(params: GetProductsParams, role?: string) {
 
     const { data, count } = await query;
 
-    // Fetch overall price bounds (unfiltered, for slider bounds)
     const { data: bounds } = await supabaseAdmin
         .from("products")
         .select("price_ghs")
@@ -143,8 +136,6 @@ export async function getProducts(params: GetProductsParams, role?: string) {
     const minPrice = prices.length ? Math.floor(prices[0]) : 0;
     const maxPrice = prices.length ? Math.ceil(prices[prices.length - 1]) : 1000;
 
-    // Enrich with category name/slug from categories table using category_type matching
-    // Fetch categories once for mapping
     const { data: allCats } = await supabaseAdmin
         .from("categories")
         .select("name, slug");
@@ -310,15 +301,16 @@ export function deriveSizes(products: ShopProduct[]): string[] {
     });
     return sorted;
 }
-/** Fetch products that have video media (mp4/mov) for the Gallery feed. */
 export async function getVideoProducts(): Promise<Array<ShopProduct & { video_url?: string }>> {
+    // Isolated video filtering logic: only products with .mp4 or .mov in image_urls
     const { data } = await supabaseAdmin
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .or('image_urls.cs.{"%.mp4%"},image_urls.cs.{"%.mov%"}'); // Prefer DB filtering
 
     if (!data) return [];
 

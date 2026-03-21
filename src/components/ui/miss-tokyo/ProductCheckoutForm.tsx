@@ -18,12 +18,13 @@ interface ProductCheckoutFormProps {
     availableSizes: string[] | null;
     wholesale?: WholesaleData | null;
     onAddedToCart?: () => void;
+    openDrawerOnAdd?: boolean;
 }
 
 export function ProductCheckoutForm({
     productId, productName, productSlug, productImageUrl,
     priceNum, price, colors, stitching, availableSizes,
-    wholesale, onAddedToCart,
+    wholesale, onAddedToCart, openDrawerOnAdd,
 }: ProductCheckoutFormProps) {
     const { addItem } = useCart();
     const sizesToRender = (availableSizes && availableSizes.length > 0) ? availableSizes : ["39", "40", "41", "42", "43", "44", "45", "46"];
@@ -74,7 +75,7 @@ export function ProductCheckoutForm({
                 wholesalePrices: wholesale.prices,
                 wholesaleTiers: wholesale.tiers,
             } : {}),
-        });
+        }, openDrawerOnAdd ?? true);
 
         onAddedToCart?.();
     };

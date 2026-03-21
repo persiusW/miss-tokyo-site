@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { ProductCheckoutForm } from "./ProductCheckoutForm";
 import Image from "next/image";
 
-export function QuickViewModal({ slug, onClose }: { slug: string; onClose: () => void }) {
+export function QuickViewModal({ slug, onClose, openDrawerOnAdd = true }: { slug: string; onClose: () => void; openDrawerOnAdd?: boolean }) {
     const [product, setProduct] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
@@ -70,6 +70,7 @@ export function QuickViewModal({ slug, onClose }: { slug: string; onClose: () =>
                                 stitching={product.available_stitching || ["Tonal", "Contrast White"]}
                                 availableSizes={product.available_sizes || null}
                                 onAddedToCart={onClose}
+                                openDrawerOnAdd={openDrawerOnAdd}
                             />
                         </div>
                     </>

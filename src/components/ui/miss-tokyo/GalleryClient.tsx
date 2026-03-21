@@ -25,8 +25,7 @@ function VideoCard({
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
-    const [isAdding, setIsAdding] = useState(false);
-    const [justAdded, setJustAdded] = useState(false);
+    const [addState, setAddState] = useState<'idle' | 'loading' | 'success'>('idle');
     const addItem = useCart(s => s.addItem);
 
     useEffect(() => {
@@ -56,7 +55,7 @@ function VideoCard({
             return;
         }
 
-        setIsAdding(true);
+        setAddState('loading');
         // Simulate a small backend delay for the premium feel
         await new Promise(r => setTimeout(r, 600));
 
@@ -71,16 +70,13 @@ function VideoCard({
             imageUrl: product.image_urls?.[0] || "",
         }, false); // Suppress opening the drawer
 
-        setIsAdding(false);
-        setJustAdded(true);
-        setTimeout(() => setJustAdded(false), 2000);
+        setAddState('success');
+        setTimeout(() => setAddState('idle'), 2000);
     };
 
     return (
         <div className="relative h-full w-full snap-start overflow-hidden bg-neutral-950 flex flex-col lg:flex-row">
-            {/* Desktop: Split Screen. Mobile: Full Cover. */}
-            
-            {/* Split 1: Media Column */}
+            {/* Media Column */}
             <div className="relative w-full h-full lg:w-[60%] bg-neutral-900 group">
                 {!isLoaded && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-900/50 backdrop-blur-sm">
@@ -99,7 +95,7 @@ function VideoCard({
                     className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-700 ${isLoaded ? "opacity-100" : "opacity-0"}`}
                 />
                 
-                {/* Mobile Overlay: Details (Hidden on lg) */}
+                {/* Mobile Overlay: Details */}
                 <div className="lg:hidden absolute bottom-0 left-0 w-full p-6 pb-28 md:pb-12 z-10 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white">
                     <div className="flex flex-col gap-2 mb-6 text-left">
                         <span className="text-[9px] uppercase tracking-[0.2em] text-white/60 font-medium">
@@ -116,13 +112,15 @@ function VideoCard({
                     <div className="flex items-center gap-4">
                         <button
                             onClick={handleQuickAdd}
-                            disabled={isAdding || justAdded}
-                            className={`flex-1 text-[10px] font-bold uppercase tracking-[0.2em] py-4 rounded-none transition-all flex items-center justify-center gap-2 ${
-                                justAdded ? "bg-emerald-500 text-white scale-[1.02]" : "bg-white text-black hover:bg-neutral-100"
+                            disabled={addState !== 'idle'}
+                            className={`flex-1 text-[10px] font-bold uppercase tracking-[0.2em] py-4 rounded-none transition-all duration-300 flex items-center justify-center gap-2 ${
+                                addState === 'success' 
+                                ? "bg-emerald-600 text-white scale-[1.05]" 
+                                : "bg-white text-black hover:bg-neutral-100 disabled:opacity-80"
                             }`}
                         >
-                            {isAdding ? <Loader2 size={14} className="animate-spin" /> : justAdded ? <Check size={14} /> : <Plus size={14} />}
-                            {isAdding ? "Adding..." : justAdded ? "Added!" : "Add to Bag"}
+                            {addState === 'loading' ? <Loader2 size={14} className="animate-spin" /> : addState === 'success' ? <Check size={14} /> : <Plus size={14} />}
+                            {addState === 'loading' ? "Adding..." : addState === 'success' ? "Added!" : "Add to Bag"}
                         </button>
                         <Link 
                             href={`/products/${product.slug}`}
@@ -134,9 +132,9 @@ function VideoCard({
                 </div>
             </div>
 
-            {/* Split 2: Desktop Detail Column (lg Only) */}
+            {/* Desktop Detail Column */}
             <div className="hidden lg:flex w-[40%] h-full bg-white flex-col justify-center p-16 xl:p-24 relative">
-                <div className="max-w-md">
+                <div className="max-w-md text-left">
                     <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-400 font-bold mb-4 block">
                         {product.category_name || "MISS TOKYO EXCLUSIVE"}
                     </span>
@@ -157,15 +155,15 @@ function VideoCard({
                     <div className="flex flex-col gap-4">
                         <button
                             onClick={handleQuickAdd}
-                            disabled={isAdding || justAdded}
+                            disabled={addState !== 'idle'}
                             className={`w-full text-[11px] font-bold uppercase tracking-[0.3em] py-5 rounded-none transition-all duration-300 flex items-center justify-center gap-3 border shadow-sm ${
-                                justAdded 
-                                ? "bg-emerald-50 text-emerald-600 border-emerald-200 scale-105" 
-                                : "bg-black text-white border-black hover:bg-neutral-800"
+                                addState === 'success' 
+                                ? "bg-emerald-600 text-white border-emerald-600 scale-105" 
+                                : "bg-black text-white border-black hover:bg-neutral-800 disabled:opacity-80"
                             }`}
                         >
-                            {isAdding ? <Loader2 size={16} className="animate-spin" /> : justAdded ? <Check size={16} /> : <Plus size={16} />}
-                            {isAdding ? "Syncing..." : justAdded ? "Included in Bag" : "Buy this Piece"}
+                            {addState === 'loading' ? <Loader2 size={16} className="animate-spin" /> : addState === 'success' ? <Check size={16} /> : <Plus size={16} />}
+                            {addState === 'loading' ? "Syncing..." : addState === 'success' ? "Included in Bag" : "Buy this Piece"}
                         </button>
                         
                         <Link 
@@ -177,8 +175,7 @@ function VideoCard({
                     </div>
                 </div>
 
-                {/* Desktop Global Mute Toggle is in Header, but we could put more info here if needed */}
-                <div className="absolute bottom-12 left-16 xl:left-24 text-[9px] uppercase tracking-[0.2em] text-neutral-300 font-medium">
+                <div className="absolute bottom-12 left-16 xl:left-24 text-[9px] uppercase tracking-[0.2em] text-neutral-300 font-medium whitespace-nowrap overflow-hidden">
                     Scroll to Explore • Snap Mandatory
                 </div>
             </div>
@@ -216,7 +213,6 @@ export function GalleryClient({ products }: GalleryClientProps) {
                 </Link>
                 
                 <div className="flex items-center gap-4 pointer-events-auto">
-                    {/* Cart Counter Overlay (Visual Feedback for Part 3) */}
                     <Link href="/shop" className="text-white bg-black/20 backdrop-blur-lg px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 hover:bg-white hover:text-black transition-all">
                         <span className="text-[10px] font-bold tracking-widest uppercase">Cart</span>
                         {hasMounted && (
@@ -254,6 +250,7 @@ export function GalleryClient({ products }: GalleryClientProps) {
                     <QuickViewModal 
                         slug={selectedSlug} 
                         onClose={() => setSelectedSlug(null)} 
+                        openDrawerOnAdd={false}
                     />
                 </div>
             )}
