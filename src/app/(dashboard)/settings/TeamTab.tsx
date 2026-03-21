@@ -33,6 +33,10 @@ type ActivityLog = {
     resource: string;
     details?: {
        resource_name?: string;
+       order_number?: string;
+       rider_name?: string;
+       previous_status?: string;
+       new_status?: string;
        changes?: Record<string, { from: any; to: any }>;
     };
     created_at: string;
@@ -405,10 +409,16 @@ export function TeamTab() {
                                                 <td className="px-6 py-4 min-w-[300px]">
                                                     <div className="flex items-center gap-1.5 mb-1.5">
                                                         <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">{log.resource}:</span>
-                                                        <span className="font-medium text-neutral-900">{log.details?.resource_name || "—"}</span>
+                                                        <span className="font-medium text-neutral-900">
+                                                            {log.action_type === 'PACKED_ORDER' ? `Packed Order #${log.details?.order_number}` :
+                                                             log.action_type === 'ASSIGNED_RIDER' ? `Assigned Order #${log.details?.order_number} to ${log.details?.rider_name || 'Rider'}` :
+                                                             log.action_type === 'DISPATCHED_ORDER' ? `Dispatched Order #${log.details?.order_number}` :
+                                                             log.action_type === 'DELIVERED_ORDER' ? `Delivered Order #${log.details?.order_number}` :
+                                                             log.details?.resource_name || "—"}
+                                                        </span>
                                                     </div>
                                                     
-                                                    {log.details?.changes && (
+                                                    {!['PACKED_ORDER', 'ASSIGNED_RIDER', 'DISPATCHED_ORDER', 'DELIVERED_ORDER'].includes(log.action_type) && log.details?.changes && (
                                                         <div className="space-y-1.5 mt-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100">
                                                             {Object.entries(log.details.changes).map(([field, delta]: [string, any]) => (
                                                                 <div key={field} className="text-[11px] flex flex-wrap items-center gap-x-2">
@@ -422,6 +432,12 @@ export function TeamTab() {
                                                                     </span>
                                                                 </div>
                                                             ))}
+                                                        </div>
+                                                    )}
+
+                                                    {['PACKED_ORDER', 'ASSIGNED_RIDER', 'DISPATCHED_ORDER', 'DELIVERED_ORDER'].includes(log.action_type) && (
+                                                        <div className="text-[11px] text-neutral-500 mt-1">
+                                                            Status: {log.details?.previous_status} → <span className="text-green-600 font-semibold">{log.details?.new_status}</span>
                                                         </div>
                                                     )}
                                                 </td>

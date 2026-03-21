@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendSMS } from "@/lib/sms";
+import { logActivity } from "@/lib/utils/logActivity";
 
 /**
  * POST /api/dispatch
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
         // ── Fetch orders ──────────────────────────────────────────────────────
         const { data: orders, error: ordersError } = await supabaseAdmin
             .from("orders")
-            .select("id, customer_name, customer_email, customer_phone, shipping_address, total_amount")
+            .select("id, customer_name, customer_email, customer_phone, shipping_address, total_amount, status, assigned_rider_id")
             .in("id", orderIds);
 
         if (ordersError || !orders) {
@@ -139,6 +140,25 @@ export async function POST(req: NextRequest) {
             });
 
         await Promise.allSettled(customerSmsPromises);
+
+        // ── Log Activity ────────────────────────────────────────────────────────
+        const logPromises = orders.map(order => {
+            const isReassignment = order.status === "shipped";
+            return logActivity({
+                userId: user.id,
+                userRole: caller.role,
+                actionType: isReassignment ? "ASSIGNED_RIDER" : "DISPATCHED_ORDER",
+                resource: "order",
+                resourceId: order.id,
+                details: {
+                    order_number: order.id.slice(0, 8),
+                    rider_name: rider.full_name,
+                    previous_status: order.status,
+                    new_status: "shipped"
+                }
+            });
+        });
+        await Promise.allSettled(logPromises);
 
         return NextResponse.json({ status: "dispatched", count: orderIds.length });
     } catch (err: any) {

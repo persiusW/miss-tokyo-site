@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendSMS } from "@/lib/sms";
+import { logActivity } from "@/lib/utils/logActivity";
 
 /**
  * POST /api/pickup-ready
@@ -147,6 +148,23 @@ export async function POST(req: NextRequest) {
             });
 
         await Promise.allSettled(smsPromises);
+
+        // ── Log Activity ────────────────────────────────────────────────────────
+        const logPromises = orders.map(order => {
+            return logActivity({
+                userId: user.id,
+                userRole: caller.role,
+                actionType: "PACKED_ORDER", // Milestone for ready for pickup
+                resource: "order",
+                resourceId: order.id,
+                details: {
+                    order_number: order.id.slice(0, 8),
+                    previous_status: "processing",
+                    new_status: "ready_for_pickup"
+                }
+            });
+        });
+        await Promise.allSettled(logPromises);
 
         return NextResponse.json({ status: "ready_for_pickup", count: orderIds.length });
     } catch (err: any) {
