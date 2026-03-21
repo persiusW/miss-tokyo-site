@@ -5,6 +5,7 @@ import { getUrl } from "@/lib/utils/getUrl";
 import { Resend } from "resend";
 import { sendSMS } from "@/lib/sms";
 import crypto from "crypto";
+import { logActivity } from "@/lib/utils/logActivity";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -23,6 +24,13 @@ export async function inviteTeamMember(data: InviteData) {
         return { success: false, error: "Unauthorized" };
     }
 
+    // Get caller's role
+    const { data: callerProfile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userData.user.id)
+        .single();
+
     const token = crypto.randomBytes(32).toString('hex');
     const dynamicHost = await getUrl();
     const inviteLink = `${dynamicHost}/invite?token=${token}`;
@@ -40,6 +48,15 @@ export async function inviteTeamMember(data: InviteData) {
         console.error("Invite insertion error:", insertError);
         return { success: false, error: "Failed to create invitation record." };
     }
+
+    // LOG ACTIVITY
+    await logActivity({
+        userId: userData.user.id,
+        userRole: callerProfile?.role || 'admin',
+        actionType: "INVITE",
+        resource: "team",
+        details: { email: data.email, role: data.role }
+    });
 
     const message = `You have been invited to collaborate on Miss Tokyo as a ${data.role}. Join here: ${inviteLink}`;
 
@@ -113,6 +130,15 @@ export async function removeTeamMember(userId: string) {
         console.error("Failed to delete user ID", userId, deleteError);
         return { success: false, error: "Failed to delete from Auth layer." };
     }
+
+    // LOG ACTIVITY
+    await logActivity({
+        userId: userData.user.id,
+        userRole: callerData.role,
+        actionType: "REMOVE_MEMBER",
+        resource: "team",
+        resourceId: userId
+    });
 
     return { success: true };
 }

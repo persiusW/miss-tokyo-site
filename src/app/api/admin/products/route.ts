@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/utils/logActivity";
 
 export async function POST(req: NextRequest) {
     // Auth check — only admin/owner can create products
@@ -72,6 +73,16 @@ export async function POST(req: NextRequest) {
         console.error("[admin/products POST]", error);
         return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
     }
+
+    // LOG ACTIVITY
+    await logActivity({
+        userId: user.id,
+        userRole: caller.role,
+        actionType: "CREATE",
+        resource: "product",
+        resourceId: data.id,
+        details: { name: name, slug: data.slug }
+    });
 
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");
@@ -149,6 +160,16 @@ export async function PATCH(req: NextRequest) {
         console.error("[admin/products PATCH]", error);
         return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
     }
+
+    // LOG ACTIVITY
+    await logActivity({
+        userId: user.id,
+        userRole: caller.role,
+        actionType: "UPDATE",
+        resource: "product",
+        resourceId: id,
+        details: { name: name, slug: slug }
+    });
 
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");

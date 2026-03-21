@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { updateOrderStatus } from "../actions";
+
 import { Printer, X } from "lucide-react";
 
 type Order = {
@@ -195,17 +197,13 @@ export default function OrderDetailPage() {
         if (!order) return;
         setUpdating(true);
         
-        let updateData: any = { status: newStatus };
-        if (newStatus === "packed") {
-            const { data } = await supabase.auth.getUser();
-            if (data?.user?.id) updateData.packed_by = data.user.id;
-        }
-
-        const { error } = await supabase.from("orders").update(updateData).eq("id", order.id);
-        if (error) {
-            toast.error("Failed to update status.");
+        const res = await updateOrderStatus(order.id, newStatus);
+        
+        if (!res.success) {
+            toast.error(res.error || "Failed to update status.");
         } else {
-            setOrder(prev => prev ? { ...prev, ...updateData } : prev);
+            // Optimistic update was local, but we know it worked now
+            setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
             toast.success(`Status updated to ${newStatus}.`);
         }
         setUpdating(false);

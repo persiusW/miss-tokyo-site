@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { Pencil, Trash2, X, Check, Star, Tag, Copy, Search } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { createCategory, updateCategory, deleteCategory } from "./actions";
+
 
 type Category = {
     id: string;
@@ -117,7 +119,7 @@ export default function CategoriesPage() {
         if (!form.name) return;
         setSaving(true);
 
-        const { error } = await supabase.from("categories").insert([{
+        const res = await createCategory({
             name: form.name,
             slug: form.slug || slugify(form.name),
             description: form.description || null,
@@ -127,10 +129,10 @@ export default function CategoriesPage() {
             wholesale_tier_1_price: newIsWholesale && newWholesalePrices.t1 ? Number(newWholesalePrices.t1) : null,
             wholesale_tier_2_price: newIsWholesale && newWholesalePrices.t2 ? Number(newWholesalePrices.t2) : null,
             wholesale_tier_3_price: newIsWholesale && newWholesalePrices.t3 ? Number(newWholesalePrices.t3) : null,
-        }]);
+        });
 
-        if (error) {
-            toast.error("Failed to add category.");
+        if (!res.success) {
+            toast.error(res.error || "Failed to add category.");
         } else {
             toast.success("Category added.");
             setForm({ name: "", slug: "", description: "" });
@@ -149,8 +151,8 @@ export default function CategoriesPage() {
             if (featuredCount >= 3) { toast.error("Max 3 featured categories. Unfeature one first."); return; }
         }
         setCategories(prev => prev.map(c => c.id === id ? { ...c, is_featured: !is_featured } : c));
-        const { error } = await supabase.from("categories").update({ is_featured: !is_featured }).eq("id", id);
-        if (error) {
+        const res = await updateCategory(id, { is_featured: !is_featured });
+        if (!res.success) {
             toast.error("Failed to update featured status.");
             setCategories(prev => prev.map(c => c.id === id ? { ...c, is_featured } : c));
         }
@@ -158,12 +160,13 @@ export default function CategoriesPage() {
 
     const toggleActive = async (id: string, is_active: boolean) => {
         setCategories(prev => prev.map(c => c.id === id ? { ...c, is_active: !is_active } : c));
-        await supabase.from("categories").update({ is_active: !is_active }).eq("id", id);
+        await updateCategory(id, { is_active: !is_active });
     };
 
     const handleDelete = async (id: string) => {
-        const { error } = await supabase.from("categories").delete().eq("id", id);
-        if (error) { toast.error("Failed to delete category."); }
+        const cat = categories.find(c => c.id === id);
+        const res = await deleteCategory(id, cat?.name || "Unknown");
+        if (!res.success) { toast.error(res.error || "Failed to delete category."); }
         else { toast.success("Category deleted."); setCategories(prev => prev.filter(c => c.id !== id)); }
         setConfirmDeleteId(null);
     };
@@ -187,28 +190,26 @@ export default function CategoriesPage() {
             return;
         }
         setSaving(true);
-        // 1. Create the wholesale clone
-        const { data: newCat, error: catError } = await supabase
-            .from("categories")
-            .insert([{
-                name: `${cat.name} Wholesale`,
-                slug: `${cat.slug}-wholesale`,
-                description: cat.description,
-                image_url: cat.image_url,
-                is_active: true,
-                is_wholesale: true,
-                wholesale_tier_1_price: null,
-                wholesale_tier_2_price: null,
-                wholesale_tier_3_price: null,
-            }])
-            .select("id")
-            .single();
+        // 1. Create the wholesale clone using the action
+        const res = await createCategory({
+            name: `${cat.name} Wholesale`,
+            slug: `${cat.slug}-wholesale`,
+            description: cat.description,
+            image_url: cat.image_url,
+            is_active: true,
+            is_wholesale: true,
+            wholesale_tier_1_price: null,
+            wholesale_tier_2_price: null,
+            wholesale_tier_3_price: null,
+        });
 
-        if (catError || !newCat) {
+        if (!res.success || !res.category) {
             toast.error("Failed to create wholesale category.");
             setSaving(false);
             return;
         }
+
+        const newCatId = res.category.id;
 
         // 2. Find all products whose primary category matches this category's slug
         const { data: matchedProducts } = await supabase
@@ -219,7 +220,7 @@ export default function CategoriesPage() {
         // 3. Append the new wholesale category ID to each product's category_ids
         const updates = (matchedProducts ?? []).map((p: { id: string; category_ids: string[] | null }) => {
             const existing: string[] = p.category_ids ?? [];
-            const merged = existing.includes(newCat.id) ? existing : [...existing, newCat.id];
+            const merged = existing.includes(newCatId) ? existing : [...existing, newCatId];
             return supabase.from("products").update({ category_ids: merged }).eq("id", p.id);
         });
 
@@ -233,7 +234,7 @@ export default function CategoriesPage() {
 
     const handleSaveEdit = async (id: string) => {
         setSaving(true);
-        const { error } = await supabase.from("categories").update({
+        const res = await updateCategory(id, {
             name: editForm.name,
             slug: editForm.slug,
             description: editForm.description || null,
@@ -242,9 +243,9 @@ export default function CategoriesPage() {
             wholesale_tier_1_price: editIsWholesale && editWholesalePrices.t1 ? Number(editWholesalePrices.t1) : null,
             wholesale_tier_2_price: editIsWholesale && editWholesalePrices.t2 ? Number(editWholesalePrices.t2) : null,
             wholesale_tier_3_price: editIsWholesale && editWholesalePrices.t3 ? Number(editWholesalePrices.t3) : null,
-        }).eq("id", id);
+        });
 
-        if (error) { toast.error("Failed to update category."); }
+        if (!res.success) { toast.error(res.error || "Failed to update category."); }
         else { toast.success("Category updated."); setEditingId(null); await fetchCategories(); }
         setSaving(false);
     };

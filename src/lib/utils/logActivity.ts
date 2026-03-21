@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 interface ActivityLogProps {
     userId: string;
@@ -15,8 +15,7 @@ export async function logActivity({ userId, userRole, actionType, resource, reso
     }
 
     try {
-        const supabase = await createClient();
-        await supabase.from("activity_logs").insert({
+        await supabaseAdmin.from("activity_logs").insert({
             user_id: userId,
             user_role: userRole,
             action_type: actionType,
