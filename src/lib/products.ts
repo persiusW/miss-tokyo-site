@@ -310,3 +310,35 @@ export function deriveSizes(products: ShopProduct[]): string[] {
     });
     return sorted;
 }
+/** Fetch products that have video media (mp4/mov) for the Gallery feed. */
+export async function getVideoProducts(): Promise<Array<ShopProduct & { video_url?: string }>> {
+    const { data } = await supabaseAdmin
+        .from("products")
+        .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
+             image_urls, is_featured, category_type, category_ids,
+             available_colors, available_sizes, color_variants, size_variants,
+             bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
+        .eq("is_active", true);
+
+    if (!data) return [];
+
+    const videoProducts = (data as any[]).map(p => {
+        const video = p.image_urls?.find((url: string) => 
+            url.toLowerCase().endsWith(".mp4") || url.toLowerCase().endsWith(".mov")
+        );
+        
+        return {
+            ...p,
+            category_id: null,
+            is_featured: p.is_featured ?? false,
+            is_sale: p.is_sale ?? false,
+            discount_value: p.discount_value ?? 0,
+            inventory_count: p.inventory_count ?? 0,
+            category_name: p.category_type ?? null,
+            category_slug: null,
+            video_url: video
+        };
+    }).filter(p => !!p.video_url);
+
+    return videoProducts;
+}

@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 const NAV_LINKS = [
     { href: "/",             label: "Home",         navKey: "nav_show_home" },
     { href: "/shop",         label: "Shop",         navKey: "nav_show_shop" },
+    { href: "/gallery",      label: "Gallery",      navKey: null },
     { href: "/shop?sale=true", label: "Sale",         navKey: null },
     { href: "/shop?category=dresses", label: "Dresses", navKey: null },
     { href: "/shop?sort=newest", label: "New Arrivals", navKey: "nav_show_new_arrivals" },
