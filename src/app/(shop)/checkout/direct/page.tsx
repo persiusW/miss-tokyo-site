@@ -29,6 +29,7 @@ function DirectPayContent() {
             });
             const data = await res.json();
             if (data.authorizationUrl) {
+                // eslint-disable-next-line react-hooks/immutability
                 window.location.href = data.authorizationUrl;
             } else {
                 toast.error(data.error || "Payment initialization failed.");

@@ -173,11 +173,6 @@ export function HomepageSectionsTab() {
         });
     }, []);
 
-    // Load subscribers separately
-    useEffect(() => {
-        loadSubscribers(0);
-    }, []);
-
     const loadSubscribers = async (page: number) => {
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
@@ -194,6 +189,11 @@ export function HomepageSectionsTab() {
         setSubscriberCount(count ?? 0);
         setSubscriberPage(page);
     };
+
+    // Load subscribers separately
+    useEffect(() => {
+        loadSubscribers(0);
+    }, []);
 
     // ---- Slot helpers ----
     const updateSlot = (

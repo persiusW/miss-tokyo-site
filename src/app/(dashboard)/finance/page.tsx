@@ -22,10 +22,6 @@ export default function FinancePage() {
     const [docType, setDocType] = useState<"invoice" | "quotation">("invoice");
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => {
-        fetchDocuments();
-    }, []);
-
     const fetchDocuments = async () => {
         setLoading(true);
         // In a real database, ensure 'documents' table exists
@@ -39,6 +35,10 @@ export default function FinancePage() {
         }
         setLoading(false);
     };
+
+    useEffect(() => {
+        fetchDocuments();
+    }, []);
 
     const handleCreateDocument = async (e: React.FormEvent) => {
         e.preventDefault();

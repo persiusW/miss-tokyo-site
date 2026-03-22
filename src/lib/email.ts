@@ -14,6 +14,7 @@ type EmailPayload = {
 let _resend: any = null;
 function getResend() {
     if (!_resend) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { Resend } = require("resend");
         _resend = new Resend(process.env.RESEND_API_KEY);
     }

@@ -265,7 +265,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
         setBulkLoading(true);
         const ids = [...selected];
         
-        let updateData: any = { status };
+        const updateData: any = { status };
         if (status === "packed") {
             const { data } = await supabase.auth.getUser();
             if (data?.user?.id) updateData.packed_by = data.user.id;

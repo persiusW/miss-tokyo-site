@@ -17,7 +17,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
     const { data: oldData } = await supabaseAdmin.from("orders").select("*, riders(full_name)").eq("id", orderId).single();
     if (!oldData) return { success: false, error: "Order not found" };
 
-    let updateData: any = { status: newStatus, ...extraData };
+    const updateData: any = { status: newStatus, ...extraData };
     if (newStatus === "packed" && !oldData.packed_by) {
         updateData.packed_by = user.id;
     }
