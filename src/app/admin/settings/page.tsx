@@ -275,8 +275,8 @@ function StoreTab() {
             <div className="bg-white border border-gray-100 p-8 space-y-8">
                 <h2 className="text-[11px] uppercase tracking-widest font-bold text-black border-b border-gray-50 pb-4">Global Parameters</h2>
                 <div className="space-y-6">
-                    <Field label="Standard Sizes" value={form.global_sizes.join(", ")} onChange={v => setForm(f => ({ ...f, global_sizes: v.split(",").map(s => s.trim()).filter(Boolean) }))} />
-                    <Field label="Core Colors" value={form.global_colors.join(", ")} onChange={v => setForm(f => ({ ...f, global_colors: v.split(",").map(c => c.trim()).filter(Boolean) }))} />
+                    <TagInput label="Standard Sizes" tags={form.global_sizes} onChange={v => setForm(f => ({ ...f, global_sizes: v }))} />
+                    <TagInput label="Core Colors" tags={form.global_colors} onChange={v => setForm(f => ({ ...f, global_colors: v }))} />
                 </div>
             </div>
 
@@ -405,6 +405,58 @@ function Field({ label, value, onChange, name }: { label: string; value: string;
                 onChange={e => onChange(e.target.value)}
                 className="w-full border-b border-gray-100 py-3 text-xs outline-none focus:border-black transition-colors bg-transparent"
             />
+        </div>
+    );
+}
+
+function TagInput({ label, tags, onChange }: { label: string; tags: string[]; onChange: (tags: string[]) => void }) {
+    const [input, setInput] = useState("");
+
+    const addTag = (raw: string) => {
+        const val = raw.trim();
+        if (val && !tags.includes(val)) onChange([...tags, val]);
+        setInput("");
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addTag(input);
+        } else if (e.key === "Backspace" && input === "" && tags.length > 0) {
+            onChange(tags.slice(0, -1));
+        }
+    };
+
+    const handleBlur = () => {
+        if (input.trim()) addTag(input);
+    };
+
+    return (
+        <div>
+            <label className="block text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-2">{label}</label>
+            <div className="flex flex-wrap gap-2 border-b border-gray-100 pb-2 min-h-[36px]">
+                {tags.map(tag => (
+                    <span key={tag} className="flex items-center gap-1 bg-neutral-100 text-[10px] uppercase tracking-widest font-bold px-2 py-1">
+                        {tag}
+                        <button
+                            type="button"
+                            onClick={() => onChange(tags.filter(t => t !== tag))}
+                            className="text-gray-400 hover:text-black leading-none ml-1"
+                            aria-label={`Remove ${tag}`}
+                        >×</button>
+                    </span>
+                ))}
+                <input
+                    type="text"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onBlur={handleBlur}
+                    placeholder="Add, press Enter"
+                    className="flex-1 min-w-[120px] text-xs outline-none bg-transparent py-1 placeholder:text-gray-300"
+                />
+            </div>
+            <p className="text-[9px] text-gray-300 mt-1 uppercase tracking-widest">Press Enter or comma to add · Backspace to remove last</p>
         </div>
     );
 }

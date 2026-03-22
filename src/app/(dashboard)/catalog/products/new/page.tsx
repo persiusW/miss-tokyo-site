@@ -50,7 +50,8 @@ export default function NewProductPage() {
                 }
                 if (storeData.global_colors) {
                     setGlobalColors(storeData.global_colors);
-                    setSelectedColors(storeData.global_colors);
+                    // Colors start unticked — admin selects which apply to this product
+                    setSelectedColors([]);
                 }
                 if (storeData.global_stitching) {
                     setGlobalStitching(storeData.global_stitching);

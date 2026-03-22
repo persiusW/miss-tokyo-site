@@ -62,7 +62,10 @@ export default async function ProductPage({
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", authUser.id).maybeSingle();
         role = profile?.role;
     }
+    // isAuthorized: can see wholesale-only products (broad — includes admin/owner for management)
     const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
+    // isWholesalerAccount: only accounts explicitly set to wholesale role see the pricing box
+    const isWholesalerAccount = role && ["wholesale", "wholesaler"].includes(role.toLowerCase());
 
     // Part 3: Direct URL Protection (PDP Gating)
     // Check if the product belongs to any retail categories.
@@ -258,7 +261,7 @@ export default async function ProductPage({
                             isSale={isSale}
                             discountValue={product.discount_value ?? 0}
                             showTrustStrip={showTrustStrip}
-                            isWholesaler={!!isAuthorized}
+                            isWholesaler={!!isWholesalerAccount}
                             wholesaleTiers={wholesaleTiers}
                         />
 
