@@ -25,6 +25,12 @@ const getHex = (c: string) => COLOR_HEX[c] ?? COLOR_HEX[c.charAt(0).toUpperCase(
 const FALLBACK_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='133'%3E%3Crect width='100' height='133' fill='%23E8D5C4'/%3E%3C/svg%3E";
 const PAGE_SIZE = 24;
 
+// Task 2: guard against passing video URLs to <Image> (causes 400 Bad Request)
+function isVideoUrl(url: string): boolean {
+    const lower = url.toLowerCase();
+    return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov");
+}
+
 function getBadge(p: ShopProduct): { label: string; type: "new" | "sale" | "bundle" } | null {
     if (p.badge === "bundle" || p.bundle_label) return { label: p.bundle_label || "Bundle", type: "bundle" };
     if (p.badge === "sale" || p.is_sale || (p.compare_at_price_ghs && p.compare_at_price_ghs > p.price_ghs))
@@ -84,16 +90,27 @@ function ShopProductCard({
             {/* Image */}
             <Link href={`/products/${product.slug}`} className="block">
                 <div className="relative overflow-hidden mb-[11px]" style={{ aspectRatio: "3/4", borderRadius: 4, background: "#E8D5C4" }}>
-                    <Image
-                        src={imgSrc}
-                        alt={product.name}
-                        fill
-                        priority={priority}
-                        sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
-                        className={`object-cover transition-all duration-700 ease-in-out ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.04]"}`}
-                        onError={() => setImgSrc(FALLBACK_IMG)}
-                    />
-                    {hoverSrc && (
+                    {isVideoUrl(imgSrc) ? (
+                        <video
+                            src={imgSrc}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="absolute inset-0 w-full h-full object-cover"
+                        />
+                    ) : (
+                        <Image
+                            src={imgSrc}
+                            alt={product.name}
+                            fill
+                            priority={priority}
+                            sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
+                            className={`object-cover transition-all duration-700 ease-in-out ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.04]"}`}
+                            onError={() => setImgSrc(FALLBACK_IMG)}
+                        />
+                    )}
+                    {hoverSrc && !isVideoUrl(hoverSrc) && (
                         <Image
                             src={hoverSrc}
                             alt={`${product.name} alternate view`}

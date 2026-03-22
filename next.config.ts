@@ -2,7 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  poweredByHeader: false, // SPD-12: suppress X-Powered-By header
   images: {
+    quality: 85,
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: 'https',

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/store/useCart";
 import { toast } from "@/lib/toast";
@@ -85,6 +85,7 @@ export function ProductOptions(props: Props) {
     const [wishlisted, setWishlisted] = useState(false);
     const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
     const [addedToBag, setAddedToBag] = useState(false);
+    const addedToBagTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const setCartOpen = useCart(s => s.setIsOpen);
 
     useEffect(() => {
@@ -93,6 +94,10 @@ export function ProductOptions(props: Props) {
             setWishlisted(wl.includes(productId));
         } catch { /* noop */ }
     }, [productId]);
+
+    useEffect(() => {
+        return () => { if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current); };
+    }, []);
 
     const toggleWishlist = () => {
         try {
@@ -141,7 +146,8 @@ export function ProductOptions(props: Props) {
         if (doAddToCart()) {
             setAddedToBag(true);
             setCartOpen(true);
-            setTimeout(() => setAddedToBag(false), 2000);
+            if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current);
+            addedToBagTimer.current = setTimeout(() => setAddedToBag(false), 2000);
         }
     };
 

@@ -13,8 +13,10 @@ const SECURITY_HEADERS: Record<string, string> = {
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' blob: data: https:",
+        "media-src 'self' https://*.supabase.co blob: data:",
         "frame-src 'self' https://js.paystack.co",
-        "connect-src 'self' https:",
+        // wss:// required for Supabase Realtime subscriptions
+        "connect-src 'self' https: wss://*.supabase.co",
     ].join("; "),
 };
 

@@ -18,9 +18,10 @@ function VideoCard({
 }: {
     product: any,
     priority: boolean,
-    onOpenModal: (slug: string) => void
+    onOpenModal: (product: any) => void
 }) {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
     const [addState, setAddState] = useState<'idle' | 'loading' | 'success'>('idle');
@@ -43,19 +44,19 @@ function VideoCard({
         );
 
         if (videoRef.current) observer.observe(videoRef.current);
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            if (resetTimer.current) clearTimeout(resetTimer.current);
+        };
     }, []);
 
-    const handleQuickAdd = async () => {
-        // If product has variants, trigger selection drawer instead
+    const handleQuickAdd = () => {
+        // If product has variants, trigger selection modal instead
         if ((product.available_sizes?.length || 0) > 0 || (product.available_colors?.length || 0) > 0) {
-            onOpenModal(product.slug);
+            // Pass the full product object — QuickViewModal skips its DB fetch (PERF-11)
+            onOpenModal(product);
             return;
         }
-
-        setAddState('loading');
-        // Simulate a small backend delay for the premium feel
-        await new Promise(r => setTimeout(r, 600));
 
         addItem({
             id: `${product.id}-default`,
@@ -69,7 +70,8 @@ function VideoCard({
         }, false); // Suppress opening the drawer
 
         setAddState('success');
-        setTimeout(() => setAddState('idle'), 2000);
+        if (resetTimer.current) clearTimeout(resetTimer.current);
+        resetTimer.current = setTimeout(() => setAddState('idle'), 2000);
     };
 
     return (
@@ -182,7 +184,8 @@ function VideoCard({
 }
 
 export function GalleryClient({ products }: GalleryClientProps) {
-    const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+    // PERF-11: track full product object so QuickViewModal can render without a DB fetch
+    const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
     const [hasMounted, setHasMounted] = useState(false);
     const totalItems = useCart(s => s.totalItems());
 
@@ -228,17 +231,17 @@ export function GalleryClient({ products }: GalleryClientProps) {
                         key={product.id}
                         product={product}
                         priority={index < 2}
-                        onOpenModal={setSelectedSlug}
+                        onOpenModal={setSelectedProduct}
                     />
                 ))}
             </div>
 
             {/* Selection Drawer (Modal Overlay) */}
-            {selectedSlug && (
+            {selectedProduct && (
                 <div className="animate-in fade-in zoom-in-95 duration-300">
-                    <QuickViewModal 
-                        slug={selectedSlug} 
-                        onClose={() => setSelectedSlug(null)} 
+                    <QuickViewModal
+                        product={selectedProduct}
+                        onClose={() => setSelectedProduct(null)}
                         openDrawerOnAdd={false}
                     />
                 </div>

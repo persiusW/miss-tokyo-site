@@ -57,6 +57,7 @@ export function CategoryGrid({ categories }: CategoryGridProps) {
                     src={imageUrl}
                     alt={label}
                     fill
+                    priority={index < 2}
                     className="object-cover object-center group-hover:scale-105 transition-transform duration-700"
                     sizes="(max-width: 768px) 50vw, 25vw"
                   />

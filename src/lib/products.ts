@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabase";
+import { unstable_cache } from "next/cache";
 
 export interface ShopProduct {
     id: string;
@@ -49,11 +50,46 @@ export interface GetProductsParams {
 
 const PAGE_SIZE = 24;
 
+// ── Cached categories fetch — reused across getProducts and getProductBySlug ──
+const getCachedCategories = unstable_cache(
+    async () => {
+        const db = createClient();
+        const { data } = await db.from("categories").select("name, slug");
+        return (data ?? []) as Array<{ name: string; slug: string }>;
+    },
+    ["categories-name-map"],
+    { revalidate: 60 }
+);
+
 export async function getProducts(params: GetProductsParams, role?: string) {
     const { category, sort, color, size, min, max, page = 1, q, sale } = params;
     const db = createClient();
 
-    // Phase 4 & 5: Bulletproof Fetcher
+    // ── PERF-02: Resolve category slug and fetch price bounds in parallel ──────
+    // Category resolve must complete before we can build the filter on the main query.
+    // Price bounds and name map are fully independent — run them concurrently.
+    const [catResult, minBoundResult, maxBoundResult, allCats] = await Promise.all([
+        category
+            ? db.from("categories").select("id, name").eq("slug", category).maybeSingle()
+            : Promise.resolve({ data: null }),
+        // PERF-04: two limit-1 queries instead of loading all prices into memory
+        db.from("products").select("price_ghs").eq("is_active", true).order("price_ghs", { ascending: true }).limit(1),
+        db.from("products").select("price_ghs").eq("is_active", true).order("price_ghs", { ascending: false }).limit(1),
+        getCachedCategories(),
+    ]);
+
+    const minPrice = catResult !== null && minBoundResult.data?.[0]
+        ? Math.floor(Number(minBoundResult.data[0].price_ghs))
+        : 0;
+    const maxPrice = maxBoundResult.data?.[0]
+        ? Math.ceil(Number(maxBoundResult.data[0].price_ghs))
+        : 1000;
+
+    const catMap = new Map<string, { name: string; slug: string }>(
+        allCats.map((c: any) => [c.name.toLowerCase(), c])
+    );
+
+    // ── Build main query (category filter already resolved above) ─────────────
     let query = db
         .from("products")
         .select(
@@ -64,21 +100,13 @@ export async function getProducts(params: GetProductsParams, role?: string) {
             { count: "exact" }
         );
 
-    // Filter by active status (Safe handle for nulls)
     query = query.or("is_active.eq.true,is_active.is.null");
 
-    // Category Filter (Inclusion)
     if (category) {
-        const { data: cat } = await db
-            .from("categories")
-            .select("id, name")
-            .eq("slug", category)
-            .maybeSingle();
-
+        const cat = catResult.data as { id: string; name: string } | null;
         if (cat) {
             query = query.or(`category_id.eq.${cat.id},category_type.ilike."${cat.name}",category_ids.cs.{"${cat.id}"}`);
         } else {
-            // Fallback for direct URL slugs that don't match slug exactly
             const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
             query = query.ilike("category_type", fallbackName);
         }
@@ -103,23 +131,6 @@ export async function getProducts(params: GetProductsParams, role?: string) {
 
     const { data, count, error } = await query;
     if (error) console.error("[getProducts] Supabase Error:", error);
-
-    const { data: bounds } = await db
-        .from("products")
-        .select("price_ghs")
-        .eq("is_active", true)
-        .order("price_ghs", { ascending: true });
-
-    const prices = (bounds || []).map((p: any) => Number(p.price_ghs)).filter(Boolean);
-    const minPrice = prices.length ? Math.floor(prices[0]) : 0;
-    const maxPrice = prices.length ? Math.ceil(prices[prices.length - 1]) : 1000;
-
-    const { data: allCats } = await db
-        .from("categories")
-        .select("name, slug");
-    const catMap = new Map<string, { name: string; slug: string }>(
-        (allCats || []).map((c: any) => [c.name.toLowerCase(), c])
-    );
 
     const products: ShopProduct[] = (data || []).map((p: any) => {
         const matchedCat = p.category_type ? catMap.get(p.category_type.toLowerCase()) : null;
@@ -188,7 +199,7 @@ export interface RatingDistribution {
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
     const db = createClient();
-    const { data } = await db
+    const { data, error } = await db
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
@@ -200,11 +211,17 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         .eq("is_active", true)
         .maybeSingle();
 
+    // LOG-07: throw on DB error so Next.js shows a 500 (transient), not a false 404
+    if (error) {
+        console.error("[getProductBySlug]", error);
+        throw error;
+    }
     if (!data) return null;
 
-    const { data: allCats } = await db.from("categories").select("name, slug");
+    // PERF-03: use cached categories — avoids a per-PDP round-trip
+    const allCats = await getCachedCategories();
     const catMap = new Map<string, { name: string; slug: string }>(
-        (allCats || []).map((c: any) => [c.name.toLowerCase(), c])
+        allCats.map((c: any) => [c.name.toLowerCase(), c])
     );
     const matchedCat = data.category_type ? catMap.get(data.category_type.toLowerCase()) : null;
 
@@ -258,7 +275,8 @@ export async function getProductReviews(productId: string): Promise<{
         .from("product_reviews")
         .select("id, rating, comment, author_name, author_initials, avatar_color, location, is_verified, created_at")
         .eq("product_id", productId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
 
     const all = (data || []) as ProductReview[];
     const total = all.length;
@@ -301,7 +319,8 @@ export async function getVideoProducts(): Promise<Array<ShopProduct & { video_ur
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .limit(50);
 
     if (!data) return [];
 

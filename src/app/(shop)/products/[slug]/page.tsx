@@ -1,8 +1,13 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { getProductBySlug, getRelatedProducts, getProductReviews } from "@/lib/products";
+
+// PERF-23: deduplicate — generateMetadata and ProductPage both call this;
+// React cache() deduplicates within one render cycle so only one DB query fires.
+const getProductBySlugCached = cache(getProductBySlug);
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { ProductGallery } from "@/components/ui/miss-tokyo/ProductGallery";
@@ -26,7 +31,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
     const { slug } = await params;
     const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
-    const product = await getProductBySlug(slug);
+    const product = await getProductBySlugCached(slug);
     if (!product) return { title: "Product — Miss Tokyo" };
     return {
         title: `${product.name} — Miss Tokyo`,
@@ -44,7 +49,7 @@ export default async function ProductPage({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const product = await getProductBySlug(slug);
+    const product = await getProductBySlugCached(slug);
     if (!product) notFound();
 
     const supabase = await createClient();

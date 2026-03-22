@@ -8,6 +8,10 @@ import webpush from "web-push";
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
+// ── HTML encoding — prevents injection of user-supplied cart data into email templates ──
+const escHtml = (s: string): string =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
 // ── Web Push ───────────────────────────────────────────────────────────────────
 
 function initWebPush() {
@@ -171,11 +175,14 @@ function buildLineItemsHtml(items: any[]): string {
             const unitPrice = Number(item.price || 0);
             const qty = Number(item.quantity || 1);
             const lineTotal = unitPrice * qty;
-            const variant = [item.size, item.color, item.stitching].filter(Boolean).join(" · ");
+            const variant = [item.size, item.color, item.stitching]
+                .filter(Boolean)
+                .map((v: string) => escHtml(v))
+                .join(" · ");
             return `
       <tr style="border-bottom: 1px solid #f5f5f5;">
         <td style="padding: 10px 0; font-size: 13px; color: #171717;">
-          ${item.name || "Item"}
+          ${escHtml(item.name || "Item")}
           ${variant ? `<div style="font-size: 11px; color: #737373; margin-top: 2px;">${variant} × ${qty}</div>` : `<div style="font-size: 11px; color: #737373; margin-top: 2px;">× ${qty}</div>`}
         </td>
         <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${lineTotal.toFixed(2)}</td>

@@ -82,7 +82,7 @@ export async function GET(req: Request) {
             .from("orders")
             .select("id, status")
             .eq("paystack_reference", reference)
-            .single();
+            .maybeSingle();
 
         if (existingOrder) {
             // Update status if payment is now confirmed

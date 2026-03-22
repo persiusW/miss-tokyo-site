@@ -1,12 +1,14 @@
 "use client";
 
+import { useMemo, useEffect, useState } from "react";
 import { useCart } from "@/store/useCart";
-import { useEffect, useState } from "react";
 import { ShoppingBag } from "lucide-react";
 
 export function CartButton() {
-    const { setIsOpen, items } = useCart();
-    const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
+    const setIsOpen = useCart(s => s.setIsOpen);
+    const items = useCart(s => s.items);
+    // PERF-18: derive count from items selector — avoids re-render on unrelated store changes
+    const totalItems = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {

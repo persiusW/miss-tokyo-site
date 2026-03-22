@@ -1,5 +1,29 @@
 import { NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+// PERF-15: cache DB lookups per code for 30 s — avoids repeated round-trips
+// when a customer types / re-submits the same code during checkout.
+// PERF-16: coupon and gift_card queries run in parallel via Promise.all.
+const lookupCode = unstable_cache(
+    async (normalized: string) => {
+        const [{ data: coupon }, { data: card }] = await Promise.all([
+            supabaseAdmin
+                .from("coupons")
+                .select("id, code, discount_type, value, min_order_amount, max_uses, used_count, is_active")
+                .ilike("code", normalized)
+                .maybeSingle(),
+            supabaseAdmin
+                .from("gift_cards")
+                .select("id, code, remaining_value, is_active")
+                .ilike("code", normalized)
+                .maybeSingle(),
+        ]);
+        return { coupon, card };
+    },
+    ["validate-code"],
+    { revalidate: 30 }
+);
 
 export async function POST(req: Request) {
     try {
@@ -12,13 +36,9 @@ export async function POST(req: Request) {
         const normalized = code.trim().toUpperCase();
         const sub = Number(subtotal) || 0;
 
-        // ── Check coupons ──────────────────────────────────────────────────────
-        const { data: coupon } = await supabaseAdmin
-            .from("coupons")
-            .select("id, code, discount_type, value, min_order_amount, max_uses, used_count, is_active")
-            .ilike("code", normalized)
-            .single();
+        const { coupon, card } = await lookupCode(normalized);
 
+        // ── Coupon branch ──────────────────────────────────────────────────────
         if (coupon) {
             if (!coupon.is_active) {
                 return NextResponse.json({ valid: false, error: "This code has expired or is inactive." });
@@ -68,13 +88,7 @@ export async function POST(req: Request) {
             });
         }
 
-        // ── Check gift cards ───────────────────────────────────────────────────
-        const { data: card } = await supabaseAdmin
-            .from("gift_cards")
-            .select("id, code, remaining_value, is_active")
-            .ilike("code", normalized)
-            .single();
-
+        // ── Gift card branch ───────────────────────────────────────────────────
         if (card) {
             if (!card.is_active || Number(card.remaining_value) <= 0) {
                 return NextResponse.json({ valid: false, error: "This gift card has already been used or is inactive." });

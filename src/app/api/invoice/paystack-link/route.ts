@@ -21,10 +21,21 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { invoiceId, amount, customerEmail } = await req.json();
+        const { invoiceId, customerEmail } = await req.json();
 
-        if (!invoiceId || !amount) {
-            return NextResponse.json({ error: "invoiceId and amount are required." }, { status: 400 });
+        if (!invoiceId) {
+            return NextResponse.json({ error: "invoiceId is required." }, { status: 400 });
+        }
+
+        // Fetch invoice amount from DB — never trust client-supplied amount (SEC-17)
+        const { data: invoiceData, error: invoiceError } = await supabaseAdmin
+            .from("invoices")
+            .select("total_amount")
+            .eq("id", invoiceId)
+            .single();
+
+        if (invoiceError || !invoiceData) {
+            return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
         }
 
         // Fetch fee settings
@@ -36,7 +47,7 @@ export async function POST(req: NextRequest) {
 
         const feePct = Number(feeData?.platform_fee_percentage) || 0;
         const feeLabel = feeData?.platform_fee_label || "Service Charge";
-        const baseAmount = Number(amount);
+        const baseAmount = Number(invoiceData.total_amount);
         const feeAmount = parseFloat((baseAmount * (feePct / 100)).toFixed(2));
         const finalAmount = parseFloat((baseAmount + feeAmount).toFixed(2));
 
