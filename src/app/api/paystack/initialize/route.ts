@@ -160,6 +160,15 @@ export async function POST(request: Request) {
             }),
         });
 
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error(`[Paystack init] HTTP ${response.status}: ${errText}`);
+            if (orderId) {
+                await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+            }
+            return NextResponse.json({ error: "Payment gateway error. Please try again." }, { status: 502 });
+        }
+
         const data = await response.json();
 
         if (data.status) {

@@ -487,21 +487,40 @@ export function ShopPageClient({
     const [priceMax, setPriceMax] = useState(activeMax ? parseInt(activeMax) : maxPrice);
     const priceDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+    // LOG-15: Stabilise prop references in refs so the sync effect below can read
+    // their latest values without listing them as deps (which would cause infinite
+    // loops because initialProducts is a new array reference on every server render).
+    const initialProductsRef = useRef(initialProducts);
+    const totalRef           = useRef(total);
+    const minPriceRef        = useRef(minPrice);
+    const maxPriceRef        = useRef(maxPrice);
+    initialProductsRef.current = initialProducts;
+    totalRef.current           = total;
+    minPriceRef.current        = minPrice;
+    maxPriceRef.current        = maxPrice;
+
+    // Cleanup debounce timer on unmount to prevent memory leak
+    useEffect(() => () => clearTimeout(priceDebounce.current), []);
+
     // Grid pref from localStorage
     useEffect(() => {
         try { const g = localStorage.getItem("mt_grid"); if (g) setGridCols(Number(g) as 2 | 3 | 4); } catch {}
     }, []);
 
-    // Sync products when server re-renders (URL change)
+    // Sync products when server re-renders (URL change).
+    // Props are read via refs so this effect only fires when searchParams actually change.
     useEffect(() => {
-        setProducts(initialProducts);
-        setTotalCount(total);
+        const prods  = initialProductsRef.current;
+        const tot    = totalRef.current;
+        const minP   = minPriceRef.current;
+        const maxP   = maxPriceRef.current;
+        setProducts(prods);
+        setTotalCount(tot);
         setLoadPage(1);
-        setHasMore(initialProducts.length < total);
-        setPriceMin(activeMin ? parseInt(activeMin) : minPrice);
-        setPriceMax(activeMax ? parseInt(activeMax) : maxPrice);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams.toString()]);
+        setHasMore(prods.length < tot);
+        setPriceMin(activeMin ? parseInt(activeMin) : minP);
+        setPriceMax(activeMax ? parseInt(activeMax) : maxP);
+    }, [searchParams.toString(), activeMin, activeMax]);
 
     const updateParams = useCallback((updates: Record<string, string | null>) => {
         const p = new URLSearchParams(searchParams.toString());
@@ -543,11 +562,13 @@ export function ShopPageClient({
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const { products: newProds, total: newTotal }: { products: ShopProduct[]; total: number } = await res.json();
 
-            const updatedCount = products.length + newProds.length;
-            setProducts(prev => [...prev, ...newProds]);
+            setProducts(prev => {
+                const merged = [...prev, ...newProds];
+                setHasMore(merged.length < newTotal);
+                return merged;
+            });
             setLoadPage(nextPage);
             setTotalCount(newTotal);
-            setHasMore(updatedCount < newTotal);
         } catch (err) {
             console.error("[loadMore] failed:", err);
             setHasMore(false);

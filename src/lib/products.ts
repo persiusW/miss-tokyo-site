@@ -62,7 +62,7 @@ const getCachedCategories = unstable_cache(
 );
 
 export async function getProducts(params: GetProductsParams, role?: string) {
-    const { category, sort, color, size, min, max, page = 1, q, sale } = params;
+    const { category, sort, color, size, min, max, page = 1, q, sale, inStock } = params;
     const db = createClient();
 
     // ── PERF-02: Resolve category slug and fetch price bounds in parallel ──────
@@ -114,6 +114,7 @@ export async function getProducts(params: GetProductsParams, role?: string) {
 
     if (q) query = query.ilike("name", `%${q}%`);
     if (sale) query = query.eq("is_sale", true);
+    if (inStock) query = query.gt("inventory_count", 0);
     if (min) query = query.gte("price_ghs", parseFloat(min));
     if (max) query = query.lte("price_ghs", parseFloat(max));
     if (color) query = query.contains("available_colors", [color]);
@@ -158,9 +159,10 @@ export async function getCategories(role?: string): Promise<ShopCategory[]> {
         query = query.or("is_wholesale.eq.false,is_wholesale.is.null");
     }
 
-    const { data } = await query
+    const { data, error } = await query
         .order("sort_order", { ascending: true })
         .order("name",       { ascending: true });
+    if (error) console.error("[getCategories]", error);
     return (data ?? []) as ShopCategory[];
 }
 
@@ -242,7 +244,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
 export async function getRelatedProducts(categoryType: string, currentSlug: string): Promise<ShopProduct[]> {
     if (!categoryType) return [];
     const db = createClient();
-    const { data } = await db
+    const { data, error } = await db
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
@@ -253,6 +255,7 @@ export async function getRelatedProducts(categoryType: string, currentSlug: stri
         .neq("slug", currentSlug)
         .order("created_at", { ascending: false })
         .limit(4);
+    if (error) console.error("[getRelatedProducts]", error);
 
     return (data || []).map((p: any) => ({
         ...p,
@@ -271,12 +274,13 @@ export async function getProductReviews(productId: string): Promise<{
     distribution: RatingDistribution[];
 }> {
     const db = createClient();
-    const { data } = await db
+    const { data, error } = await db
         .from("product_reviews")
         .select("id, rating, comment, author_name, author_initials, avatar_color, location, is_verified, created_at")
         .eq("product_id", productId)
         .order("created_at", { ascending: false })
         .limit(50);
+    if (error) console.error("[getProductReviews]", error);
 
     const all = (data || []) as ProductReview[];
     const total = all.length;

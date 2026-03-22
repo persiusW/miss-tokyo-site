@@ -26,10 +26,20 @@ const cinzel = localFont({
   fallback: ["serif"],
 });
 
+import { unstable_cache } from "next/cache";
 import { supabase } from "@/lib/supabase";
 
+const getSiteMetadata = unstable_cache(
+  async () => {
+    const { data } = await supabase.from("site_metadata").select("*").eq("page_path", "/").single();
+    return data;
+  },
+  ["site-metadata"],
+  { revalidate: 3600 }
+);
+
 export async function generateMetadata(): Promise<Metadata> {
-  const { data } = await supabase.from("site_metadata").select("*").eq("page_path", "/").single();
+  const data = await getSiteMetadata();
 
   if (data) {
     return {

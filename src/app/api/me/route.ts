@@ -15,8 +15,12 @@ export async function GET() {
             .eq("id", user.id)
             .single();
         const isAdmin = profile?.role === "admin" || profile?.role === "owner";
-        return NextResponse.json({ isAdmin });
+        return NextResponse.json({ isAdmin }, {
+            headers: { "Cache-Control": "private, no-store" },
+        });
     } catch {
-        return NextResponse.json({ isAdmin: false });
+        return NextResponse.json({ isAdmin: false }, {
+            headers: { "Cache-Control": "private, no-store" },
+        });
     }
 }
