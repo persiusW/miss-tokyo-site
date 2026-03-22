@@ -51,8 +51,6 @@ const PAGE_SIZE = 24;
 export async function getProducts(params: GetProductsParams, role?: string) {
     const { category, sort, color, size, min, max, page = 1, q, sale } = params;
 
-    const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
-
     // Phase 4 & 5: Bulletproof Fetcher
     let query = supabaseAdmin
         .from("products")
@@ -66,37 +64,6 @@ export async function getProducts(params: GetProductsParams, role?: string) {
 
     // Filter by active status (Safe handle for nulls)
     query = query.or("is_active.eq.true,is_active.is.null");
-
-    // B2B Gating: Exclude products in Wholesale Categories for Retail users
-    if (!isAuthorized) {
-        // Find all wholesale categories
-        const { data: wholesaleCats } = await supabaseAdmin
-            .from("categories")
-            .select("id, name")
-            .eq("is_wholesale", true);
-        
-        const restrictedIds = (wholesaleCats || []).map(c => c.id);
-        const restrictedNames = (wholesaleCats || []).map(c => c.name);
-
-        // Action 1: Empty Array Trap Fix + NULL Trap Fix
-        // CRITICAL: In PostgreSQL, `NULL NOT IN (...)` and `NOT (NULL @> ARRAY[...])` both
-        // return NULL (not TRUE), so rows with NULL columns get excluded by .not() filters.
-        // We use .or() to explicitly allow NULL values through — only exclude rows that
-        // have a confirmed match to a wholesale category.
-        if (restrictedIds.length > 0) {
-            // Exclude by Primary Category ID — allow NULL category_id through
-            query = query.or(`category_id.is.null,category_id.not.in.(${restrictedIds.join(",")})`);
-
-            // Exclude by Category Array — allow NULL category_ids through
-            const formattedIds = restrictedIds.map(id => `"${id}"`).join(",");
-            query = query.or(`category_ids.is.null,category_ids.not.ov.{${formattedIds}}`);
-        }
-
-        if (restrictedNames.length > 0) {
-            // Exclude by Category Name — allow NULL category_type through
-            query = query.or(`category_type.is.null,category_type.not.in.(${restrictedNames.join(",")})`);
-        }
-    }
 
     // Category Filter (Inclusion)
     if (category) {
@@ -164,15 +131,16 @@ export async function getProducts(params: GetProductsParams, role?: string) {
 
 export async function getCategories(role?: string): Promise<ShopCategory[]> {
     const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
-    
+
     let query = supabaseAdmin
         .from("categories")
         .select("id, name, slug, product_count, sort_order")
+        .eq("is_active", true);
+
+    // Hide wholesale-only categories from retail users
     if (!isAuthorized) {
         query = query.or("is_wholesale.eq.false,is_wholesale.is.null");
     }
-
-    query = query.eq("is_active", true);
 
     const { data } = await query
         .order("sort_order", { ascending: true })
@@ -189,6 +157,10 @@ export interface ProductDetail extends ShopProduct {
     care_instructions: string[] | null;
     rating_average: number;
     review_count: number;
+    wholesale_override?: boolean;
+    wholesale_price_tier_1?: number | null;
+    wholesale_price_tier_2?: number | null;
+    wholesale_price_tier_3?: number | null;
 }
 
 export interface ProductReview {
@@ -216,7 +188,8 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count,
-             sku, features_list, care_instructions, rating_average, review_count, created_at`)
+             sku, features_list, care_instructions, rating_average, review_count, created_at,
+             wholesale_override, wholesale_price_tier_1, wholesale_price_tier_2, wholesale_price_tier_3`)
         .eq("slug", slug)
         .eq("is_active", true)
         .maybeSingle();

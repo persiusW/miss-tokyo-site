@@ -37,30 +37,34 @@ export interface WholesaleTiers {
     tier3_min: number;
     tier3_max: number;
     tier3_discount: number;
+    // Optional explicit per-unit prices — set when product or category has a price override.
+    // When present, these take precedence over percentage discounts.
+    tier1_price?: number | null;
+    tier2_price?: number | null;
+    tier3_price?: number | null;
 }
 
 /**
  * Resolves the final unit price based on quantity tiers.
- * If quantity exceeds the Tier 3 max, it applies the Tier 3 discount.
+ * If the tiers carry explicit per-unit prices (tier*_price), those are used directly.
+ * Otherwise the tier's percentage discount is applied to basePrice.
+ * Quantities below tier1_min receive basePrice (no wholesale benefit).
  */
 export function resolveWholesalePrice(
     quantity: number,
     basePrice: number,
     tiers: WholesaleTiers
 ): number {
-    let discount = 0;
-
-    if (quantity >= tiers.tier1_min && quantity <= tiers.tier1_max) {
-        discount = tiers.tier1_discount;
-    } else if (quantity >= tiers.tier2_min && quantity <= tiers.tier2_max) {
-        discount = tiers.tier2_discount;
-    } else if (quantity >= tiers.tier3_min) {
-        // If exceeds Tier 3 max, continue applying Tier 3 discount
-        discount = tiers.tier3_discount;
+    if (quantity >= tiers.tier3_min) {
+        return tiers.tier3_price != null ? tiers.tier3_price : basePrice * (1 - tiers.tier3_discount / 100);
     }
-
-    // Apply percentage discount
-    return basePrice * (1 - (discount / 100));
+    if (quantity >= tiers.tier2_min && quantity <= tiers.tier2_max) {
+        return tiers.tier2_price != null ? tiers.tier2_price : basePrice * (1 - tiers.tier2_discount / 100);
+    }
+    if (quantity >= tiers.tier1_min && quantity <= tiers.tier1_max) {
+        return tiers.tier1_price != null ? tiers.tier1_price : basePrice * (1 - tiers.tier1_discount / 100);
+    }
+    return basePrice;
 }
 
 /**

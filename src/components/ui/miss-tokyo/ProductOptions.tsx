@@ -209,22 +209,34 @@ export function ProductOptions(props: Props) {
                     </p>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                         {[1, 2, 3].map(t => {
-                            const min = (wholesaleTiers as any)[`tier${t}_min`];
-                            const max = (wholesaleTiers as any)[`tier${t}_max`];
-                            const disc = (wholesaleTiers as any)[`tier${t}_discount`];
+                            const tiers = wholesaleTiers as any;
+                            const min: number = tiers[`tier${t}_min`];
+                            const max: number = tiers[`tier${t}_max`];
+                            const disc: number = tiers[`tier${t}_discount`];
+                            const explicitPrice: number | null | undefined = tiers[`tier${t}_price`];
                             const isActive = qty >= min && (t === 3 || qty <= max);
-                            
+
                             return (
-                                <div key={t} style={{ 
-                                    padding: "10px 8px", 
+                                <div key={t} style={{
+                                    padding: "10px 8px",
                                     background: isActive ? "#059669" : "transparent",
                                     border: isActive ? "1px solid #059669" : "1px solid rgba(5, 150, 105, 0.2)",
                                     textAlign: "center",
                                     borderRadius: 2,
                                     transition: "all 0.2s"
                                 }}>
-                                    <div style={{ fontSize: 9, fontWeight: 700, color: isActive ? "#fff" : "#059669" }}>{min}{t === 3 ? "+" : `-${max}`}</div>
-                                    <div style={{ fontSize: 10, color: isActive ? "#fff" : "#059669", opacity: 0.8 }}>{disc}% OFF</div>
+                                    <div style={{ fontSize: 9, fontWeight: 600, color: isActive ? "rgba(255,255,255,0.75)" : "rgba(5,150,105,0.7)", marginBottom: 3 }}>
+                                        {min}{t === 3 ? "+" : `–${max}`} units
+                                    </div>
+                                    {explicitPrice != null ? (
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: isActive ? "#fff" : "#059669" }}>
+                                            GH₵{explicitPrice.toFixed(2)}
+                                        </div>
+                                    ) : (
+                                        <div style={{ fontSize: 11, fontWeight: 600, color: isActive ? "#fff" : "#059669" }}>
+                                            {disc}% OFF
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
