@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ShoppingBag, Heart, X, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { ShoppingBag, Heart, X, ChevronDown, SlidersHorizontal, Check } from "lucide-react";
 import { useCart } from "@/store/useCart";
 import type { ShopProduct, ShopCategory } from "@/lib/products";
 
@@ -42,6 +42,9 @@ function ShopProductCard({
 }) {
     const [wishlist, setWishlist] = useState(false);
     const [imgSrc, setImgSrc] = useState(product.image_urls?.[0] || FALLBACK_IMG);
+    const [hoverSrc, setHoverSrc] = useState<string | undefined>(product.image_urls?.[1] || undefined);
+    const [addState, setAddState] = useState<"idle" | "added">("idle");
+    const { addItem } = useCart();
     const badge = getBadge(product);
     // Mirror the "You May Also Like" logic from the PDP:
     // Prefer compare_at_price_ghs; fall back to is_sale + discount_value percentage.
@@ -87,9 +90,19 @@ function ShopProductCard({
                         fill
                         priority={priority}
                         sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
-                        className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                        className={`object-cover transition-all duration-700 ease-in-out ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.04]"}`}
                         onError={() => setImgSrc(FALLBACK_IMG)}
                     />
+                    {hoverSrc && (
+                        <Image
+                            src={hoverSrc}
+                            alt={`${product.name} alternate view`}
+                            fill
+                            sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
+                            className="object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-in-out"
+                            onError={() => setHoverSrc(undefined)}
+                        />
+                    )}
 
                     {/* Badge */}
                     {badge && (
@@ -115,16 +128,41 @@ function ShopProductCard({
                         <Heart size={15} fill={wishlist ? "#E8485A" : "none"} stroke={wishlist ? "#E8485A" : "#141210"} strokeWidth={1.5} />
                     </button>
 
-                    {/* Quick Add */}
-                    <div className="absolute bottom-[10px] left-[10px] right-[10px] flex gap-[6px] opacity-0 translate-y-[6px] group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 z-10">
+                    {/* Quick Add — always visible on mobile, hover-only on desktop */}
+                    <div className="absolute bottom-[10px] left-[10px] right-[10px] flex gap-[6px] z-10 md:opacity-0 md:translate-y-[6px] md:group-hover:opacity-100 md:group-hover:translate-y-0 md:transition-all md:duration-200">
                         <button
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onQuickAdd(product); }}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const hasVariants = (product.available_sizes?.length ?? 0) > 0 || (product.available_colors?.length ?? 0) > 0;
+                                if (hasVariants) { onQuickAdd(product); return; }
+                                addItem({
+                                    id: `${product.id}-default`,
+                                    productId: product.id,
+                                    name: product.name,
+                                    slug: product.slug,
+                                    price: product.price_ghs,
+                                    size: "One Size",
+                                    quantity: 1,
+                                    imageUrl: product.image_urls?.[0] || "",
+                                }, false);
+                                setAddState("added");
+                                setTimeout(() => setAddState("idle"), 1500);
+                            }}
                             className="flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] transition-colors duration-150"
-                            style={{ background: "#fff", color: "#141210", borderRadius: 2, border: "none" }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; }}
+                            style={{
+                                background: addState === "added" ? "#22c55e" : "#fff",
+                                color: addState === "added" ? "#fff" : "#141210",
+                                borderRadius: 2,
+                                border: "none",
+                            }}
+                            onMouseEnter={e => { if (addState === "idle") { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
+                            onMouseLeave={e => { if (addState === "idle") { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; } }}
                         >
-                            <ShoppingBag size={12} strokeWidth={1.8} /> Quick Add
+                            {addState === "added"
+                                ? <><Check size={12} strokeWidth={2.5} /> Added</>
+                                : <><ShoppingBag size={12} strokeWidth={1.8} /> Quick Add</>
+                            }
                         </button>
                     </div>
                 </div>
@@ -199,7 +237,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
             color: selectedColor || undefined,
             quantity: 1,
             imageUrl: product.image_urls?.[0] || "",
-        });
+        }, false);
         setAdding(false);
         setAdded(true);
         setTimeout(onClose, 1400);

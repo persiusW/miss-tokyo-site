@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Plus, ChevronLeft, Volume2, VolumeX, Loader2, Check } from "lucide-react";
+import { Plus, ChevronLeft, Loader2, Check } from "lucide-react";
 import { QuickViewModal } from "@/components/ui/miss-tokyo/QuickViewModal";
 import { useCart } from "@/store/useCart";
 import { toast } from "@/lib/toast";
@@ -11,14 +11,12 @@ interface GalleryClientProps {
     products: any[];
 }
 
-function VideoCard({ 
-    product, 
-    isMuted, 
-    priority, 
-    onOpenModal 
-}: { 
-    product: any, 
-    isMuted: boolean, 
+function VideoCard({
+    product,
+    priority,
+    onOpenModal
+}: {
+    product: any,
     priority: boolean,
     onOpenModal: (slug: string) => void
 }) {
@@ -87,7 +85,7 @@ function VideoCard({
                     ref={videoRef}
                     src={product.video_url}
                     poster={product.image_urls?.[0]}
-                    muted={isMuted}
+                    muted
                     loop
                     playsInline
                     preload={priority ? "auto" : "metadata"}
@@ -184,7 +182,6 @@ function VideoCard({
 }
 
 export function GalleryClient({ products }: GalleryClientProps) {
-    const [isMuted, setIsMuted] = useState(true);
     const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
     const [hasMounted, setHasMounted] = useState(false);
     const totalItems = useCart(s => s.totalItems());
@@ -221,23 +218,15 @@ export function GalleryClient({ products }: GalleryClientProps) {
                             </span>
                         )}
                     </Link>
-
-                    <button 
-                        onClick={() => setIsMuted(!isMuted)}
-                        className="text-white bg-black/20 backdrop-blur-lg p-3 rounded-full border border-white/10 hover:bg-white hover:text-black transition-all shadow-xl"
-                    >
-                        {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                    </button>
                 </div>
             </div>
 
             {/* Snapping Container */}
             <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth hide-scrollbar">
                 {products.map((product, index) => (
-                    <VideoCard 
-                        key={product.id} 
-                        product={product} 
-                        isMuted={isMuted}
+                    <VideoCard
+                        key={product.id}
+                        product={product}
                         priority={index < 2}
                         onOpenModal={setSelectedSlug}
                     />
