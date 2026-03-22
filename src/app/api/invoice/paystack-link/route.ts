@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
 
 /**
  * POST /api/invoice/paystack-link
  * Creates a Paystack payment link for an invoice using the Payment Pages API.
  */
 export async function POST(req: NextRequest) {
+    const serverClient = await createClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!secretKey) {
         return NextResponse.json({ error: "Paystack not configured." }, { status: 500 });

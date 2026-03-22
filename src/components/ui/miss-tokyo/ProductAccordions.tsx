@@ -69,7 +69,7 @@ export function ProductAccordions({ description, featuresList, careInstructions,
                     {featuresList && featuresList.length > 0 && (
                         <ul style={{ paddingLeft: 16, marginTop: description ? 6 : 0 }}>
                             {featuresList.map((f, i) => (
-                                <li key={i} style={{ marginBottom: 5 }} dangerouslySetInnerHTML={{ __html: f }} />
+                                <li key={i} style={{ marginBottom: 5 }}>{f}</li>
                             ))}
                         </ul>
                     )}

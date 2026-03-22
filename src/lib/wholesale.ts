@@ -58,10 +58,10 @@ export function resolveWholesalePrice(
     if (quantity >= tiers.tier3_min) {
         return tiers.tier3_price != null ? tiers.tier3_price : basePrice * (1 - tiers.tier3_discount / 100);
     }
-    if (quantity >= tiers.tier2_min && quantity <= tiers.tier2_max) {
+    if (quantity >= tiers.tier2_min && quantity < tiers.tier3_min) {
         return tiers.tier2_price != null ? tiers.tier2_price : basePrice * (1 - tiers.tier2_discount / 100);
     }
-    if (quantity >= tiers.tier1_min && quantity <= tiers.tier1_max) {
+    if (quantity >= tiers.tier1_min && quantity < tiers.tier2_min) {
         return tiers.tier1_price != null ? tiers.tier1_price : basePrice * (1 - tiers.tier1_discount / 100);
     }
     return basePrice;

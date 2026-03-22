@@ -115,8 +115,6 @@ export function ProductOptions(props: Props) {
         ? resolveWholesalePrice(qty, baseProductPrice, wholesaleTiers)
         : baseProductPrice;
 
-    const effectivePrice = unitPrice;
-
     const doAddToCart = (): boolean => {
         if (sizes.length > 0 && !selectedSize) {
             toast.error("Please select a size");
@@ -181,9 +179,9 @@ export function ProductOptions(props: Props) {
                     fontSize: 36, fontWeight: 400,
                     color: isSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)",
                 }}>
-                    GH₵{effectivePrice.toFixed(2)}
+                    GH₵{unitPrice.toFixed(2)}
                 </span>
-                {compareAtPrice && compareAtPrice > effectivePrice && (
+                {compareAtPrice && compareAtPrice > unitPrice && (
                     <span style={{ fontSize: 18, color: "var(--muted, #7A7167)", textDecoration: "line-through", fontWeight: 300 }}>
                         GH₵{compareAtPrice.toFixed(2)}
                     </span>

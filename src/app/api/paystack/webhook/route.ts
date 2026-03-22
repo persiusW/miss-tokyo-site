@@ -110,7 +110,6 @@ async function ensureCustomerAccount(
 
 async function trackDiscountUsage(
     discountCode: string | undefined,
-    discountAmount: unknown,
     discountTag: string | undefined,
 ) {
     if (!discountCode) return;
@@ -138,7 +137,20 @@ async function trackDiscountUsage(
             .ilike("code", code)
             .single();
         if (card) {
-            const newBalance = Math.max(0, Number(card.remaining_value) - Number(discountAmount));
+            // Use the server-validated redemption record — do not trust metadata discount_amount
+            const { data: redemption } = await supabaseAdmin
+                .from("gift_card_redemptions")
+                .select("amount_used")
+                .eq("gift_card_id", card.id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            const validatedAmount = redemption
+                ? Number(redemption.amount_used)
+                : Number(card.remaining_value); // fallback: full remaining balance
+
+            const newBalance = Math.max(0, Number(card.remaining_value) - validatedAmount);
             await supabaseAdmin
                 .from("gift_cards")
                 .update({
@@ -554,7 +566,7 @@ export async function POST(req: Request) {
                     const orderRef = orderId.substring(0, 8).toUpperCase();
                     await Promise.allSettled([
                         sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
-                        trackDiscountUsage(discount_code, discount_amount, discount_tag),
+                        trackDiscountUsage(discount_code, discount_tag),
                         phone ? sendSMS({
                             to: phone,
                             message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
@@ -606,7 +618,7 @@ export async function POST(req: Request) {
                         const orderRef = newOrder.id.substring(0, 8).toUpperCase();
                         await Promise.allSettled([
                             sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
-                            trackDiscountUsage(discount_code, discount_amount, discount_tag),
+                            trackDiscountUsage(discount_code, discount_tag),
                             phone ? sendSMS({
                                 to: phone,
                                 message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),

@@ -121,32 +121,8 @@ export async function GET(req: Request) {
             return NextResponse.json({ status: orderStatus });
         }
 
-        // Deduct inventory only for successful payments — batch fetch then concurrent updates
-        if (newOrder && paystackTxStatus === "success" && parsedItems.length > 0) {
-            const productIds = [...new Set(parsedItems.map((i: any) => i.productId).filter(Boolean))];
-            const { data: products } = await supabase
-                .from("products")
-                .select("id, inventory_count")
-                .in("id", productIds);
-
-            if (products) {
-                const stockMap = new Map(products.map(p => [p.id, p.inventory_count as number]));
-                await Promise.allSettled(
-                    parsedItems
-                        .filter((item: any) => item.productId && stockMap.has(item.productId))
-                        .map((item: any) => {
-                            const stock = stockMap.get(item.productId) ?? 0;
-                            if (typeof stock === "number" && stock >= item.quantity) {
-                                return supabase
-                                    .from("products")
-                                    .update({ inventory_count: stock - item.quantity })
-                                    .eq("id", item.productId);
-                            }
-                            return Promise.resolve();
-                        })
-                );
-            }
-        }
+        // Inventory deduction is handled exclusively by the server-to-server webhook (charge.success).
+        // Do not deduct here to avoid race conditions and double-deductions.
 
         const order = newOrder ? await fetchOrderForReceipt(newOrder.id) : null;
         return NextResponse.json({ status: orderStatus, orderId: newOrder?.id, order, created: true });

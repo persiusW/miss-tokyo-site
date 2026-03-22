@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabase";
 
 export interface ShopProduct {
     id: string;
@@ -50,9 +51,10 @@ const PAGE_SIZE = 24;
 
 export async function getProducts(params: GetProductsParams, role?: string) {
     const { category, sort, color, size, min, max, page = 1, q, sale } = params;
+    const db = createClient();
 
     // Phase 4 & 5: Bulletproof Fetcher
-    let query = supabaseAdmin
+    let query = db
         .from("products")
         .select(
             `id, name, slug, description, price_ghs, compare_at_price_ghs,
@@ -67,7 +69,7 @@ export async function getProducts(params: GetProductsParams, role?: string) {
 
     // Category Filter (Inclusion)
     if (category) {
-        const { data: cat } = await supabaseAdmin
+        const { data: cat } = await db
             .from("categories")
             .select("id, name")
             .eq("slug", category)
@@ -81,7 +83,7 @@ export async function getProducts(params: GetProductsParams, role?: string) {
             query = query.ilike("category_type", fallbackName);
         }
     }
-    
+
     if (q) query = query.ilike("name", `%${q}%`);
     if (sale) query = query.eq("is_sale", true);
     if (min) query = query.gte("price_ghs", parseFloat(min));
@@ -102,7 +104,7 @@ export async function getProducts(params: GetProductsParams, role?: string) {
     const { data, count, error } = await query;
     if (error) console.error("[getProducts] Supabase Error:", error);
 
-    const { data: bounds } = await supabaseAdmin
+    const { data: bounds } = await db
         .from("products")
         .select("price_ghs")
         .eq("is_active", true)
@@ -112,10 +114,12 @@ export async function getProducts(params: GetProductsParams, role?: string) {
     const minPrice = prices.length ? Math.floor(prices[0]) : 0;
     const maxPrice = prices.length ? Math.ceil(prices[prices.length - 1]) : 1000;
 
-    const { data: allCats } = await supabaseAdmin
+    const { data: allCats } = await db
         .from("categories")
         .select("name, slug");
-    const catMap = new Map((allCats || []).map((c: any) => [c.name.toLowerCase(), c]));
+    const catMap = new Map<string, { name: string; slug: string }>(
+        (allCats || []).map((c: any) => [c.name.toLowerCase(), c])
+    );
 
     const products: ShopProduct[] = (data || []).map((p: any) => {
         const matchedCat = p.category_type ? catMap.get(p.category_type.toLowerCase()) : null;
@@ -131,8 +135,9 @@ export async function getProducts(params: GetProductsParams, role?: string) {
 
 export async function getCategories(role?: string): Promise<ShopCategory[]> {
     const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
+    const db = createClient();
 
-    let query = supabaseAdmin
+    let query = db
         .from("categories")
         .select("id, name, slug, product_count, sort_order")
         .eq("is_active", true);
@@ -182,7 +187,8 @@ export interface RatingDistribution {
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
-    const { data } = await supabaseAdmin
+    const db = createClient();
+    const { data } = await db
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
@@ -196,8 +202,10 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
 
     if (!data) return null;
 
-    const { data: allCats } = await supabaseAdmin.from("categories").select("name, slug");
-    const catMap = new Map((allCats || []).map((c: any) => [c.name.toLowerCase(), c]));
+    const { data: allCats } = await db.from("categories").select("name, slug");
+    const catMap = new Map<string, { name: string; slug: string }>(
+        (allCats || []).map((c: any) => [c.name.toLowerCase(), c])
+    );
     const matchedCat = data.category_type ? catMap.get(data.category_type.toLowerCase()) : null;
 
     return {
@@ -216,7 +224,8 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
 
 export async function getRelatedProducts(categoryType: string, currentSlug: string): Promise<ShopProduct[]> {
     if (!categoryType) return [];
-    const { data } = await supabaseAdmin
+    const db = createClient();
+    const { data } = await db
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
@@ -244,7 +253,8 @@ export async function getProductReviews(productId: string): Promise<{
     reviews: ProductReview[];
     distribution: RatingDistribution[];
 }> {
-    const { data } = await supabaseAdmin
+    const db = createClient();
+    const { data } = await db
         .from("product_reviews")
         .select("id, rating, comment, author_name, author_initials, avatar_color, location, is_verified, created_at")
         .eq("product_id", productId)
@@ -284,7 +294,8 @@ export function deriveSizes(products: ShopProduct[]): string[] {
     return sorted;
 }
 export async function getVideoProducts(): Promise<Array<ShopProduct & { video_url?: string }>> {
-    const { data } = await supabaseAdmin
+    const db = createClient();
+    const { data } = await db
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
