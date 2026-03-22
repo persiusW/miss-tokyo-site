@@ -350,13 +350,13 @@ export function ProductOptions(props: Props) {
                         style={{ width: 44, height: 40, border: "none", textAlign: "center", fontSize: 14, fontWeight: 500, color: "var(--ink, #141210)", background: "transparent", outline: "none" }}
                     />
                     <button
-                        onClick={() => setQty(q => Math.min(inventoryCount || 99, q + 1))}
+                        onClick={() => setQty(q => inventoryCount >= 9999 ? q + 1 : Math.min(inventoryCount || 99, q + 1))}
                         style={{ width: 36, height: 40, border: "none", background: "transparent", fontSize: 18, color: "var(--ink, #141210)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                     >
                         +
                     </button>
                 </div>
-                {inventoryCount > 0 && (
+                {inventoryCount > 0 && inventoryCount < 9999 && (
                     <span style={{ fontSize: 11, color: "var(--muted, #7A7167)" }}>{inventoryCount} left in stock</span>
                 )}
             </div>

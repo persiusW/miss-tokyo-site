@@ -783,7 +783,7 @@ function CarouselConfigSection() {
     useEffect(() => {
         Promise.all([
             supabase.from("categories").select("name, slug").eq("is_active", true).order("name"),
-            supabase.from("site_copy").select("value").eq("copy_key", "carousel_config").single(),
+            supabase.from("site_copy").select("value").eq("copy_key", "carousel_config").maybeSingle(),
         ]).then(([{ data: cats }, { data: config }]) => {
             if (cats) setCategories(cats);
             if (config?.value) {

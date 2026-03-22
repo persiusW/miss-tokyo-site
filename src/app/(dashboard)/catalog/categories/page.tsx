@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
-import { Pencil, Trash2, X, Check, Star, Tag, Copy, Search } from "lucide-react";
+import { Pencil, Trash2, X, Check, Star, Tag, Copy, Search, LayoutGrid, List } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { createCategory, updateCategory, deleteCategory } from "./actions";
 
@@ -85,6 +85,7 @@ export default function CategoriesPage() {
     const [editWholesalePrices, setEditWholesalePrices] = useState({ t1: "", t2: "", t3: "" });
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [search, setSearch] = useState("");
+    const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
     const fetchCategories = async () => {
         setLoading(true);
@@ -273,6 +274,23 @@ export default function CategoriesPage() {
                             className="pl-9 pr-4 py-2.5 border border-neutral-200 bg-white text-sm outline-none focus:border-black transition-colors w-56 rounded-none"
                         />
                     </div>
+                    {/* View toggle */}
+                    <div className="flex border border-neutral-200">
+                        <button
+                            onClick={() => setViewMode("list")}
+                            title="List view"
+                            className={`p-2.5 transition-colors ${viewMode === "list" ? "bg-black text-white" : "bg-white text-neutral-400 hover:text-black"}`}
+                        >
+                            <List size={15} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode("grid")}
+                            title="Grid view"
+                            className={`p-2.5 transition-colors ${viewMode === "grid" ? "bg-black text-white" : "bg-white text-neutral-400 hover:text-black"}`}
+                        >
+                            <LayoutGrid size={15} />
+                        </button>
+                    </div>
                     <button
                         onClick={() => setIsAdding(!isAdding)}
                         className="bg-black text-white px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors whitespace-nowrap"
@@ -337,6 +355,101 @@ export default function CategoriesPage() {
                 </form>
             )}
 
+            {(() => {
+                const q = search.trim().toLowerCase();
+                const filtered = q
+                    ? categories.filter(c => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q) || (c.description ?? "").toLowerCase().includes(q))
+                    : categories;
+
+                if (loading) return (
+                    <div className="bg-white border border-neutral-200 px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</div>
+                );
+                if (categories.length === 0) return (
+                    <div className="bg-white border border-neutral-200 px-6 py-16 text-center text-neutral-500 italic font-serif">No categories yet. Add your first above.</div>
+                );
+                if (filtered.length === 0) return (
+                    <div className="bg-white border border-neutral-200 px-6 py-12 text-center text-neutral-400 text-sm">No categories match &ldquo;{search}&rdquo;</div>
+                );
+
+                /* ── Grid view ─────────────────────────────────────────── */
+                if (viewMode === "grid") return (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {filtered.map(cat => (
+                            <div key={cat.id} className="bg-white border border-neutral-200 group relative flex flex-col overflow-hidden">
+                                {/* Image */}
+                                <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden">
+                                    {cat.image_url
+                                        ? <img src={cat.image_url} alt={cat.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                        : <div className="w-full h-full bg-neutral-100 flex items-center justify-center"><span className="text-neutral-300 text-xs uppercase tracking-widest">No image</span></div>
+                                    }
+                                    {/* Featured star overlay */}
+                                    <button
+                                        onClick={() => toggleFeatured(cat.id, cat.is_featured)}
+                                        title={cat.is_featured ? "Unfeature" : "Feature on homepage"}
+                                        className={`absolute top-2 right-2 transition-colors ${cat.is_featured ? "text-amber-400" : "text-white/60 hover:text-amber-400"}`}
+                                    >
+                                        <Star size={16} fill={cat.is_featured ? "currentColor" : "none"} />
+                                    </button>
+                                    {/* Badges */}
+                                    <div className="absolute top-2 left-2 flex flex-col gap-1">
+                                        {cat.is_wholesale && (
+                                            <span className="flex items-center gap-1 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 bg-emerald-600 text-white rounded-full">
+                                                <Tag size={8} /> B2B
+                                            </span>
+                                        )}
+                                        {!cat.is_active && (
+                                            <span className="text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 bg-neutral-700 text-white rounded-full">
+                                                Inactive
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Body */}
+                                <div className="p-3 flex flex-col gap-1.5 flex-1">
+                                    <p className="font-medium text-sm text-neutral-900 truncate">{cat.name}</p>
+                                    <p className="font-mono text-[10px] text-neutral-400 truncate">{cat.slug}</p>
+                                    {cat.description && <p className="text-[11px] text-neutral-500 line-clamp-2">{cat.description}</p>}
+                                    {cat.is_wholesale && (
+                                        <div className="text-[10px] text-neutral-500 space-y-0.5 mt-auto pt-1 border-t border-neutral-100">
+                                            {cat.wholesale_tier_1_price != null && <div>T1: GH₵{cat.wholesale_tier_1_price}</div>}
+                                            {cat.wholesale_tier_2_price != null && <div>T2: GH₵{cat.wholesale_tier_2_price}</div>}
+                                            {cat.wholesale_tier_3_price != null && <div>T3: GH₵{cat.wholesale_tier_3_price}</div>}
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Actions */}
+                                <div className="px-3 pb-3 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2">
+                                    <button
+                                        onClick={() => toggleActive(cat.id, cat.is_active)}
+                                        className={`px-2 py-0.5 text-[9px] uppercase tracking-widest rounded ${cat.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}
+                                    >
+                                        {cat.is_active ? "Active" : "Inactive"}
+                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        {!cat.is_wholesale && (
+                                            <button onClick={() => handleDuplicateAsWholesale(cat)} disabled={saving} title="Duplicate as Wholesale"
+                                                className="text-neutral-400 hover:text-emerald-600 transition-colors disabled:opacity-50"><Copy size={13} /></button>
+                                        )}
+                                        <button onClick={() => startEdit(cat)} title="Edit"
+                                            className="text-neutral-400 hover:text-black transition-colors"><Pencil size={13} /></button>
+                                        {confirmDeleteId === cat.id ? (
+                                            <div className="flex items-center gap-1">
+                                                <button onClick={() => handleDelete(cat.id)} className="text-[10px] text-red-600 font-semibold">Yes</button>
+                                                <button onClick={() => setConfirmDeleteId(null)} className="text-[10px] text-neutral-400">No</button>
+                                            </div>
+                                        ) : (
+                                            <button onClick={() => setConfirmDeleteId(cat.id)} title="Delete"
+                                                className="text-neutral-400 hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                );
+
+                /* ── List / table view ─────────────────────────────────── */
+                return (
             <div className="bg-white border border-neutral-200 overflow-x-auto">
                 <table className="w-full text-left text-sm whitespace-nowrap">
                     <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -352,18 +465,7 @@ export default function CategoriesPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
-                        {loading ? (
-                            <tr><td colSpan={8} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td></tr>
-                        ) : categories.length === 0 ? (
-                            <tr><td colSpan={8} className="px-6 py-16 text-center text-neutral-500 italic font-serif">No categories yet. Add your first above.</td></tr>
-                        ) : (() => {
-                            const q = search.trim().toLowerCase();
-                            const filtered = q
-                                ? categories.filter(c => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q) || (c.description ?? "").toLowerCase().includes(q))
-                                : categories;
-                            if (filtered.length === 0) return (
-                                <tr><td colSpan={8} className="px-6 py-12 text-center text-neutral-400 text-sm">No categories match &ldquo;{search}&rdquo;</td></tr>
-                            );
+                        {(() => {
                             return filtered.map((cat) => (
                             editingId === cat.id ? (
                                 <tr key={cat.id} className="bg-neutral-50">
@@ -510,6 +612,8 @@ export default function CategoriesPage() {
                     </tbody>
                 </table>
             </div>
+                );
+            })()}
         </div>
     );
 }
