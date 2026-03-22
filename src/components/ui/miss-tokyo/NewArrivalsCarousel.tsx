@@ -33,6 +33,7 @@ export function NewArrivalsCarousel({ products }: { products: CarouselProduct[] 
                                 src={product.imageUrl || FALLBACK}
                                 alt={product.name}
                                 fill
+                                quality={85}
                                 sizes="(max-width: 768px) 85vw, 400px"
                                 className="object-cover w-full transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                             />

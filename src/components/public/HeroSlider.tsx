@@ -66,6 +66,7 @@ export function HeroSlider({ slides }: HeroSliderProps) {
               src={slide.image_url}
               alt={slide.headline_line1}
               fill
+              quality={85}
               className="object-cover object-center"
               priority={index === 0}
               sizes="100vw"

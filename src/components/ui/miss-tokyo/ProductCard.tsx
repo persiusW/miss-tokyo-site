@@ -33,6 +33,7 @@ export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, catego
                         src={imgSrc}
                         alt={name}
                         fill
+                        quality={85}
                         sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
                         onError={() => setImgSrc(FALLBACK)}
                         className={`${imageStretch ? "object-fill" : "object-cover object-center"} transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)] ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.05]"}`}
@@ -42,6 +43,7 @@ export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, catego
                             src={hoverSrc}
                             alt={`${name} alternate view`}
                             fill
+                            quality={85}
                             sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
                             onError={() => setHoverSrc(undefined)}
                             className={`${imageStretch ? "object-fill" : "object-cover object-center"} absolute inset-0 opacity-0 group-hover:opacity-100 group-hover:scale-[1.05] transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)]`}

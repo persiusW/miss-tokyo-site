@@ -85,6 +85,7 @@ function ShopProductCard({
                         src={imgSrc}
                         alt={product.name}
                         fill
+                        quality={85}
                         priority={priority}
                         sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
                         className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"

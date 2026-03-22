@@ -44,6 +44,7 @@ export function ProductImageCarousel({ images, name }: Props) {
                         src={images[current]}
                         alt={`${name} — view ${current + 1}`}
                         fill
+                        quality={85}
                         className="object-cover object-center transition-opacity duration-300"
                         priority={current === 0}
                     />
@@ -110,6 +111,7 @@ export function ProductImageCarousel({ images, name }: Props) {
                                     src={url}
                                     alt={`${name} thumbnail ${i + 1}`}
                                     fill
+                                    quality={85}
                                     className="object-cover object-center"
                                 />
                             )}
