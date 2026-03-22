@@ -2,11 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
-  experimental: {
-    turbopackFileSystemCacheForDev: false,
-  },
   images: {
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -18,7 +14,7 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'dfhrtuiszsumvtzsfzic.supabase.co',
         port: '',
-        pathname: '/**',
+        pathname: '/storage/v1/object/public/**',
       },
       {
         protocol: 'https',

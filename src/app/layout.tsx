@@ -6,18 +6,24 @@ const geistSans = localFont({
   src: "../../public/fonts/geist.woff2",
   variable: "--font-geist-sans",
   weight: "100 900",
+  display: "swap",
+  fallback: ["sans-serif"],
 });
 
 const playfairDisplay = localFont({
   src: "../../public/fonts/playfair.woff2",
   variable: "--font-playfair-display",
   weight: "400 900",
+  display: "swap",
+  fallback: ["serif"],
 });
 
 const cinzel = localFont({
   src: "../../public/fonts/cinzel.woff2",
   variable: "--font-cinzel",
   weight: "400 900",
+  display: "swap",
+  fallback: ["serif"],
 });
 
 import { supabase } from "@/lib/supabase";
