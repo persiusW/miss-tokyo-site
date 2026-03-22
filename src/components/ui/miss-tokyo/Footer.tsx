@@ -92,8 +92,8 @@ export function Footer() {
 
     return (
         <footer className="w-full bg-black text-white px-6 py-16 md:px-12 md:py-24 mt-16 md:mt-24 rounded-none">
-            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
-                <div className="col-span-1 md:col-span-2">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-5 gap-12">
+                <div className="col-span-1 md:col-span-2 lg:col-span-2">
                     <h3 className="font-serif text-3xl tracking-[0.2em] uppercase mb-6">Miss Tokyo</h3>
                     <p className="max-w-sm text-neutral-400 leading-relaxed text-sm mb-10">
                         Sleek, Monochromatic, Stark. <br />Handmade in Ghana.
@@ -150,6 +150,17 @@ export function Footer() {
                         <li><Link href="/contact" className="hover:text-white transition-colors">Concierge</Link></li>
                     </ul>
                 </div>
+
+                <div>
+                    <h4 className="text-[10px] uppercase tracking-[0.3em] font-bold text-white mb-8">Policies</h4>
+                    <ul className="space-y-4 text-[11px] uppercase tracking-[0.2em] text-neutral-400">
+                        <li><Link href="/policies/refund-policy" className="hover:text-white transition-colors">Refunds</Link></li>
+                        <li><Link href="/policies/shipping-policy" className="hover:text-white transition-colors">Shipping</Link></li>
+                        <li><Link href="/policies/terms-and-conditions" className="hover:text-white transition-colors">Terms</Link></li>
+                        <li><Link href="/policies/privacy-policy" className="hover:text-white transition-colors">Privacy</Link></li>
+                        <li><Link href="/policies/accessibility-statement" className="hover:text-white transition-colors">Accessibility</Link></li>
+                    </ul>
+                </div>
             </div>
 
             {socialLinks.some(s => !!settings[s.key as keyof typeof settings]) && (
@@ -181,11 +192,18 @@ export function Footer() {
             )}
 
             <div className="max-w-7xl mx-auto pt-8 border-t border-neutral-800 flex flex-col md:flex-row justify-between items-center text-[10px] uppercase tracking-[0.2em] text-neutral-500">
-                <p>&copy; {new Date().getFullYear()} Miss Tokyo. Directed by DashUp.</p>
-                <div className="space-x-8 mt-6 md:mt-0">
-                    <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-                    <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-                </div>
+                <p>
+                    &copy; {new Date().getFullYear()} Miss Tokyo. Powered by{" "}
+                    <a
+                        href="https://dashttp.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline"
+                    >
+                        DasHttp
+                    </a>
+                    .
+                </p>
             </div>
         </footer>
     );
