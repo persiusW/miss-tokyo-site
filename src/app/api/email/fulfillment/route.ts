@@ -1,12 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
 import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { Resend } from "resend";
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
+        const serverClient = await createClient();
+        const { data: { user } } = await serverClient.auth.getUser();
+        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+        if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         const { orderId, type } = await req.json();
         if (!orderId) return NextResponse.json({ error: "orderId required" }, { status: 400 });
 
