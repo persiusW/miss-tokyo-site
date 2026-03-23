@@ -221,7 +221,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
              sku, features_list, care_instructions, rating_average, review_count, created_at,
              wholesale_override, wholesale_price_tier_1, wholesale_price_tier_2, wholesale_price_tier_3`)
         .eq("slug", slug)
-        .eq("is_active", true)
+        .or("is_active.eq.true,is_active.is.null")
         .maybeSingle();
 
     // LOG-07: throw on DB error so Next.js shows a 500 (transient), not a false 404
@@ -344,7 +344,7 @@ export async function getAllProductSlugs(): Promise<string[]> {
         const { data } = await supabaseAdmin
             .from("products")
             .select("slug")
-            .eq("is_active", true)
+            .or("is_active.eq.true,is_active.is.null")
             .order("created_at", { ascending: false })
             .limit(50);
         return (data ?? []).map((p: { slug: string }) => p.slug).filter(Boolean);
