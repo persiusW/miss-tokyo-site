@@ -58,6 +58,7 @@ function VideoCard({
     useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
 
     const handleQuickAdd = () => {
+        if (product.inventory_count === 0) return;
         if ((product.available_sizes?.length || 0) > 0 || (product.available_colors?.length || 0) > 0) {
             onOpenModal(product);
             return;

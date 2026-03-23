@@ -126,7 +126,14 @@ function ShopProductCard({
                     )}
 
                     {/* Badge */}
-                    {badge && (
+                    {product.inventory_count === 0 ? (
+                        <span
+                            className="absolute top-[10px] left-[10px] z-10 text-[9px] font-medium tracking-[0.1em] uppercase px-2 py-[3px]"
+                            style={{ borderRadius: 2, background: "#7A7167", color: "#fff" }}
+                        >
+                            Sold Out
+                        </span>
+                    ) : badge && (
                         <span
                             className="absolute top-[10px] left-[10px] z-10 text-[9px] font-medium tracking-[0.1em] uppercase px-2 py-[3px]"
                             style={{
@@ -152,6 +159,7 @@ function ShopProductCard({
                     {/* Quick Add — always visible on mobile, hover-only on desktop */}
                     <div className="absolute bottom-[10px] left-[10px] right-[10px] flex gap-[6px] z-10 md:opacity-0 md:translate-y-[6px] md:group-hover:opacity-100 md:group-hover:translate-y-0 md:transition-all md:duration-200">
                         <button
+                            disabled={product.inventory_count === 0}
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -170,19 +178,21 @@ function ShopProductCard({
                                 setAddState("added");
                                 setTimeout(() => setAddState("idle"), 1500);
                             }}
-                            className="flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] transition-colors duration-150"
+                            className="flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] transition-colors duration-150 disabled:cursor-not-allowed"
                             style={{
-                                background: addState === "added" ? "#22c55e" : "#fff",
-                                color: addState === "added" ? "#fff" : "#141210",
+                                background: product.inventory_count === 0 ? "#E8D5C4" : addState === "added" ? "#22c55e" : "#fff",
+                                color: product.inventory_count === 0 ? "#7A7167" : addState === "added" ? "#fff" : "#141210",
                                 borderRadius: 2,
                                 border: "none",
                             }}
-                            onMouseEnter={e => { if (addState === "idle") { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
-                            onMouseLeave={e => { if (addState === "idle") { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; } }}
+                            onMouseEnter={e => { if (addState === "idle" && product.inventory_count > 0) { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
+                            onMouseLeave={e => { if (addState === "idle" && product.inventory_count > 0) { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; } }}
                         >
-                            {addState === "added"
-                                ? <><Check size={12} strokeWidth={2.5} /> Added</>
-                                : <><ShoppingBag size={12} strokeWidth={1.8} /> Add to Cart</>
+                            {product.inventory_count === 0
+                                ? "Sold Out"
+                                : addState === "added"
+                                    ? <><Check size={12} strokeWidth={2.5} /> Added</>
+                                    : <><ShoppingBag size={12} strokeWidth={1.8} /> Add to Cart</>
                             }
                         </button>
                     </div>
@@ -245,7 +255,10 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
         return () => { document.body.style.overflow = ""; document.removeEventListener("keydown", onKey); };
     }, [onClose]);
 
+    const isOutOfStock = product.inventory_count === 0;
+
     const handleAdd = () => {
+        if (isOutOfStock) return;
         if (sizes.length > 0 && !selectedSize) return;
         setAdding(true);
         addItem({
@@ -356,17 +369,17 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
 
                     <button
                         onClick={handleAdd}
-                        disabled={adding || (sizes.length > 0 && !selectedSize)}
+                        disabled={adding || isOutOfStock || (sizes.length > 0 && !selectedSize)}
                         className="w-full py-[13px] flex items-center justify-center gap-2 text-[12px] font-medium tracking-[0.1em] uppercase mb-[10px] transition-colors"
                         style={{
                             borderRadius: 2, border: "none",
-                            background: added ? "#16a34a" : (sizes.length > 0 && !selectedSize) ? "#999" : "#141210",
-                            color: "#fff",
-                            cursor: (sizes.length > 0 && !selectedSize) ? "not-allowed" : "pointer",
+                            background: added ? "#16a34a" : (isOutOfStock || (sizes.length > 0 && !selectedSize)) ? "#D1D5DB" : "#141210",
+                            color: isOutOfStock ? "#9CA3AF" : "#fff",
+                            cursor: (isOutOfStock || (sizes.length > 0 && !selectedSize)) ? "not-allowed" : "pointer",
                         }}
                     >
                         <ShoppingBag size={14} strokeWidth={1.5} />
-                        {added ? "Added to Cart ✓" : adding ? "Adding…" : "Add to Cart"}
+                        {added ? "Added to Cart ✓" : adding ? "Adding…" : isOutOfStock ? "Out of Stock" : "Add to Cart"}
                     </button>
                     <Link href={`/products/${product.slug}`} onClick={onClose}
                         className="block text-center text-[11px] underline transition-colors"

@@ -76,6 +76,12 @@ export async function POST(request: Request) {
             }
         }
 
+        // Apply discount server-side
+        const discountAmount = Number(clientMetadata?.discount_amount) || 0;
+        if (discountAmount > 0) {
+            amountInGHS = Math.max(0, parseFloat((amountInGHS - discountAmount).toFixed(2)));
+        }
+
         if (amountInGHS <= 0) {
             return NextResponse.json({ error: "Invalid amount calculation" }, { status: 400 });
         }
