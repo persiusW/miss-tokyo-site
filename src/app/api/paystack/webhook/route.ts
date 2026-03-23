@@ -469,29 +469,63 @@ export async function POST(req: Request) {
 
             const parsedItems = parseItems(cartItems);
 
-            // Decrement inventory — batch fetch then concurrent updates
+            // Decrement inventory — hybrid model: variant-level or product-level
             if (parsedItems.length > 0) {
                 const productIds = [...new Set(parsedItems.map(i => i.productId).filter(Boolean))];
+
+                // Fetch products with track_variant_inventory flag
                 const { data: products } = await supabaseAdmin
                     .from("products")
-                    .select("id, inventory_count")
+                    .select("id, inventory_count, track_variant_inventory")
                     .in("id", productIds);
 
                 if (products) {
-                    const stockMap = new Map(products.map(p => [p.id, p.inventory_count as number]));
+                    const productMap = new Map(
+                        products.map(p => [p.id, { stock: p.inventory_count as number, trackVariant: p.track_variant_inventory as boolean }])
+                    );
+
+                    // Separate items by deduction strategy
+                    const globalItems = parsedItems.filter(item =>
+                        item.productId && productMap.has(item.productId) && !productMap.get(item.productId)!.trackVariant
+                    );
+                    const variantItems = parsedItems.filter(item =>
+                        item.productId && productMap.has(item.productId) && productMap.get(item.productId)!.trackVariant
+                    );
+
+                    // Strategy A: deduct from products.inventory_count
                     await Promise.allSettled(
-                        parsedItems
-                            .filter(item => item.productId && stockMap.has(item.productId))
-                            .map(item => {
-                                const stock = stockMap.get(item.productId) ?? 0;
-                                if (typeof stock === "number" && stock >= item.quantity) {
-                                    return supabaseAdmin
-                                        .from("products")
-                                        .update({ inventory_count: stock - item.quantity })
-                                        .eq("id", item.productId);
-                                }
-                                return Promise.resolve();
-                            })
+                        globalItems.map(item => {
+                            const { stock } = productMap.get(item.productId)!;
+                            if (typeof stock === "number" && stock >= item.quantity) {
+                                return supabaseAdmin
+                                    .from("products")
+                                    .update({ inventory_count: stock - item.quantity })
+                                    .eq("id", item.productId);
+                            }
+                            return Promise.resolve();
+                        })
+                    );
+
+                    // Strategy B: deduct from product_variants.inventory_count
+                    await Promise.allSettled(
+                        variantItems.map(async item => {
+                            const { data: variant } = await supabaseAdmin
+                                .from("product_variants")
+                                .select("id, inventory_count")
+                                .eq("product_id", item.productId)
+                                .eq("size", item.size ?? null)
+                                .eq("color", item.color ?? null)
+                                .eq("stitching", item.stitching ?? null)
+                                .maybeSingle();
+
+                            if (variant && typeof variant.inventory_count === "number" && variant.inventory_count >= item.quantity) {
+                                return supabaseAdmin
+                                    .from("product_variants")
+                                    .update({ inventory_count: variant.inventory_count - item.quantity })
+                                    .eq("id", variant.id);
+                            }
+                            return Promise.resolve();
+                        })
                     );
                 }
             }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/store/useCart";
 import { toast } from "@/lib/toast";
@@ -8,6 +8,12 @@ import { resolveWholesalePrice, WholesaleTiers } from "@/lib/wholesale";
 
 export interface ColorVariant { name: string; hex: string; in_stock: boolean; }
 export interface SizeVariant { label: string; in_stock: boolean; }
+export interface ProductVariant {
+    size: string | null;
+    color: string | null;
+    stitching: string | null;
+    inventory_count: number;
+}
 
 interface Props {
     productId: string;
@@ -29,6 +35,9 @@ interface Props {
     showTrustStrip?: boolean;
     isWholesaler?: boolean;
     wholesaleTiers?: WholesaleTiers;
+    // Variant inventory
+    trackVariantInventory?: boolean;
+    productVariants?: ProductVariant[];
 }
 
 const COLOR_HEX: Record<string, string> = {
@@ -66,6 +75,8 @@ export function ProductOptions(props: Props) {
         showTrustStrip = true,
         isWholesaler = false,
         wholesaleTiers,
+        trackVariantInventory = false,
+        productVariants,
     } = props;
 
     const router = useRouter();
@@ -82,6 +93,19 @@ export function ProductOptions(props: Props) {
     const [selectedColor, setSelectedColor] = useState<string>(colors[0]?.name ?? "");
     const [selectedSize, setSelectedSize] = useState<string>(sizes.find(s => s.in_stock)?.label ?? "");
     const [qty, setQty] = useState(1);
+
+    // ── Variant-aware effective inventory ─────────────────────────────────────
+    const effectiveInventory = useMemo(() => {
+        if (!trackVariantInventory || !productVariants?.length) return inventoryCount;
+        const match = productVariants.find(v =>
+            (v.size ?? "") === selectedSize &&
+            (v.color ?? "") === selectedColor
+        );
+        // No matching variant found means this combo isn't tracked — treat as 0
+        return match?.inventory_count ?? 0;
+    }, [trackVariantInventory, productVariants, selectedSize, selectedColor, inventoryCount]);
+
+    const isOutOfStock = trackVariantInventory && effectiveInventory === 0;
     const [wishlisted, setWishlisted] = useState(false);
     const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
     const [addedToBag, setAddedToBag] = useState(false);
@@ -366,14 +390,17 @@ export function ProductOptions(props: Props) {
                         style={{ width: 44, height: 40, border: "none", textAlign: "center", fontSize: 14, fontWeight: 500, color: "var(--ink, #141210)", background: "transparent", outline: "none" }}
                     />
                     <button
-                        onClick={() => setQty(q => inventoryCount >= 9999 ? q + 1 : Math.min(inventoryCount || 99, q + 1))}
+                        onClick={() => setQty(q => effectiveInventory >= 9999 ? q + 1 : Math.min(effectiveInventory || 99, q + 1))}
                         style={{ width: 36, height: 40, border: "none", background: "transparent", fontSize: 18, color: "var(--ink, #141210)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                     >
                         +
                     </button>
                 </div>
-                {inventoryCount > 0 && inventoryCount < 9999 && (
-                    <span style={{ fontSize: 11, color: "var(--muted, #7A7167)" }}>{inventoryCount} left in stock</span>
+                {effectiveInventory > 0 && effectiveInventory < 9999 && (
+                    <span style={{ fontSize: 11, color: "var(--muted, #7A7167)" }}>{effectiveInventory} left in stock</span>
+                )}
+                {isOutOfStock && (
+                    <span style={{ fontSize: 11, color: "#E8485A", fontWeight: 500 }}>Out of stock</span>
                 )}
             </div>
 
@@ -381,14 +408,14 @@ export function ProductOptions(props: Props) {
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
                 <button
                     onClick={handleAddToBag}
-                    disabled={addedToBag}
+                    disabled={addedToBag || isOutOfStock}
                     style={{
                         width: "100%", padding: "15px 24px",
-                        background: addedToBag ? "#059669" : "var(--ink, #141210)",
+                        background: addedToBag ? "#059669" : isOutOfStock ? "#D1D5DB" : "var(--ink, #141210)",
                         color: "#fff",
                         border: "none", borderRadius: 2,
                         fontSize: 12, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase",
-                        cursor: addedToBag ? "default" : "pointer",
+                        cursor: addedToBag || isOutOfStock ? "default" : "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                         transition: "background 0.25s",
                     }}
@@ -400,6 +427,8 @@ export function ProductOptions(props: Props) {
                             </svg>
                             Added to Bag ✓
                         </>
+                    ) : isOutOfStock ? (
+                        "Out of Stock"
                     ) : (
                         <>
                             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5">

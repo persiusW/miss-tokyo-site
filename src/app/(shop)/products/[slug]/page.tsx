@@ -125,10 +125,22 @@ export default async function ProductPage({
         console.warn("[PDP Defensive Fetch] Failed to load settings:", err);
     }
 
-    const [related, { reviews, distribution }] = await Promise.all([
+    const [related, { reviews, distribution }, variantRes, variantMetaRes] = await Promise.all([
         getRelatedProducts(product.category_type ?? "", slug),
         getProductReviews(product.id),
+        supabaseAdmin
+            .from("product_variants")
+            .select("size, color, stitching, inventory_count")
+            .eq("product_id", product.id),
+        supabaseAdmin
+            .from("products")
+            .select("track_variant_inventory")
+            .eq("id", product.id)
+            .maybeSingle(),
     ]);
+
+    const productVariants = variantRes.data ?? [];
+    const trackVariantInventory = (variantMetaRes.data as any)?.track_variant_inventory ?? false;
 
     const baseTiers = wholesaleTiersData || {
         tier1_min: 3, tier1_max: 5, tier1_discount: 10,
@@ -308,6 +320,8 @@ export default async function ProductPage({
                             showTrustStrip={showTrustStrip}
                             isWholesaler={!!isWholesalerAccount}
                             wholesaleTiers={wholesaleTiers}
+                            trackVariantInventory={trackVariantInventory}
+                            productVariants={productVariants}
                         />
 
                         {/* Accordions */}

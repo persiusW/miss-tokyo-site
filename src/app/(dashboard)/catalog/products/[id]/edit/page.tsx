@@ -1,12 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { toast } from "@/lib/toast";
+
 type Category = { id: string; name: string; slug: string; is_wholesale: boolean };
+
+// ── Variant inventory types ───────────────────────────────────────────────────
+
+type VariantStore = Record<string, { sku: string; inventory_count: number }>;
+
+function makeVariantKey(size: string, color: string, stitching: string): string {
+    return `${size}||${color}||${stitching}`;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function EditProductPage() {
     const { id } = useParams<{ id: string }>();
@@ -24,6 +35,8 @@ export default function EditProductPage() {
     const [globalStitching, setGlobalStitching] = useState<string[]>([]);
     const [selectedStitching, setSelectedStitching] = useState<string[]>([]);
     const [trackInventory, setTrackInventory] = useState(true);
+    const [trackVariantInventory, setTrackVariantInventory] = useState(false);
+    const [variantData, setVariantData] = useState<VariantStore>({});
     const [wholesaleTierConfig, setWholesaleTierConfig] = useState<{ enabled: boolean; tier1Min: number; tier1Max: number; tier2Min: number; tier2Max: number; tier3Min: number; tier3Max: number } | null>(null);
     const [wholesalePrices, setWholesalePrices] = useState({ tier1: "", tier2: "", tier3: "" });
     const [wholesaleOverride, setWholesaleOverride] = useState(false);
@@ -38,10 +51,16 @@ export default function EditProductPage() {
     });
 
     const fetchProduct = useCallback(async () => {
-        const [{ data: product }, { data: cats }, { data: storeData }] = await Promise.all([
+        const [
+            { data: product },
+            { data: cats },
+            { data: storeData },
+            { data: existingVariants },
+        ] = await Promise.all([
             supabase.from("products").select("*").eq("id", id).single(),
             supabase.from("categories").select("id, name, slug, is_wholesale").eq("is_active", true).order("name"),
-            supabase.from("store_settings").select("global_sizes, global_colors, global_stitching, wholesale_enabled, wholesale_tier_1_min, wholesale_tier_1_max, wholesale_tier_2_min, wholesale_tier_2_max, wholesale_tier_3_min, wholesale_tier_3_max").eq("id", "default").single()
+            supabase.from("store_settings").select("global_sizes, global_colors, global_stitching, wholesale_enabled, wholesale_tier_1_min, wholesale_tier_1_max, wholesale_tier_2_min, wholesale_tier_2_max, wholesale_tier_3_min, wholesale_tier_3_max").eq("id", "default").single(),
+            supabase.from("product_variants").select("size, color, stitching, sku, inventory_count").eq("product_id", id),
         ]);
 
         if (!product) {
@@ -53,6 +72,7 @@ export default function EditProductPage() {
         if (cats) setCategories(cats);
 
         setTrackInventory(product.track_inventory ?? true);
+        setTrackVariantInventory(product.track_variant_inventory ?? false);
         setFormData({
             name: product.name || "",
             slug: product.slug || "",
@@ -78,31 +98,53 @@ export default function EditProductPage() {
                 setGlobalStitching(storeData.global_stitching);
                 setSelectedStitching(product.available_stitching || storeData.global_stitching);
             }
-        setSelectedCategoryIds(Array.isArray(product.category_ids) ? product.category_ids : []);
-        setWholesaleOverride(product.wholesale_override === true);
-        setWholesalePrices({
-            tier1: product.wholesale_price_tier_1 != null ? String(product.wholesale_price_tier_1) : "",
-            tier2: product.wholesale_price_tier_2 != null ? String(product.wholesale_price_tier_2) : "",
-            tier3: product.wholesale_price_tier_3 != null ? String(product.wholesale_price_tier_3) : "",
-        });
-
-        if (storeData && storeData.wholesale_enabled) {
-            setWholesaleTierConfig({
-                enabled: true,
-                tier1Min: storeData.wholesale_tier_1_min ?? 3,
-                tier1Max: storeData.wholesale_tier_1_max ?? 5,
-                tier2Min: storeData.wholesale_tier_2_min ?? 8,
-                tier2Max: storeData.wholesale_tier_2_max ?? 10,
-                tier3Min: storeData.wholesale_tier_3_min ?? 12,
-                tier3Max: storeData.wholesale_tier_3_max ?? 24,
+            setSelectedCategoryIds(Array.isArray(product.category_ids) ? product.category_ids : []);
+            setWholesaleOverride(product.wholesale_override === true);
+            setWholesalePrices({
+                tier1: product.wholesale_price_tier_1 != null ? String(product.wholesale_price_tier_1) : "",
+                tier2: product.wholesale_price_tier_2 != null ? String(product.wholesale_price_tier_2) : "",
+                tier3: product.wholesale_price_tier_3 != null ? String(product.wholesale_price_tier_3) : "",
             });
+
+            if (storeData && storeData.wholesale_enabled) {
+                setWholesaleTierConfig({
+                    enabled: true,
+                    tier1Min: storeData.wholesale_tier_1_min ?? 3,
+                    tier1Max: storeData.wholesale_tier_1_max ?? 5,
+                    tier2Min: storeData.wholesale_tier_2_min ?? 8,
+                    tier2Max: storeData.wholesale_tier_2_max ?? 10,
+                    tier3Min: storeData.wholesale_tier_3_min ?? 12,
+                    tier3Max: storeData.wholesale_tier_3_max ?? 24,
+                });
+            }
         }
+
+        // Populate variant store from existing DB rows
+        if (existingVariants && existingVariants.length > 0) {
+            const store: VariantStore = {};
+            for (const v of existingVariants) {
+                const key = makeVariantKey(v.size || "", v.color || "", v.stitching || "");
+                store[key] = { sku: v.sku || "", inventory_count: v.inventory_count ?? 0 };
+            }
+            setVariantData(store);
         }
 
         setLoading(false);
     }, [id, router]);
 
     useEffect(() => { fetchProduct(); }, [fetchProduct]);
+
+    // ── Derive all combinations from current selections ───────────────────────
+    const variantCombos = useMemo(() => {
+        const ss = selectedSizes.length > 0 ? selectedSizes : [""];
+        const cc = selectedColors.length > 0 ? selectedColors : [""];
+        const st = selectedStitching.length > 0 ? selectedStitching : [""];
+        const combos: Array<{ size: string; color: string; stitching: string; key: string }> = [];
+        for (const s of ss) for (const c of cc) for (const t of st) {
+            combos.push({ size: s, color: c, stitching: t, key: makeVariantKey(s, c, t) });
+        }
+        return combos;
+    }, [selectedSizes, selectedColors, selectedStitching]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { id: fieldId, value, type } = e.target;
@@ -124,6 +166,17 @@ export default function EditProductPage() {
         setSelectedStitching(prev => prev.includes(stitch) ? prev.filter(s => s !== stitch) : [...prev, stitch]);
     };
 
+    const updateVariantCell = (key: string, field: "sku" | "inventory_count", value: string | number) => {
+        setVariantData(prev => ({
+            ...prev,
+            [key]: {
+                sku: prev[key]?.sku ?? "",
+                inventory_count: prev[key]?.inventory_count ?? 0,
+                [field]: value,
+            },
+        }));
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
@@ -137,8 +190,9 @@ export default function EditProductPage() {
                     name: formData.name,
                     slug: formData.slug,
                     price_ghs: Number(formData.price_ghs),
-                    inventory_count: trackInventory ? Number(formData.inventory_count) : 9999,
+                    inventory_count: trackInventory && !trackVariantInventory ? Number(formData.inventory_count) : 9999,
                     track_inventory: trackInventory,
+                    track_variant_inventory: trackVariantInventory,
                     description: formData.description,
                     category_type: formData.category_type,
                     category_ids: selectedCategoryIds,
@@ -156,6 +210,22 @@ export default function EditProductPage() {
 
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || "Failed to update product");
+
+            // Upsert variant rows when variant inventory tracking is on
+            if (trackInventory && trackVariantInventory && variantCombos.length > 0) {
+                const rows = variantCombos.map(c => ({
+                    product_id: id,
+                    size: c.size || null,
+                    color: c.color || null,
+                    stitching: c.stitching || null,
+                    sku: variantData[c.key]?.sku || null,
+                    inventory_count: variantData[c.key]?.inventory_count ?? 0,
+                }));
+                const { error: variantErr } = await supabase
+                    .from("product_variants")
+                    .upsert(rows, { onConflict: "product_id,size,color,stitching" });
+                if (variantErr) console.error("[variants] upsert failed:", variantErr.message);
+            }
 
             toast.success("Product updated.");
             router.push("/catalog/products");
@@ -178,7 +248,7 @@ export default function EditProductPage() {
 
     return (
         <div className="space-y-8">
-            {/* Header with top-right save */}
+            {/* Header */}
             <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div>
                     <div className="flex items-center gap-2 text-sm text-neutral-500 mb-4">
@@ -276,7 +346,7 @@ export default function EditProductPage() {
                                                             className="w-4 h-4 accent-black flex-shrink-0"
                                                             checked={selectedCategoryIds.includes(cat.id)}
                                                             onChange={() => setSelectedCategoryIds(prev =>
-                                                                prev.includes(cat.id) ? prev.filter(id => id !== cat.id) : [...prev, cat.id]
+                                                                prev.includes(cat.id) ? prev.filter(cid => cid !== cat.id) : [...prev, cat.id]
                                                             )}
                                                         />
                                                         <span className="text-sm flex-1">{cat.name}</span>
@@ -380,6 +450,73 @@ export default function EditProductPage() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* ── Variant Inventory Matrix ───────────────────── */}
+                            {trackInventory && trackVariantInventory && (
+                                <div className="pt-6 border-t border-neutral-100">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-xs font-semibold uppercase tracking-widest">Inventory by Variant</h3>
+                                        <span className="text-[10px] text-neutral-400 uppercase tracking-wider">
+                                            {variantCombos.length} combination{variantCombos.length !== 1 ? "s" : ""}
+                                        </span>
+                                    </div>
+                                    <div className="border border-neutral-200 rounded-lg overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="bg-neutral-50 border-b border-neutral-200">
+                                                    {selectedSizes.length > 0 && (
+                                                        <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Size</th>
+                                                    )}
+                                                    {selectedColors.length > 0 && (
+                                                        <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Color</th>
+                                                    )}
+                                                    {selectedStitching.length > 0 && (
+                                                        <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stitching</th>
+                                                    )}
+                                                    <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">SKU</th>
+                                                    <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stock</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-neutral-100">
+                                                {variantCombos.map((combo, idx) => (
+                                                    <tr key={combo.key} className={idx % 2 === 1 ? "bg-neutral-50/50" : ""}>
+                                                        {selectedSizes.length > 0 && (
+                                                            <td className="px-3 py-2 font-medium">{combo.size}</td>
+                                                        )}
+                                                        {selectedColors.length > 0 && (
+                                                            <td className="px-3 py-2 text-neutral-600">{combo.color}</td>
+                                                        )}
+                                                        {selectedStitching.length > 0 && (
+                                                            <td className="px-3 py-2 text-neutral-600">{combo.stitching}</td>
+                                                        )}
+                                                        <td className="px-3 py-2">
+                                                            <input
+                                                                type="text"
+                                                                value={variantData[combo.key]?.sku ?? ""}
+                                                                onChange={e => updateVariantCell(combo.key, "sku", e.target.value)}
+                                                                placeholder="e.g. SKU-001"
+                                                                className="w-full border-b border-neutral-200 bg-transparent py-1 text-sm outline-none focus:border-black transition-colors"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={variantData[combo.key]?.inventory_count ?? 0}
+                                                                onChange={e => updateVariantCell(combo.key, "inventory_count", Number(e.target.value))}
+                                                                className="w-20 border-b border-neutral-200 bg-transparent py-1 text-sm outline-none focus:border-black transition-colors"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p className="text-[10px] text-neutral-400 mt-2 uppercase tracking-wider">
+                                        Toggle options above to add or remove rows. Values are preserved when you deselect and re-select an option.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -403,7 +540,7 @@ export default function EditProductPage() {
                                 />
                             </div>
 
-                            {/* Track Inventory Toggle */}
+                            {/* Track Inventory toggle */}
                             <div className="flex items-start gap-3 p-4 bg-neutral-50 border border-neutral-200">
                                 <button
                                     type="button"
@@ -420,7 +557,29 @@ export default function EditProductPage() {
                                 </div>
                             </div>
 
+                            {/* Track by Variant toggle — only when tracking is on */}
                             {trackInventory && (
+                                <div className="flex items-start gap-3 p-4 bg-neutral-50 border border-neutral-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTrackVariantInventory(v => !v)}
+                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none mt-0.5 ${trackVariantInventory ? "bg-black" : "bg-neutral-300"}`}
+                                    >
+                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${trackVariantInventory ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                    <div>
+                                        <p className="text-xs uppercase tracking-widest font-semibold">Track Inventory by Variant</p>
+                                        <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">
+                                            {trackVariantInventory
+                                                ? "Each size/colour combination has its own stock count."
+                                                : "All variants share one global stock count."}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Global inventory count — hidden when variant tracking is on */}
+                            {trackInventory && !trackVariantInventory && (
                                 <div>
                                     <label htmlFor="inventory_count" className="block text-xs uppercase tracking-widest font-semibold mb-3">Inventory Count</label>
                                     <input
@@ -433,6 +592,13 @@ export default function EditProductPage() {
                                         className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
                                     />
                                 </div>
+                            )}
+
+                            {/* Hint when variant tracking is on */}
+                            {trackInventory && trackVariantInventory && (
+                                <p className="text-[10px] text-emerald-600 uppercase tracking-widest font-semibold">
+                                    ✓ Stock is managed per variant in the matrix below.
+                                </p>
                             )}
                         </div>
 
