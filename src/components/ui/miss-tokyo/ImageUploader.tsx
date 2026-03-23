@@ -107,7 +107,7 @@ function SortableImage({ url, index, isPrimary, onRemove }: SortableImageProps) 
         <div
             ref={setNodeRef}
             style={style}
-            className="relative group aspect-square min-h-[8rem] overflow-hidden bg-neutral-100 border border-neutral-200 touch-none"
+            className="relative group aspect-square min-h-[10rem] overflow-hidden bg-neutral-100 border border-neutral-200 touch-none"
         >
             {isVideo ? (
                 <video src={url} className="w-full h-full object-cover" muted />
@@ -327,7 +327,7 @@ export function ImageUploader(props: ImageUploaderProps) {
                         onDragEnd={handleDragEnd}
                     >
                         <SortableContext items={previews} strategy={rectSortingStrategy}>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {previews.map((url, idx) => (
                                     <SortableImage
                                         key={url}

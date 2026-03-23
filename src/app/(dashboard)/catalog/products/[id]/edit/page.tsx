@@ -259,10 +259,10 @@ export default function EditProductPage() {
                     <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Edit Product</h1>
                     <p className="text-neutral-500">{formData.name}</p>
                 </div>
-                <div className="flex items-center gap-3 md:mt-8">
+                <div className="flex items-center gap-3 md:mt-8 w-full md:w-auto">
                     <Link
                         href="/catalog/products"
-                        className="px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-100 transition-colors border border-neutral-200"
+                        className="flex-1 md:flex-none text-center px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-100 transition-colors border border-neutral-200"
                     >
                         Cancel
                     </Link>
@@ -270,7 +270,7 @@ export default function EditProductPage() {
                         type="submit"
                         form="product-form"
                         disabled={saving || uploadingMedia}
-                        className="px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                        className="flex-1 md:flex-none px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
                     >
                         {saving ? "Saving..." : "Update Product"}
                     </button>
@@ -282,7 +282,7 @@ export default function EditProductPage() {
                     {/* Left column — main details */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Basic Info */}
-                        <div className="bg-white p-8 border border-neutral-200 space-y-8">
+                        <div className="bg-white p-4 sm:p-8 border border-neutral-200 space-y-8">
                             <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Basic Information</h2>
 
                             <div>
@@ -385,7 +385,7 @@ export default function EditProductPage() {
                         </div>
 
                         {/* Variants */}
-                        <div className="bg-white p-8 border border-neutral-200 space-y-8">
+                        <div className="bg-white p-4 sm:p-8 border border-neutral-200 space-y-8">
                             <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Variants</h2>
 
                             <div>
@@ -523,7 +523,7 @@ export default function EditProductPage() {
                     {/* Right column — pricing, inventory, images */}
                     <div className="space-y-6">
                         {/* Pricing & Inventory */}
-                        <div className="bg-white p-6 border border-neutral-200 space-y-6">
+                        <div className="bg-white p-4 sm:p-6 border border-neutral-200 space-y-6">
                             <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Pricing & Inventory</h2>
 
                             <div>
@@ -604,7 +604,7 @@ export default function EditProductPage() {
 
                         {/* Wholesale Pricing */}
                         {wholesaleTierConfig?.enabled && (
-                            <div className="bg-white p-6 border border-neutral-200 space-y-5">
+                            <div className="bg-white p-4 sm:p-6 border border-neutral-200 space-y-5">
                                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Wholesale Pricing</h2>
                                 <label className="flex items-center justify-between cursor-pointer">
                                     <div>
@@ -645,7 +645,7 @@ export default function EditProductPage() {
                         )}
 
                         {/* Media */}
-                        <div className="bg-white p-6 border border-neutral-200 space-y-4">
+                        <div className="bg-white p-4 sm:p-6 border border-neutral-200 space-y-4">
                             <div>
                                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Media</h2>
                                 <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 10 files — select multiple at once. First image is the primary display.</p>
