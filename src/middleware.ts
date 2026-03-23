@@ -10,13 +10,16 @@ const SECURITY_HEADERS: Record<string, string> = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Content-Security-Policy": [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co",
+        // blob: for FFmpeg Web Worker inline scripts; https://vercel.live for Live Preview toolbar
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://vercel.live blob:",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' blob: data: https:",
         "media-src 'self' https://*.supabase.co blob: data:",
+        // blob: allows FFmpeg Web Workers instantiated via createObjectURL
+        "worker-src 'self' blob:",
         "frame-src 'self' https://js.paystack.co",
-        // wss:// required for Supabase Realtime subscriptions
-        "connect-src 'self' https: wss://*.supabase.co",
+        // wss:// required for Supabase Realtime; https://vercel.live for Live Preview toolbar
+        "connect-src 'self' https: wss://*.supabase.co https://vercel.live",
     ].join("; "),
 };
 
