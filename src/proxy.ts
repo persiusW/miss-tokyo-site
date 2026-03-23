@@ -17,9 +17,10 @@ const SECURITY_HEADERS: Record<string, string> = {
         "media-src 'self' https://*.supabase.co blob: data:",
         // blob: allows FFmpeg Web Workers instantiated via createObjectURL
         "worker-src 'self' blob:",
-        "frame-src 'self' https://js.paystack.co",
-        // wss:// required for Supabase Realtime; https://vercel.live for Live Preview toolbar
-        "connect-src 'self' https: wss://*.supabase.co https://vercel.live",
+        // https://vercel.live/ required for Vercel Live Preview toolbar iframe
+        "frame-src 'self' https://js.paystack.co https://vercel.live/",
+        // wss:// for Supabase Realtime; https://vercel.live for Live toolbar; blob: for FFmpeg fetch
+        "connect-src 'self' https: wss://*.supabase.co https://vercel.live blob:",
     ].join("; "),
 };
 
