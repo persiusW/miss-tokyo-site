@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
   experimental: {
     turbopackFileSystemCacheForDev: false,
   },
+  async redirects() {
+    return [
+      // Legacy CMS-generated slugs → correct search-param routes (permanent)
+      { source: "/shop/sale",         destination: "/shop?sale=true",    permanent: true },
+      { source: "/shop/new-arrivals", destination: "/shop?sort=newest",  permanent: true },
+      { source: "/new-arrivals",      destination: "/shop?sort=newest",  permanent: true },
+    ];
+  },
   poweredByHeader: false, // SPD-12: suppress X-Powered-By header
   images: {
     formats: ["image/avif", "image/webp"],

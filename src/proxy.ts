@@ -13,6 +13,8 @@ const SECURITY_HEADERS: Record<string, string> = {
         // blob: for FFmpeg Web Worker inline scripts; https://vercel.live for Live Preview toolbar
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://vercel.live blob:",
         "style-src 'self' 'unsafe-inline'",
+        // https://vercel.live fonts used by the Vercel preview toolbar
+        "font-src 'self' https://vercel.live data:",
         "img-src 'self' blob: data: https:",
         "media-src 'self' https://*.supabase.co blob: data:",
         // blob: allows FFmpeg Web Workers instantiated via createObjectURL

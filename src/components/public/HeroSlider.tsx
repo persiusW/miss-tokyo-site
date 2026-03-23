@@ -23,7 +23,7 @@ const FALLBACK_SLIDE: HeroSlide = {
   cta_primary_label: "Shop Now",
   cta_primary_url: "/shop",
   cta_secondary_label: "New Arrivals",
-  cta_secondary_url: "/new-arrivals",
+  cta_secondary_url: "/shop?sort=newest",
 } as HeroSlide;
 
 export function HeroSlider({ slides }: HeroSliderProps) {

@@ -91,9 +91,8 @@ export const options = {
     thresholds: {
         http_req_duration:  ["p(95)<3000"],
         homepage_duration:  ["p(95)<2000"],
-        // Production target p(95)<2000. Preview allowance 3 s (fewer CDN edges).
-        // Revert to 2000 when running against https://misstokyo.shop.
-        pdp_duration:       ["p(95)<3000"],
+        // Production target p(95)<2000. Tightened now that ISR is live on production.
+        pdp_duration:       ["p(95)<2000"],
         checkout_duration:  ["p(95)<5000"],
         // errors counts only functional failures (5xx / missing content / timeout).
         // Timing slowdowns are captured by the Trend thresholds above.
