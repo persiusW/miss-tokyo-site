@@ -88,14 +88,6 @@ export const options = {
         // { duration: "1m",  target: 0   },
     ],
 
-    // Fail fast: don't let timed-out VUs block for 60 s (k6 default).
-    // 15 s is enough to distinguish a slow-but-live response from a dead one.
-    httpDebug: false,
-    noConnectionReuse: false,
-    http: {
-        timeout: "15s",
-    },
-
     thresholds: {
         http_req_duration:  ["p(95)<3000"],
         homepage_duration:  ["p(95)<2000"],
@@ -121,6 +113,9 @@ const pageParams = {
     },
     // k6 follows redirects by default (maxRedirects=10). Setting explicitly:
     redirects: 10,
+    // Fail fast: 15 s is enough to distinguish slow-but-live from a dead server.
+    // Default is 60 s — without this, timed-out VUs pile up and skew metrics.
+    timeout: "15s",
 };
 
 const jsonParams = {
@@ -130,6 +125,7 @@ const jsonParams = {
         "X-Load-Test":  "k6",
     },
     redirects: 10,
+    timeout: "15s",
 };
 
 function randomBetween(min, max) {
