@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/store/useCart";
 import { toast } from "@/lib/toast";
@@ -640,7 +641,7 @@ export function ProductOptions(props: Props) {
             </div>}
 
             {/* Size Guide Modal */}
-            {sizeGuideOpen && (
+            {sizeGuideOpen && createPortal(
                 <div
                     onClick={e => { if (e.target === e.currentTarget) setSizeGuideOpen(false); }}
                     style={{
@@ -684,7 +685,8 @@ export function ProductOptions(props: Props) {
                             </p>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );
