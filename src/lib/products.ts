@@ -58,7 +58,7 @@ const getCachedCategories = unstable_cache(
         return (data ?? []) as Array<{ name: string; slug: string }>;
     },
     ["categories-name-map"],
-    { revalidate: 60 }
+    { revalidate: 300 }
 );
 
 const getCachedProducts = unstable_cache(
@@ -169,7 +169,7 @@ const getCachedCategoriesByRole = unstable_cache(
         return (data ?? []) as ShopCategory[];
     },
     ["categories-list"],
-    { revalidate: 60 } // Cache for 60 seconds
+    { revalidate: 300 }
 );
 
 export async function getCategories(role?: string): Promise<ShopCategory[]> {
@@ -226,6 +226,12 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
 
     // LOG-07: throw on DB error so Next.js shows a 500 (transient), not a false 404
     if (error) {
+        // PGRST002 is a transient 503 during PostgREST schema cache reload (e.g. DB restart).
+        // Retry once after a short delay rather than surface a false 404.
+        if ((error as any).code === "PGRST002") {
+            await new Promise(r => setTimeout(r, 500));
+            return getProductBySlug(slug);
+        }
         console.error("[getProductBySlug]", error);
         throw error;
     }

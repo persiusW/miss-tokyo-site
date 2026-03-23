@@ -68,53 +68,55 @@ export async function GET(req: NextRequest) {
     const bizName  = biz?.business_name || "Miss Tokyo";
     const siteUrl  = process.env.NEXT_PUBLIC_SITE_URL || "";
 
-    let sent = 0;
-    const errors: string[] = [];
+    const results = await Promise.allSettled(
+        toRemind
+            .filter(order => !!order.customer_email)
+            .map(async order => {
+                const itemCount = Array.isArray(order.items) ? order.items.length : 0;
 
-    for (const order of toRemind) {
-        if (!order.customer_email) continue;
+                const { ok } = await sendEmail({
+                    to: order.customer_email!,
+                    subject: `You left something behind at ${bizName}`,
+                    html: `
+                    <div style="font-family:Georgia,serif;background:#fafaf9;padding:40px 20px;">
+                      <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;padding:48px;">
+                        <h1 style="font-size:20px;letter-spacing:.15em;text-transform:uppercase;margin:0 0 6px;">${bizName}</h1>
+                        <p style="color:#737373;font-size:11px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 36px;">Your Cart Is Waiting</p>
+                        <p style="font-size:15px;color:#171717;margin:0 0 16px;">
+                          Hello${order.customer_name ? ` ${order.customer_name}` : ""},
+                        </p>
+                        <p style="font-size:14px;color:#525252;line-height:1.8;margin:0 0 28px;">
+                          You left ${itemCount > 0 ? `${itemCount} item${itemCount > 1 ? "s" : ""}` : "items"} in your cart.
+                          Your selection is still here — complete your order before it sells out.
+                        </p>
+                        <div style="background:#171717;padding:14px 24px;display:inline-block;margin-bottom:32px;">
+                          <a href="${siteUrl}/shop" style="color:#fff;font-size:11px;letter-spacing:.2em;text-transform:uppercase;text-decoration:none;">
+                            Return to Shop →
+                          </a>
+                        </div>
+                        <div style="border-top:1px solid #e5e5e5;padding-top:20px;margin-top:20px;">
+                          <p style="font-size:11px;color:#a3a3a3;text-transform:uppercase;letter-spacing:.15em;margin:0;">${bizName}</p>
+                        </div>
+                      </div>
+                    </div>`,
+                });
 
-        const itemCount = Array.isArray(order.items) ? order.items.length : 0;
+                if (ok) {
+                    await supabaseAdmin.from("abandoned_history").insert([{
+                        order_id:       order.id,
+                        customer_email: order.customer_email,
+                        customer_name:  order.customer_name,
+                    }]);
+                    return { success: true, id: order.id };
+                }
+                return { success: false, id: order.id };
+            })
+    );
 
-        const { ok } = await sendEmail({
-            to: order.customer_email,
-            subject: `You left something behind at ${bizName}`,
-            html: `
-            <div style="font-family:Georgia,serif;background:#fafaf9;padding:40px 20px;">
-              <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;padding:48px;">
-                <h1 style="font-size:20px;letter-spacing:.15em;text-transform:uppercase;margin:0 0 6px;">${bizName}</h1>
-                <p style="color:#737373;font-size:11px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 36px;">Your Cart Is Waiting</p>
-                <p style="font-size:15px;color:#171717;margin:0 0 16px;">
-                  Hello${order.customer_name ? ` ${order.customer_name}` : ""},
-                </p>
-                <p style="font-size:14px;color:#525252;line-height:1.8;margin:0 0 28px;">
-                  You left ${itemCount > 0 ? `${itemCount} item${itemCount > 1 ? "s" : ""}` : "items"} in your cart.
-                  Your selection is still here — complete your order before it sells out.
-                </p>
-                <div style="background:#171717;padding:14px 24px;display:inline-block;margin-bottom:32px;">
-                  <a href="${siteUrl}/shop" style="color:#fff;font-size:11px;letter-spacing:.2em;text-transform:uppercase;text-decoration:none;">
-                    Return to Shop →
-                  </a>
-                </div>
-                <div style="border-top:1px solid #e5e5e5;padding-top:20px;margin-top:20px;">
-                  <p style="font-size:11px;color:#a3a3a3;text-transform:uppercase;letter-spacing:.15em;margin:0;">${bizName}</p>
-                </div>
-              </div>
-            </div>`,
-        });
-
-        if (ok) {
-            // Log so we don't double-send
-            await supabaseAdmin.from("abandoned_history").insert([{
-                order_id:       order.id,
-                customer_email: order.customer_email,
-                customer_name:  order.customer_name,
-            }]);
-            sent++;
-        } else {
-            errors.push(order.id);
-        }
-    }
+    const sent = results.filter(r => r.status === "fulfilled" && (r.value as any).success).length;
+    const errors = results
+        .filter(r => r.status === "rejected" || (r.status === "fulfilled" && !(r.value as any).success))
+        .map(r => r.status === "fulfilled" ? (r.value as any).id : String((r as PromiseRejectedResult).reason));
 
     console.log(`[cron/abandoned-cart] sent=${sent} errors=${errors.length}`);
     return NextResponse.json({ sent, errors: errors.length ? errors : undefined });

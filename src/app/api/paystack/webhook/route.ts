@@ -333,26 +333,34 @@ export async function POST(req: Request) {
                     );
 
                     // Strategy B: deduct from product_variants.inventory_count
-                    await Promise.allSettled(
-                        variantItems.map(async item => {
-                            const { data: variant } = await supabaseAdmin
-                                .from("product_variants")
-                                .select("id, inventory_count")
-                                .eq("product_id", item.productId)
-                                .eq("size", item.size ?? null)
-                                .eq("color", item.color ?? null)
-                                .eq("stitching", item.stitching ?? null)
-                                .maybeSingle();
+                    // Batch-fetch all variants for relevant products in one query, then match in memory
+                    if (variantItems.length > 0) {
+                        const variantProductIds = [...new Set(variantItems.map(i => i.productId))];
+                        const { data: allVariants } = await supabaseAdmin
+                            .from("product_variants")
+                            .select("id, product_id, size, color, stitching, inventory_count")
+                            .in("product_id", variantProductIds);
 
-                            if (variant && typeof variant.inventory_count === "number" && variant.inventory_count >= item.quantity) {
-                                return supabaseAdmin
-                                    .from("product_variants")
-                                    .update({ inventory_count: variant.inventory_count - item.quantity })
-                                    .eq("id", variant.id);
-                            }
-                            return Promise.resolve();
-                        })
-                    );
+                        const variantMap = ((allVariants ?? []) as Array<{ id: string; product_id: string; size: string | null; color: string | null; stitching: string | null; inventory_count: number | null }>).reduce((acc, v) => {
+                            const key = `${v.product_id}|${v.size ?? "null"}|${v.color ?? "null"}|${v.stitching ?? "null"}`;
+                            acc[key] = v;
+                            return acc;
+                        }, {} as Record<string, { id: string; inventory_count: number | null }>);
+
+                        await Promise.allSettled(
+                            variantItems.map(item => {
+                                const key = `${item.productId}|${item.size ?? "null"}|${item.color ?? "null"}|${item.stitching ?? "null"}`;
+                                const variant = variantMap[key];
+                                if (variant && typeof variant.inventory_count === "number" && variant.inventory_count >= item.quantity) {
+                                    return supabaseAdmin
+                                        .from("product_variants")
+                                        .update({ inventory_count: variant.inventory_count - item.quantity })
+                                        .eq("id", variant.id);
+                                }
+                                return Promise.resolve();
+                            })
+                        );
+                    }
 
                     // Revalidate product pages so updated stock is reflected immediately
                     const slugs = products
