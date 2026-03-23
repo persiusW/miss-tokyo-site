@@ -71,7 +71,7 @@ http.setResponseCallback(
     http.expectedStatuses(
         { min: 200, max: 299 }, // success
         301, 302, 303, 307, 308, // redirects (followed automatically)
-        401, 403,                // expected for unauthenticated checkout
+        400, 401, 403,           // expected: 400 = validation, 401/403 = unauthenticated checkout
     )
 );
 
