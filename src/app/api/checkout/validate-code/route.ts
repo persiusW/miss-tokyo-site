@@ -10,7 +10,7 @@ const lookupCode = unstable_cache(
         const [{ data: coupon }, { data: card }] = await Promise.all([
             supabaseAdmin
                 .from("coupons")
-                .select("id, code, discount_type, value, min_order_amount, max_uses, used_count, is_active")
+                .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, expires_at")
                 .ilike("code", normalized)
                 .maybeSingle(),
             supabaseAdmin
@@ -43,13 +43,13 @@ export async function POST(req: Request) {
             if (!coupon.is_active) {
                 return NextResponse.json({ valid: false, error: "This code has expired or is inactive." });
             }
-            if (coupon.max_uses !== null && coupon.used_count >= coupon.max_uses) {
+            if (coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit) {
                 return NextResponse.json({ valid: false, error: "This code has reached its maximum usage limit." });
             }
-            if (coupon.min_order_amount && sub < Number(coupon.min_order_amount)) {
+            if (coupon.min_order_value && sub < Number(coupon.min_order_value)) {
                 return NextResponse.json({
                     valid: false,
-                    error: `Minimum order of GH₵ ${Number(coupon.min_order_amount).toFixed(2)} required for this code.`,
+                    error: `Minimum order of GH₵ ${Number(coupon.min_order_value).toFixed(2)} required for this code.`,
                 });
             }
 
@@ -58,12 +58,12 @@ export async function POST(req: Request) {
 
             switch (coupon.discount_type) {
                 case "percentage":
-                    discount_amount = parseFloat(((sub * Number(coupon.value)) / 100).toFixed(2));
-                    label = `${Number(coupon.value)}% Off`;
+                    discount_amount = parseFloat(((sub * Number(coupon.discount_value)) / 100).toFixed(2));
+                    label = `${Number(coupon.discount_value)}% Off`;
                     break;
                 case "fixed":
-                    discount_amount = parseFloat(Math.min(Number(coupon.value), sub).toFixed(2));
-                    label = `GH₵ ${Number(coupon.value).toFixed(2)} Off`;
+                    discount_amount = parseFloat(Math.min(Number(coupon.discount_value), sub).toFixed(2));
+                    label = `GH₵ ${Number(coupon.discount_value).toFixed(2)} Off`;
                     break;
                 case "free_shipping":
                     discount_amount = 0;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Eye, EyeOff, Tag, X } from "lucide-react";
@@ -134,22 +134,36 @@ export default function CatalogProductsPage() {
         }
     };
 
-    const filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.category_type || "").toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
 
-    const toggleSelectAll = () => {
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
+        return () => clearTimeout(handler);
+    }, [searchQuery]);
+
+    const filteredProducts = useMemo(() => {
+        return products.filter((p: Product) =>
+            p.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+            (p.category_type || "").toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+        );
+    }, [products, debouncedSearchQuery]);
+
+    const toggleSelectAll = useCallback(() => {
         if (selectedIds.length === filteredProducts.length) {
             setSelectedIds([]);
         } else {
             setSelectedIds(filteredProducts.map(p => p.id));
         }
-    };
+    }, [selectedIds.length, filteredProducts]);
 
-    const toggleSelect = (id: string) => {
+    const toggleSelect = useCallback((id: string) => {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(pid => pid !== id) : [...prev, id]);
-    };
+    }, []);
+
+    const handleDeleteClick = useCallback((id: string) => setConfirmDeleteId(id), []);
+    const handleCancelDelete = useCallback(() => setConfirmDeleteId(null), []);
+    const handleConfirmDeleteRow = useCallback((id: string) => handleDelete(id), [products, selectedIds]); // handle delete has access to these anyway
+    const handleToggleActiveRow = useCallback((id: string, current: boolean) => handleToggleActive(id, current), [products]);
 
     return (
         <div className="space-y-12">
@@ -249,120 +263,20 @@ export default function CatalogProductsPage() {
                                 </td>
                             </tr>
                         ) : (
-                            filteredProducts.map((product) => {
-                                const variantTotal = product.track_variant_inventory
-                                    ? (product.product_variants || []).reduce((sum, v) => sum + (v.inventory_count ?? 0), 0)
-                                    : null;
-                                const displayCount = variantTotal !== null ? variantTotal : product.inventory_count;
-                                const isLowStock = product.track_inventory && displayCount < 5;
-                                const isConfirming = confirmDeleteId === product.id;
-                                const displaySku = product.sku || "—";
-
-                                return (
-                                    <tr
-                                        key={product.id}
-                                        className={`hover:bg-neutral-50 transition-colors cursor-pointer ${!product.is_active ? "opacity-50" : ""}`}
-                                        onClick={() => router.push(`/catalog/products/${product.id}/edit`)}
-                                    >
-                                        <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                                            <input
-                                                type="checkbox"
-                                                className="w-4 h-4 accent-black align-middle cursor-pointer"
-                                                checked={selectedIds.includes(product.id)}
-                                                onChange={() => toggleSelect(product.id)}
-                                            />
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 bg-neutral-100 relative overflow-hidden flex-shrink-0">
-                                                    {product.image_urls?.[0] ? (
-                                                        <img src={product.image_urls[0]} alt={product.name} className="object-cover w-full h-full" />
-                                                    ) : (
-                                                        <div className="w-full h-full bg-neutral-200" />
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-neutral-900">{product.name}</p>
-                                                    <div className="flex items-center gap-1.5 mt-1">
-                                                        <p className="text-xs text-neutral-500">{product.category_type || "No Primary Category"}</p>
-                                                        {product.category_ids && product.category_ids.length > 0 && (
-                                                            <span className="text-[10px] px-1.5 py-0.5 bg-neutral-100 text-neutral-400 rounded-full font-medium">
-                                                                +{product.category_ids.length}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-xs font-mono text-neutral-500">{displaySku}</span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${product.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-600'}`}>
-                                                {product.is_active ? 'Active' : 'Draft'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            {!product.track_inventory ? (
-                                                <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">Untracked</span>
-                                            ) : isLowStock ? (
-                                                <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1 rounded">
-                                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                                                    <span className="font-medium">{displayCount} left</span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-neutral-600 font-medium">{displayCount}</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-medium">
-                                            GH₵ {product.price_ghs}
-                                        </td>
-                                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                                            {isConfirming ? (
-                                                <div className="flex items-center gap-3 justify-end">
-                                                    <span className="text-xs text-neutral-500">Delete?</span>
-                                                    <button
-                                                        onClick={() => handleDelete(product.id)}
-                                                        className="text-xs uppercase tracking-widest text-red-600 hover:text-red-800 font-semibold"
-                                                    >
-                                                        Yes
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setConfirmDeleteId(null)}
-                                                        className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black"
-                                                    >
-                                                        No
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-3 justify-end">
-                                                    <button
-                                                        onClick={() => handleToggleActive(product.id, product.is_active)}
-                                                        className={`transition-colors ${product.is_active ? "text-neutral-400 hover:text-black" : "text-neutral-300 hover:text-black"}`}
-                                                        title={product.is_active ? "Hide from store" : "Show on store"}
-                                                    >
-                                                        {product.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
-                                                    </button>
-                                                    <Link
-                                                        href={`/catalog/products/${product.id}/edit`}
-                                                        className="text-neutral-400 hover:text-black transition-colors"
-                                                        title="Edit"
-                                                    >
-                                                        <Pencil size={15} />
-                                                    </Link>
-                                                    <button
-                                                        onClick={() => setConfirmDeleteId(product.id)}
-                                                        className="text-neutral-400 hover:text-red-600 transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={15} />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })
+                            filteredProducts.map((product: Product) => (
+                                <ProductRow
+                                    key={product.id}
+                                    product={product}
+                                    isSelected={selectedIds.includes(product.id)}
+                                    isConfirming={confirmDeleteId === product.id}
+                                    onToggleSelect={toggleSelect}
+                                    onToggleActive={handleToggleActiveRow}
+                                    onDeleteClick={handleDeleteClick}
+                                    onConfirmDelete={handleConfirmDeleteRow}
+                                    onCancelDelete={handleCancelDelete}
+                                    router={router}
+                                />
+                            ))
                         )}
                     </tbody>
                 </table>
@@ -428,3 +342,136 @@ export default function CatalogProductsPage() {
         </div>
     );
 }
+
+const ProductRow = React.memo(({
+    product,
+    isSelected,
+    isConfirming,
+    onToggleSelect,
+    onToggleActive,
+    onDeleteClick,
+    onConfirmDelete,
+    onCancelDelete,
+    router
+}: {
+    product: Product;
+    isSelected: boolean;
+    isConfirming: boolean;
+    onToggleSelect: (id: string) => void;
+    onToggleActive: (id: string, current: boolean) => void;
+    onDeleteClick: (id: string) => void;
+    onConfirmDelete: (id: string) => void;
+    onCancelDelete: () => void;
+    router: any;
+}) => {
+    const variantTotal = product.track_variant_inventory
+        ? (product.product_variants || []).reduce((sum, v) => sum + (v.inventory_count ?? 0), 0)
+        : null;
+    const displayCount = variantTotal !== null ? variantTotal : product.inventory_count;
+    const isLowStock = product.track_inventory && displayCount < 5;
+    const displaySku = product.sku || "—";
+
+    return (
+        <tr
+            className={`hover:bg-neutral-50 transition-colors cursor-pointer ${!product.is_active ? "opacity-50" : ""}`}
+            onClick={() => router.push(`/catalog/products/${product.id}/edit`)}
+        >
+            <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-black align-middle cursor-pointer"
+                    checked={isSelected}
+                    onChange={() => onToggleSelect(product.id)}
+                />
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-neutral-100 relative overflow-hidden flex-shrink-0">
+                        {product.image_urls?.[0] ? (
+                            <img src={product.image_urls[0]} alt={product.name} className="object-cover w-full h-full" />
+                        ) : (
+                            <div className="w-full h-full bg-neutral-200" />
+                        )}
+                    </div>
+                    <div>
+                        <p className="font-medium text-neutral-900">{product.name}</p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                            <p className="text-xs text-neutral-500">{product.category_type || "No Primary Category"}</p>
+                            {product.category_ids && product.category_ids.length > 0 && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-neutral-100 text-neutral-400 rounded-full font-medium">
+                                    +{product.category_ids.length}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td className="px-6 py-4">
+                <span className="text-xs font-mono text-neutral-500">{displaySku}</span>
+            </td>
+            <td className="px-6 py-4">
+                <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${product.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-600'}`}>
+                    {product.is_active ? 'Active' : 'Draft'}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-right">
+                {!product.track_inventory ? (
+                    <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">Untracked</span>
+                ) : isLowStock ? (
+                    <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1 rounded">
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                        <span className="font-medium">{displayCount} left</span>
+                    </div>
+                ) : (
+                    <span className="text-neutral-600 font-medium">{displayCount}</span>
+                )}
+            </td>
+            <td className="px-6 py-4 text-right font-medium">
+                GH₵ {product.price_ghs}
+            </td>
+            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                {isConfirming ? (
+                    <div className="flex items-center gap-3 justify-end">
+                        <span className="text-xs text-neutral-500">Delete?</span>
+                        <button
+                            onClick={() => onConfirmDelete(product.id)}
+                            className="text-xs uppercase tracking-widest text-red-600 hover:text-red-800 font-semibold"
+                        >
+                            Yes
+                        </button>
+                        <button
+                            onClick={onCancelDelete}
+                            className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black"
+                        >
+                            No
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-3 justify-end">
+                        <button
+                            onClick={() => onToggleActive(product.id, product.is_active)}
+                            className={`transition-colors ${product.is_active ? "text-neutral-400 hover:text-black" : "text-neutral-300 hover:text-black"}`}
+                            title={product.is_active ? "Hide from store" : "Show on store"}
+                        >
+                            {product.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
+                        </button>
+                        <Link
+                            href={`/catalog/products/${product.id}/edit`}
+                            className="text-neutral-400 hover:text-black transition-colors"
+                            title="Edit"
+                        >
+                            <Pencil size={15} />
+                        </Link>
+                        <button
+                            onClick={() => onDeleteClick(product.id)}
+                            className="text-neutral-400 hover:text-red-600 transition-colors"
+                            title="Delete"
+                        >
+                            <Trash2 size={15} />
+                        </button>
+                    </div>
+                )}
+            </td>
+        </tr>
+    );
+});

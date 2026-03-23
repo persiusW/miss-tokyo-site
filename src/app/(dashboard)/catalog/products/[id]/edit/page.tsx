@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -18,6 +18,65 @@ function makeVariantKey(size: string, color: string, stitching: string): string 
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
+
+const DebouncedInput = React.memo(({ id, value, onChange, type = "text", placeholder, className, required, min, step }: any) => {
+    const [localVal, setLocalVal] = useState(value);
+    
+    useEffect(() => {
+        setLocalVal(value);
+    }, [value]);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            if (localVal !== value) {
+                onChange({ target: { id, value: localVal, type } });
+            }
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [localVal, value, id, onChange, type]);
+
+    return (
+        <input
+            id={id}
+            type={type}
+            value={localVal}
+            onChange={(e) => setLocalVal(e.target.value)}
+            placeholder={placeholder}
+            className={className?.replace("transition-colors", "")}
+            required={required}
+            min={min}
+            step={step}
+        />
+    );
+});
+
+const DebouncedTextarea = React.memo(({ id, value, onChange, rows, placeholder, className }: any) => {
+    const [localVal, setLocalVal] = useState(value);
+    
+    useEffect(() => {
+        setLocalVal(value);
+    }, [value]);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            if (localVal !== value) {
+                onChange({ target: { id, value: localVal, type: "textarea" } });
+            }
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [localVal, value, id, onChange]);
+
+    return (
+        <textarea
+            id={id}
+            rows={rows}
+            value={localVal}
+            onChange={(e) => setLocalVal(e.target.value)}
+            placeholder={placeholder}
+            className={className?.replace("transition-colors", "")}
+        />
+    );
+});
 
 export default function EditProductPage() {
     const { id } = useParams<{ id: string }>();
@@ -148,13 +207,13 @@ export default function EditProductPage() {
         return combos;
     }, [selectedSizes, selectedColors, selectedStitching]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const handleChange = useCallback((e: any) => {
         const { id: fieldId, value, type } = e.target;
         setFormData(prev => ({
             ...prev,
-            [fieldId]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+            [fieldId]: type === "checkbox" ? e.target.checked : value,
         }));
-    };
+    }, []);
 
     const toggleSize = (size: string) => {
         setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]);
@@ -285,26 +344,26 @@ export default function EditProductPage() {
 
                             <div>
                                 <label htmlFor="name" className="block text-xs uppercase tracking-widest font-semibold mb-3">Product Name</label>
-                                <input
+                                <DebouncedInput
                                     type="text"
                                     id="name"
                                     value={formData.name}
                                     onChange={handleChange}
                                     required
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
                                 />
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
                                     <label htmlFor="slug" className="block text-xs uppercase tracking-widest font-semibold mb-3">URL Slug</label>
-                                    <input
+                                    <DebouncedInput
                                         type="text"
                                         id="slug"
                                         value={formData.slug}
                                         onChange={handleChange}
                                         required
-                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
                                     />
                                 </div>
                                 <div className="space-y-4">
@@ -361,23 +420,23 @@ export default function EditProductPage() {
 
                             <div>
                                 <label htmlFor="description" className="block text-xs uppercase tracking-widest font-semibold mb-3">Description</label>
-                                <textarea
+                                <DebouncedTextarea
                                     id="description"
                                     rows={4}
                                     value={formData.description}
                                     onChange={handleChange}
-                                    className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black transition-colors resize-y"
+                                    className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black resize-y"
                                 />
                             </div>
 
                             <div>
                                 <label htmlFor="sku" className="block text-xs uppercase tracking-widest font-semibold mb-3">SKU</label>
-                                <input
+                                <DebouncedInput
                                     type="text"
                                     id="sku"
                                     value={formData.sku}
                                     onChange={handleChange}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
                                     placeholder="e.g. MT-001"
                                 />
                             </div>
@@ -538,7 +597,7 @@ export default function EditProductPage() {
 
                             <div>
                                 <label htmlFor="price_ghs" className="block text-xs uppercase tracking-widest font-semibold mb-3">Price (GHS)</label>
-                                <input
+                                <DebouncedInput
                                     type="number"
                                     id="price_ghs"
                                     value={formData.price_ghs}
@@ -546,7 +605,7 @@ export default function EditProductPage() {
                                     min="0"
                                     step="0.01"
                                     required
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
                                 />
                             </div>
 
