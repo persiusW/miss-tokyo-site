@@ -80,6 +80,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Invalid amount calculation" }, { status: 400 });
         }
 
+        // Apply platform fee server-side — never trust client-supplied fee amounts
+        const { data: storeFeeSettings } = await supabaseAdmin
+            .from("store_settings")
+            .select("platform_fee_percentage, platform_fee_label")
+            .eq("id", "default")
+            .maybeSingle();
+
+        const feePct = Number(storeFeeSettings?.platform_fee_percentage) || 0;
+        const platformFeeAmount = feePct > 0
+            ? parseFloat((amountInGHS * feePct / 100).toFixed(2))
+            : 0;
+        const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
+        const amountWithFee = parseFloat((amountInGHS + platformFeeAmount).toFixed(2));
+
         const paystackSecret = process.env.PAYSTACK_SECRET_KEY || "";
         if (!paystackSecret) {
             return NextResponse.json({
@@ -102,7 +116,7 @@ export async function POST(request: Request) {
                     region: clientMetadata.region || null,
                 } : null,
                 delivery_method: clientMetadata?.deliveryMethod || "delivery",
-                total_amount: amountInGHS,
+                total_amount: amountWithFee,
                 status: "pending",
                 items: cartArr,
                 discount_code: clientMetadata?.discount_code || null,
@@ -123,7 +137,7 @@ export async function POST(request: Request) {
 
         const orderId = pendingOrder.id;
 
-        const amountInPesewas = amountInGHS * 100;
+        const amountInPesewas = amountWithFee * 100;
         const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
         const siteUrl = rawSiteUrl.replace(/\/+$/, "");
 
@@ -158,6 +172,9 @@ export async function POST(request: Request) {
                     productId,
                     orderId,
                     cartItems: cartArr.length > 0 ? JSON.stringify(cartArr) : undefined,
+                    // Override client-supplied fee values with server-calculated ones
+                    platform_fee_amount: platformFeeAmount > 0 ? platformFeeAmount : undefined,
+                    platform_fee_label: platformFeeLabel,
                 },
             }),
         });

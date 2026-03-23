@@ -49,14 +49,34 @@ const COLOR_HEX: Record<string, string> = {
 };
 
 const SIZE_TABLE = [
-    { label: "XS — 6",  uk: "6–8",   bust: "80–84",   waist: "62–66", hips: "88–92"   },
-    { label: "S — 8",   uk: "8–10",  bust: "84–88",   waist: "66–70", hips: "92–96"   },
+    { label: "XS-6",  uk: "6–8",   bust: "80–84",   waist: "62–66", hips: "88–92"   },
+    { label: "S-8",   uk: "8–10",  bust: "84–88",   waist: "66–70", hips: "92–96"   },
     { label: "Free (8–14)", uk: "8–14", bust: "84–96", waist: "66–78", hips: "92–104" },
-    { label: "M — 10",  uk: "10–12", bust: "88–92",   waist: "70–74", hips: "96–100"  },
-    { label: "L — 12",  uk: "12–14", bust: "92–96",   waist: "74–78", hips: "100–104" },
-    { label: "XL — 14", uk: "14–16", bust: "96–100",  waist: "78–82", hips: "104–108" },
-    { label: "XXL — 16", uk: "18–20", bust: "104–108", waist: "86–90", hips: "112–116" },
+    { label: "M-10",  uk: "10–12", bust: "88–92",   waist: "70–74", hips: "96–100"  },
+    { label: "L-12",  uk: "12–14", bust: "92–96",   waist: "74–78", hips: "100–104" },
+    { label: "XL-14", uk: "14–16", bust: "96–100",  waist: "78–82", hips: "104–108" },
+    { label: "XXL-16", uk: "18–20", bust: "104–108", waist: "86–90", hips: "112–116" },
 ];
+
+// Canonical brand size labels: XS-6, S-8, M-10, L-12, XL-14, XXL-16
+const SIZE_CANONICAL: Record<string, string> = {
+    XS: "XS-6", S: "S-8", M: "M-10", L: "L-12", XL: "XL-14", XXL: "XXL-16",
+};
+
+/**
+ * Normalizes any stored size format to the canonical brand label.
+ * Handles: plain ("M"), em-dash ("M — 10"), hyphen ("M-10") → "M-10"
+ * Unknown formats (e.g. "Free (8-14)") are returned as-is.
+ */
+function displaySizeLabel(raw: string): string {
+    // Already canonical hyphen format
+    if (/^(XXL|XL|XS|[SML])-\d+$/.test(raw)) return raw;
+    // Em-dash format: "S — 8", "XL — 14"
+    const emDash = raw.match(/^(XXL|XL|XS|[SML])\s*[—–]\s*\d+$/);
+    if (emDash) return SIZE_CANONICAL[emDash[1]] ?? raw;
+    // Plain format: "M", "XL"
+    return SIZE_CANONICAL[raw] ?? raw;
+}
 
 function Stars({ rating }: { rating: number }) {
     return (
@@ -102,11 +122,21 @@ export function ProductOptions(props: Props) {
         ? colorVariants
         : (availableColors || []).map(n => ({ name: n, hex: COLOR_HEX[n] || "#E8D5C4", in_stock: true }));
 
-    // available_sizes is the admin-managed source of truth and always has the current format.
-    // size_variants is a stale JSONB column that may contain old-format labels — prefer available_sizes.
-    const sizes: SizeVariant[] = availableSizes && availableSizes.length > 0
-        ? availableSizes.map(l => ({ label: l, in_stock: true }))
-        : (sizeVariants || []);
+    // available_sizes is the admin-managed source of truth.
+    // Deduplicate by normalized display label so mixed-format DB arrays (e.g. both
+    // "M — 10" and "M" in available_sizes) don't produce duplicate buttons.
+    const sizes: SizeVariant[] = (() => {
+        const raw = availableSizes && availableSizes.length > 0
+            ? availableSizes.map(l => ({ label: l, in_stock: true }))
+            : (sizeVariants || []);
+        const seen = new Set<string>();
+        return raw.filter(s => {
+            const key = displaySizeLabel(s.label);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    })();
 
     const [selectedColor, setSelectedColor] = useState<string>(colors[0]?.name ?? "");
     const [selectedSize, setSelectedSize] = useState<string>(sizes.find(s => s.in_stock)?.label ?? "");
@@ -164,7 +194,12 @@ export function ProductOptions(props: Props) {
         return match?.inventory_count ?? 0;
     }, [trackVariantInventory, productVariants, selectedSize, selectedColor, inventoryCount]);
 
-    const isOutOfStock = trackVariantInventory && effectiveInventory === 0;
+    // Out of stock when effectiveInventory is 0.
+    // effectiveInventory already handles both cases:
+    //   - variant tracking ON  → per-variant count for selected size+colour
+    //   - variant tracking OFF → product-level inventoryCount
+    // 9999 is the sentinel for "unlimited stock" and is never === 0.
+    const isOutOfStock = effectiveInventory === 0;
     const [wishlisted, setWishlisted] = useState(false);
     const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
     const [addedToBag, setAddedToBag] = useState(false);
@@ -206,6 +241,10 @@ export function ProductOptions(props: Props) {
     const doAddToCart = (): boolean => {
         if (sizes.length > 0 && !selectedSize) {
             toast.error("Please select a size");
+            return false;
+        }
+        if (isOutOfStock) {
+            toast.error("This item is out of stock");
             return false;
         }
         addItem({
@@ -419,7 +458,7 @@ export function ProductOptions(props: Props) {
                     <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted, #7A7167)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
                         Size{" "}
                         <span style={{ fontWeight: 400, color: "var(--ink, #141210)", letterSpacing: 0, textTransform: "none", fontSize: 12 }}>
-                            {selectedSize || "Select a size"}
+                            {selectedSize ? displaySizeLabel(selectedSize) : "Select a size"}
                         </span>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
@@ -453,7 +492,7 @@ export function ProductOptions(props: Props) {
                                         overflow: "hidden",
                                     }}
                                 >
-                                    {s.label}
+                                    {displaySizeLabel(s.label)}
                                     {/* Diagonal line overlay for OOS sizes */}
                                     {!inStock && (
                                         <span style={{
@@ -561,12 +600,15 @@ export function ProductOptions(props: Props) {
                 </button>
                 <button
                     onClick={handleBuyNow}
+                    disabled={isOutOfStock}
                     style={{
                         width: "100%", padding: "15px 24px",
-                        background: "var(--gold, #C9A96E)", color: "var(--ink, #141210)",
+                        background: isOutOfStock ? "#D1D5DB" : "var(--gold, #C9A96E)",
+                        color: isOutOfStock ? "#9CA3AF" : "var(--ink, #141210)",
                         border: "none", borderRadius: 2,
                         fontSize: 12, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase",
-                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        cursor: isOutOfStock ? "default" : "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                         transition: "background 0.18s",
                     }}
                 >
