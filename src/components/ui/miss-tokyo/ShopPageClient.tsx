@@ -97,6 +97,8 @@ function ShopProductCard({
                             loop
                             muted
                             playsInline
+                            preload="none"
+                            poster={product.image_urls?.find(u => !isVideoUrl(u))}
                             className="absolute inset-0 w-full h-full object-cover"
                         />
                     ) : (
@@ -104,7 +106,7 @@ function ShopProductCard({
                             src={imgSrc}
                             alt={product.name}
                             fill
-                            quality={85}
+                            quality={90}
                             priority={priority}
                             sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
                             className={`object-cover transition-all duration-700 ease-in-out ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.04]"}`}
@@ -116,7 +118,7 @@ function ShopProductCard({
                             src={hoverSrc}
                             alt={`${product.name} alternate view`}
                             fill
-                            quality={85}
+                            quality={90}
                             sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
                             className="object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-in-out"
                             onError={() => setHoverSrc(undefined)}

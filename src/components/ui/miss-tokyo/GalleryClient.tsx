@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Plus, ChevronLeft, Loader2, Check } from "lucide-react";
 import { QuickViewModal } from "@/components/ui/miss-tokyo/QuickViewModal";
 import { useCart } from "@/store/useCart";
-import { toast } from "@/lib/toast";
+import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import type { VideoProduct } from "@/lib/products";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -37,28 +37,25 @@ function VideoCard({
     const [addState, setAddState] = useState<"idle" | "loading" | "success">("idle");
     const addItem = useCart(s => s.addItem);
 
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    onVisible(index);
-                    videoRef.current?.play().catch(() => {});
-                } else {
-                    if (videoRef.current) {
-                        videoRef.current.pause();
-                        videoRef.current.currentTime = 0;
-                    }
-                }
-            },
-            { threshold: 0.8 },
-        );
+    // Use the shared hook for viewport detection — threshold 0.8 matches the old inline observer
+    const [containerRef, isVisible] = useIntersectionObserver<HTMLDivElement>({ threshold: 0.8 });
 
-        if (videoRef.current) observer.observe(videoRef.current);
-        return () => {
-            observer.disconnect();
-            if (resetTimer.current) clearTimeout(resetTimer.current);
-        };
-    }, [index, onVisible]);
+
+    // Play/pause based on intersection, notify parent of active index
+    useEffect(() => {
+        if (isVisible) {
+            onVisible(index);
+            videoRef.current?.play().catch(() => {});
+        } else {
+            if (videoRef.current) {
+                videoRef.current.pause();
+                videoRef.current.currentTime = 0;
+            }
+        }
+    }, [isVisible, index, onVisible]);
+
+    // Cleanup timer on unmount
+    useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
 
     const handleQuickAdd = () => {
         if ((product.available_sizes?.length || 0) > 0 || (product.available_colors?.length || 0) > 0) {
@@ -83,7 +80,13 @@ function VideoCard({
     };
 
     return (
-        <div className="relative h-full w-full snap-start overflow-hidden bg-neutral-950 flex flex-col lg:flex-row">
+        // content-visibility:auto lets the browser skip rendering offscreen cards.
+        // contain-intrinsic-block-size tells it each card is 100dvh tall so snap
+        // scroll positions remain correct even for unpainted items.
+        <div
+            ref={containerRef}
+            className="relative h-full w-full snap-start overflow-hidden bg-neutral-950 flex flex-col lg:flex-row [content-visibility:auto] [contain-intrinsic-block-size:100dvh]"
+        >
             {/* Media Column */}
             <div className="relative w-full h-full lg:w-[60%] bg-neutral-900 group">
                 {!isLoaded && (
@@ -94,11 +97,14 @@ function VideoCard({
                 <video
                     ref={videoRef}
                     src={product.video_url}
+                    // poster shows the first product image while the video is loading/paused
                     poster={product.image_urls?.[0]}
                     muted
                     loop
                     playsInline
-                    preload={priority ? "auto" : "metadata"}
+                    // Priority cards preload eagerly; all others wait until they enter
+                    // the viewport so mobile devices don't waste bandwidth on off-screen videos
+                    preload={priority ? "auto" : "none"}
                     onCanPlayThrough={() => setIsLoaded(true)}
                     className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-700 ${
                         isLoaded ? "opacity-100" : "opacity-0"
@@ -292,7 +298,7 @@ export function GalleryClient({
             {/* Snapping Container */}
             <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth hide-scrollbar">
                 {videos.map((product, index) => (
-                    <div key={product.id} className="h-[100dvh] w-full snap-start">
+                    <div key={product.id} className="h-[100dvh] w-full">
                         <VideoCard
                             product={product}
                             index={index}
