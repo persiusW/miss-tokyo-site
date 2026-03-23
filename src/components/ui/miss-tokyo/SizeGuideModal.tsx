@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -49,7 +50,7 @@ export function SizeGuideModal() {
                 Size Guide
             </button>
 
-            {open && (
+            {open && createPortal(
                 <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
                     <div className="relative bg-white max-w-lg w-full p-8 z-10 max-h-[90vh] overflow-y-auto">
@@ -88,7 +89,8 @@ export function SizeGuideModal() {
                             Between sizes? We recommend sizing up for a relaxed fit or sizing down for a more fitted look.
                         </p>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );

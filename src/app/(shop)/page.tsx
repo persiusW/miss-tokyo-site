@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { TrustBar } from "@/components/public/TrustBar";
 import { HeroSlider } from "@/components/public/HeroSlider";

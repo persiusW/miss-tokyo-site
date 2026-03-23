@@ -258,6 +258,26 @@ export default function OrderDetailPage() {
         setUpdating(false);
     };
 
+    const [resending, setResending] = useState(false);
+
+    const handleResendConfirmation = async () => {
+        if (!order) return;
+        setResending(true);
+        try {
+            const res = await fetch("/api/admin/orders/resend-confirmation", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: order.id }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.errors?.join(", ") || "Failed to resend");
+            toast.success("Order confirmation resent via email & SMS.");
+        } catch (err: any) {
+            toast.error(err.message || "Failed to resend confirmation.");
+        }
+        setResending(false);
+    };
+
     const copyDetails = () => {
         if (!order) return;
         const text = [
@@ -393,6 +413,15 @@ export default function OrderDetailPage() {
                         className="px-5 py-2.5 text-xs uppercase tracking-widest border border-neutral-200 hover:border-black text-neutral-500 hover:text-black transition-colors">
                         Copy Details
                     </button>
+                    {["paid", "processing", "packed", "shipped", "ready_for_pickup", "fulfilled", "delivered"].includes(order.status) && (
+                        <button
+                            onClick={handleResendConfirmation}
+                            disabled={resending}
+                            className="px-5 py-2.5 text-xs uppercase tracking-widest border border-neutral-200 hover:border-black text-neutral-500 hover:text-black transition-colors disabled:opacity-50"
+                        >
+                            {resending ? "Sending..." : "Resend Confirmation"}
+                        </button>
+                    )}
                     <button onClick={() => window.print()}
                         className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors">
                         <Printer size={14} /> Print Receipt

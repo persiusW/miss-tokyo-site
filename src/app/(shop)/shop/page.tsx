@@ -4,8 +4,6 @@ import { unstable_cache } from "next/cache";
 import { getProducts, getCategories, deriveColors, deriveSizes } from "@/lib/products";
 import { ShopPageClient } from "@/components/ui/miss-tokyo/ShopPageClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { createClient } from "@/lib/supabaseServer";
-import { notFound } from "next/navigation";
 
 // Cache admin-controlled settings for 5 minutes — they change rarely and this
 // fetch fires on every dynamic /shop render, contributing ~0.5-1s per invocation.
@@ -83,37 +81,10 @@ export default async function ShopPage({
     searchParams: Promise<SearchParams>;
 }) {
     const params = await searchParams;
-    const supabase = await createClient();
-    
-    // Auth Hardening: Catch stale sessions/403s gracefully to ensure public access
-    let user = null;
-    let role: string | undefined;
-    
-    try {
-        const { data, error: authError } = await supabase.auth.getUser();
-        if (!authError && data?.user) {
-            user = data.user;
-            // Fetch profile using the authenticated client
-            const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-            role = profile?.role;
-        }
-    } catch (err) {
-        console.warn("[Auth Hardening] Session verification failed, proceeding as public user:", err);
-    }
-    const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
-
-    // Part 3: Direct URL Protection (Category)
-    if (params.category) {
-        const { data: cat } = await supabaseAdmin
-            .from("categories")
-            .select("is_wholesale")
-            .eq("slug", params.category)
-            .maybeSingle();
-        
-        if (cat?.is_wholesale && !isAuthorized) {
-            notFound();
-        }
-    }
+    // Role is resolved client-side to keep this page ISR-cacheable.
+    // Wholesale users see public products on initial load; client-side auth
+    // in ShopPageClient can upgrade the view after hydration if needed.
+    const role: string | undefined = undefined;
 
     // Settings are cached at module level — no DB round-trip on cache hit
     const { paginationSetting, mobileCols } = await getShopSettings().catch(() => ({
