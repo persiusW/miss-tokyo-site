@@ -43,6 +43,7 @@ export default function EditProductPage() {
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
+        sku: "",
         price_ghs: 0,
         inventory_count: 0,
         description: "",
@@ -76,6 +77,7 @@ export default function EditProductPage() {
         setFormData({
             name: product.name || "",
             slug: product.slug || "",
+            sku: product.sku || "",
             price_ghs: product.price_ghs || 0,
             inventory_count: product.inventory_count || 0,
             description: product.description || "",
@@ -189,6 +191,7 @@ export default function EditProductPage() {
                     id,
                     name: formData.name,
                     slug: formData.slug,
+                    sku: formData.sku || null,
                     price_ghs: Number(formData.price_ghs),
                     inventory_count: trackInventory && !trackVariantInventory ? Number(formData.inventory_count) : 9999,
                     track_inventory: trackInventory,
@@ -205,27 +208,22 @@ export default function EditProductPage() {
                     wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
                     wholesale_price_tier_2: wholesaleOverride && wholesalePrices.tier2 ? Number(wholesalePrices.tier2) : null,
                     wholesale_price_tier_3: wholesaleOverride && wholesalePrices.tier3 ? Number(wholesalePrices.tier3) : null,
+                    // Variants sent here so the server uses the service role key (bypasses RLS)
+                    variants: (trackInventory && trackVariantInventory && variantCombos.length > 0)
+                        ? variantCombos.map(c => ({
+                            product_id: id,
+                            size: c.size || null,
+                            color: c.color || null,
+                            stitching: c.stitching || null,
+                            sku: variantData[c.key]?.sku || null,
+                            inventory_count: variantData[c.key]?.inventory_count ?? 0,
+                        }))
+                        : undefined,
                 }),
             });
 
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || "Failed to update product");
-
-            // Upsert variant rows when variant inventory tracking is on
-            if (trackInventory && trackVariantInventory && variantCombos.length > 0) {
-                const rows = variantCombos.map(c => ({
-                    product_id: id,
-                    size: c.size || null,
-                    color: c.color || null,
-                    stitching: c.stitching || null,
-                    sku: variantData[c.key]?.sku || null,
-                    inventory_count: variantData[c.key]?.inventory_count ?? 0,
-                }));
-                const { error: variantErr } = await supabase
-                    .from("product_variants")
-                    .upsert(rows, { onConflict: "product_id,size,color,stitching" });
-                if (variantErr) console.error("[variants] upsert failed:", variantErr.message);
-            }
 
             toast.success("Product updated.");
             router.push("/catalog/products");
@@ -369,6 +367,18 @@ export default function EditProductPage() {
                                     value={formData.description}
                                     onChange={handleChange}
                                     className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black transition-colors resize-y"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="sku" className="block text-xs uppercase tracking-widest font-semibold mb-3">SKU</label>
+                                <input
+                                    type="text"
+                                    id="sku"
+                                    value={formData.sku}
+                                    onChange={handleChange}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                    placeholder="e.g. MT-001"
                                 />
                             </div>
 

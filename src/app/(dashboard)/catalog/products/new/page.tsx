@@ -29,6 +29,7 @@ export default function NewProductPage() {
     const [formData, setFormData] = useState({
         name: "",
         slug: "",
+        sku: "",
         price_ghs: 300,
         inventory_count: 10,
         description: "",
@@ -109,6 +110,7 @@ export default function NewProductPage() {
                 body: JSON.stringify({
                     name: formData.name,
                     slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+                    sku: formData.sku || null,
                     price_ghs: Number(formData.price_ghs),
                     inventory_count: trackInventory ? Number(formData.inventory_count) : 9999,
                     track_inventory: trackInventory,
@@ -266,6 +268,18 @@ export default function NewProductPage() {
                                     onChange={handleChange}
                                     className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black transition-colors resize-y"
                                     placeholder="Describe the materials and craftsmanship..."
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="sku" className="block text-xs uppercase tracking-widest font-semibold mb-3">SKU</label>
+                                <input
+                                    type="text"
+                                    id="sku"
+                                    value={formData.sku}
+                                    onChange={handleChange}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                    placeholder="e.g. MT-001"
                                 />
                             </div>
                         </div>

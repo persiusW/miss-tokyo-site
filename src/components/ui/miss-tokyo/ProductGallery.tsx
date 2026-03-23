@@ -114,8 +114,7 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                                             alt={name}
                                             fill
                                             priority={i === 0}
-                                            sizes="(max-width: 768px) 100vw, 50vw"
-                                            unoptimized={true}
+                                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
                                             className="object-cover"
                                         />
                                     )}
@@ -191,7 +190,6 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                                     fill
                                     sizes="80px"
                                     loading="lazy"
-                                    unoptimized={true}
                                     className="object-cover"
                                 />
                             )}

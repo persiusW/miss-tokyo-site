@@ -16,9 +16,10 @@ type Product = {
     price_ghs: number;
     inventory_count: number;
     track_inventory: boolean;
+    track_variant_inventory: boolean;
     is_active: boolean;
     image_urls: string[] | null;
-    product_variants: { sku: string | null }[] | null;
+    product_variants: { sku: string | null; inventory_count: number | null }[] | null;
 };
 
 type WholesaleCategory = {
@@ -44,7 +45,7 @@ export default function CatalogProductsPage() {
     const fetchProducts = useCallback(async () => {
         const { data } = await supabase
             .from("products")
-            .select("id, name, slug, category_type, category_ids, price_ghs, inventory_count, track_inventory, is_active, image_urls, product_variants(sku)")
+            .select("id, name, slug, category_type, category_ids, price_ghs, inventory_count, track_inventory, track_variant_inventory, is_active, image_urls, product_variants(sku, inventory_count)")
             .order("created_at", { ascending: false });
         setProducts(data || []);
         setLoading(false);
@@ -248,7 +249,11 @@ export default function CatalogProductsPage() {
                             </tr>
                         ) : (
                             filteredProducts.map((product) => {
-                                const isLowStock = product.track_inventory && product.inventory_count < 5;
+                                const variantTotal = product.track_variant_inventory
+                                    ? (product.product_variants || []).reduce((sum, v) => sum + (v.inventory_count ?? 0), 0)
+                                    : null;
+                                const displayCount = variantTotal !== null ? variantTotal : product.inventory_count;
+                                const isLowStock = product.track_inventory && displayCount < 5;
                                 const isConfirming = confirmDeleteId === product.id;
                                 const firstSku = product.product_variants?.[0]?.sku || "—";
 
@@ -302,10 +307,10 @@ export default function CatalogProductsPage() {
                                             ) : isLowStock ? (
                                                 <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1 rounded">
                                                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                                                    <span className="font-medium">{product.inventory_count || 0} left</span>
+                                                    <span className="font-medium">{displayCount} left</span>
                                                 </div>
                                             ) : (
-                                                <span className="text-neutral-600 font-medium">{product.inventory_count || 0}</span>
+                                                <span className="text-neutral-600 font-medium">{displayCount}</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right font-medium">

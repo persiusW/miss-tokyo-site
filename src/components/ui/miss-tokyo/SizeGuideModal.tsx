@@ -12,12 +12,12 @@ interface SizeRow {
 }
 
 const DEFAULTS: SizeRow[] = [
-    { label: "XS",  bust: "80–83",   waist: "62–65",  hips: "88–91"   },
-    { label: "S",   bust: "84–87",   waist: "66–69",  hips: "92–95"   },
-    { label: "M",   bust: "88–91",   waist: "70–73",  hips: "96–99"   },
-    { label: "L",   bust: "92–96",   waist: "74–78",  hips: "100–104" },
-    { label: "XL",  bust: "97–102",  waist: "79–84",  hips: "105–110" },
-    { label: "XXL", bust: "103–110", waist: "85–92",  hips: "111–118" },
+    { label: "XS — 6",  bust: "80–83",   waist: "62–65",  hips: "88–91"   },
+    { label: "S — 8",   bust: "84–87",   waist: "66–69",  hips: "92–95"   },
+    { label: "M — 10",  bust: "88–91",   waist: "70–73",  hips: "96–99"   },
+    { label: "L — 12",  bust: "92–96",   waist: "74–78",  hips: "100–104" },
+    { label: "XL — 14", bust: "97–102",  waist: "79–84",  hips: "105–110" },
+    { label: "XXL — 16", bust: "103–110", waist: "85–92", hips: "111–118" },
 ];
 
 export function SizeGuideModal() {
@@ -50,7 +50,7 @@ export function SizeGuideModal() {
             </button>
 
             {open && (
-                <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
                     <div className="relative bg-white max-w-lg w-full p-8 z-10 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-6">

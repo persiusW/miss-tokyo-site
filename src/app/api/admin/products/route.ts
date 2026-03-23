@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     const {
         name,
         slug,
+        sku,
         price_ghs,
         inventory_count,
         track_inventory,
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
         .insert([{
             name,
             slug,
+            sku: sku ?? null,
             price_ghs: Number(price_ghs),
             inventory_count: track_inventory ? Number(inventory_count) : 9999,
             track_inventory: track_inventory ?? true,
@@ -116,9 +118,11 @@ export async function PATCH(req: NextRequest) {
     const {
         name,
         slug,
+        sku,
         price_ghs,
         inventory_count,
         track_inventory,
+        track_variant_inventory,
         description,
         category_type,
         category_ids,
@@ -131,6 +135,7 @@ export async function PATCH(req: NextRequest) {
         wholesale_price_tier_1,
         wholesale_price_tier_2,
         wholesale_price_tier_3,
+        variants,
     } = fields;
 
     // 1. Fetch current record for diffing
@@ -143,9 +148,11 @@ export async function PATCH(req: NextRequest) {
     const updateFields = {
         name,
         slug,
+        sku: sku ?? null,
         price_ghs: Number(price_ghs),
         inventory_count: track_inventory ? Number(inventory_count) : 9999,
         track_inventory: track_inventory ?? true,
+        track_variant_inventory: track_variant_inventory ?? false,
         description,
         category_type,
         category_ids: category_ids ?? [],
@@ -169,6 +176,19 @@ export async function PATCH(req: NextRequest) {
     if (error) {
         console.error("[admin/products PATCH]", error);
         return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
+    }
+
+    // Save variants: delete existing then insert fresh.
+    // Avoids NULL conflict key issues (NULL != NULL in SQL breaks ON CONFLICT).
+    if (Array.isArray(variants) && variants.length > 0) {
+        await supabaseAdmin.from("product_variants").delete().eq("product_id", id);
+        const { error: variantErr } = await supabaseAdmin
+            .from("product_variants")
+            .insert(variants);
+        if (variantErr) {
+            console.error("[admin/products PATCH] variant insert failed:", variantErr.message);
+            return NextResponse.json({ error: `Variant save failed: ${variantErr.message}` }, { status: 500 });
+        }
     }
 
     // LOG ACTIVITY

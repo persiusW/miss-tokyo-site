@@ -33,7 +33,7 @@ export default async function ShopLayout({
                 <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                     <h1 className="font-serif text-4xl md:text-5xl tracking-widest uppercase mb-6">MISS TOKYO</h1>
                     <p className="text-neutral-500 tracking-widest uppercase text-sm max-w-md mx-auto leading-relaxed">
-                        We are currently preparing something new. <br /><br /> Our atelier will return shortly.
+                        We are currently preparing something new. <br /><br /> Our Shop will return shortly.
                     </p>
                 </main>
             </div>
