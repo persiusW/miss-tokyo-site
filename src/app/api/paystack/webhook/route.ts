@@ -27,7 +27,8 @@ async function sendAdminPushNotifications(title: string, body: string, url = "/s
 
     const { data: subs } = await supabaseAdmin
         .from("admin_push_subscriptions")
-        .select("endpoint, p256dh, auth");
+        .select("endpoint, p256dh, auth")
+        .limit(50);
 
     if (!subs?.length) return;
 
@@ -124,7 +125,7 @@ async function trackDiscountUsage(
             .from("coupons")
             .select("id, used_count")
             .ilike("code", code)
-            .single();
+            .maybeSingle();
         if (coupon) {
             await supabaseAdmin
                 .from("coupons")
@@ -139,7 +140,7 @@ async function trackDiscountUsage(
             .from("gift_cards")
             .select("id, remaining_value")
             .ilike("code", code)
-            .single();
+            .maybeSingle();
         if (card) {
             // Use the server-validated redemption record — do not trust metadata discount_amount
             const { data: redemption } = await supabaseAdmin

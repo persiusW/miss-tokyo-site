@@ -10,8 +10,9 @@ export default async function OrdersPage() {
     const [{ data: orders }, stats] = await Promise.all([
         supabase
             .from("orders")
-            .select("*")
-            .order("created_at", { ascending: false }),
+            .select("id, customer_name, customer_email, customer_phone, total_amount, status, paystack_reference, shipping_address, delivery_method, created_at")
+            .order("created_at", { ascending: false })
+            .limit(500),
         fetchOrderStats(),
     ]);
 

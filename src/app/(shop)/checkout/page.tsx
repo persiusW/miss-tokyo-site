@@ -46,7 +46,8 @@ type AppliedDiscount = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CheckoutPage() {
-    const { items, totalAmount } = useCart();
+    const items = useCart(s => s.items);
+    const totalAmount = useCart(s => s.totalAmount);
     const [mounted, setMounted] = useState(false);
     const [loading, setLoading] = useState(false);
 

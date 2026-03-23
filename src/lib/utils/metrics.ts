@@ -177,10 +177,16 @@ export async function fetchSalesByCategory(): Promise<CategoryRevenue[]> {
  * Only counts revenue-qualifying orders.
  */
 export async function fetchMonthlyRevenue(monthsBack = 6): Promise<MonthlyRevenue[]> {
+    const since = new Date();
+    since.setMonth(since.getMonth() - monthsBack);
+    since.setDate(1);
+    since.setHours(0, 0, 0, 0);
+
     const { data, error } = await supabase
         .from("orders")
         .select("total_amount, created_at")
         .in("status", [...REVENUE_STATUSES])
+        .gte("created_at", since.toISOString())
         .order("created_at", { ascending: true });
 
     if (error) {
