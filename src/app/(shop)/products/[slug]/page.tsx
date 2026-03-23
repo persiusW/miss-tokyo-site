@@ -113,20 +113,21 @@ export default async function ProductPage({
     // Step 2: only read cookies if this product actually requires auth gating.
     // For retail products (the vast majority) we skip createClient() entirely,
     // which preserves the ISR static cache and prevents DB hammering under load.
+    // createClient() is inside try/catch so static generation (no cookies context)
+    // doesn't throw an uncaught error and fail the build.
     if (isWholesaleOnly) {
-        const supabase = await createClient();
-        let authUser = null;
+        let isAuthorized = false;
         try {
+            const supabase = await createClient();
             const { data } = await supabase.auth.getUser();
-            authUser = data?.user || null;
+            const authUser = data?.user || null;
+            if (authUser) {
+                const { data: profile } = await supabase.from("profiles").select("role").eq("id", authUser.id).maybeSingle();
+                const role = profile?.role;
+                isAuthorized = !!(role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase()));
+            }
         } catch (err) {
             console.warn("[PDP] Wholesale gate auth check failed:", err);
-        }
-        let isAuthorized = false;
-        if (authUser) {
-            const { data: profile } = await supabase.from("profiles").select("role").eq("id", authUser.id).maybeSingle();
-            const role = profile?.role;
-            isAuthorized = !!(role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase()));
         }
         if (!isAuthorized) notFound();
     }
