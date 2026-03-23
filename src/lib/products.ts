@@ -61,88 +61,91 @@ const getCachedCategories = unstable_cache(
     { revalidate: 60 }
 );
 
-export async function getProducts(params: GetProductsParams, role?: string) {
-    const { category, sort, color, size, min, max, page = 1, q, sale, inStock } = params;
-    const db = createClient();
+const getCachedProducts = unstable_cache(
+    async (params: GetProductsParams, role?: string) => {
+        const { category, sort, color, size, min, max, page = 1, q, sale, inStock } = params;
+        const db = createClient();
 
-    // ── PERF-02: Resolve category slug and fetch price bounds in parallel ──────
-    // Category resolve must complete before we can build the filter on the main query.
-    // Price bounds and name map are fully independent — run them concurrently.
-    const [catResult, minBoundResult, maxBoundResult, allCats] = await Promise.all([
-        category
-            ? db.from("categories").select("id, name").eq("slug", category).maybeSingle()
-            : Promise.resolve({ data: null }),
-        // PERF-04: two limit-1 queries instead of loading all prices into memory
-        db.from("products").select("price_ghs").eq("is_active", true).order("price_ghs", { ascending: true }).limit(1),
-        db.from("products").select("price_ghs").eq("is_active", true).order("price_ghs", { ascending: false }).limit(1),
-        getCachedCategories(),
-    ]);
+        const [catResult, minBoundResult, maxBoundResult, allCats] = await Promise.all([
+            category
+                ? db.from("categories").select("id, name").eq("slug", category).maybeSingle()
+                : Promise.resolve({ data: null }),
+            db.from("products").select("price_ghs").eq("is_active", true).order("price_ghs", { ascending: true }).limit(1),
+            db.from("products").select("price_ghs").eq("is_active", true).order("price_ghs", { ascending: false }).limit(1),
+            getCachedCategories(),
+        ]);
 
-    const minPrice = catResult !== null && minBoundResult.data?.[0]
-        ? Math.floor(Number(minBoundResult.data[0].price_ghs))
-        : 0;
-    const maxPrice = maxBoundResult.data?.[0]
-        ? Math.ceil(Number(maxBoundResult.data[0].price_ghs))
-        : 1000;
+        const minPrice = catResult !== null && minBoundResult.data?.[0]
+            ? Math.floor(Number(minBoundResult.data[0].price_ghs))
+            : 0;
+        const maxPrice = maxBoundResult.data?.[0]
+            ? Math.ceil(Number(maxBoundResult.data[0].price_ghs))
+            : 1000;
 
-    const catMap = new Map<string, { name: string; slug: string }>(
-        allCats.map((c: any) => [c.name.toLowerCase(), c])
-    );
-
-    // ── Build main query (category filter already resolved above) ─────────────
-    let query = db
-        .from("products")
-        .select(
-            `id, name, slug, description, price_ghs, compare_at_price_ghs,
-             image_urls, is_featured, is_active, category_id, category_type, category_ids,
-             available_colors, available_sizes, color_variants, size_variants,
-             bundle_label, badge, is_sale, discount_value, inventory_count, created_at`,
-            { count: "exact" }
+        const catMap = new Map<string, { name: string; slug: string }>(
+            allCats.map((c: any) => [c.name.toLowerCase(), c])
         );
 
-    query = query.or("is_active.eq.true,is_active.is.null");
+        let query = db
+            .from("products")
+            .select(
+                `id, name, slug, description, price_ghs, compare_at_price_ghs,
+                 image_urls, is_featured, is_active, category_id, category_type, category_ids,
+                 available_colors, available_sizes, color_variants, size_variants,
+                 bundle_label, badge, is_sale, discount_value, inventory_count, created_at`,
+                { count: "exact" }
+            );
 
-    if (category) {
-        const cat = catResult.data as { id: string; name: string } | null;
-        if (cat) {
-            query = query.or(`category_id.eq.${cat.id},category_type.ilike."${cat.name}",category_ids.cs.{"${cat.id}"}`);
-        } else {
-            const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-            query = query.ilike("category_type", fallbackName);
+        query = query.or("is_active.eq.true,is_active.is.null");
+
+        if (category) {
+            const cat = catResult.data as { id: string; name: string } | null;
+            if (cat) {
+                query = query.or(`category_id.eq.${cat.id},category_type.ilike."${cat.name}",category_ids.cs.{"${cat.id}"}`);
+            } else {
+                const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+                query = query.ilike("category_type", fallbackName);
+            }
         }
-    }
 
-    if (q) query = query.ilike("name", `%${q}%`);
-    if (sale) query = query.eq("is_sale", true);
-    if (inStock) query = query.gt("inventory_count", 0);
-    if (min) query = query.gte("price_ghs", parseFloat(min));
-    if (max) query = query.lte("price_ghs", parseFloat(max));
-    if (color) query = query.contains("available_colors", [color]);
-    if (size) query = query.contains("available_sizes", [size]);
+        if (q) query = query.ilike("name", `%${q}%`);
+        if (sale) query = query.eq("is_sale", true);
+        if (inStock) query = query.gt("inventory_count", 0);
+        if (min) query = query.gte("price_ghs", parseFloat(min));
+        if (max) query = query.lte("price_ghs", parseFloat(max));
+        if (color) query = query.contains("available_colors", [color]);
+        if (size) query = query.contains("available_sizes", [size]);
 
-    switch (sort) {
-        case "price-asc":  query = query.order("price_ghs",  { ascending: true });  break;
-        case "price-desc": query = query.order("price_ghs",  { ascending: false }); break;
-        case "name-asc":   query = query.order("name",       { ascending: true });  break;
-        default:           query = query.order("created_at", { ascending: false }); break;
-    }
+        switch (sort) {
+            case "price-asc":  query = query.order("price_ghs",  { ascending: true });  break;
+            case "price-desc": query = query.order("price_ghs",  { ascending: false }); break;
+            case "name-asc":   query = query.order("name",       { ascending: true });  break;
+            default:           query = query.order("created_at", { ascending: false }); break;
+        }
 
-    const from = (page - 1) * PAGE_SIZE;
-    query = query.range(from, from + PAGE_SIZE - 1);
+        const from = (page - 1) * 24; // Use constant or PAGE_SIZE
+        query = query.range(from, from + 24 - 1);
 
-    const { data, count, error } = await query;
-    if (error) console.error("[getProducts] Supabase Error:", error);
+        const { data, count, error } = await query;
+        if (error) console.error("[getProducts] Supabase Error:", error);
 
-    const products: ShopProduct[] = (data || []).map((p: any) => {
-        const matchedCat = p.category_type ? catMap.get(p.category_type.toLowerCase()) : null;
-        return {
-            ...p,
-            category_name: matchedCat?.name ?? p.category_type ?? null,
-            category_slug: matchedCat?.slug ?? null,
-        };
-    });
+        const products: ShopProduct[] = (data || []).map((p: any) => {
+            const matchedCat = p.category_type ? catMap.get(p.category_type.toLowerCase()) : null;
+            return {
+                ...p,
+                category_name: matchedCat?.name ?? p.category_type ?? null,
+                category_slug: matchedCat?.slug ?? null,
+            };
+        });
 
-    return { products, total: count ?? 0, minPrice, maxPrice };
+        return { products, total: count ?? 0, minPrice, maxPrice };
+    },
+    ["products-list"],
+    { revalidate: 60 }
+);
+
+export async function getProducts(params: GetProductsParams, role?: string) {
+    return getCachedProducts(params, role);
 }
 
 const getCachedCategoriesByRole = unstable_cache(
