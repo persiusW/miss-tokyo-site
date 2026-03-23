@@ -1,14 +1,16 @@
 import Image from "next/image";
 import { CustomOrderForm } from "@/components/ui/miss-tokyo/CustomOrderForm";
 import { Suspense } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+export const dynamic = "force-dynamic";
 
 export default async function WhiteLabelPage({ searchParams }: { searchParams: Promise<{ ref?: string }> }) {
     let imageUrl: string | null = null;
     const { ref: refSlug } = await searchParams;
 
     if (refSlug) {
-        const { data } = await supabase.from("products").select("image_urls")
+        const { data } = await supabaseAdmin.from("products").select("image_urls")
             .eq("slug", refSlug).single();
         if (data && data.image_urls && data.image_urls.length > 0) {
             imageUrl = data.image_urls[0];

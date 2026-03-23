@@ -319,15 +319,21 @@ export function deriveSizes(products: ShopProduct[]): string[] {
 export const VIDEO_BATCH_SIZE = 20;
 
 // ── Static generation helper ───────────────────────────────────────────────
-// Used by generateStaticParams to pre-build every published product page at
-// deploy time, so the first request after deploy always hits the static cache.
+// Used by generateStaticParams to pre-build the most recent product pages at
+// deploy time. Capped at 50 to keep builds fast — ISR (revalidate=60) handles
+// the rest on first request. Returns [] on error so builds don't hang if DB is slow.
 export async function getAllProductSlugs(): Promise<string[]> {
-    const { data } = await supabaseAdmin
-        .from("products")
-        .select("slug")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
-    return (data ?? []).map((p: { slug: string }) => p.slug).filter(Boolean);
+    try {
+        const { data } = await supabaseAdmin
+            .from("products")
+            .select("slug")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(50);
+        return (data ?? []).map((p: { slug: string }) => p.slug).filter(Boolean);
+    } catch {
+        return [];
+    }
 }
 
 export type VideoProduct = ShopProduct & { video_url: string };

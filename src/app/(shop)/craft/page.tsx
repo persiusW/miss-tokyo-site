@@ -1,16 +1,17 @@
 import Image from "next/image";
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export default async function CraftPage() {
-    const { data: assetsData } = await supabase.from("site_assets").select("*");
+    const [{ data: assetsData }, { data: copyData }] = await Promise.all([
+        supabaseAdmin.from("site_assets").select("*"),
+        supabaseAdmin.from("site_copy").select("copy_key, value").eq("page_group", "craft"),
+    ]);
     const siteAssets = (assetsData || []).reduce((acc: any, asset: any) => {
         acc[asset.section_key] = asset;
         return acc;
     }, {});
-
-    const { data: copyData } = await supabase.from("site_copy").select("copy_key, value").eq("page_group", "craft");
     const copy = (copyData || []).reduce((acc: any, row: any) => {
         acc[row.copy_key] = row.value;
         return acc;
