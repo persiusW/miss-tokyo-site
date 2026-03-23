@@ -135,19 +135,19 @@ export function Footer() {
                 <div>
                     <h4 className="text-[10px] uppercase tracking-[0.3em] font-bold text-white mb-8">Navigation</h4>
                     <ul className="space-y-4 text-[11px] uppercase tracking-[0.2em] text-neutral-400">
-                        <li><Link href="/shop" className="hover:text-white transition-colors">Archive</Link></li>
-                        <li><Link href="/whitelabel" className="hover:text-white transition-colors">Labelling</Link></li>
-                        <li><Link href="/craft" className="hover:text-white transition-colors">Atelier</Link></li>
+                        <li><Link href="/track" className="hover:text-white transition-colors">Track Order</Link></li>
+                        <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
+                        <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+                        <li><Link href="/gift-cards" className="hover:text-white transition-colors">Gift Cards</Link></li>
                     </ul>
                 </div>
 
                 <div>
                     <h4 className="text-[10px] uppercase tracking-[0.3em] font-bold text-white mb-8">Assistance</h4>
                     <ul className="space-y-4 text-[11px] uppercase tracking-[0.2em] text-neutral-400">
-                        <li><Link href="/faq" className="hover:text-white transition-colors">Information</Link></li>
-                        <li><Link href="/shipping" className="hover:text-white transition-colors">Logistics</Link></li>
-                        <li><Link href="/about" className="hover:text-white transition-colors">Story</Link></li>
-                        <li><Link href="/contact" className="hover:text-white transition-colors">Concierge</Link></li>
+                        <li><Link href="/account" className="hover:text-white transition-colors">Account</Link></li>
+                        <li><Link href="/faq" className="hover:text-white transition-colors">FAQ</Link></li>
+                        <li><Link href="/size-guide" className="hover:text-white transition-colors">Size Guide</Link></li>
                     </ul>
                 </div>
 
