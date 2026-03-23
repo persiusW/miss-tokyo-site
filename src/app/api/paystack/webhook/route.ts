@@ -2,6 +2,7 @@ export const maxDuration = 60; // 1 minute — safe window for Paystack webhook 
 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
@@ -301,7 +302,7 @@ export async function POST(req: Request) {
                 // Fetch products with track_variant_inventory flag
                 const { data: products } = await supabaseAdmin
                     .from("products")
-                    .select("id, inventory_count, track_variant_inventory")
+                    .select("id, slug, inventory_count, track_variant_inventory")
                     .in("id", productIds);
 
                 if (products) {
@@ -352,6 +353,15 @@ export async function POST(req: Request) {
                             return Promise.resolve();
                         })
                     );
+
+                    // Revalidate product pages so updated stock is reflected immediately
+                    const slugs = products
+                        .map(p => (p as any).slug as string | null)
+                        .filter((s): s is string => !!s);
+                    for (const slug of slugs) {
+                        revalidatePath(`/products/${slug}`, "page");
+                    }
+                    revalidatePath("/shop", "page");
                 }
             }
 
@@ -359,7 +369,7 @@ export async function POST(req: Request) {
             if (!isAlreadyProcessed && !parsedItems.length && productId) {
                 const { data: product } = await supabaseAdmin
                     .from("products")
-                    .select("inventory_count")
+                    .select("inventory_count, slug")
                     .eq("id", productId)
                     .single();
                 if (product && product.inventory_count > 0) {
@@ -367,6 +377,10 @@ export async function POST(req: Request) {
                         .from("products")
                         .update({ inventory_count: product.inventory_count - 1 })
                         .eq("id", productId);
+                    if ((product as any).slug) {
+                        revalidatePath(`/products/${(product as any).slug}`, "page");
+                    }
+                    revalidatePath("/shop", "page");
                 }
             }
 
