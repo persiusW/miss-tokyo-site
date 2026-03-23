@@ -32,7 +32,7 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
 
 // ── Proxy (middleware) ────────────────────────────────────────────────────────
 
-export async function middleware(request: NextRequest): Promise<NextResponse> {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
     const { pathname } = request.nextUrl;
 
     // Build a mutable response — cookie mutations must be forwarded to the browser
