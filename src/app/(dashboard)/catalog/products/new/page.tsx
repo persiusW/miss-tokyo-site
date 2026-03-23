@@ -50,7 +50,7 @@ export default function NewProductPage() {
                 }
                 if (storeData.global_colors) {
                     setGlobalColors(storeData.global_colors);
-                    setSelectedColors(storeData.global_colors);
+                    setSelectedColors([]);
                 }
                 if (storeData.global_stitching) {
                     setGlobalStitching(storeData.global_stitching);
