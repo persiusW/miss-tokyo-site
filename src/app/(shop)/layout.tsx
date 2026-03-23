@@ -2,20 +2,30 @@ import { NavBar } from "@/components/ui/miss-tokyo/NavBar";
 import { Footer } from "@/components/ui/miss-tokyo/Footer";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
 import { CartDrawer } from "@/components/ui/miss-tokyo/CartDrawer";
-import { createClient } from "@/lib/supabaseServer";
+import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+// ── ISR-SAFE: supabaseAdmin does NOT call cookies() so this layout never opts
+// pages out of static caching. Maintenance mode changes rarely — 60 s TTL.
+const getMaintenanceMode = unstable_cache(
+    async () => {
+        const { data } = await supabaseAdmin
+            .from("store_settings")
+            .select("maintenance_mode")
+            .eq("id", "default")
+            .maybeSingle();
+        return data?.maintenance_mode ?? false;
+    },
+    ["maintenance-mode"],
+    { revalidate: 60 }
+);
 
 export default async function ShopLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const supabase = await createClient();
-    const [{ data }, { data: { user } }] = await Promise.all([
-        supabaseAdmin.from("store_settings").select("maintenance_mode").eq("id", "default").maybeSingle(),
-        supabase.auth.getUser(),
-    ]);
-    const isMaintenanceMode = data?.maintenance_mode || false;
+    const isMaintenanceMode = await getMaintenanceMode();
 
     if (isMaintenanceMode) {
         return (
@@ -32,7 +42,14 @@ export default async function ShopLayout({
 
     return (
         <div className="min-h-screen flex flex-col bg-white">
-            <NavBar initialUser={user} />
+            {/*
+              * initialUser is intentionally null here.
+              * NavBar is a client component — supabase.auth.onAuthStateChange() fires
+              * on mount and sets isLoggedIn correctly from the browser session.
+              * Removing server-side auth.getUser() from the layout prevents cookies()
+              * from being called, which restores ISR for every page under (shop).
+              */}
+            <NavBar initialUser={null} />
             <main className="flex-1 pt-20">
                 {children}
             </main>

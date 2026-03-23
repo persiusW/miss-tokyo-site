@@ -82,6 +82,21 @@ export function ProductOptions(props: Props) {
     const router = useRouter();
     const addItem = useCart(s => s.addItem);
 
+    // Hydrate wholesale role client-side.
+    // The layout no longer calls auth.getUser() server-side (restores ISR).
+    // /api/me is private/no-store — one small fetch after mount, only affects
+    // the ~1% of users with a wholesale account.
+    const [isWholesalerState, setIsWholesalerState] = useState(isWholesaler);
+    useEffect(() => {
+        fetch("/api/me")
+            .then(r => r.json())
+            .then(({ role }: { role?: string | null }) => {
+                const wholesale = !!(role && ["wholesale", "wholesaler"].includes(role.toLowerCase()));
+                setIsWholesalerState(wholesale);
+            })
+            .catch(() => { /* silent — default false is correct for retail users */ });
+    }, []);
+
     const colors: ColorVariant[] = colorVariants && colorVariants.length > 0
         ? colorVariants
         : (availableColors || []).map(n => ({ name: n, hex: COLOR_HEX[n] || "#E8D5C4", in_stock: true }));
@@ -181,7 +196,7 @@ export function ProductOptions(props: Props) {
 
     const baseProductPrice = isSale && discountValue > 0 ? price * (1 - discountValue / 100) : price;
 
-    const unitPrice = (isWholesaler && wholesaleTiers)
+    const unitPrice = (isWholesalerState && wholesaleTiers)
         ? resolveWholesalePrice(qty, baseProductPrice, wholesaleTiers)
         : baseProductPrice;
 
@@ -200,7 +215,7 @@ export function ProductOptions(props: Props) {
             color: selectedColor || undefined,
             quantity: qty,
             imageUrl,
-            isWholesale: isWholesaler,
+            isWholesale: isWholesalerState,
             wholesaleTiers,
         });
         return true;
@@ -257,7 +272,7 @@ export function ProductOptions(props: Props) {
                         GH₵{compareAtPrice.toFixed(2)}
                     </span>
                 )}
-                {isWholesaler && (
+                {isWholesalerState && (
                     <span style={{ fontSize: 10, color: "#059669", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginLeft: "auto" }}>
                         Wholesale Rate
                     </span>
@@ -265,7 +280,7 @@ export function ProductOptions(props: Props) {
             </div>
 
             {/* Volume Pricing Grid for Wholesalers */}
-            {isWholesaler && wholesaleTiers && (
+            {isWholesalerState && wholesaleTiers && (
                 <div style={{
                     background: "rgba(5, 150, 105, 0.04)",
                     border: "1px solid rgba(5, 150, 105, 0.15)",

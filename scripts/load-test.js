@@ -82,21 +82,28 @@ export const options = {
         { duration: "60s", target: 50  }, // ramp up — 0 → 50 VUs
         { duration: "60s", target: 50  }, // sustained load
         { duration: "30s", target: 0   }, // ramp down
-        // To scale up, replace lines above with e.g.:
+        // ⚠ 200 VU test: PRODUCTION URL only — preview deployments will timeout.
         // { duration: "2m",  target: 200 },
         // { duration: "2m",  target: 200 },
         // { duration: "1m",  target: 0   },
     ],
 
+    // Fail fast: don't let timed-out VUs block for 60 s (k6 default).
+    // 15 s is enough to distinguish a slow-but-live response from a dead one.
+    httpDebug: false,
+    noConnectionReuse: false,
+    http: {
+        timeout: "15s",
+    },
+
     thresholds: {
         http_req_duration:  ["p(95)<3000"],
         homepage_duration:  ["p(95)<2000"],
-        // Preview deployments have fewer CDN edges → cold-start spikes.
-        // Production target is p(95)<2000 (static pages via generateStaticParams).
-        // Preview allowance is 3 s — change back to 2000 when testing production.
+        // Production target p(95)<2000. Preview allowance 3 s (fewer CDN edges).
+        // Revert to 2000 when running against https://misstokyo.shop.
         pdp_duration:       ["p(95)<3000"],
         checkout_duration:  ["p(95)<5000"],
-        // errors counts only functional failures (5xx / missing content).
+        // errors counts only functional failures (5xx / missing content / timeout).
         // Timing slowdowns are captured by the Trend thresholds above.
         errors:             ["rate<0.02"],
     },
@@ -151,16 +158,20 @@ export default function (data) {
         homepageDur.add(res.timings.duration);
 
         // Functional checks drive errorRate — timing is tracked via the Trend threshold
+        // res.body is null on timeout — guard against TypeError crashing the check
         const functional = check(res, {
             "homepage: status 200":            r => r.status === 200,
             "homepage: has Miss Tokyo content": r =>
-                r.body.includes("MISS TOKYO") ||
-                r.body.includes("Miss Tokyo") ||
-                r.body.includes("misstokyo"),
+                r.body != null && (
+                    r.body.includes("MISS TOKYO") ||
+                    r.body.includes("Miss Tokyo") ||
+                    r.body.includes("misstokyo")
+                ),
         });
         check(res, { "homepage: responds in < 2 s": r => r.timings.duration < 2000 });
 
-        errorRate.add(functional ? 0 : 1);
+        // Count timeouts (status 0) and functional failures as errors
+        errorRate.add((!functional || res.status === 0) ? 1 : 0);
     });
 
     sleep(randomBetween(2, 3));
@@ -172,16 +183,20 @@ export default function (data) {
         pdpDur.add(res.timings.duration);
 
         // Functional checks drive errorRate — timing is tracked via the Trend threshold
+        // res.body is null on timeout — guard against TypeError crashing the check
         const functional = check(res, {
             "pdp: status 200":      r => r.status === 200,
             "pdp: has Add to Cart": r =>
-                r.body.includes("Add to Cart") ||
-                r.body.includes("add-to-cart") ||
-                r.body.includes("Add to Bag"),
+                r.body != null && (
+                    r.body.includes("Add to Cart") ||
+                    r.body.includes("add-to-cart") ||
+                    r.body.includes("Add to Bag")
+                ),
         });
         check(res, { "pdp: responds in < 2 s": r => r.timings.duration < 2000 });
 
-        errorRate.add(functional ? 0 : 1);
+        // Count timeouts (status 0) and functional failures as errors
+        errorRate.add((!functional || res.status === 0) ? 1 : 0);
     });
 
     sleep(randomBetween(2, 5));

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
@@ -14,6 +15,34 @@ import { ProductGallery } from "@/components/ui/miss-tokyo/ProductGallery";
 import { ProductOptions } from "@/components/ui/miss-tokyo/ProductOptions";
 import { ProductAccordions } from "@/components/ui/miss-tokyo/ProductAccordions";
 import { ReviewsSection } from "@/components/ui/miss-tokyo/ReviewsSection";
+
+// ── ISR-SAFE caches ────────────────────────────────────────────────────────────
+// These use supabaseAdmin (no cookies) and change rarely.
+// Caching here means one DB query per 5 minutes across ALL PDP renders,
+// instead of one query per request.
+const getPdpSettings = unstable_cache(
+    async () => {
+        const [settingsRes, tiersRes] = await Promise.all([
+            supabaseAdmin
+                .from("site_settings")
+                .select("pdp_show_trust_strip, pdp_show_reviews, pdp_show_product_details, pdp_show_care_instructions, pdp_show_delivery_returns")
+                .eq("id", "singleton")
+                .maybeSingle(),
+            supabaseAdmin
+                .from("site_copy")
+                .select("value")
+                .eq("copy_key", "wholesale_tiers")
+                .maybeSingle(),
+        ]);
+        let wholesaleTiersData = null;
+        try {
+            wholesaleTiersData = tiersRes.data?.value ? JSON.parse(tiersRes.data.value) : null;
+        } catch { /* use defaults */ }
+        return { pdpSettings: settingsRes.data || {}, wholesaleTiersData };
+    },
+    ["pdp-settings"],
+    { revalidate: 300 }
+);
 
 export const revalidate = 60;
 
@@ -60,34 +89,13 @@ export default async function ProductPage({
     const product = await getProductBySlugCached(slug);
     if (!product) notFound();
 
-    const supabase = await createClient();
-    let authUser = null;
-    try {
-        const { data } = await supabase.auth.getUser();
-        authUser = data?.user || null;
-    } catch (err) {
-        console.warn("[Auth Hardening] PDP session check failed:", err);
-    }
-    
-    // Fetch role if authenticated
-    let role: string | undefined;
-    if (authUser) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", authUser.id).maybeSingle();
-        role = profile?.role;
-    }
-    // isAuthorized: can see wholesale-only products (broad — includes admin/owner for management)
-    const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
-    // isWholesalerAccount: only accounts explicitly set to wholesale role see the pricing box
-    const isWholesalerAccount = role && ["wholesale", "wholesaler"].includes(role.toLowerCase());
-
-    // Part 3: Direct URL Protection (PDP Gating)
-    // Check if the product belongs to any retail categories.
-    // If it belongs ONLY to wholesale categories, prevent retail access.
+    // ── Wholesale-only gate ───────────────────────────────────────────────────
+    // Step 1: check product categories with supabaseAdmin — no cookies(), ISR safe.
     const productCatIds = product.category_ids ? [...product.category_ids] : [];
     if (product.category_id) productCatIds.push(product.category_id);
-    
+
     let isWholesaleOnly = false;
-    
+
     if (productCatIds.length > 0 || product.category_type) {
         const orConditions = [];
         if (productCatIds.length > 0) orConditions.push(`id.in.(${productCatIds.join(",")})`);
@@ -97,41 +105,37 @@ export default async function ProductPage({
             .from("categories")
             .select("is_wholesale")
             .or(orConditions.join(","));
-        
-        isWholesaleOnly = (activeProductCats || []).length > 0 && 
+
+        isWholesaleOnly = (activeProductCats || []).length > 0 &&
                           (activeProductCats || []).every(c => c.is_wholesale === true);
     }
 
-    if (isWholesaleOnly && !isAuthorized) {
-        notFound();
-    }
-
-    // Phase 3 & 4: Defensive settings fetch for PDP
-    let pdpSettings: any = {};
-    let wholesaleTiersData: any = null;
-
-    try {
-        const [settingsRes, tiersRes] = await Promise.all([
-            supabaseAdmin
-                .from("site_settings")
-                .select("pdp_show_trust_strip, pdp_show_reviews, pdp_show_product_details, pdp_show_care_instructions, pdp_show_delivery_returns")
-                .eq("id", "singleton")
-                .maybeSingle(),
-            supabaseAdmin
-                .from("site_copy")
-                .select("value")
-                .eq("copy_key", "wholesale_tiers")
-                .maybeSingle(),
-        ]);
-        pdpSettings = settingsRes.data || {};
+    // Step 2: only read cookies if this product actually requires auth gating.
+    // For retail products (the vast majority) we skip createClient() entirely,
+    // which preserves the ISR static cache and prevents DB hammering under load.
+    if (isWholesaleOnly) {
+        const supabase = await createClient();
+        let authUser = null;
         try {
-            wholesaleTiersData = tiersRes.data?.value ? JSON.parse(tiersRes.data.value) : null;
-        } catch {
-            wholesaleTiersData = null;
+            const { data } = await supabase.auth.getUser();
+            authUser = data?.user || null;
+        } catch (err) {
+            console.warn("[PDP] Wholesale gate auth check failed:", err);
         }
-    } catch (err) {
-        console.warn("[PDP Defensive Fetch] Failed to load settings:", err);
+        let isAuthorized = false;
+        if (authUser) {
+            const { data: profile } = await supabase.from("profiles").select("role").eq("id", authUser.id).maybeSingle();
+            const role = profile?.role;
+            isAuthorized = !!(role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase()));
+        }
+        if (!isAuthorized) notFound();
     }
+
+    // Settings are globally cached — no per-request DB query
+    const { pdpSettings, wholesaleTiersData } = await getPdpSettings().catch(() => ({
+        pdpSettings: {} as any,
+        wholesaleTiersData: null,
+    }));
 
     const [related, { reviews, distribution }, variantRes, variantMetaRes] = await Promise.all([
         getRelatedProducts(product.category_type ?? "", slug),
@@ -156,11 +160,12 @@ export default async function ProductPage({
         tier3_min: 11, tier3_max: 999, tier3_discount: 20
     };
 
-    // Resolve explicit per-unit prices: product override takes priority,
-    // then category-level prices, then fall back to percentage discounts.
+    // Resolve wholesale tier prices server-side so the client component receives
+    // the data it needs. supabaseAdmin — no cookies, ISR safe.
+    // ProductOptions decides whether to display this based on the user's role
+    // fetched client-side from /api/me.
     let categoryTierPrices: { tier1_price?: number | null; tier2_price?: number | null; tier3_price?: number | null } = {};
-    if (isAuthorized && !product.wholesale_override) {
-        // Fetch the category's wholesale prices if product has no override
+    if (!product.wholesale_override) {
         try {
             const catConditions = [];
             if (product.category_ids?.length) catConditions.push(`id.in.(${product.category_ids.join(",")})`);
@@ -181,7 +186,7 @@ export default async function ProductPage({
                     };
                 }
             }
-        } catch { /* fall back to discounts */ }
+        } catch { /* fall back to percentage discounts */ }
     }
 
     const wholesaleTiers = {
@@ -326,7 +331,7 @@ export default async function ProductPage({
                             isSale={isSale}
                             discountValue={product.discount_value ?? 0}
                             showTrustStrip={showTrustStrip}
-                            isWholesaler={!!isWholesalerAccount}
+                            isWholesaler={false}
                             wholesaleTiers={wholesaleTiers}
                             trackVariantInventory={trackVariantInventory}
                             productVariants={productVariants}
