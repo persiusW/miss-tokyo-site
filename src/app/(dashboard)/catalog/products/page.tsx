@@ -19,6 +19,7 @@ type Product = {
     track_variant_inventory: boolean;
     is_active: boolean;
     image_urls: string[] | null;
+    sku: string | null;
     product_variants: { sku: string | null; inventory_count: number | null }[] | null;
 };
 
@@ -45,7 +46,7 @@ export default function CatalogProductsPage() {
     const fetchProducts = useCallback(async () => {
         const { data } = await supabase
             .from("products")
-            .select("id, name, slug, category_type, category_ids, price_ghs, inventory_count, track_inventory, track_variant_inventory, is_active, image_urls, product_variants(sku, inventory_count)")
+            .select("id, name, slug, sku, category_type, category_ids, price_ghs, inventory_count, track_inventory, track_variant_inventory, is_active, image_urls, product_variants(sku, inventory_count)")
             .order("created_at", { ascending: false });
         setProducts(data || []);
         setLoading(false);
@@ -255,7 +256,7 @@ export default function CatalogProductsPage() {
                                 const displayCount = variantTotal !== null ? variantTotal : product.inventory_count;
                                 const isLowStock = product.track_inventory && displayCount < 5;
                                 const isConfirming = confirmDeleteId === product.id;
-                                const firstSku = product.product_variants?.[0]?.sku || "—";
+                                const displaySku = product.sku || "—";
 
                                 return (
                                     <tr
@@ -294,7 +295,7 @@ export default function CatalogProductsPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className="text-xs font-mono text-neutral-500">{firstSku}</span>
+                                            <span className="text-xs font-mono text-neutral-500">{displaySku}</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${product.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-600'}`}>

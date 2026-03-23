@@ -293,15 +293,15 @@ export default async function ProductPage({
                     {/* Info panel - STICKY on desktop */}
                     <div className="md:sticky md:top-24 h-fit">
                         {/* Meta top: category + SKU */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <div className="flex items-center justify-between mb-[10px]">
                             {product.category_name && (
-                                <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--muted, #7A7167)" }}>
+                                <span className="text-[10px] font-medium tracking-[0.15em] uppercase text-[#7A7167]">
                                     {product.category_name}
                                 </span>
                             )}
                             {product.sku && (
-                                <span style={{ fontSize: 10, color: "var(--muted, #7A7167)", letterSpacing: "0.08em" }}>
-                                    SKU {product.sku}
+                                <span className="text-[10px] font-medium tracking-[0.15em] uppercase text-[#7A7167]">
+                                    SKU: #{product.sku}
                                 </span>
                             )}
                         </div>
