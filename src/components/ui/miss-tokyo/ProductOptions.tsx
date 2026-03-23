@@ -48,13 +48,13 @@ const COLOR_HEX: Record<string, string> = {
 };
 
 const SIZE_TABLE = [
-    { label: "XS",        uk: "6–8",   bust: "80–84", waist: "62–66", hips: "88–92"   },
-    { label: "S",         uk: "8–10",  bust: "84–88", waist: "66–70", hips: "92–96"   },
-    { label: "Free (8–14)",uk:"8–14",  bust: "84–96", waist: "66–78", hips: "92–104"  },
-    { label: "M",         uk: "10–12", bust: "88–92", waist: "70–74", hips: "96–100"  },
-    { label: "L",         uk: "12–14", bust: "92–96", waist: "74–78", hips: "100–104" },
-    { label: "XL",        uk: "14–16", bust: "96–100",waist: "78–82", hips: "104–108" },
-    { label: "2XL",       uk: "18–20", bust: "104–108",waist:"86–90", hips: "112–116" },
+    { label: "XS", uk: "6–8", bust: "80–84", waist: "62–66", hips: "88–92" },
+    { label: "S", uk: "8–10", bust: "84–88", waist: "66–70", hips: "92–96" },
+    { label: "Free (8–14)", uk: "8–14", bust: "84–96", waist: "66–78", hips: "92–104" },
+    { label: "M", uk: "10–12", bust: "88–92", waist: "70–74", hips: "96–100" },
+    { label: "L", uk: "12–14", bust: "92–96", waist: "74–78", hips: "100–104" },
+    { label: "XL", uk: "14–16", bust: "96–100", waist: "78–82", hips: "104–108" },
+    { label: "2XL", uk: "18–20", bust: "104–108", waist: "86–90", hips: "112–116" },
 ];
 
 function Stars({ rating }: { rating: number }) {
@@ -132,8 +132,8 @@ export function ProductOptions(props: Props) {
             const first = colors.find(c => colorsWithStock.has(c.name));
             setSelectedColor(first?.name ?? "");
         }
-    // Only run when the size changes — colorsWithStock is derived from selectedSize
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Only run when the size changes — colorsWithStock is derived from selectedSize
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedSize]);
 
     /** Effective stock for the currently selected size + color combo */
@@ -175,7 +175,7 @@ export function ProductOptions(props: Props) {
     };
 
     const copyLink = () => {
-        navigator.clipboard?.writeText(window.location.href).catch(() => {});
+        navigator.clipboard?.writeText(window.location.href).catch(() => { });
         toast.success("Link copied to clipboard");
     };
 
@@ -266,8 +266,8 @@ export function ProductOptions(props: Props) {
 
             {/* Volume Pricing Grid for Wholesalers */}
             {isWholesaler && wholesaleTiers && (
-                <div style={{ 
-                    background: "rgba(5, 150, 105, 0.04)", 
+                <div style={{
+                    background: "rgba(5, 150, 105, 0.04)",
                     border: "1px solid rgba(5, 150, 105, 0.15)",
                     padding: "16px",
                     borderRadius: 4,
@@ -413,13 +413,12 @@ export function ProductOptions(props: Props) {
                                     style={{
                                         position: "relative",
                                         padding: "9px 16px",
-                                        border: `1px solid ${
-                                            isActive
+                                        border: `1px solid ${isActive
                                                 ? "var(--ink, #141210)"
                                                 : inStock
                                                     ? "rgba(20,18,16,0.15)"
                                                     : "rgba(20,18,16,0.08)"
-                                        }`,
+                                            }`,
                                         borderRadius: 2, fontSize: 12, fontWeight: 400,
                                         color: isActive ? "#fff" : inStock ? "var(--muted, #7A7167)" : "rgba(20,18,16,0.3)",
                                         background: isActive ? "var(--ink, #141210)" : "transparent",
@@ -600,11 +599,11 @@ export function ProductOptions(props: Props) {
             {showTrustStrip && <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", border: "1px solid rgba(20,18,16,0.1)", borderRadius: 4, overflow: "hidden", marginBottom: 28 }}>
                 {[
                     {
-                        label: "Free Delivery", sub: "Orders GH₵150+",
+                        label: "Free Delivery", sub: "Orders GH₵1000+",
                         icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--gold, #C9A96E)" strokeWidth="1.3"><path d="M5 12h14M12 5l7 7-7 7" /></svg>,
                     },
                     {
-                        label: "Easy Returns", sub: "7-day policy",
+                        label: "Easy Returns", sub: "72-hour policy",
                         icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--gold, #C9A96E)" strokeWidth="1.3"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>,
                     },
                     {

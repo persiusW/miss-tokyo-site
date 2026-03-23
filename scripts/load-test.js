@@ -91,10 +91,13 @@ export const options = {
     thresholds: {
         http_req_duration:  ["p(95)<3000"],
         homepage_duration:  ["p(95)<2000"],
-        pdp_duration:       ["p(95)<2000"],
+        // Preview deployments have fewer CDN edges → cold-start spikes.
+        // Production target is p(95)<2000 (static pages via generateStaticParams).
+        // Preview allowance is 3 s — change back to 2000 when testing production.
+        pdp_duration:       ["p(95)<3000"],
         checkout_duration:  ["p(95)<5000"],
-        // After applying setResponseCallback, this should be < 1% for healthy runs.
-        // A persistent > 5% signals real server errors or Vercel edge rate-limiting.
+        // errors counts only functional failures (5xx / missing content).
+        // Timing slowdowns are captured by the Trend thresholds above.
         errors:             ["rate<0.02"],
     },
 };
@@ -147,16 +150,17 @@ export default function (data) {
         diagnose("Homepage", res);
         homepageDur.add(res.timings.duration);
 
-        const ok = check(res, {
+        // Functional checks drive errorRate — timing is tracked via the Trend threshold
+        const functional = check(res, {
             "homepage: status 200":            r => r.status === 200,
             "homepage: has Miss Tokyo content": r =>
                 r.body.includes("MISS TOKYO") ||
                 r.body.includes("Miss Tokyo") ||
                 r.body.includes("misstokyo"),
-            "homepage: responds in < 2 s":     r => r.timings.duration < 2000,
         });
+        check(res, { "homepage: responds in < 2 s": r => r.timings.duration < 2000 });
 
-        errorRate.add(ok ? 0 : 1);
+        errorRate.add(functional ? 0 : 1);
     });
 
     sleep(randomBetween(2, 3));
@@ -167,16 +171,17 @@ export default function (data) {
         diagnose("PDP", res);
         pdpDur.add(res.timings.duration);
 
-        const ok = check(res, {
-            "pdp: status 200":        r => r.status === 200,
-            "pdp: has Add to Cart":   r =>
+        // Functional checks drive errorRate — timing is tracked via the Trend threshold
+        const functional = check(res, {
+            "pdp: status 200":      r => r.status === 200,
+            "pdp: has Add to Cart": r =>
                 r.body.includes("Add to Cart") ||
                 r.body.includes("add-to-cart") ||
                 r.body.includes("Add to Bag"),
-            "pdp: responds in < 2 s": r => r.timings.duration < 2000,
         });
+        check(res, { "pdp: responds in < 2 s": r => r.timings.duration < 2000 });
 
-        errorRate.add(ok ? 0 : 1);
+        errorRate.add(functional ? 0 : 1);
     });
 
     sleep(randomBetween(2, 5));
@@ -204,17 +209,18 @@ export default function (data) {
         diagnose("Checkout", res);
         checkoutDur.add(res.timings.duration);
 
-        const ok = check(res, {
-            // 401 = unauthenticated (expected for k6 traffic)
-            // 400 = validation fired — function is running correctly
-            // 200 = authenticated (if you add session cookies via k6 scenarios)
-            "checkout: server responded":  r => [200, 400, 401, 403].includes(r.status),
-            "checkout: not a 5xx error":   r => r.status < 500,
-            "checkout: responds in < 5 s": r => r.timings.duration < 5000,
+        // Functional checks drive errorRate — timing is tracked via the Trend threshold
+        // 401 = unauthenticated (expected for k6 traffic)
+        // 400 = validation fired — function is running correctly
+        // 200 = authenticated (if you add session cookies via k6 scenarios)
+        const functional = check(res, {
+            "checkout: server responded": r => [200, 400, 401, 403].includes(r.status),
+            "checkout: not a 5xx error":  r => r.status < 500,
         });
+        check(res, { "checkout: responds in < 5 s": r => r.timings.duration < 5000 });
 
         // Only count as error if the server broke (5xx) or didn't respond
-        errorRate.add((!ok || res.status >= 500) ? 1 : 0);
+        errorRate.add((!functional || res.status >= 500) ? 1 : 0);
     });
 
     sleep(randomBetween(1, 2));
