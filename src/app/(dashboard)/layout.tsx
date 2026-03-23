@@ -6,13 +6,29 @@ import { AdminSidebar } from "@/components/ui/miss-tokyo/AdminSidebar";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+async function safeQuery<T>(fn: () => PromiseLike<{ data: T | null }>, ms = 8000): Promise<T | null> {
+    try {
+        const race = await Promise.race([
+            Promise.resolve(fn()),
+            delay(ms).then(() => ({ data: null as T | null })),
+        ]);
+        return race.data ?? null;
+    } catch {
+        return null;
+    }
+}
+
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
     const serverClient = await createClient();
-    const [{ data: { user } }, { data: storeSettings }, { data: businessSettings }] = await Promise.all([
+    const [{ data: { user } }, storeData, bizData] = await Promise.all([
         serverClient.auth.getUser(),
-        supabaseAdmin.from("store_settings").select("enable_custom_requests").eq("id", "default").single(),
-        supabaseAdmin.from("business_settings").select("business_name").eq("id", "default").single(),
+        safeQuery(() => supabaseAdmin.from("store_settings").select("enable_custom_requests").eq("id", "default").single()),
+        safeQuery(() => supabaseAdmin.from("business_settings").select("business_name").eq("id", "default").single()),
     ]);
+    const storeSettings = storeData as { enable_custom_requests: boolean } | null;
+    const businessSettings = bizData as { business_name: string } | null;
 
     if (!user) {
         redirect("/admin/login");

@@ -9,12 +9,21 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 // pages out of static caching. Maintenance mode changes rarely — 60 s TTL.
 const getMaintenanceMode = unstable_cache(
     async () => {
-        const { data } = await supabaseAdmin
-            .from("store_settings")
-            .select("maintenance_mode")
-            .eq("id", "default")
-            .maybeSingle();
-        return data?.maintenance_mode ?? false;
+        try {
+            const result = await Promise.race([
+                supabaseAdmin
+                    .from("store_settings")
+                    .select("maintenance_mode")
+                    .eq("id", "default")
+                    .maybeSingle(),
+                new Promise<{ data: null }>((resolve) =>
+                    setTimeout(() => resolve({ data: null }), 5000)
+                ),
+            ]);
+            return result.data?.maintenance_mode ?? false;
+        } catch {
+            return false;
+        }
     },
     ["maintenance-mode"],
     { revalidate: 60 }
