@@ -47,7 +47,7 @@ export function EditorialProductCard({ slug, name, price, imageUrl, onQuickAdd }
                         onClick={() => onQuickAdd(slug)}
                         className="w-full mt-4 bg-black text-white py-3 text-xs uppercase tracking-[0.2em] font-bold hover:bg-neutral-800 transition-colors rounded-none"
                     >
-                        Quick Add
+                        Add to Cart
                     </button>
                 )}
             </div>

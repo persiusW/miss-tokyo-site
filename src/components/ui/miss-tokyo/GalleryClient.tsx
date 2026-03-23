@@ -130,7 +130,7 @@ function VideoCard({
                             }`}
                         >
                             {addState === "loading" ? <Loader2 size={14} className="animate-spin" /> : addState === "success" ? <Check size={14} /> : <Plus size={14} />}
-                            {addState === "loading" ? "Adding..." : addState === "success" ? "Added!" : "Add to Bag"}
+                            {addState === "loading" ? "Adding..." : addState === "success" ? "Added!" : "Add to Cart"}
                         </button>
                         <Link
                             href={`/products/${product.slug}`}

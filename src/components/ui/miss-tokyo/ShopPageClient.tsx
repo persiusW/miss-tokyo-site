@@ -178,7 +178,7 @@ function ShopProductCard({
                         >
                             {addState === "added"
                                 ? <><Check size={12} strokeWidth={2.5} /> Added</>
-                                : <><ShoppingBag size={12} strokeWidth={1.8} /> Quick Add</>
+                                : <><ShoppingBag size={12} strokeWidth={1.8} /> Add to Cart</>
                             }
                         </button>
                     </div>
@@ -362,7 +362,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
                         }}
                     >
                         <ShoppingBag size={14} strokeWidth={1.5} />
-                        {added ? "Added to Bag ✓" : adding ? "Adding…" : "Add to Bag"}
+                        {added ? "Added to Cart ✓" : adding ? "Adding…" : "Add to Cart"}
                     </button>
                     <Link href={`/products/${product.slug}`} onClick={onClose}
                         className="block text-center text-[11px] underline transition-colors"
