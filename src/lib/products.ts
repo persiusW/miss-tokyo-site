@@ -92,7 +92,7 @@ const getCachedProducts = unstable_cache(
                 `id, name, slug, description, price_ghs, compare_at_price_ghs,
                  image_urls, is_featured, is_active, category_id, category_type, category_ids,
                  available_colors, available_sizes, color_variants, size_variants,
-                 bundle_label, badge, is_sale, discount_value, inventory_count, created_at`,
+                 bundle_label, badge, is_sale, discount_value, inventory_count, sku, created_at`,
                 { count: "exact" }
             );
 
@@ -108,7 +108,7 @@ const getCachedProducts = unstable_cache(
             }
         }
 
-        if (q) query = query.ilike("name", `%${q}%`);
+        if (q) query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
         if (sale) query = query.eq("is_sale", true);
         if (inStock) query = query.gt("inventory_count", 0);
         if (min) query = query.gte("price_ghs", parseFloat(min));

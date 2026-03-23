@@ -142,9 +142,13 @@ export default function CatalogProductsPage() {
     }, [searchQuery]);
 
     const filteredProducts = useMemo(() => {
+        const q = debouncedSearchQuery.toLowerCase();
+        if (!q) return products;
         return products.filter((p: Product) =>
-            p.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-            (p.category_type || "").toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+            p.name.toLowerCase().includes(q) ||
+            (p.category_type || "").toLowerCase().includes(q) ||
+            (p.sku || "").toLowerCase().includes(q) ||
+            (p.product_variants || []).some(v => (v.sku || "").toLowerCase().includes(q))
         );
     }, [products, debouncedSearchQuery]);
 

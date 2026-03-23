@@ -170,7 +170,7 @@ function ShopProductCard({
                                     productId: product.id,
                                     name: product.name,
                                     slug: product.slug,
-                                    price: product.price_ghs,
+                                    price: displayPrice,
                                     size: "One Size",
                                     quantity: 1,
                                     imageUrl: product.image_urls?.[0] || "",

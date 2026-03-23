@@ -11,6 +11,9 @@ export interface QuickViewProduct {
     name: string;
     slug: string;
     price_ghs: number;
+    compare_at_price_ghs?: number | null;
+    is_sale?: boolean;
+    discount_value?: number | null;
     image_urls: string[] | null;
     available_colors: string[] | null;
     available_stitching?: string[] | null;
@@ -48,7 +51,7 @@ export function QuickViewModal({
         setLoading(true);
         supabase
             .from("products")
-            .select("id, name, slug, price_ghs, image_urls, available_colors, available_stitching, available_sizes")
+            .select("id, name, slug, price_ghs, compare_at_price_ghs, is_sale, discount_value, image_urls, available_colors, available_stitching, available_sizes")
             .eq("slug", slug)
             .single()
             .then(({ data }: { data: any }) => {
@@ -98,22 +101,42 @@ export function QuickViewModal({
 
                         {/* Details side */}
                         <div className="w-full md:w-1/2 p-8 md:p-12 overflow-y-auto max-h-[90vh]">
-                            <h2 className="font-serif text-3xl tracking-widest uppercase mb-2">{product.name}</h2>
-                            <p className="text-sm tracking-wider text-neutral-500 mb-8">{product.price_ghs} GHS</p>
-
-                            <ProductCheckoutForm
-                                productId={product.id}
-                                productName={product.name}
-                                productSlug={product.slug}
-                                productImageUrl={product.image_urls?.[0] || ""}
-                                priceNum={product.price_ghs}
-                                price={`${product.price_ghs} GHS`}
-                                colors={product.available_colors || ["Noir", "Cognac", "Sand"]}
-                                stitching={product.available_stitching || ["Tonal", "Contrast White"]}
-                                availableSizes={product.available_sizes || null}
-                                onAddedToCart={onClose}
-                                openDrawerOnAdd={openDrawerOnAdd}
-                            />
+                            {(() => {
+                                const hasSaleFromCompare = !!(product.compare_at_price_ghs && product.compare_at_price_ghs > product.price_ghs);
+                                const hasSaleFromDiscount = !!(product.is_sale && (product.discount_value ?? 0) > 0);
+                                const effectivePrice = hasSaleFromDiscount && !hasSaleFromCompare
+                                    ? product.price_ghs * (1 - (product.discount_value ?? 0) / 100)
+                                    : product.price_ghs;
+                                const originalPrice = hasSaleFromCompare ? product.compare_at_price_ghs! : hasSaleFromDiscount ? product.price_ghs : null;
+                                return (
+                                    <>
+                                        <h2 className="font-serif text-3xl tracking-widest uppercase mb-2">{product.name}</h2>
+                                        <div className="flex items-center gap-3 mb-8">
+                                            {originalPrice && (
+                                                <span className="text-sm tracking-wider line-through text-neutral-400">
+                                                    GH₵{originalPrice.toFixed(2)}
+                                                </span>
+                                            )}
+                                            <span className="text-sm tracking-wider text-neutral-500">
+                                                GH₵{effectivePrice.toFixed(2)}
+                                            </span>
+                                        </div>
+                                        <ProductCheckoutForm
+                                            productId={product.id}
+                                            productName={product.name}
+                                            productSlug={product.slug}
+                                            productImageUrl={product.image_urls?.[0] || ""}
+                                            priceNum={effectivePrice}
+                                            price={`GH₵${effectivePrice.toFixed(2)}`}
+                                            colors={product.available_colors || ["Noir", "Cognac", "Sand"]}
+                                            stitching={product.available_stitching || ["Tonal", "Contrast White"]}
+                                            availableSizes={product.available_sizes || null}
+                                            onAddedToCart={onClose}
+                                            openDrawerOnAdd={openDrawerOnAdd}
+                                        />
+                                    </>
+                                );
+                            })()}
                         </div>
                     </>
                 )}
