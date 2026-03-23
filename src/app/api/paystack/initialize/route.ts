@@ -1,3 +1,5 @@
+export const maxDuration = 30; // 30 seconds — headroom for Paystack API handshake
+
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 

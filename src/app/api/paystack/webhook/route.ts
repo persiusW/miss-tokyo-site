@@ -1,3 +1,5 @@
+export const maxDuration = 60; // 1 minute — safe window for Paystack webhook processing
+
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";

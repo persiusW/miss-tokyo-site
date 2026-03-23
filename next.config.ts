@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false, // SPD-12: suppress X-Powered-By header
   images: {
     formats: ["image/avif", "image/webp"],
+    // Image optimization enabled — Vercel Pro plan
     remotePatterns: [
       {
         protocol: 'https',
