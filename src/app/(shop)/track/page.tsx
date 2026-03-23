@@ -109,24 +109,37 @@ function statusLabel(status: string): string {
 
 // ── Server-side order lookup ──────────────────────────────────────────────────
 
-async function lookupOrder(ref: string, email: string): Promise<Order | null> {
-    if (!ref || !email) return null;
+async function lookupOrder(ref: string, email: string, phone?: string): Promise<Order | null> {
+    if (!ref) return null;
 
-    // Sanitise: ref should be 8 hex chars, email a valid-ish string
+    // Sanitise: strip non-hex chars (handles # prefix, spaces), require exactly 8
     const cleanRef = ref.trim().toUpperCase().replace(/[^A-F0-9]/g, "");
+    if (cleanRef.length !== 8) return null;
+
     const cleanEmail = email.trim().toLowerCase();
-    if (cleanRef.length !== 8 || !cleanEmail.includes("@")) return null;
+    const hasEmail = cleanEmail.includes("@");
 
-    // Match on the first 8 chars of the UUID (the order reference shown in emails)
-    // and verify the customer email — both must match
-    const { data } = await supabaseAdmin
-        .from("orders")
-        .select("id, created_at, total_amount, status, items, customer_name, shipping_address, delivery_method")
-        .ilike("id", `${cleanRef}%`)
-        .ilike("customer_email", cleanEmail)
-        .maybeSingle();
+    // Digits only; also try last 9 digits to handle +233 vs 0 prefix variants
+    const cleanPhone = phone ? phone.trim().replace(/\D/g, "") : "";
+    const hasPhone = cleanPhone.length >= 9;
 
-    return data ?? null;
+    if (!hasEmail && !hasPhone) return null;
+
+    // Use an RPC function so the UUID → text cast happens inside PostgreSQL directly.
+    // PostgREST filter chaining with "id::text" column expressions is unreliable across
+    // Supabase JS versions; the RPC approach is version-independent and tested.
+    const { data, error } = await supabaseAdmin.rpc("find_order_by_ref", {
+        p_ref:   cleanRef,
+        p_email: hasEmail ? cleanEmail : null,
+        p_phone: hasPhone ? cleanPhone : null,
+    });
+
+    if (error) {
+        console.error("[track] find_order_by_ref RPC error:", error.message);
+        return null;
+    }
+
+    return (data as Order[] | null)?.[0] ?? null;
 }
 
 // ── Timeline Component ────────────────────────────────────────────────────────
@@ -189,9 +202,10 @@ export default async function TrackOrderPage({
     const params = await searchParams;
     const rawRef = params.ref ?? "";
     const rawEmail = params.email ?? "";
+    const rawPhone = params.phone ?? "";
 
-    const hasQuery = rawRef.length > 0 && rawEmail.length > 0;
-    const order = hasQuery ? await lookupOrder(rawRef, rawEmail) : null;
+    const hasQuery = rawRef.length > 0 && (rawEmail.length > 0 || rawPhone.length > 0);
+    const order = hasQuery ? await lookupOrder(rawRef, rawEmail, rawPhone) : null;
     const notFound = hasQuery && !order;
 
     const orderRef = order ? order.id.substring(0, 8).toUpperCase() : "";
@@ -213,14 +227,17 @@ export default async function TrackOrderPage({
                     </label>
                     <input
                         name="ref"
-                        defaultValue={rawRef}
+                        defaultValue={rawRef.trim().toUpperCase().replace(/[^A-F0-9]/g, "").slice(0, 8)}
                         placeholder="e.g. A1B2C3D4"
                         maxLength={8}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="characters"
                         required
                         className="w-full border border-neutral-300 px-4 py-3 text-sm tracking-wider uppercase placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:border-black"
                     />
                     <p className="mt-1 text-[10px] text-neutral-400">
-                        Your 8-character order reference is in your confirmation email subject line.
+                        Your 8-character order reference is in your confirmation email subject line, e.g. <span className="font-mono">A1B2C3D4</span>.
                     </p>
                 </div>
                 <div>
@@ -232,7 +249,20 @@ export default async function TrackOrderPage({
                         type="email"
                         defaultValue={rawEmail}
                         placeholder="you@example.com"
-                        required
+                        autoComplete="email"
+                        className="w-full border border-neutral-300 px-4 py-3 text-sm focus:outline-none focus:border-black"
+                    />
+                </div>
+                <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-neutral-500 mb-1.5">
+                        Phone Number <span className="normal-case tracking-normal text-neutral-400">(if email doesn&apos;t work)</span>
+                    </label>
+                    <input
+                        name="phone"
+                        type="tel"
+                        defaultValue={rawPhone}
+                        placeholder="e.g. 0244123456"
+                        autoComplete="tel"
                         className="w-full border border-neutral-300 px-4 py-3 text-sm focus:outline-none focus:border-black"
                     />
                 </div>
@@ -251,8 +281,11 @@ export default async function TrackOrderPage({
                         No order found matching that reference and email address.
                     </p>
                     <p className="mt-2 text-[11px] text-neutral-400">
-                        Please check your confirmation email and try again. If you need help,{" "}
-                        <Link href="/contact" className="underline">contact us</Link>.
+                        Check the subject line of your confirmation email for the exact reference and email address used at checkout. If the email doesn&apos;t match, try entering your phone number instead.
+                    </p>
+                    <p className="mt-2 text-[11px] text-neutral-400">
+                        Still need help?{" "}
+                        <Link href="/contact" className="underline">Contact us</Link>.
                     </p>
                 </div>
             )}
