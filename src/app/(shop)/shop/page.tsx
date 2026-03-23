@@ -1,10 +1,36 @@
 import { Metadata } from "next";
 import { Suspense } from "react";
+import { unstable_cache } from "next/cache";
 import { getProducts, getCategories, deriveColors, deriveSizes } from "@/lib/products";
 import { ShopPageClient } from "@/components/ui/miss-tokyo/ShopPageClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { notFound } from "next/navigation";
+
+// Cache admin-controlled settings for 5 minutes — they change rarely and this
+// fetch fires on every dynamic /shop render, contributing ~0.5-1s per invocation.
+const getShopSettings = unstable_cache(
+    async () => {
+        const [paginationRes, mobileColsRes] = await Promise.all([
+            supabaseAdmin
+                .from("site_settings")
+                .select("shop_pagination_type")
+                .eq("id", "singleton")
+                .maybeSingle(),
+            supabaseAdmin
+                .from("store_settings")
+                .select("shop_mobile_cols")
+                .eq("id", "default")
+                .maybeSingle(),
+        ]);
+        return {
+            paginationSetting: (paginationRes.data?.shop_pagination_type ?? "load_more") as "load_more" | "pagination",
+            mobileCols: (Number(mobileColsRes.data?.shop_mobile_cols) || 2) as 1 | 2,
+        };
+    },
+    ["shop-settings"],
+    { revalidate: 300 }
+);
 
 export const revalidate = 60;
 
@@ -89,33 +115,11 @@ export default async function ShopPage({
         }
     }
 
-    // Phase 3 & 4: Defensive settings fetch with robust fallbacks
-    let paginationSetting: "load_more" | "pagination" = "load_more";
-    let mobileCols: 1 | 2 = 2;
-
-    try {
-        const [paginationRes, mobileColsRes] = await Promise.all([
-            supabaseAdmin
-                .from("site_settings")
-                .select("shop_pagination_type")
-                .eq("id", "singleton")
-                .maybeSingle(),
-            supabaseAdmin
-                .from("store_settings")
-                .select("shop_mobile_cols")
-                .eq("id", "default")
-                .maybeSingle(),
-        ]);
-
-        if (paginationRes.data?.shop_pagination_type) {
-            paginationSetting = paginationRes.data.shop_pagination_type as any;
-        }
-        if (mobileColsRes.data?.shop_mobile_cols) {
-            mobileCols = Number(mobileColsRes.data.shop_mobile_cols) as 1 | 2;
-        }
-    } catch (err) {
-        console.warn("[Defensive Fetch] Settings retrieval failed, using fallbacks:", err);
-    }
+    // Settings are cached at module level — no DB round-trip on cache hit
+    const { paginationSetting, mobileCols } = await getShopSettings().catch(() => ({
+        paginationSetting: "load_more" as const,
+        mobileCols: 2 as const,
+    }));
 
     const [{ products, total, minPrice, maxPrice }, categories] = await Promise.all([
         getProducts({
