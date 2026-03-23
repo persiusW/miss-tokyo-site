@@ -54,7 +54,7 @@ import { Rate, Trend } from "k6/metrics";
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const BASE_URL     = (__ENV.BASE_URL     || "https://misstokyo.shop").replace(/\/$/, "");
-const PRODUCT_SLUG = __ENV.PRODUCT_SLUG || "stark-ring";
+const PRODUCT_SLUG = __ENV.PRODUCT_SLUG || null; // null = auto-discover from /api/products in setup()
 const DEBUG        = __ENV.DEBUG === "true";
 
 // ── Custom metrics ────────────────────────────────────────────────────────────
@@ -138,7 +138,8 @@ function diagnose(label, res) {
 
 // ── Virtual user journey ──────────────────────────────────────────────────────
 
-export default function () {
+export default function (data) {
+    const productSlug = (data && data.productSlug) || "stark-ring";
 
     // ── Stage 1: Homepage ────────────────────────────────────────────────────
     group("1. Homepage", () => {
@@ -162,7 +163,7 @@ export default function () {
 
     // ── Stage 2: Product Detail Page (PDP) ──────────────────────────────────
     group("2. Product Detail Page", () => {
-        const res = http.get(`${BASE_URL}/products/${PRODUCT_SLUG}`, pageParams);
+        const res = http.get(`${BASE_URL}/products/${productSlug}`, pageParams);
         diagnose("PDP", res);
         pdpDur.add(res.timings.duration);
 
@@ -219,13 +220,41 @@ export default function () {
     sleep(randomBetween(1, 2));
 }
 
-// ── Setup — warm ISR cache before ramp ───────────────────────────────────────
+// ── Setup — discover a real product slug, then warm ISR cache ────────────────
 export function setup() {
     console.log(`[setup] Warming ISR cache at ${BASE_URL}…`);
 
+    // ── Step 1: resolve product slug ──────────────────────────────────────────
+    // If PRODUCT_SLUG was passed via --env, use it directly.
+    // Otherwise fetch the first active product from /api/products so the PDP
+    // stage always hits a slug that actually exists in this deployment's DB.
+    let productSlug = PRODUCT_SLUG;
+    if (!productSlug) {
+        const apiRes = http.get(
+            `${BASE_URL}/api/products?sort=created_at&page=1`,
+            { headers: { "Accept": "application/json" }, redirects: 10 },
+        );
+        if (apiRes.status === 200) {
+            try {
+                const body = JSON.parse(apiRes.body);
+                const first = body.products && body.products[0];
+                if (first && first.slug) {
+                    productSlug = first.slug;
+                    console.log(`[setup] Auto-discovered product slug: "${productSlug}"`);
+                }
+            } catch (e) {
+                console.warn("[setup] Could not parse /api/products response:", e);
+            }
+        } else {
+            console.warn(`[setup] /api/products returned ${apiRes.status} — falling back to "stark-ring"`);
+        }
+        if (!productSlug) productSlug = "stark-ring";
+    }
+
+    // ── Step 2: warm ISR cache ─────────────────────────────────────────────────
     const warmTargets = [
         BASE_URL + "/",
-        `${BASE_URL}/products/${PRODUCT_SLUG}`,
+        `${BASE_URL}/products/${productSlug}`,
         BASE_URL + "/shop",
     ];
 
@@ -233,8 +262,6 @@ export function setup() {
         const res = http.get(url, pageParams);
         console.log(`[setup] ${url} → ${res.status} (${Math.round(res.timings.duration)}ms)`);
 
-        // If setup hits non-200, log it prominently — indicates a config problem
-        // (wrong BASE_URL, www redirect, Vercel edge protection, etc.)
         if (res.status !== 200) {
             console.warn(
                 `[setup] ⚠ Expected 200 but got ${res.status} for ${url}.\n` +
@@ -246,10 +273,11 @@ export function setup() {
     }
 
     console.log("[setup] Done. Starting VU ramp.");
+    return { productSlug };
 }
 
 // ── Teardown ──────────────────────────────────────────────────────────────────
-export function teardown(data) {
+export function teardown(_data) {
     console.log([
         "",
         "─── Interpreting results ─────────────────────────────────────────────",
