@@ -315,7 +315,16 @@ export function deriveSizes(products: ShopProduct[]): string[] {
     });
     return sorted;
 }
-export async function getVideoProducts(): Promise<Array<ShopProduct & { video_url?: string }>> {
+/** Number of product rows fetched per page. Videos are a subset of this. */
+export const VIDEO_BATCH_SIZE = 20;
+
+export type VideoProduct = ShopProduct & { video_url: string };
+
+export async function getVideoProducts(offset = 0): Promise<{
+    videos: VideoProduct[];
+    nextOffset: number;
+    hasMore: boolean;
+}> {
     const db = createClient();
     const { data } = await db
         .from("products")
@@ -324,27 +333,34 @@ export async function getVideoProducts(): Promise<Array<ShopProduct & { video_ur
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
         .eq("is_active", true)
-        .limit(50);
+        .order("created_at", { ascending: false })
+        .range(offset, offset + VIDEO_BATCH_SIZE - 1);
 
-    if (!data) return [];
+    if (!data) return { videos: [], nextOffset: offset + VIDEO_BATCH_SIZE, hasMore: false };
 
-    const videoProducts = (data as any[]).map(p => {
-        const video = p.image_urls?.find((url: string) => 
-            url.toLowerCase().endsWith(".mp4") || url.toLowerCase().endsWith(".mov")
-        );
-        
-        return {
-            ...p,
-            category_id: null,
-            is_featured: p.is_featured ?? false,
-            is_sale: p.is_sale ?? false,
-            discount_value: p.discount_value ?? 0,
-            inventory_count: p.inventory_count ?? 0,
-            category_name: p.category_type ?? null,
-            category_slug: null,
-            video_url: video
-        };
-    }).filter(p => !!p.video_url);
+    const videos = (data as any[])
+        .map(p => {
+            const video_url = p.image_urls?.find((url: string) =>
+                url.toLowerCase().endsWith(".mp4") || url.toLowerCase().endsWith(".mov")
+            ) as string | undefined;
+            return {
+                ...p,
+                category_id: null,
+                is_featured: p.is_featured ?? false,
+                is_sale: p.is_sale ?? false,
+                discount_value: p.discount_value ?? 0,
+                inventory_count: p.inventory_count ?? 0,
+                category_name: p.category_type ?? null,
+                category_slug: null,
+                video_url,
+            };
+        })
+        .filter((p): p is VideoProduct => !!p.video_url);
 
-    return videoProducts;
+    return {
+        videos,
+        nextOffset: offset + VIDEO_BATCH_SIZE,
+        // If the DB returned a full batch, there may be more products to scan
+        hasMore: data.length === VIDEO_BATCH_SIZE,
+    };
 }
