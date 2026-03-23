@@ -102,6 +102,7 @@ async function ensureCustomerAccount(
         const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
             type: "recovery",
             email: customerEmail,
+            options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop"}/account` },
         });
         setupLink = (linkData as any)?.properties?.action_link || undefined;
     } catch {

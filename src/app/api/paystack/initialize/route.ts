@@ -124,7 +124,7 @@ export async function POST(request: Request) {
         const orderId = pendingOrder.id;
 
         const amountInPesewas = amountInGHS * 100;
-        const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+        const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
         const siteUrl = rawSiteUrl.replace(/\/+$/, "");
 
         // --- SPLIT GROUP (SPL_xxx) — active for testing ---

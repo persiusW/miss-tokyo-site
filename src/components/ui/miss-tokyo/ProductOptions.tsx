@@ -102,9 +102,11 @@ export function ProductOptions(props: Props) {
         ? colorVariants
         : (availableColors || []).map(n => ({ name: n, hex: COLOR_HEX[n] || "#E8D5C4", in_stock: true }));
 
-    const sizes: SizeVariant[] = sizeVariants && sizeVariants.length > 0
-        ? sizeVariants
-        : (availableSizes || []).map(l => ({ label: l, in_stock: true }));
+    // available_sizes is the admin-managed source of truth and always has the current format.
+    // size_variants is a stale JSONB column that may contain old-format labels — prefer available_sizes.
+    const sizes: SizeVariant[] = availableSizes && availableSizes.length > 0
+        ? availableSizes.map(l => ({ label: l, in_stock: true }))
+        : (sizeVariants || []);
 
     const [selectedColor, setSelectedColor] = useState<string>(colors[0]?.name ?? "");
     const [selectedSize, setSelectedSize] = useState<string>(sizes.find(s => s.in_stock)?.label ?? "");
@@ -404,6 +406,14 @@ export function ProductOptions(props: Props) {
             )}
 
             {/* Size selector */}
+            {sizes.length === 0 && (
+                <div style={{ marginBottom: 22, fontSize: 12, color: "var(--muted, #7A7167)" }}>
+                    Contact us for sizing —{" "}
+                    <a href="mailto:studio@misstokyo.shop" style={{ color: "var(--ink, #141210)", textDecoration: "underline" }}>
+                        studio@misstokyo.shop
+                    </a>
+                </div>
+            )}
             {sizes.length > 0 && (
                 <div style={{ marginBottom: 22 }}>
                     <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted, #7A7167)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>

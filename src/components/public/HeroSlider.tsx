@@ -71,7 +71,10 @@ export function HeroSlider({ slides }: HeroSliderProps) {
         <div
           key={slide.id}
           className="absolute inset-0 transition-opacity duration-1000"
-          style={{ opacity: index === current ? 1 : 0 }}
+          style={{ 
+            opacity: index === current ? 1 : 0,
+            pointerEvents: index === current ? "auto" : "none"
+          }}
           aria-hidden={index !== current}
         >
           {/* Background image: index 0 already rendered eagerly above */}

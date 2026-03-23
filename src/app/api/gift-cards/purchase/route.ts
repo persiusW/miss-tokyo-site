@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ authorizationUrl: null, gift_card_id: card.id, code });
         }
 
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
         const amountInPesewas = Math.round(amt * 100);
 
         const paystackRes = await fetch("https://api.paystack.co/transaction/initialize", {
