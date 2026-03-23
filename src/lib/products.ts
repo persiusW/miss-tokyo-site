@@ -145,25 +145,33 @@ export async function getProducts(params: GetProductsParams, role?: string) {
     return { products, total: count ?? 0, minPrice, maxPrice };
 }
 
+const getCachedCategoriesByRole = unstable_cache(
+    async (isAuthorized: boolean) => {
+        const db = createClient();
+        let query = db
+            .from("categories")
+            .select("id, name, slug, product_count, sort_order")
+            .eq("is_active", true);
+
+        // Hide wholesale-only categories from retail users
+        if (!isAuthorized) {
+            query = query.or("is_wholesale.eq.false,is_wholesale.is.null");
+        }
+
+        const { data, error } = await query
+            .order("sort_order", { ascending: true })
+            .order("name",       { ascending: true });
+            
+        if (error) console.error("[getCategories]", error);
+        return (data ?? []) as ShopCategory[];
+    },
+    ["categories-list"],
+    { revalidate: 60 } // Cache for 60 seconds
+);
+
 export async function getCategories(role?: string): Promise<ShopCategory[]> {
-    const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
-    const db = createClient();
-
-    let query = db
-        .from("categories")
-        .select("id, name, slug, product_count, sort_order")
-        .eq("is_active", true);
-
-    // Hide wholesale-only categories from retail users
-    if (!isAuthorized) {
-        query = query.or("is_wholesale.eq.false,is_wholesale.is.null");
-    }
-
-    const { data, error } = await query
-        .order("sort_order", { ascending: true })
-        .order("name",       { ascending: true });
-    if (error) console.error("[getCategories]", error);
-    return (data ?? []) as ShopCategory[];
+    const isAuthorized = !!role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
+    return getCachedCategoriesByRole(isAuthorized);
 }
 
 // ─── PDP interfaces ────────────────────────────────────────────────────────

@@ -200,27 +200,38 @@ export async function POST(req: Request) {
 
             // ── Idempotency Check ─────────────────────────────────────────────
             // Verify if this transaction has already been processed to prevent double inventory/logic
+            let isAlreadyProcessed = false;
+            let emailAlreadySent = false;
+            
             if (orderId) {
                 const { data: existingOrder } = await supabaseAdmin
                     .from("orders")
-                    .select("status, paystack_reference")
+                    .select("status, paystack_reference, customer_metadata")
                     .eq("id", orderId)
                     .single();
                 
                 if (existingOrder && (existingOrder.status === "paid" || existingOrder.status === "confirmed" || existingOrder.paystack_reference === paystackRef)) {
-                    console.log(`[webhook] Order ${orderId} already processed. Skipping.`);
-                    return NextResponse.json({ status: "already_processed" });
+                    console.log(`[webhook] Order ${orderId} already processed in DB. Skipping inventory deductions but will trigger email.`);
+                    isAlreadyProcessed = true;
+                }
+                
+                if (existingOrder && (existingOrder.customer_metadata as any)?.webhook_email_sent) {
+                    emailAlreadySent = true;
                 }
             } else if (paystackRef) {
                 const { data: existingOrder } = await supabaseAdmin
                     .from("orders")
-                    .select("id")
+                    .select("id, customer_metadata")
                     .eq("paystack_reference", paystackRef)
                     .maybeSingle();
 
                 if (existingOrder) {
-                    console.log(`[webhook] Reference ${paystackRef} already exists. Skipping.`);
-                    return NextResponse.json({ status: "already_processed" });
+                    console.log(`[webhook] Reference ${paystackRef} already exists in DB. Skipping inventory deductions but will trigger email.`);
+                    isAlreadyProcessed = true;
+                }
+                
+                if (existingOrder && (existingOrder.customer_metadata as any)?.webhook_email_sent) {
+                    emailAlreadySent = true;
                 }
             }
             // ─────────────────────────────────────────────────────────────────
@@ -283,7 +294,7 @@ export async function POST(req: Request) {
             const parsedItems = parseItems(cartItems);
 
             // Decrement inventory — hybrid model: variant-level or product-level
-            if (parsedItems.length > 0) {
+            if (!isAlreadyProcessed && parsedItems.length > 0) {
                 const productIds = [...new Set(parsedItems.map(i => i.productId).filter(Boolean))];
 
                 // Fetch products with track_variant_inventory flag
@@ -344,7 +355,7 @@ export async function POST(req: Request) {
             }
 
             // Legacy single-product flow
-            if (!parsedItems.length && productId) {
+            if (!isAlreadyProcessed && !parsedItems.length && productId) {
                 const { data: product } = await supabaseAdmin
                     .from("products")
                     .select("inventory_count")
@@ -372,7 +383,7 @@ export async function POST(req: Request) {
             }
 
             // Auto-archive any pay link matching this reference
-            if (paystackRef) {
+            if (!isAlreadyProcessed && paystackRef) {
                 await supabaseAdmin
                     .from("pay_links")
                     .update({ status: "archived" })
@@ -395,6 +406,9 @@ export async function POST(req: Request) {
             };
 
             if (orderId) {
+                                const { data: currentOrderData } = await supabaseAdmin.from("orders").select("customer_metadata").eq("id", orderId).single();
+                const currentMeta = (currentOrderData?.customer_metadata as object) || {};
+
                 const { error } = await supabaseAdmin
                     .from("orders")
                     .update({
@@ -409,9 +423,11 @@ export async function POST(req: Request) {
                         discount_code: discount_code || null,
                         discount_amount: Number(discount_amount) || 0,
                         customer_metadata: {
+                            ...currentMeta,
                             whatsapp: whatsapp || null,
                             instagram: instagram || null,
                             snapchat: snapchat || null,
+                            webhook_email_sent: true
                         },
                         ...(customerId ? { customer_id: customerId } : {}),
                     })
@@ -421,14 +437,16 @@ export async function POST(req: Request) {
                     console.error("Webhook: Failed to update order:", error);
                 } else {
                     const orderRef = orderId.substring(0, 8).toUpperCase();
+                    if (!emailAlreadySent) console.log('Webhook triggered email for order:', orderId);
+                    
                     const [emailResult, , smsResult, pushResult] = await Promise.allSettled([
-                        sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
-                        trackDiscountUsage(discount_code, discount_tag),
-                        phone ? sendSMS({
+                        emailAlreadySent ? Promise.resolve() : sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
+                        isAlreadyProcessed ? Promise.resolve() : trackDiscountUsage(discount_code, discount_tag),
+                        (emailAlreadySent || !phone) ? Promise.resolve() : sendSMS({
                             to: phone,
                             message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
-                        }) : Promise.resolve(),
-                        sendAdminPushNotifications(
+                        }),
+                        isAlreadyProcessed ? Promise.resolve() : sendAdminPushNotifications(
                             "New Order Received!",
                             `Order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${fullName || customerEmail} has been paid.`,
                         ),
@@ -441,7 +459,7 @@ export async function POST(req: Request) {
                 // Fallback: create order if none pre-created
                 const { data: existing } = await supabaseAdmin
                     .from("orders")
-                    .select("id")
+                    .select("id, customer_metadata")
                     .eq("paystack_reference", paystackRef)
                     .single();
 
@@ -466,6 +484,7 @@ export async function POST(req: Request) {
                                 whatsapp: whatsapp || null,
                                 instagram: instagram || null,
                                 snapchat: snapchat || null,
+                                webhook_email_sent: true
                             },
                             ...(customerId ? { customer_id: customerId } : {}),
                         }])
@@ -476,14 +495,15 @@ export async function POST(req: Request) {
                         console.error("Webhook: Failed to create order:", error);
                     } else if (newOrder) {
                         const orderRef = newOrder.id.substring(0, 8).toUpperCase();
+                        console.log('Webhook triggered email for order:', newOrder.id);
                         const [emailResult, , smsResult, pushResult] = await Promise.allSettled([
                             sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
-                            trackDiscountUsage(discount_code, discount_tag),
-                            phone ? sendSMS({
+                            isAlreadyProcessed ? Promise.resolve() : trackDiscountUsage(discount_code, discount_tag),
+                            (!phone) ? Promise.resolve() : sendSMS({
                                 to: phone,
                                 message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
-                            }) : Promise.resolve(),
-                            sendAdminPushNotifications(
+                            }),
+                            isAlreadyProcessed ? Promise.resolve() : sendAdminPushNotifications(
                                 "New Order Received!",
                                 `Order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${fullName || customerEmail} has been paid.`,
                             ),

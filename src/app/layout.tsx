@@ -29,6 +29,8 @@ const cinzel = localFont({
 import { unstable_cache } from "next/cache";
 import { supabase } from "@/lib/supabase";
 
+export const revalidate = 60;
+
 const getSiteMetadata = unstable_cache(
   async () => {
     const { data } = await supabase.from("site_metadata").select("*").eq("page_path", "/").single();

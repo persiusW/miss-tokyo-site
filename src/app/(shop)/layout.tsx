@@ -5,6 +5,8 @@ import { CartDrawer } from "@/components/ui/miss-tokyo/CartDrawer";
 import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+export const revalidate = 60;
+
 // ── ISR-SAFE: supabaseAdmin does NOT call cookies() so this layout never opts
 // pages out of static caching. Maintenance mode changes rarely — 60 s TTL.
 const getMaintenanceMode = unstable_cache(
