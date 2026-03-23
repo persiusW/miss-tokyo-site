@@ -28,6 +28,7 @@ const FALLBACK_SLIDE: HeroSlide = {
 
 export function HeroSlider({ slides }: HeroSliderProps) {
   const activeSlides = slides.length > 0 ? slides : [FALLBACK_SLIDE];
+  const firstSlide = activeSlides[0];
   const [current, setCurrent] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -53,6 +54,19 @@ export function HeroSlider({ slides }: HeroSliderProps) {
       aria-live="polite"
       aria-label="Hero slideshow"
     >
+      {/* SPD-02: First slide image rendered eagerly outside the slider loop so the
+          server emits a <link rel="preload"> immediately, improving LCP. */}
+      {firstSlide.image_url && (
+        <Image
+          src={firstSlide.image_url}
+          alt={firstSlide.headline_line1}
+          fill
+          priority
+          sizes="100vw"
+          className={`object-cover object-center transition-opacity duration-1000 ${current === 0 ? "opacity-100" : "opacity-0"}`}
+        />
+      )}
+
       {activeSlides.map((slide, index) => (
         <div
           key={slide.id}
@@ -60,23 +74,22 @@ export function HeroSlider({ slides }: HeroSliderProps) {
           style={{ opacity: index === current ? 1 : 0 }}
           aria-hidden={index !== current}
         >
-          {/* Background image or gradient fallback */}
-          {slide.image_url ? (
+          {/* Background image: index 0 already rendered eagerly above */}
+          {index !== 0 && slide.image_url ? (
             <Image
               src={slide.image_url}
               alt={slide.headline_line1}
               fill
               quality={85}
               className="object-cover object-center"
-              priority={index === 0}
               sizes="100vw"
             />
-          ) : (
+          ) : !slide.image_url ? (
             <div
               className="absolute inset-0"
               style={{ background: "linear-gradient(135deg, #1a1208 0%, #2d1f0e 40%, #141210 100%)" }}
             />
-          )}
+          ) : null}
 
           {/* Dark overlay */}
           <div

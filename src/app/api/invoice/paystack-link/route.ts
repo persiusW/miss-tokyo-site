@@ -1,21 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
 
 /**
  * POST /api/invoice/paystack-link
  * Creates a Paystack payment link for an invoice using the Payment Pages API.
  */
 export async function POST(req: NextRequest) {
+    const serverClient = await createClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!secretKey) {
         return NextResponse.json({ error: "Paystack not configured." }, { status: 500 });
     }
 
     try {
-        const { invoiceId, amount, customerEmail } = await req.json();
+        const { invoiceId, customerEmail } = await req.json();
 
-        if (!invoiceId || !amount) {
-            return NextResponse.json({ error: "invoiceId and amount are required." }, { status: 400 });
+        if (!invoiceId) {
+            return NextResponse.json({ error: "invoiceId is required." }, { status: 400 });
+        }
+
+        // Fetch invoice amount from DB — never trust client-supplied amount (SEC-17)
+        const { data: invoiceData, error: invoiceError } = await supabaseAdmin
+            .from("invoices")
+            .select("total_amount")
+            .eq("id", invoiceId)
+            .single();
+
+        if (invoiceError || !invoiceData) {
+            return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
         }
 
         // Fetch fee settings
@@ -27,7 +47,7 @@ export async function POST(req: NextRequest) {
 
         const feePct = Number(feeData?.platform_fee_percentage) || 0;
         const feeLabel = feeData?.platform_fee_label || "Service Charge";
-        const baseAmount = Number(amount);
+        const baseAmount = Number(invoiceData.total_amount);
         const feeAmount = parseFloat((baseAmount * (feePct / 100)).toFixed(2));
         const finalAmount = parseFloat((baseAmount + feeAmount).toFixed(2));
 

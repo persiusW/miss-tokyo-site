@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { X, Search } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
 import { CartButton } from "./CartButton";
 import { supabase } from "@/lib/supabase";
 
@@ -22,11 +21,11 @@ const NAV_LINKS = [
 
 const TRENDING_SEARCHES = ["DRESSES", "NEW ARRIVALS", "SALE", "BLACK"];
 
-export function NavBar() {
+export function NavBar({ initialUser }: { initialUser?: { id: string } | null }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isLoggedIn, setIsLoggedIn] = useState(!!initialUser);
     const [navVisible, setNavVisible] = useState(true);
     const lastScrollY = useRef(0);
     const [navSettings, setNavSettings] = useState({
@@ -40,8 +39,9 @@ export function NavBar() {
     const pathname = usePathname();
     const router = useRouter();
 
+    // SPD-08: initialUser is server-rendered — no client fetch needed on mount.
+    // onAuthStateChange keeps state in sync after sign-in / sign-out / token refresh.
     useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }: { data: any }) => setIsLoggedIn(!!user));
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_: any, session: any) => {
             setIsLoggedIn(!!session?.user);
         });
@@ -161,15 +161,9 @@ export function NavBar() {
                 </div>
             </header>
 
-            {/* Premium Full-Screen Search Modal */}
-            <AnimatePresence>
-                {searchOpen && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[200] bg-white text-black flex flex-col justify-center items-center px-6"
-                    >
+            {/* SPD-07: Full-Screen Search Modal — framer-motion removed, Tailwind animate-in used instead */}
+            {searchOpen && (
+                    <div className="fixed inset-0 z-[200] bg-white text-black flex flex-col justify-center items-center px-6 animate-in fade-in duration-300">
                         <button 
                             onClick={() => setSearchOpen(false)}
                             className="absolute top-6 right-6 md:top-12 md:right-12 hover:rotate-90 transition-transform duration-500"
@@ -210,9 +204,8 @@ export function NavBar() {
                                 </div>
                             </div>
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    </div>
+            )}
 
             {/* Full-screen mobile overlay */}
             {menuOpen && (

@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabase";
+import { unstable_cache } from "next/cache";
 
 export interface ShopProduct {
     id: string;
@@ -48,13 +50,47 @@ export interface GetProductsParams {
 
 const PAGE_SIZE = 24;
 
+// ── Cached categories fetch — reused across getProducts and getProductBySlug ──
+const getCachedCategories = unstable_cache(
+    async () => {
+        const db = createClient();
+        const { data } = await db.from("categories").select("name, slug");
+        return (data ?? []) as Array<{ name: string; slug: string }>;
+    },
+    ["categories-name-map"],
+    { revalidate: 60 }
+);
+
 export async function getProducts(params: GetProductsParams, role?: string) {
-    const { category, sort, color, size, min, max, page = 1, q, sale } = params;
+    const { category, sort, color, size, min, max, page = 1, q, sale, inStock } = params;
+    const db = createClient();
 
-    const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
+    // ── PERF-02: Resolve category slug and fetch price bounds in parallel ──────
+    // Category resolve must complete before we can build the filter on the main query.
+    // Price bounds and name map are fully independent — run them concurrently.
+    const [catResult, minBoundResult, maxBoundResult, allCats] = await Promise.all([
+        category
+            ? db.from("categories").select("id, name").eq("slug", category).maybeSingle()
+            : Promise.resolve({ data: null }),
+        // PERF-04: two limit-1 queries instead of loading all prices into memory
+        db.from("products").select("price_ghs").eq("is_active", true).order("price_ghs", { ascending: true }).limit(1),
+        db.from("products").select("price_ghs").eq("is_active", true).order("price_ghs", { ascending: false }).limit(1),
+        getCachedCategories(),
+    ]);
 
-    // Phase 4 & 5: Bulletproof Fetcher
-    let query = supabaseAdmin
+    const minPrice = catResult !== null && minBoundResult.data?.[0]
+        ? Math.floor(Number(minBoundResult.data[0].price_ghs))
+        : 0;
+    const maxPrice = maxBoundResult.data?.[0]
+        ? Math.ceil(Number(maxBoundResult.data[0].price_ghs))
+        : 1000;
+
+    const catMap = new Map<string, { name: string; slug: string }>(
+        allCats.map((c: any) => [c.name.toLowerCase(), c])
+    );
+
+    // ── Build main query (category filter already resolved above) ─────────────
+    let query = db
         .from("products")
         .select(
             `id, name, slug, description, price_ghs, compare_at_price_ghs,
@@ -64,59 +100,21 @@ export async function getProducts(params: GetProductsParams, role?: string) {
             { count: "exact" }
         );
 
-    // Filter by active status (Safe handle for nulls)
     query = query.or("is_active.eq.true,is_active.is.null");
 
-    // B2B Gating: Exclude products in Wholesale Categories for Retail users
-    if (!isAuthorized) {
-        // Find all wholesale categories
-        const { data: wholesaleCats } = await supabaseAdmin
-            .from("categories")
-            .select("id, name")
-            .eq("is_wholesale", true);
-        
-        const restrictedIds = (wholesaleCats || []).map(c => c.id);
-        const restrictedNames = (wholesaleCats || []).map(c => c.name);
-
-        // Action 1: Empty Array Trap Fix + NULL Trap Fix
-        // CRITICAL: In PostgreSQL, `NULL NOT IN (...)` and `NOT (NULL @> ARRAY[...])` both
-        // return NULL (not TRUE), so rows with NULL columns get excluded by .not() filters.
-        // We use .or() to explicitly allow NULL values through — only exclude rows that
-        // have a confirmed match to a wholesale category.
-        if (restrictedIds.length > 0) {
-            // Exclude by Primary Category ID — allow NULL category_id through
-            query = query.or(`category_id.is.null,category_id.not.in.(${restrictedIds.join(",")})`);
-
-            // Exclude by Category Array — allow NULL category_ids through
-            const formattedIds = restrictedIds.map(id => `"${id}"`).join(",");
-            query = query.or(`category_ids.is.null,category_ids.not.ov.{${formattedIds}}`);
-        }
-
-        if (restrictedNames.length > 0) {
-            // Exclude by Category Name — allow NULL category_type through
-            query = query.or(`category_type.is.null,category_type.not.in.(${restrictedNames.join(",")})`);
-        }
-    }
-
-    // Category Filter (Inclusion)
     if (category) {
-        const { data: cat } = await supabaseAdmin
-            .from("categories")
-            .select("id, name")
-            .eq("slug", category)
-            .maybeSingle();
-
+        const cat = catResult.data as { id: string; name: string } | null;
         if (cat) {
             query = query.or(`category_id.eq.${cat.id},category_type.ilike."${cat.name}",category_ids.cs.{"${cat.id}"}`);
         } else {
-            // Fallback for direct URL slugs that don't match slug exactly
             const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
             query = query.ilike("category_type", fallbackName);
         }
     }
-    
+
     if (q) query = query.ilike("name", `%${q}%`);
     if (sale) query = query.eq("is_sale", true);
+    if (inStock) query = query.gt("inventory_count", 0);
     if (min) query = query.gte("price_ghs", parseFloat(min));
     if (max) query = query.lte("price_ghs", parseFloat(max));
     if (color) query = query.contains("available_colors", [color]);
@@ -135,21 +133,6 @@ export async function getProducts(params: GetProductsParams, role?: string) {
     const { data, count, error } = await query;
     if (error) console.error("[getProducts] Supabase Error:", error);
 
-    const { data: bounds } = await supabaseAdmin
-        .from("products")
-        .select("price_ghs")
-        .eq("is_active", true)
-        .order("price_ghs", { ascending: true });
-
-    const prices = (bounds || []).map((p: any) => Number(p.price_ghs)).filter(Boolean);
-    const minPrice = prices.length ? Math.floor(prices[0]) : 0;
-    const maxPrice = prices.length ? Math.ceil(prices[prices.length - 1]) : 1000;
-
-    const { data: allCats } = await supabaseAdmin
-        .from("categories")
-        .select("name, slug");
-    const catMap = new Map((allCats || []).map((c: any) => [c.name.toLowerCase(), c]));
-
     const products: ShopProduct[] = (data || []).map((p: any) => {
         const matchedCat = p.category_type ? catMap.get(p.category_type.toLowerCase()) : null;
         return {
@@ -164,19 +147,22 @@ export async function getProducts(params: GetProductsParams, role?: string) {
 
 export async function getCategories(role?: string): Promise<ShopCategory[]> {
     const isAuthorized = role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
-    
-    let query = supabaseAdmin
+    const db = createClient();
+
+    let query = db
         .from("categories")
         .select("id, name, slug, product_count, sort_order")
+        .eq("is_active", true);
+
+    // Hide wholesale-only categories from retail users
     if (!isAuthorized) {
         query = query.or("is_wholesale.eq.false,is_wholesale.is.null");
     }
 
-    query = query.eq("is_active", true);
-
-    const { data } = await query
+    const { data, error } = await query
         .order("sort_order", { ascending: true })
         .order("name",       { ascending: true });
+    if (error) console.error("[getCategories]", error);
     return (data ?? []) as ShopCategory[];
 }
 
@@ -189,6 +175,10 @@ export interface ProductDetail extends ShopProduct {
     care_instructions: string[] | null;
     rating_average: number;
     review_count: number;
+    wholesale_override?: boolean;
+    wholesale_price_tier_1?: number | null;
+    wholesale_price_tier_2?: number | null;
+    wholesale_price_tier_3?: number | null;
 }
 
 export interface ProductReview {
@@ -210,21 +200,31 @@ export interface RatingDistribution {
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
-    const { data } = await supabaseAdmin
+    const db = createClient();
+    const { data, error } = await db
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count,
-             sku, features_list, care_instructions, rating_average, review_count, created_at`)
+             sku, features_list, care_instructions, rating_average, review_count, created_at,
+             wholesale_override, wholesale_price_tier_1, wholesale_price_tier_2, wholesale_price_tier_3`)
         .eq("slug", slug)
         .eq("is_active", true)
         .maybeSingle();
 
+    // LOG-07: throw on DB error so Next.js shows a 500 (transient), not a false 404
+    if (error) {
+        console.error("[getProductBySlug]", error);
+        throw error;
+    }
     if (!data) return null;
 
-    const { data: allCats } = await supabaseAdmin.from("categories").select("name, slug");
-    const catMap = new Map((allCats || []).map((c: any) => [c.name.toLowerCase(), c]));
+    // PERF-03: use cached categories — avoids a per-PDP round-trip
+    const allCats = await getCachedCategories();
+    const catMap = new Map<string, { name: string; slug: string }>(
+        allCats.map((c: any) => [c.name.toLowerCase(), c])
+    );
     const matchedCat = data.category_type ? catMap.get(data.category_type.toLowerCase()) : null;
 
     return {
@@ -243,7 +243,8 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
 
 export async function getRelatedProducts(categoryType: string, currentSlug: string): Promise<ShopProduct[]> {
     if (!categoryType) return [];
-    const { data } = await supabaseAdmin
+    const db = createClient();
+    const { data, error } = await db
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
@@ -254,6 +255,7 @@ export async function getRelatedProducts(categoryType: string, currentSlug: stri
         .neq("slug", currentSlug)
         .order("created_at", { ascending: false })
         .limit(4);
+    if (error) console.error("[getRelatedProducts]", error);
 
     return (data || []).map((p: any) => ({
         ...p,
@@ -271,11 +273,14 @@ export async function getProductReviews(productId: string): Promise<{
     reviews: ProductReview[];
     distribution: RatingDistribution[];
 }> {
-    const { data } = await supabaseAdmin
+    const db = createClient();
+    const { data, error } = await db
         .from("product_reviews")
         .select("id, rating, comment, author_name, author_initials, avatar_color, location, is_verified, created_at")
         .eq("product_id", productId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(50);
+    if (error) console.error("[getProductReviews]", error);
 
     const all = (data || []) as ProductReview[];
     const total = all.length;
@@ -310,34 +315,52 @@ export function deriveSizes(products: ShopProduct[]): string[] {
     });
     return sorted;
 }
-export async function getVideoProducts(): Promise<Array<ShopProduct & { video_url?: string }>> {
-    const { data } = await supabaseAdmin
+/** Number of product rows fetched per page. Videos are a subset of this. */
+export const VIDEO_BATCH_SIZE = 20;
+
+export type VideoProduct = ShopProduct & { video_url: string };
+
+export async function getVideoProducts(offset = 0): Promise<{
+    videos: VideoProduct[];
+    nextOffset: number;
+    hasMore: boolean;
+}> {
+    const db = createClient();
+    const { data } = await db
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + VIDEO_BATCH_SIZE - 1);
 
-    if (!data) return [];
+    if (!data) return { videos: [], nextOffset: offset + VIDEO_BATCH_SIZE, hasMore: false };
 
-    const videoProducts = (data as any[]).map(p => {
-        const video = p.image_urls?.find((url: string) => 
-            url.toLowerCase().endsWith(".mp4") || url.toLowerCase().endsWith(".mov")
-        );
-        
-        return {
-            ...p,
-            category_id: null,
-            is_featured: p.is_featured ?? false,
-            is_sale: p.is_sale ?? false,
-            discount_value: p.discount_value ?? 0,
-            inventory_count: p.inventory_count ?? 0,
-            category_name: p.category_type ?? null,
-            category_slug: null,
-            video_url: video
-        };
-    }).filter(p => !!p.video_url);
+    const videos = (data as any[])
+        .map(p => {
+            const video_url = p.image_urls?.find((url: string) =>
+                url.toLowerCase().endsWith(".mp4") || url.toLowerCase().endsWith(".mov")
+            ) as string | undefined;
+            return {
+                ...p,
+                category_id: null,
+                is_featured: p.is_featured ?? false,
+                is_sale: p.is_sale ?? false,
+                discount_value: p.discount_value ?? 0,
+                inventory_count: p.inventory_count ?? 0,
+                category_name: p.category_type ?? null,
+                category_slug: null,
+                video_url,
+            };
+        })
+        .filter((p): p is VideoProduct => !!p.video_url);
 
-    return videoProducts;
+    return {
+        videos,
+        nextOffset: offset + VIDEO_BATCH_SIZE,
+        // If the DB returned a full batch, there may be more products to scan
+        hasMore: data.length === VIDEO_BATCH_SIZE,
+    };
 }

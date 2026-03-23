@@ -7,7 +7,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export function CartDrawer() {
-    const { isOpen, setIsOpen, items, removeItem, updateQuantity } = useCart();
+    // PERF-18: granular selectors — each re-renders only when its slice changes
+    const isOpen = useCart(s => s.isOpen);
+    const setIsOpen = useCart(s => s.setIsOpen);
+    const items = useCart(s => s.items);
+    const removeItem = useCart(s => s.removeItem);
+    const updateQuantity = useCart(s => s.updateQuantity);
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
 

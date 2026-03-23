@@ -6,7 +6,6 @@ export async function POST(request: Request) {
         const {
             productId,
             email,
-            amount: customAmount,
             cartItems,
             metadata: clientMetadata,
         } = await request.json();
@@ -17,11 +16,9 @@ export async function POST(request: Request) {
 
         const cartArr: any[] = Array.isArray(cartItems) ? cartItems : [];
 
-        // Calculate amount
+        // Calculate amount exclusively server-side — never trust client-supplied amounts
         let amountInGHS = 0;
-        if (customAmount && Number(customAmount) > 0) {
-            amountInGHS = Number(customAmount);
-        } else if (cartArr.length > 0 || productId) {
+        if (cartArr.length > 0 || productId) {
             // Priority 2: Recalculate Cart Total or Single Product server-side
             const { data: userProfile } = await supabaseAdmin
                 .from("profiles")
@@ -117,11 +114,12 @@ export async function POST(request: Request) {
             .select("id")
             .single();
 
-        if (orderError) {
+        if (orderError || !pendingOrder) {
             console.error("Failed to create pending order:", orderError);
+            return NextResponse.json({ error: "Failed to record order. Payment not initiated." }, { status: 500 });
         }
 
-        const orderId = pendingOrder?.id || null;
+        const orderId = pendingOrder.id;
 
         const amountInPesewas = amountInGHS * 100;
         const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -161,6 +159,15 @@ export async function POST(request: Request) {
                 },
             }),
         });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error(`[Paystack init] HTTP ${response.status}: ${errText}`);
+            if (orderId) {
+                await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+            }
+            return NextResponse.json({ error: "Payment gateway error. Please try again." }, { status: 502 });
+        }
 
         const data = await response.json();
 

@@ -6,8 +6,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { notFound } from "next/navigation";
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 60;
 
 interface SearchParams {
     category?: string;
@@ -181,8 +180,16 @@ export default async function ShopPage({
     const allColors = deriveColors(toFilterRows(colorsData) as any);
     const allSizes  = deriveSizes(toFilterRows(sizesData)  as any);
 
+    const skeletonFallback = (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="h-64 bg-gray-100 animate-pulse rounded-md" />
+            ))}
+        </div>
+    );
+
     return (
-        <Suspense fallback={null}>
+        <Suspense fallback={skeletonFallback}>
             <ShopPageClient
                 initialProducts={products}
                 categories={categories}

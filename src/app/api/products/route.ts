@@ -40,5 +40,12 @@ export async function GET(request: Request) {
         role,
     );
 
-    return NextResponse.json({ products, total });
+    // Authenticated requests may see role-filtered results — must not be shared via CDN
+    const cacheControl = role
+        ? "private, no-store"
+        : "public, s-maxage=60, stale-while-revalidate=300";
+
+    return NextResponse.json({ products, total }, {
+        headers: { "Cache-Control": cacheControl },
+    });
 }

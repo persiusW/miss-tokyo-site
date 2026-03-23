@@ -1,8 +1,13 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { getProductBySlug, getRelatedProducts, getProductReviews } from "@/lib/products";
+
+// PERF-23: deduplicate — generateMetadata and ProductPage both call this;
+// React cache() deduplicates within one render cycle so only one DB query fires.
+const getProductBySlugCached = cache(getProductBySlug);
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { ProductGallery } from "@/components/ui/miss-tokyo/ProductGallery";
@@ -26,7 +31,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
     const { slug } = await params;
     const BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
-    const product = await getProductBySlug(slug);
+    const product = await getProductBySlugCached(slug);
     if (!product) return { title: "Product — Miss Tokyo" };
     return {
         title: `${product.name} — Miss Tokyo`,
@@ -44,7 +49,7 @@ export default async function ProductPage({
     params: Promise<{ slug: string }>;
 }) {
     const { slug } = await params;
-    const product = await getProductBySlug(slug);
+    const product = await getProductBySlugCached(slug);
     if (!product) notFound();
 
     const supabase = await createClient();
@@ -125,10 +130,50 @@ export default async function ProductPage({
         getProductReviews(product.id),
     ]);
 
-    const wholesaleTiers = wholesaleTiersData || {
+    const baseTiers = wholesaleTiersData || {
         tier1_min: 3, tier1_max: 5, tier1_discount: 10,
         tier2_min: 6, tier2_max: 10, tier2_discount: 15,
         tier3_min: 11, tier3_max: 999, tier3_discount: 20
+    };
+
+    // Resolve explicit per-unit prices: product override takes priority,
+    // then category-level prices, then fall back to percentage discounts.
+    let categoryTierPrices: { tier1_price?: number | null; tier2_price?: number | null; tier3_price?: number | null } = {};
+    if (isAuthorized && !product.wholesale_override) {
+        // Fetch the category's wholesale prices if product has no override
+        try {
+            const catConditions = [];
+            if (product.category_ids?.length) catConditions.push(`id.in.(${product.category_ids.join(",")})`);
+            if (product.category_type) catConditions.push(`name.ilike."${product.category_type}"`);
+            if (catConditions.length) {
+                const { data: catPrices } = await supabaseAdmin
+                    .from("categories")
+                    .select("wholesale_tier_1_price, wholesale_tier_2_price, wholesale_tier_3_price, is_wholesale")
+                    .or(catConditions.join(","))
+                    .eq("is_wholesale", true)
+                    .limit(1)
+                    .maybeSingle();
+                if (catPrices) {
+                    categoryTierPrices = {
+                        tier1_price: catPrices.wholesale_tier_1_price ?? null,
+                        tier2_price: catPrices.wholesale_tier_2_price ?? null,
+                        tier3_price: catPrices.wholesale_tier_3_price ?? null,
+                    };
+                }
+            }
+        } catch { /* fall back to discounts */ }
+    }
+
+    const wholesaleTiers = {
+        ...baseTiers,
+        // Product-specific override prices take precedence over category prices
+        ...(product.wholesale_override
+            ? {
+                tier1_price: product.wholesale_price_tier_1 ?? null,
+                tier2_price: product.wholesale_price_tier_2 ?? null,
+                tier3_price: product.wholesale_price_tier_3 ?? null,
+            }
+            : categoryTierPrices),
     };
 
     const showTrustStrip = (pdpSettings as any)?.pdp_show_trust_strip ?? true;

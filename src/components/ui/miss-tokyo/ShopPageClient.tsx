@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ShoppingBag, Heart, X, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { ShoppingBag, Heart, X, ChevronDown, SlidersHorizontal, Check } from "lucide-react";
 import { useCart } from "@/store/useCart";
 import type { ShopProduct, ShopCategory } from "@/lib/products";
 
@@ -25,6 +25,12 @@ const getHex = (c: string) => COLOR_HEX[c] ?? COLOR_HEX[c.charAt(0).toUpperCase(
 const FALLBACK_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='133'%3E%3Crect width='100' height='133' fill='%23E8D5C4'/%3E%3C/svg%3E";
 const PAGE_SIZE = 24;
 
+// Task 2: guard against passing video URLs to <Image> (causes 400 Bad Request)
+function isVideoUrl(url: string): boolean {
+    const lower = url.toLowerCase();
+    return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov");
+}
+
 function getBadge(p: ShopProduct): { label: string; type: "new" | "sale" | "bundle" } | null {
     if (p.badge === "bundle" || p.bundle_label) return { label: p.bundle_label || "Bundle", type: "bundle" };
     if (p.badge === "sale" || p.is_sale || (p.compare_at_price_ghs && p.compare_at_price_ghs > p.price_ghs))
@@ -42,6 +48,9 @@ function ShopProductCard({
 }) {
     const [wishlist, setWishlist] = useState(false);
     const [imgSrc, setImgSrc] = useState(product.image_urls?.[0] || FALLBACK_IMG);
+    const [hoverSrc, setHoverSrc] = useState<string | undefined>(product.image_urls?.[1] || undefined);
+    const [addState, setAddState] = useState<"idle" | "added">("idle");
+    const { addItem } = useCart();
     const badge = getBadge(product);
     // Mirror the "You May Also Like" logic from the PDP:
     // Prefer compare_at_price_ghs; fall back to is_sale + discount_value percentage.
@@ -81,16 +90,38 @@ function ShopProductCard({
             {/* Image */}
             <Link href={`/products/${product.slug}`} className="block">
                 <div className="relative overflow-hidden mb-[11px]" style={{ aspectRatio: "3/4", borderRadius: 4, background: "#E8D5C4" }}>
-                    <Image
-                        src={imgSrc}
-                        alt={product.name}
-                        fill
-                        quality={85}
-                        priority={priority}
-                        sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
-                        className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-                        onError={() => setImgSrc(FALLBACK_IMG)}
-                    />
+                    {isVideoUrl(imgSrc) ? (
+                        <video
+                            src={imgSrc}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="absolute inset-0 w-full h-full object-cover"
+                        />
+                    ) : (
+                        <Image
+                            src={imgSrc}
+                            alt={product.name}
+                            fill
+                            quality={85}
+                            priority={priority}
+                            sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
+                            className={`object-cover transition-all duration-700 ease-in-out ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.04]"}`}
+                            onError={() => setImgSrc(FALLBACK_IMG)}
+                        />
+                    )}
+                    {hoverSrc && !isVideoUrl(hoverSrc) && (
+                        <Image
+                            src={hoverSrc}
+                            alt={`${product.name} alternate view`}
+                            fill
+                            quality={85}
+                            sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
+                            className="object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-in-out"
+                            onError={() => setHoverSrc(undefined)}
+                        />
+                    )}
 
                     {/* Badge */}
                     {badge && (
@@ -116,16 +147,41 @@ function ShopProductCard({
                         <Heart size={15} fill={wishlist ? "#E8485A" : "none"} stroke={wishlist ? "#E8485A" : "#141210"} strokeWidth={1.5} />
                     </button>
 
-                    {/* Quick Add */}
-                    <div className="absolute bottom-[10px] left-[10px] right-[10px] flex gap-[6px] opacity-0 translate-y-[6px] group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 z-10">
+                    {/* Quick Add — always visible on mobile, hover-only on desktop */}
+                    <div className="absolute bottom-[10px] left-[10px] right-[10px] flex gap-[6px] z-10 md:opacity-0 md:translate-y-[6px] md:group-hover:opacity-100 md:group-hover:translate-y-0 md:transition-all md:duration-200">
                         <button
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onQuickAdd(product); }}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const hasVariants = (product.available_sizes?.length ?? 0) > 0 || (product.available_colors?.length ?? 0) > 0;
+                                if (hasVariants) { onQuickAdd(product); return; }
+                                addItem({
+                                    id: `${product.id}-default`,
+                                    productId: product.id,
+                                    name: product.name,
+                                    slug: product.slug,
+                                    price: product.price_ghs,
+                                    size: "One Size",
+                                    quantity: 1,
+                                    imageUrl: product.image_urls?.[0] || "",
+                                }, false);
+                                setAddState("added");
+                                setTimeout(() => setAddState("idle"), 1500);
+                            }}
                             className="flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] transition-colors duration-150"
-                            style={{ background: "#fff", color: "#141210", borderRadius: 2, border: "none" }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; }}
+                            style={{
+                                background: addState === "added" ? "#22c55e" : "#fff",
+                                color: addState === "added" ? "#fff" : "#141210",
+                                borderRadius: 2,
+                                border: "none",
+                            }}
+                            onMouseEnter={e => { if (addState === "idle") { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
+                            onMouseLeave={e => { if (addState === "idle") { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; } }}
                         >
-                            <ShoppingBag size={12} strokeWidth={1.8} /> Quick Add
+                            {addState === "added"
+                                ? <><Check size={12} strokeWidth={2.5} /> Added</>
+                                : <><ShoppingBag size={12} strokeWidth={1.8} /> Add to Cart</>
+                            }
                         </button>
                     </div>
                 </div>
@@ -200,7 +256,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
             color: selectedColor || undefined,
             quantity: 1,
             imageUrl: product.image_urls?.[0] || "",
-        });
+        }, false);
         setAdding(false);
         setAdded(true);
         setTimeout(onClose, 1400);
@@ -308,7 +364,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
                         }}
                     >
                         <ShoppingBag size={14} strokeWidth={1.5} />
-                        {added ? "Added to Bag ✓" : adding ? "Adding…" : "Add to Bag"}
+                        {added ? "Added to Cart ✓" : adding ? "Adding…" : "Add to Cart"}
                     </button>
                     <Link href={`/products/${product.slug}`} onClick={onClose}
                         className="block text-center text-[11px] underline transition-colors"
@@ -433,21 +489,40 @@ export function ShopPageClient({
     const [priceMax, setPriceMax] = useState(activeMax ? parseInt(activeMax) : maxPrice);
     const priceDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+    // LOG-15: Stabilise prop references in refs so the sync effect below can read
+    // their latest values without listing them as deps (which would cause infinite
+    // loops because initialProducts is a new array reference on every server render).
+    const initialProductsRef = useRef(initialProducts);
+    const totalRef           = useRef(total);
+    const minPriceRef        = useRef(minPrice);
+    const maxPriceRef        = useRef(maxPrice);
+    initialProductsRef.current = initialProducts;
+    totalRef.current           = total;
+    minPriceRef.current        = minPrice;
+    maxPriceRef.current        = maxPrice;
+
+    // Cleanup debounce timer on unmount to prevent memory leak
+    useEffect(() => () => clearTimeout(priceDebounce.current), []);
+
     // Grid pref from localStorage
     useEffect(() => {
         try { const g = localStorage.getItem("mt_grid"); if (g) setGridCols(Number(g) as 2 | 3 | 4); } catch {}
     }, []);
 
-    // Sync products when server re-renders (URL change)
+    // Sync products when server re-renders (URL change).
+    // Props are read via refs so this effect only fires when searchParams actually change.
     useEffect(() => {
-        setProducts(initialProducts);
-        setTotalCount(total);
+        const prods  = initialProductsRef.current;
+        const tot    = totalRef.current;
+        const minP   = minPriceRef.current;
+        const maxP   = maxPriceRef.current;
+        setProducts(prods);
+        setTotalCount(tot);
         setLoadPage(1);
-        setHasMore(initialProducts.length < total);
-        setPriceMin(activeMin ? parseInt(activeMin) : minPrice);
-        setPriceMax(activeMax ? parseInt(activeMax) : maxPrice);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams.toString()]);
+        setHasMore(prods.length < tot);
+        setPriceMin(activeMin ? parseInt(activeMin) : minP);
+        setPriceMax(activeMax ? parseInt(activeMax) : maxP);
+    }, [searchParams.toString(), activeMin, activeMax]);
 
     const updateParams = useCallback((updates: Record<string, string | null>) => {
         const p = new URLSearchParams(searchParams.toString());
@@ -489,11 +564,13 @@ export function ShopPageClient({
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const { products: newProds, total: newTotal }: { products: ShopProduct[]; total: number } = await res.json();
 
-            const updatedCount = products.length + newProds.length;
-            setProducts(prev => [...prev, ...newProds]);
+            setProducts(prev => {
+                const merged = [...prev, ...newProds];
+                setHasMore(merged.length < newTotal);
+                return merged;
+            });
             setLoadPage(nextPage);
             setTotalCount(newTotal);
-            setHasMore(updatedCount < newTotal);
         } catch (err) {
             console.error("[loadMore] failed:", err);
             setHasMore(false);

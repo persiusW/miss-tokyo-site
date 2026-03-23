@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { createClient } from "@/lib/supabaseServer";
 
 export async function POST(req: NextRequest) {
     try {
+        const serverClient = await createClient();
+        const { data: { user } } = await serverClient.auth.getUser();
+        if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+        const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+        if (!caller || !["admin", "owner"].includes(caller.role)) {
+            return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+        }
+
         const { code, order_id, amount_to_use, redeemed_by } = await req.json();
 
         if (!code || !amount_to_use) {

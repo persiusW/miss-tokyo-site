@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 
+const NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const ORDER_FIELDS = "id, customer_name, customer_email, customer_phone, shipping_address, delivery_method, total_amount, items, discount_code, discount_amount, status, paystack_reference";
 
 async function fetchOrderForReceipt(orderId: string) {
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
 
         const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
         if (!PAYSTACK_SECRET) {
-            return NextResponse.json({ status: "skipped", reference });
+            return NextResponse.json({ status: "skipped", reference }, { headers: NO_STORE });
         }
 
         const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
@@ -49,7 +50,7 @@ export async function GET(req: Request) {
         const data = await response.json();
 
         if (!data.status || !data.data) {
-            return NextResponse.json({ status: "failed" });
+            return NextResponse.json({ status: "failed" }, { headers: NO_STORE });
         }
 
         const txData = data.data;
@@ -74,7 +75,9 @@ export async function GET(req: Request) {
                 })
                 .eq("id", metaOrderId);
             const order = await fetchOrderForReceipt(metaOrderId);
-            return NextResponse.json({ status: orderStatus, orderId: metaOrderId, order });
+            return NextResponse.json({ status: orderStatus, orderId: metaOrderId, order }, {
+                headers: { "Cache-Control": "private, no-store" },
+            });
         }
 
         // Check if order already exists for this reference
@@ -82,7 +85,7 @@ export async function GET(req: Request) {
             .from("orders")
             .select("id, status")
             .eq("paystack_reference", reference)
-            .single();
+            .maybeSingle();
 
         if (existingOrder) {
             // Update status if payment is now confirmed
@@ -90,12 +93,12 @@ export async function GET(req: Request) {
                 await supabase.from("orders").update({ status: "paid" }).eq("id", existingOrder.id);
             }
             const order = await fetchOrderForReceipt(existingOrder.id);
-            return NextResponse.json({ status: orderStatus, orderId: existingOrder.id, order });
+            return NextResponse.json({ status: orderStatus, orderId: existingOrder.id, order }, { headers: NO_STORE });
         }
 
         // Only create an order record if we have a customer email
         if (!customerEmail) {
-            return NextResponse.json({ status: orderStatus });
+            return NextResponse.json({ status: orderStatus }, { headers: NO_STORE });
         }
 
         const parsedItems = parseCartItems(cartItems);
@@ -118,38 +121,14 @@ export async function GET(req: Request) {
 
         if (error) {
             console.error("Verify: Failed to insert order:", error);
-            return NextResponse.json({ status: orderStatus });
+            return NextResponse.json({ status: orderStatus }, { headers: NO_STORE });
         }
 
-        // Deduct inventory only for successful payments — batch fetch then concurrent updates
-        if (newOrder && paystackTxStatus === "success" && parsedItems.length > 0) {
-            const productIds = [...new Set(parsedItems.map((i: any) => i.productId).filter(Boolean))];
-            const { data: products } = await supabase
-                .from("products")
-                .select("id, inventory_count")
-                .in("id", productIds);
-
-            if (products) {
-                const stockMap = new Map(products.map(p => [p.id, p.inventory_count as number]));
-                await Promise.allSettled(
-                    parsedItems
-                        .filter((item: any) => item.productId && stockMap.has(item.productId))
-                        .map((item: any) => {
-                            const stock = stockMap.get(item.productId) ?? 0;
-                            if (typeof stock === "number" && stock >= item.quantity) {
-                                return supabase
-                                    .from("products")
-                                    .update({ inventory_count: stock - item.quantity })
-                                    .eq("id", item.productId);
-                            }
-                            return Promise.resolve();
-                        })
-                );
-            }
-        }
+        // Inventory deduction is handled exclusively by the server-to-server webhook (charge.success).
+        // Do not deduct here to avoid race conditions and double-deductions.
 
         const order = newOrder ? await fetchOrderForReceipt(newOrder.id) : null;
-        return NextResponse.json({ status: orderStatus, orderId: newOrder?.id, order, created: true });
+        return NextResponse.json({ status: orderStatus, orderId: newOrder?.id, order, created: true }, { headers: NO_STORE });
     } catch (err) {
         console.error("Verify Error:", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

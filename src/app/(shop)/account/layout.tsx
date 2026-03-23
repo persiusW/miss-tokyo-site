@@ -1,45 +1,41 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabaseServer";
 
-const NAV = [
+const NAV: { href: string; label: string }[] = [
     { href: "/account/orders",    label: "Orders" },
     { href: "/account/profile",   label: "Profile" },
     { href: "/account/addresses", label: "Addresses" },
 ];
 
-export default function AccountLayout({ children }: { children: React.ReactNode }) {
-    const router = useRouter();
-    const pathname = usePathname();
-    const [email, setEmail] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+export default async function AccountLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    // SEC-15: server-side auth guard — redirect fires before any HTML is sent.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }: { data: any }) => {
-            if (!user) {
-                router.replace(`/login?next=${pathname}`);
-            } else {
-                setEmail(user.email ?? null);
-                setLoading(false);
-            }
-        });
-    }, []);
+    if (!user) {
+        redirect("/login?next=/account");
+    }
 
-    const handleSignOut = async () => {
-        await supabase.auth.signOut();
-        router.push("/");
-    };
-
-    if (loading) return null;
+    // Server action — no client JS required for sign-out.
+    async function signOut() {
+        "use server";
+        const serverClient = await createClient();
+        await serverClient.auth.signOut();
+        redirect("/");
+    }
 
     return (
         <div className="pt-32 pb-32 px-6 md:px-12 max-w-5xl mx-auto">
             <header className="mb-12">
                 <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">My Account</h1>
-                {email && <p className="text-neutral-500 text-sm">{email}</p>}
+                {user.email && (
+                    <p className="text-neutral-500 text-sm">{user.email}</p>
+                )}
             </header>
 
             <div className="flex gap-0 border-b border-neutral-200 mb-12 overflow-x-auto">
@@ -47,19 +43,20 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                     <Link
                         key={href}
                         href={href}
-                        className={`px-6 py-3 text-xs font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors whitespace-nowrap ${
-                            pathname === href ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"
-                        }`}
+                        className="px-6 py-3 text-xs font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors whitespace-nowrap border-transparent text-neutral-400 hover:text-black"
                     >
                         {label}
                     </Link>
                 ))}
-                <button
-                    onClick={handleSignOut}
-                    className="ml-auto px-6 py-3 text-xs uppercase tracking-widest text-neutral-400 hover:text-black transition-colors whitespace-nowrap"
-                >
-                    Sign Out
-                </button>
+
+                <form action={signOut} className="ml-auto">
+                    <button
+                        type="submit"
+                        className="px-6 py-3 text-xs uppercase tracking-widest text-neutral-400 hover:text-black transition-colors whitespace-nowrap"
+                    >
+                        Sign Out
+                    </button>
+                </form>
             </div>
 
             {children}

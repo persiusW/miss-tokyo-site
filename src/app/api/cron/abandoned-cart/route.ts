@@ -13,10 +13,10 @@ import { sendEmail } from "@/lib/email";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-    // Verify this is a legitimate Vercel Cron call
+    // Verify this is a legitimate Vercel Cron call — fail closed if secret is missing
     const authHeader = req.headers.get("authorization");
     if (
-        process.env.CRON_SECRET &&
+        !process.env.CRON_SECRET ||
         authHeader !== `Bearer ${process.env.CRON_SECRET}`
     ) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

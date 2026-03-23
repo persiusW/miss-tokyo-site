@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   experimental: {
     turbopackFileSystemCacheForDev: false,
   },
-  poweredByHeader: false,
+  poweredByHeader: false, // SPD-12: suppress X-Powered-By header
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'dfhrtuiszsumvtzsfzic.supabase.co',
         port: '',
-        pathname: '/**',
+        pathname: '/storage/v1/object/public/**',
       },
       {
         protocol: 'https',

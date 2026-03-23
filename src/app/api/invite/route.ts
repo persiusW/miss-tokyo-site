@@ -28,6 +28,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email and role are required" }, { status: 400 });
     }
 
+    if (!["admin", "sales_staff"].includes(role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+
     // 1. Invite User via Admin Auth API
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         redirectTo: `${new URL(req.url).origin}/admin/login`,

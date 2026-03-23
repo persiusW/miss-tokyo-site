@@ -58,6 +58,7 @@ export function CategoryGrid({ categories }: CategoryGridProps) {
                     alt={label}
                     fill
                     quality={85}
+                    priority={index < 2}
                     className="object-cover object-center group-hover:scale-105 transition-transform duration-700"
                     sizes="(max-width: 768px) 50vw, 25vw"
                   />

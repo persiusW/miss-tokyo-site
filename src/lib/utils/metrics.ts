@@ -69,36 +69,27 @@ export async function fetchTotalRevenue(): Promise<number> {
 
 /**
  * Full order statistics including counts per status and derived rates.
- * Single DB round-trip — fetches all orders and derives every stat in JS.
+ * Revenue + paid count: DB-side aggregate via get_order_stats() RPC.
+ * Status breakdown: lightweight status-only query (no amount columns fetched).
  */
 export async function fetchOrderStats(): Promise<OrderStats> {
-    const { data, error } = await supabase
-        .from("orders")
-        .select("id, total_amount, status");
+    const [rpcRes, countsRes] = await Promise.all([
+        supabase.rpc("get_order_stats"),
+        supabase.from("orders").select("status"),
+    ]);
 
-    if (error) {
-        console.error("[metrics] fetchOrderStats:", error.message, error.details);
-        return {
-            totalRevenue: 0,
-            revenueOrderCount: 0,
-            pendingCount: 0,
-            processingCount: 0,
-            fulfilledCount: 0,
-            cancelledCount: 0,
-            totalOrders: 0,
-            avgOrderValue: 0,
-            conversionRate: "0.0",
-        };
+    if (rpcRes.error) {
+        console.error("[metrics] fetchOrderStats (rpc):", rpcRes.error.message);
+    }
+    if (countsRes.error) {
+        console.error("[metrics] fetchOrderStats (counts):", countsRes.error.message, countsRes.error.details);
     }
 
-    const orders = data ?? [];
-    const revenueOrders = orders.filter(o =>
-        REVENUE_STATUSES.includes(o.status as RevenueStatus)
-    );
-    const totalRevenue = revenueOrders.reduce(
-        (sum, o) => sum + Number(o.total_amount ?? 0), 0
-    );
-    const revenueOrderCount = revenueOrders.length;
+    const stats = rpcRes.data as { total_revenue: number; order_count: number } | null;
+    const totalRevenue = Number(stats?.total_revenue ?? 0);
+    const revenueOrderCount = Number(stats?.order_count ?? 0);
+
+    const orders = (countsRes.data ?? []) as { status: string }[];
     const totalOrders = orders.length;
 
     return {
@@ -186,10 +177,16 @@ export async function fetchSalesByCategory(): Promise<CategoryRevenue[]> {
  * Only counts revenue-qualifying orders.
  */
 export async function fetchMonthlyRevenue(monthsBack = 6): Promise<MonthlyRevenue[]> {
+    const since = new Date();
+    since.setMonth(since.getMonth() - monthsBack);
+    since.setDate(1);
+    since.setHours(0, 0, 0, 0);
+
     const { data, error } = await supabase
         .from("orders")
         .select("total_amount, created_at")
         .in("status", [...REVENUE_STATUSES])
+        .gte("created_at", since.toISOString())
         .order("created_at", { ascending: true });
 
     if (error) {

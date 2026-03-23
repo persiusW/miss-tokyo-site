@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/store/useCart";
 import { toast } from "@/lib/toast";
@@ -85,6 +85,7 @@ export function ProductOptions(props: Props) {
     const [wishlisted, setWishlisted] = useState(false);
     const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
     const [addedToBag, setAddedToBag] = useState(false);
+    const addedToBagTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const setCartOpen = useCart(s => s.setIsOpen);
 
     useEffect(() => {
@@ -93,6 +94,10 @@ export function ProductOptions(props: Props) {
             setWishlisted(wl.includes(productId));
         } catch { /* noop */ }
     }, [productId]);
+
+    useEffect(() => {
+        return () => { if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current); };
+    }, []);
 
     const toggleWishlist = () => {
         try {
@@ -114,8 +119,6 @@ export function ProductOptions(props: Props) {
     const unitPrice = (isWholesaler && wholesaleTiers)
         ? resolveWholesalePrice(qty, baseProductPrice, wholesaleTiers)
         : baseProductPrice;
-
-    const effectivePrice = unitPrice;
 
     const doAddToCart = (): boolean => {
         if (sizes.length > 0 && !selectedSize) {
@@ -143,7 +146,8 @@ export function ProductOptions(props: Props) {
         if (doAddToCart()) {
             setAddedToBag(true);
             setCartOpen(true);
-            setTimeout(() => setAddedToBag(false), 2000);
+            if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current);
+            addedToBagTimer.current = setTimeout(() => setAddedToBag(false), 2000);
         }
     };
 
@@ -181,9 +185,9 @@ export function ProductOptions(props: Props) {
                     fontSize: 36, fontWeight: 400,
                     color: isSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)",
                 }}>
-                    GH₵{effectivePrice.toFixed(2)}
+                    GH₵{unitPrice.toFixed(2)}
                 </span>
-                {compareAtPrice && compareAtPrice > effectivePrice && (
+                {compareAtPrice && compareAtPrice > unitPrice && (
                     <span style={{ fontSize: 18, color: "var(--muted, #7A7167)", textDecoration: "line-through", fontWeight: 300 }}>
                         GH₵{compareAtPrice.toFixed(2)}
                     </span>
@@ -209,22 +213,34 @@ export function ProductOptions(props: Props) {
                     </p>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                         {[1, 2, 3].map(t => {
-                            const min = (wholesaleTiers as any)[`tier${t}_min`];
-                            const max = (wholesaleTiers as any)[`tier${t}_max`];
-                            const disc = (wholesaleTiers as any)[`tier${t}_discount`];
+                            const tiers = wholesaleTiers as any;
+                            const min: number = tiers[`tier${t}_min`];
+                            const max: number = tiers[`tier${t}_max`];
+                            const disc: number = tiers[`tier${t}_discount`];
+                            const explicitPrice: number | null | undefined = tiers[`tier${t}_price`];
                             const isActive = qty >= min && (t === 3 || qty <= max);
-                            
+
                             return (
-                                <div key={t} style={{ 
-                                    padding: "10px 8px", 
+                                <div key={t} style={{
+                                    padding: "10px 8px",
                                     background: isActive ? "#059669" : "transparent",
                                     border: isActive ? "1px solid #059669" : "1px solid rgba(5, 150, 105, 0.2)",
                                     textAlign: "center",
                                     borderRadius: 2,
                                     transition: "all 0.2s"
                                 }}>
-                                    <div style={{ fontSize: 9, fontWeight: 700, color: isActive ? "#fff" : "#059669" }}>{min}{t === 3 ? "+" : `-${max}`}</div>
-                                    <div style={{ fontSize: 10, color: isActive ? "#fff" : "#059669", opacity: 0.8 }}>{disc}% OFF</div>
+                                    <div style={{ fontSize: 9, fontWeight: 600, color: isActive ? "rgba(255,255,255,0.75)" : "rgba(5,150,105,0.7)", marginBottom: 3 }}>
+                                        {min}{t === 3 ? "+" : `–${max}`} units
+                                    </div>
+                                    {explicitPrice != null ? (
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: isActive ? "#fff" : "#059669" }}>
+                                            GH₵{explicitPrice.toFixed(2)}
+                                        </div>
+                                    ) : (
+                                        <div style={{ fontSize: 11, fontWeight: 600, color: isActive ? "#fff" : "#059669" }}>
+                                            {disc}% OFF
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
@@ -390,7 +406,7 @@ export function ProductOptions(props: Props) {
                                 <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
                                 <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
                             </svg>
-                            Add to Bag
+                            Add to Cart
                         </>
                     )}
                 </button>

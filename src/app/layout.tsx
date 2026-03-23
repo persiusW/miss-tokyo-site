@@ -6,24 +6,40 @@ const geistSans = localFont({
   src: "../../public/fonts/geist.woff2",
   variable: "--font-geist-sans",
   weight: "100 900",
+  display: "swap",
+  fallback: ["sans-serif"],
 });
 
 const playfairDisplay = localFont({
   src: "../../public/fonts/playfair.woff2",
   variable: "--font-playfair-display",
   weight: "400 900",
+  display: "swap",
+  fallback: ["serif"],
 });
 
 const cinzel = localFont({
   src: "../../public/fonts/cinzel.woff2",
   variable: "--font-cinzel",
   weight: "400 900",
+  display: "swap",
+  fallback: ["serif"],
 });
 
+import { unstable_cache } from "next/cache";
 import { supabase } from "@/lib/supabase";
 
+const getSiteMetadata = unstable_cache(
+  async () => {
+    const { data } = await supabase.from("site_metadata").select("*").eq("page_path", "/").single();
+    return data;
+  },
+  ["site-metadata"],
+  { revalidate: 3600 }
+);
+
 export async function generateMetadata(): Promise<Metadata> {
-  const { data } = await supabase.from("site_metadata").select("*").eq("page_path", "/").single();
+  const data = await getSiteMetadata();
 
   if (data) {
     return {

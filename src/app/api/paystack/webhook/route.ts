@@ -8,6 +8,10 @@ import webpush from "web-push";
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
+// ── HTML encoding — prevents injection of user-supplied cart data into email templates ──
+const escHtml = (s: string): string =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
 // ── Web Push ───────────────────────────────────────────────────────────────────
 
 function initWebPush() {
@@ -23,7 +27,8 @@ async function sendAdminPushNotifications(title: string, body: string, url = "/s
 
     const { data: subs } = await supabaseAdmin
         .from("admin_push_subscriptions")
-        .select("endpoint, p256dh, auth");
+        .select("endpoint, p256dh, auth")
+        .limit(50);
 
     if (!subs?.length) return;
 
@@ -110,7 +115,6 @@ async function ensureCustomerAccount(
 
 async function trackDiscountUsage(
     discountCode: string | undefined,
-    discountAmount: unknown,
     discountTag: string | undefined,
 ) {
     if (!discountCode) return;
@@ -121,7 +125,7 @@ async function trackDiscountUsage(
             .from("coupons")
             .select("id, used_count")
             .ilike("code", code)
-            .single();
+            .maybeSingle();
         if (coupon) {
             await supabaseAdmin
                 .from("coupons")
@@ -136,9 +140,22 @@ async function trackDiscountUsage(
             .from("gift_cards")
             .select("id, remaining_value")
             .ilike("code", code)
-            .single();
+            .maybeSingle();
         if (card) {
-            const newBalance = Math.max(0, Number(card.remaining_value) - Number(discountAmount));
+            // Use the server-validated redemption record — do not trust metadata discount_amount
+            const { data: redemption } = await supabaseAdmin
+                .from("gift_card_redemptions")
+                .select("amount_used")
+                .eq("gift_card_id", card.id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            const validatedAmount = redemption
+                ? Number(redemption.amount_used)
+                : Number(card.remaining_value); // fallback: full remaining balance
+
+            const newBalance = Math.max(0, Number(card.remaining_value) - validatedAmount);
             await supabaseAdmin
                 .from("gift_cards")
                 .update({
@@ -159,11 +176,14 @@ function buildLineItemsHtml(items: any[]): string {
             const unitPrice = Number(item.price || 0);
             const qty = Number(item.quantity || 1);
             const lineTotal = unitPrice * qty;
-            const variant = [item.size, item.color, item.stitching].filter(Boolean).join(" · ");
+            const variant = [item.size, item.color, item.stitching]
+                .filter(Boolean)
+                .map((v: string) => escHtml(v))
+                .join(" · ");
             return `
       <tr style="border-bottom: 1px solid #f5f5f5;">
         <td style="padding: 10px 0; font-size: 13px; color: #171717;">
-          ${item.name || "Item"}
+          ${escHtml(item.name || "Item")}
           ${variant ? `<div style="font-size: 11px; color: #737373; margin-top: 2px;">${variant} × ${qty}</div>` : `<div style="font-size: 11px; color: #737373; margin-top: 2px;">× ${qty}</div>`}
         </td>
         <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${lineTotal.toFixed(2)}</td>
@@ -554,7 +574,7 @@ export async function POST(req: Request) {
                     const orderRef = orderId.substring(0, 8).toUpperCase();
                     await Promise.allSettled([
                         sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
-                        trackDiscountUsage(discount_code, discount_amount, discount_tag),
+                        trackDiscountUsage(discount_code, discount_tag),
                         phone ? sendSMS({
                             to: phone,
                             message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
@@ -606,7 +626,7 @@ export async function POST(req: Request) {
                         const orderRef = newOrder.id.substring(0, 8).toUpperCase();
                         await Promise.allSettled([
                             sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
-                            trackDiscountUsage(discount_code, discount_amount, discount_tag),
+                            trackDiscountUsage(discount_code, discount_tag),
                             phone ? sendSMS({
                                 to: phone,
                                 message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),

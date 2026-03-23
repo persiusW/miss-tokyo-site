@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { toast } from "@/lib/toast";
+import { TagInput } from "@/components/ui/TagInput";
 import { EmailsTab } from "./EmailsTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { RidersTab } from "./RidersTab";
@@ -412,38 +413,32 @@ function StoreTab() {
                 <div className="pt-4 border-t border-neutral-100 mt-6 grid grid-cols-1 gap-6">
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Shoe Sizes</label>
-                        <input
-                            type="text"
-                            value={form.global_sizes.join(", ")}
-                            onChange={(e) => setForm(p => ({ ...p, global_sizes: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }))}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="39, 40, 41, 42, 43, 44, 45, 46"
+                        <TagInput
+                            value={form.global_sizes}
+                            onChange={(tags) => setForm(p => ({ ...p, global_sizes: tags }))}
+                            placeholder="Type a size and press Enter…"
                         />
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Comma-separated list of globally available sizes.</p>
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each size.</p>
                     </div>
 
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Colors</label>
-                        <input
-                            type="text"
-                            value={form.global_colors.join(", ")}
-                            onChange={(e) => setForm(p => ({ ...p, global_colors: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }))}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="Noir, Cognac, Sand"
+                        <TagInput
+                            value={form.global_colors}
+                            onChange={(tags) => setForm(p => ({ ...p, global_colors: tags }))}
+                            placeholder="Type a color and press Enter…"
                         />
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Comma-separated list of colors available globally.</p>
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each color.</p>
                     </div>
 
                     <div>
                         <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Stitching Options</label>
-                        <input
-                            type="text"
-                            value={form.global_stitching.join(", ")}
-                            onChange={(e) => setForm(p => ({ ...p, global_stitching: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }))}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="Tonal, Contrast White"
+                        <TagInput
+                            value={form.global_stitching}
+                            onChange={(tags) => setForm(p => ({ ...p, global_stitching: tags }))}
+                            placeholder="Type an option and press Enter…"
                         />
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Comma-separated list of stitching styles.</p>
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each stitching style.</p>
                     </div>
                 </div>
             </div>

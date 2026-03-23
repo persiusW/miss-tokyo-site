@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
 
         const { orderIds } = await req.json();
 
-        if (!orderIds?.length) {
-            return NextResponse.json({ error: "orderIds is required." }, { status: 400 });
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 100 || orderIds.some((id: unknown) => typeof id !== "string" || !UUID_RE.test(id))) {
+            return NextResponse.json({ error: "Invalid orderIds — must be an array of 1–100 UUIDs." }, { status: 400 });
         }
 
         // ── Fetch orders ──────────────────────────────────────────────────────

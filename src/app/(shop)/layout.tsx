@@ -2,7 +2,7 @@ import { NavBar } from "@/components/ui/miss-tokyo/NavBar";
 import { Footer } from "@/components/ui/miss-tokyo/Footer";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
 import { CartDrawer } from "@/components/ui/miss-tokyo/CartDrawer";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export default async function ShopLayout({
@@ -10,7 +10,11 @@ export default async function ShopLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const { data } = await supabaseAdmin.from("store_settings").select("maintenance_mode").eq("id", "default").maybeSingle();
+    const supabase = await createClient();
+    const [{ data }, { data: { user } }] = await Promise.all([
+        supabaseAdmin.from("store_settings").select("maintenance_mode").eq("id", "default").maybeSingle(),
+        supabase.auth.getUser(),
+    ]);
     const isMaintenanceMode = data?.maintenance_mode || false;
 
     if (isMaintenanceMode) {
@@ -28,7 +32,7 @@ export default async function ShopLayout({
 
     return (
         <div className="min-h-screen flex flex-col bg-white">
-            <NavBar />
+            <NavBar initialUser={user} />
             <main className="flex-1 pt-20">
                 {children}
             </main>

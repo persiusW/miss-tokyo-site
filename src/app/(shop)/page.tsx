@@ -30,7 +30,7 @@ export default async function HomePage() {
       .order("position", { ascending: true }),
     supabaseAdmin
       .from("featured_categories")
-      .select("*, category:categories(name, slug, image_url)")
+      .select("*, category:categories(name, slug, image_url, product_count)")
       .eq("enabled", true)
       .order("position", { ascending: true }),
     supabaseAdmin
@@ -45,22 +45,11 @@ export default async function HomePage() {
   const reviews = (reviewsData || []) as HomepageReview[];
   const featuredCats = (featuredCatsData || []) as FeaturedCategory[];
 
-  // Fetch item counts for featured categories
-  const categoriesWithCounts = await Promise.all(
-    featuredCats.map(async (fc) => {
-      if (fc.item_count_override !== null) {
-        return { ...fc, itemCount: fc.item_count_override };
-      }
-      const categoryName = fc.category?.name ?? "";
-      if (!categoryName) return { ...fc, itemCount: 0 };
-      const { count } = await supabaseAdmin
-        .from("products")
-        .select("id", { count: "exact", head: true })
-        .eq("category_type", categoryName)
-        .eq("is_active", true);
-      return { ...fc, itemCount: count || 0 };
-    })
-  );
+  // PERF-01: use pre-fetched product_count from the category join — no per-category DB round-trips
+  const categoriesWithCounts = featuredCats.map((fc) => ({
+    ...fc,
+    itemCount: fc.item_count_override ?? (fc.category as any)?.product_count ?? 0,
+  }));
 
   // Trust bar data
   const trustBarEnabled = settings?.trust_bar_enabled ?? false;

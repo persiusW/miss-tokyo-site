@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { compressToWebP } from "@/lib/utils/imageCompression";
 import { convertToMp4 } from "@/lib/utils/videoConversion";
+import { Trash2, GripVertical } from "lucide-react";
 import {
     DndContext,
     closestCenter,
@@ -76,8 +77,15 @@ interface SortableImageProps {
 }
 
 function SortableImage({ url, index, isPrimary, onRemove }: SortableImageProps) {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-        useSortable({ id: url });
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        setActivatorNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: url });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -87,19 +95,19 @@ function SortableImage({ url, index, isPrimary, onRemove }: SortableImageProps) 
 
     const isVideo = url.endsWith(".mp4");
 
+    const handleRemove = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (window.confirm("Are you sure you want to remove this image?")) {
+            onRemove();
+        }
+    };
+
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className="relative group aspect-square overflow-hidden bg-neutral-100 border border-neutral-200 touch-none"
+            className="relative group aspect-square min-h-[8rem] overflow-hidden bg-neutral-100 border border-neutral-200 touch-none"
         >
-            {/* Drag handle — entire card is draggable */}
-            <div
-                {...attributes}
-                {...listeners}
-                className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing"
-            />
-
             {isVideo ? (
                 <video src={url} className="w-full h-full object-cover" muted />
             ) : (
@@ -107,27 +115,30 @@ function SortableImage({ url, index, isPrimary, onRemove }: SortableImageProps) 
             )}
 
             {isPrimary && (
-                <span className="absolute top-1 left-1 z-20 bg-black/70 text-white text-[8px] uppercase tracking-widest px-1.5 py-0.5 pointer-events-none">
+                <span className="absolute top-2 left-2 z-20 bg-black/70 text-white text-[8px] uppercase tracking-widest px-1.5 py-0.5 pointer-events-none">
                     Primary
                 </span>
             )}
 
-            {/* Drag hint */}
-            <span className="absolute bottom-1 right-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                <svg className="w-4 h-4 text-white drop-shadow" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 4.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 7.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 7.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM18 4.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 7.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0 7.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
-                </svg>
-            </span>
+            {/* Trash button — top-right, isolated from drag */}
+            <button
+                type="button"
+                onClick={handleRemove}
+                aria-label="Remove image"
+                className="absolute top-2 right-2 z-30 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+            >
+                <Trash2 size={13} strokeWidth={2} />
+            </button>
 
-            {/* Remove overlay */}
-            <div className="absolute inset-0 z-20 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center pointer-events-none">
-                <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onRemove(); }}
-                    className="pointer-events-auto opacity-0 group-hover:opacity-100 text-white text-[9px] uppercase tracking-widest font-bold border border-white px-2 py-1 z-30 relative"
-                >
-                    Remove
-                </button>
+            {/* Drag handle — bottom-right, separate from delete */}
+            <div
+                ref={setActivatorNodeRef}
+                {...attributes}
+                {...listeners}
+                aria-label="Drag to reorder"
+                className="absolute bottom-2 right-2 z-30 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+            >
+                <GripVertical size={13} strokeWidth={2} />
             </div>
         </div>
     );
@@ -346,15 +357,19 @@ export function ImageUploader(props: ImageUploaderProps) {
                         ) : (
                             <img src={previews[0]} alt="" className="w-full h-full object-cover" />
                         )}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center">
-                            <button
-                                type="button"
-                                onClick={() => handleRemove(0)}
-                                className="opacity-0 group-hover:opacity-100 text-white text-[9px] uppercase tracking-widest font-bold border border-white px-2 py-1"
-                            >
-                                Remove
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm("Are you sure you want to remove this image?")) {
+                                    handleRemove(0);
+                                }
+                            }}
+                            aria-label="Remove image"
+                            className="absolute top-2 right-2 z-20 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                        >
+                            <Trash2 size={13} strokeWidth={2} />
+                        </button>
                     </div>
                 )
             )}
