@@ -9,6 +9,7 @@ import {
     DndContext,
     closestCenter,
     PointerSensor,
+    TouchSensor,
     useSensor,
     useSensors,
     DragEndEvent,
@@ -120,25 +121,25 @@ function SortableImage({ url, index, isPrimary, onRemove }: SortableImageProps) 
                 </span>
             )}
 
-            {/* Trash button — top-right, isolated from drag */}
+            {/* Trash button — always visible on mobile, hover-reveal on desktop */}
             <button
                 type="button"
                 onClick={handleRemove}
                 aria-label="Remove image"
-                className="absolute top-2 right-2 z-30 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                className="absolute top-2 right-2 z-30 bg-red-500 hover:bg-red-600 text-white p-2 min-w-[36px] min-h-[36px] rounded-md shadow-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
             >
-                <Trash2 size={13} strokeWidth={2} />
+                <Trash2 size={14} strokeWidth={2} />
             </button>
 
-            {/* Drag handle — bottom-right, separate from delete */}
+            {/* Drag handle — always visible on mobile, hover-reveal on desktop */}
             <div
                 ref={setActivatorNodeRef}
                 {...attributes}
                 {...listeners}
                 aria-label="Drag to reorder"
-                className="absolute bottom-2 right-2 z-30 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                className="absolute bottom-2 right-2 z-30 bg-black/60 hover:bg-black/80 text-white p-2 min-w-[36px] min-h-[36px] rounded-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
             >
-                <GripVertical size={13} strokeWidth={2} />
+                <GripVertical size={14} strokeWidth={2} />
             </div>
         </div>
     );
@@ -168,7 +169,9 @@ export function ImageUploader(props: ImageUploaderProps) {
     const maxFiles = multiMode ? (props.maxFiles ?? 1) : 1;
 
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        // TouchSensor with delay prevents scroll hijacking on mobile
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
     );
 
     // ── Upload helpers ─────────────────────────────────────────────────────────
@@ -366,7 +369,7 @@ export function ImageUploader(props: ImageUploaderProps) {
                                 }
                             }}
                             aria-label="Remove image"
-                            className="absolute top-2 right-2 z-20 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                            className="absolute top-2 right-2 z-20 bg-red-500 hover:bg-red-600 text-white p-2 min-w-[36px] min-h-[36px] rounded-md shadow-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         >
                             <Trash2 size={13} strokeWidth={2} />
                         </button>
