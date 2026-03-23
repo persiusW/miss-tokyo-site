@@ -3,7 +3,7 @@ import { cache } from "react";
 import { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { getProductBySlug, getRelatedProducts, getProductReviews } from "@/lib/products";
+import { getProductBySlug, getRelatedProducts, getProductReviews, getAllProductSlugs } from "@/lib/products";
 
 // PERF-23: deduplicate — generateMetadata and ProductPage both call this;
 // React cache() deduplicates within one render cycle so only one DB query fires.
@@ -16,6 +16,14 @@ import { ProductAccordions } from "@/components/ui/miss-tokyo/ProductAccordions"
 import { ReviewsSection } from "@/components/ui/miss-tokyo/ReviewsSection";
 
 export const revalidate = 60;
+
+// Pre-build every published product page at deploy time.
+// ISR (revalidate = 60) handles background refresh; this ensures zero cold-start
+// DB queries for any product URL under load.
+export async function generateStaticParams() {
+    const slugs = await getAllProductSlugs();
+    return slugs.map(slug => ({ slug }));
+}
 
 const COLOR_HEX: Record<string, string> = {
     Black: "#141210", White: "#FAFAFA", Red: "#E8485A", Pink: "#F5A7B3",

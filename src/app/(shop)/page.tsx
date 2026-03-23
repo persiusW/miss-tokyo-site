@@ -9,7 +9,9 @@ import { OptInSection } from "@/components/public/OptInSection";
 import { InstagramFeed } from "@/components/public/InstagramFeed";
 import type { SiteSettings, HeroSlide, FeaturedCategory, HomepageReview, TrustBarItem } from "@/types/settings";
 
-export const revalidate = 60;
+// 5-minute ISR: homepage content (hero, categories, reviews) changes rarely.
+// Under heavy load this means only ~1 DB query per 5 minutes instead of per-request.
+export const revalidate = 300;
 
 export default async function HomePage() {
   const [

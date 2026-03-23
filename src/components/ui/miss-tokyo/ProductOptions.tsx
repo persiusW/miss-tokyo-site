@@ -94,14 +94,55 @@ export function ProductOptions(props: Props) {
     const [selectedSize, setSelectedSize] = useState<string>(sizes.find(s => s.in_stock)?.label ?? "");
     const [qty, setQty] = useState(1);
 
-    // ── Variant-aware effective inventory ─────────────────────────────────────
+    // ── Variant-aware availability ─────────────────────────────────────────────
+
+    /**
+     * Set of sizes that have at least one in-stock color variant.
+     * null → variant inventory not tracked, fall back to sizeVariant.in_stock.
+     */
+    const sizesWithStock = useMemo<Set<string> | null>(() => {
+        if (!trackVariantInventory || !productVariants?.length) return null;
+        const result = new Set<string>();
+        for (const v of productVariants) {
+            if ((v.inventory_count ?? 0) > 0 && v.size != null) result.add(v.size);
+        }
+        return result;
+    }, [trackVariantInventory, productVariants]);
+
+    /**
+     * Set of colors that have stock for the currently selected size.
+     * When no size is chosen, checks across ALL sizes.
+     * null → variant inventory not tracked, fall back to colorVariant.in_stock.
+     */
+    const colorsWithStock = useMemo<Set<string> | null>(() => {
+        if (!trackVariantInventory || !productVariants?.length) return null;
+        const result = new Set<string>();
+        for (const v of productVariants) {
+            const sizeMatch = selectedSize ? (v.size ?? "") === selectedSize : true;
+            if (sizeMatch && (v.inventory_count ?? 0) > 0 && v.color != null) result.add(v.color);
+        }
+        return result;
+    }, [trackVariantInventory, productVariants, selectedSize]);
+
+    // When the selected size changes and the current color is no longer available
+    // for that size, auto-advance to the first in-stock color.
+    useEffect(() => {
+        if (!colorsWithStock) return;
+        if (selectedColor && !colorsWithStock.has(selectedColor)) {
+            const first = colors.find(c => colorsWithStock.has(c.name));
+            setSelectedColor(first?.name ?? "");
+        }
+    // Only run when the size changes — colorsWithStock is derived from selectedSize
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSize]);
+
+    /** Effective stock for the currently selected size + color combo */
     const effectiveInventory = useMemo(() => {
         if (!trackVariantInventory || !productVariants?.length) return inventoryCount;
         const match = productVariants.find(v =>
             (v.size ?? "") === selectedSize &&
             (v.color ?? "") === selectedColor
         );
-        // No matching variant found means this combo isn't tracked — treat as 0
         return match?.inventory_count ?? 0;
     }, [trackVariantInventory, productVariants, selectedSize, selectedColor, inventoryCount]);
 
@@ -298,25 +339,50 @@ export function ProductOptions(props: Props) {
                         </span>
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {colors.map(c => (
-                            <button
-                                key={c.name}
-                                title={c.name}
-                                onClick={() => { if (c.in_stock) setSelectedColor(c.name); }}
-                                style={{
-                                    width: 32, height: 32, borderRadius: "50%",
-                                    background: c.hex,
-                                    border: "2px solid transparent",
-                                    cursor: c.in_stock ? "pointer" : "not-allowed",
-                                    transition: "box-shadow 0.15s",
-                                    boxShadow: selectedColor === c.name
-                                        ? "0 0 0 2px #fff, 0 0 0 3.5px var(--ink, #141210)"
-                                        : "none",
-                                    opacity: c.in_stock ? 1 : 0.35,
-                                    outline: "none",
-                                }}
-                            />
-                        ))}
+                        {colors.map(c => {
+                            // If variant inventory is tracked, use per-combo availability;
+                            // otherwise fall back to the static colorVariant.in_stock flag.
+                            const inStock = colorsWithStock !== null
+                                ? colorsWithStock.has(c.name)
+                                : c.in_stock;
+                            const isSelected = selectedColor === c.name;
+                            return (
+                                <button
+                                    key={c.name}
+                                    title={inStock ? c.name : `${c.name} — out of stock`}
+                                    onClick={() => { if (inStock) setSelectedColor(c.name); }}
+                                    disabled={!inStock}
+                                    style={{
+                                        position: "relative",
+                                        width: 32, height: 32, borderRadius: "50%",
+                                        background: c.hex,
+                                        border: "2px solid transparent",
+                                        cursor: inStock ? "pointer" : "not-allowed",
+                                        transition: "box-shadow 0.15s, opacity 0.15s",
+                                        boxShadow: isSelected
+                                            ? "0 0 0 2px #fff, 0 0 0 3.5px var(--ink, #141210)"
+                                            : "none",
+                                        opacity: inStock ? 1 : 0.3,
+                                        outline: "none",
+                                        overflow: "hidden",
+                                    }}
+                                >
+                                    {/* Diagonal strike-through line for OOS colours */}
+                                    {!inStock && (
+                                        <span style={{
+                                            position: "absolute", inset: 0,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            pointerEvents: "none",
+                                        }}>
+                                            <svg viewBox="0 0 32 32" width="32" height="32" style={{ position: "absolute", inset: 0 }}>
+                                                <line x1="4" y1="28" x2="28" y2="4" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" />
+                                                <line x1="4" y1="28" x2="28" y2="4" stroke="rgba(0,0,0,0.35)" strokeWidth="1" strokeLinecap="round" />
+                                            </svg>
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -332,25 +398,54 @@ export function ProductOptions(props: Props) {
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                         {sizes.map(s => {
+                            // If variant inventory is tracked, derive availability from
+                            // variant data; otherwise fall back to sizeVariant.in_stock.
+                            const inStock = sizesWithStock !== null
+                                ? sizesWithStock.has(s.label)
+                                : s.in_stock;
                             const isActive = selectedSize === s.label;
                             return (
                                 <button
                                     key={s.label}
-                                    onClick={() => { if (s.in_stock) setSelectedSize(s.label); }}
-                                    disabled={!s.in_stock}
+                                    onClick={() => { if (inStock) setSelectedSize(s.label); }}
+                                    disabled={!inStock}
+                                    title={inStock ? s.label : `${s.label} — out of stock`}
                                     style={{
+                                        position: "relative",
                                         padding: "9px 16px",
-                                        border: `1px solid ${isActive ? "var(--ink, #141210)" : "rgba(20,18,16,0.15)"}`,
+                                        border: `1px solid ${
+                                            isActive
+                                                ? "var(--ink, #141210)"
+                                                : inStock
+                                                    ? "rgba(20,18,16,0.15)"
+                                                    : "rgba(20,18,16,0.08)"
+                                        }`,
                                         borderRadius: 2, fontSize: 12, fontWeight: 400,
-                                        color: isActive ? "#fff" : "var(--muted, #7A7167)",
+                                        color: isActive ? "#fff" : inStock ? "var(--muted, #7A7167)" : "rgba(20,18,16,0.3)",
                                         background: isActive ? "var(--ink, #141210)" : "transparent",
-                                        cursor: s.in_stock ? "pointer" : "not-allowed",
+                                        cursor: inStock ? "pointer" : "not-allowed",
                                         transition: "all 0.15s",
-                                        opacity: s.in_stock ? 1 : 0.35,
-                                        textDecoration: s.in_stock ? "none" : "line-through",
+                                        overflow: "hidden",
                                     }}
                                 >
                                     {s.label}
+                                    {/* Diagonal line overlay for OOS sizes */}
+                                    {!inStock && (
+                                        <span style={{
+                                            position: "absolute", inset: 0,
+                                            pointerEvents: "none",
+                                            overflow: "hidden",
+                                        }}>
+                                            <svg
+                                                width="100%" height="100%"
+                                                preserveAspectRatio="none"
+                                                style={{ position: "absolute", inset: 0 }}
+                                            >
+                                                <line x1="0" y1="100%" x2="100%" y2="0"
+                                                    stroke="rgba(20,18,16,0.2)" strokeWidth="1" />
+                                            </svg>
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })}

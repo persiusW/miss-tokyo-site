@@ -318,6 +318,18 @@ export function deriveSizes(products: ShopProduct[]): string[] {
 /** Number of product rows fetched per page. Videos are a subset of this. */
 export const VIDEO_BATCH_SIZE = 20;
 
+// ── Static generation helper ───────────────────────────────────────────────
+// Used by generateStaticParams to pre-build every published product page at
+// deploy time, so the first request after deploy always hits the static cache.
+export async function getAllProductSlugs(): Promise<string[]> {
+    const { data } = await supabaseAdmin
+        .from("products")
+        .select("slug")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+    return (data ?? []).map((p: { slug: string }) => p.slug).filter(Boolean);
+}
+
 export type VideoProduct = ShopProduct & { video_url: string };
 
 export async function getVideoProducts(offset = 0): Promise<{
