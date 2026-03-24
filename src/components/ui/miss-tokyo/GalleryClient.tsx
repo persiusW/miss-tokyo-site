@@ -37,6 +37,16 @@ function VideoCard({
     const [addState, setAddState] = useState<"idle" | "loading" | "success">("idle");
     const addItem = useCart(s => s.addItem);
 
+    // Out-of-stock if master inventory is depleted OR all size variants are individually OOS.
+    // track_inventory !== false treats null/undefined/true as "tracked" (mirrors ShopPageClient).
+    // allSizesOOS catches products using per-variant stock (track_variant_inventory=true) where
+    // master inventory_count stays at 9999 but every size_variant has in_stock: false.
+    const masterOOS = product.track_inventory !== false && (product.inventory_count ?? 0) <= 0;
+    const allSizesOOS = Array.isArray(product.size_variants) &&
+        product.size_variants.length > 0 &&
+        product.size_variants.every((v: { label: string; in_stock: boolean }) => v.in_stock === false);
+    const isOutOfStock = masterOOS || allSizesOOS;
+
     // Use the shared hook for viewport detection — threshold 0.8 matches the old inline observer
     const [containerRef, isVisible] = useIntersectionObserver<HTMLDivElement>({ threshold: 0.8 });
 
@@ -58,7 +68,7 @@ function VideoCard({
     useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
 
     const handleQuickAdd = () => {
-        if (product.track_inventory && product.inventory_count === 0) return;
+        if (isOutOfStock) return;
         if ((product.available_sizes?.length || 0) > 0 || (product.available_colors?.length || 0) > 0) {
             onOpenModal(product);
             return;
@@ -130,17 +140,17 @@ function VideoCard({
                     <div className="flex items-center gap-4">
                         <button
                             onClick={handleQuickAdd}
-                            disabled={addState !== "idle" || (product.track_inventory && product.inventory_count === 0)}
+                            disabled={addState !== "idle" || isOutOfStock}
                             className={`flex-1 text-[10px] font-bold uppercase tracking-[0.2em] py-4 rounded-none transition-all duration-300 flex items-center justify-center gap-2 ${
                                 addState === "success"
                                     ? "bg-emerald-600 text-white scale-[1.05]"
-                                    : (product.track_inventory && product.inventory_count === 0)
+                                    : isOutOfStock
                                         ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
                                         : "bg-white text-black hover:bg-neutral-100 disabled:opacity-80"
                             }`}
                         >
-                            {addState === "loading" ? <Loader2 size={14} className="animate-spin" /> : addState === "success" ? <Check size={14} /> : (product.track_inventory && product.inventory_count === 0) ? null : <Plus size={14} />}
-                            {addState === "loading" ? "Adding..." : addState === "success" ? "Added!" : (product.track_inventory && product.inventory_count === 0) ? "OUT OF STOCK" : "Add to Cart"}
+                            {addState === "loading" ? <Loader2 size={14} className="animate-spin" /> : addState === "success" ? <Check size={14} /> : isOutOfStock ? null : <Plus size={14} />}
+                            {addState === "loading" ? "Adding..." : addState === "success" ? "Added!" : isOutOfStock ? "OUT OF STOCK" : "Add to Cart"}
                         </button>
                         <Link
                             href={`/products/${product.slug}`}
@@ -176,17 +186,17 @@ function VideoCard({
                     <div className="flex flex-col gap-4">
                         <button
                             onClick={handleQuickAdd}
-                            disabled={addState !== "idle" || (product.track_inventory && product.inventory_count === 0)}
+                            disabled={addState !== "idle" || isOutOfStock}
                             className={`w-full text-[11px] font-bold uppercase tracking-[0.3em] py-5 rounded-none transition-all duration-300 flex items-center justify-center gap-3 border shadow-sm ${
                                 addState === "success"
                                     ? "bg-emerald-600 text-white border-emerald-600 scale-105"
-                                    : (product.track_inventory && product.inventory_count === 0)
+                                    : isOutOfStock
                                         ? "bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed"
                                         : "bg-black text-white border-black hover:bg-neutral-800 disabled:opacity-80"
                             }`}
                         >
-                            {addState === "loading" ? <Loader2 size={16} className="animate-spin" /> : addState === "success" ? <Check size={16} /> : (product.track_inventory && product.inventory_count === 0) ? null : <Plus size={16} />}
-                            {addState === "loading" ? "Syncing..." : addState === "success" ? "Included in Bag" : (product.track_inventory && product.inventory_count === 0) ? "OUT OF STOCK" : "Buy this Piece"}
+                            {addState === "loading" ? <Loader2 size={16} className="animate-spin" /> : addState === "success" ? <Check size={16} /> : isOutOfStock ? null : <Plus size={16} />}
+                            {addState === "loading" ? "Syncing..." : addState === "success" ? "Included in Bag" : isOutOfStock ? "OUT OF STOCK" : "Buy this Piece"}
                         </button>
 
                         <Link

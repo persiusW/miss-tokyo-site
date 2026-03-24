@@ -371,7 +371,7 @@ export async function getVideoProducts(offset = 0): Promise<{
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
-             bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
+             bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, created_at`)
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .range(offset, offset + VIDEO_BATCH_SIZE - 1);

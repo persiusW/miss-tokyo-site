@@ -84,12 +84,7 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
             <div className="flex flex-col gap-4 w-full">
                 {/* ── Main image ── */}
                 <div
-                    className="relative w-full aspect-[3/4] md:aspect-[4/5] overflow-hidden rounded-lg bg-gray-50 cursor-zoom-in"
-                    onClick={openLightbox}
-                    role="button"
-                    aria-label="Tap to zoom image"
-                    tabIndex={0}
-                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") openLightbox(); }}
+                    className="relative w-full aspect-[3/4] md:aspect-[4/5] overflow-hidden rounded-lg bg-gray-50"
                 >
                     {/* Image stack */}
                     <div className="absolute inset-0">
@@ -132,15 +127,6 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
                             {badgeLabel}
                         </span>
                     )}
-
-                    {/* Zoom hint */}
-                    <div className="absolute bottom-4 right-4 z-[2] flex items-center gap-1 bg-black/60 text-white text-[10px] tracking-wide px-2.5 py-1.5 rounded-sm pointer-events-none">
-                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#fff" strokeWidth="1.5">
-                            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-                            <line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
-                        </svg>
-                        Tap to zoom
-                    </div>
 
                     {/* Nav arrows */}
                     {imgs.length > 1 && (
