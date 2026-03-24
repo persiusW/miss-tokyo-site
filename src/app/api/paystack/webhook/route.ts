@@ -205,21 +205,28 @@ export async function POST(req: Request) {
             // Verify if this transaction has already been processed to prevent double inventory/logic
             let isAlreadyProcessed = false;
             let emailAlreadySent = false;
-            
+            // Items fetched from DB — avoids relying on cartItems in Paystack metadata
+            // (large carts hit Paystack's metadata size limit).
+            let orderItemsFromDB: any[] = [];
+
             if (orderId) {
                 const { data: existingOrder } = await supabaseAdmin
                     .from("orders")
-                    .select("status, paystack_reference, customer_metadata")
+                    .select("status, paystack_reference, customer_metadata, items")
                     .eq("id", orderId)
                     .single();
-                
+
                 if (existingOrder && (existingOrder.status === "paid" || existingOrder.status === "confirmed" || existingOrder.paystack_reference === paystackRef)) {
                     console.log(`[webhook] Order ${orderId} already processed in DB. Skipping inventory deductions but will trigger email.`);
                     isAlreadyProcessed = true;
                 }
-                
+
                 if (existingOrder && (existingOrder.customer_metadata as any)?.webhook_email_sent) {
                     emailAlreadySent = true;
+                }
+
+                if (existingOrder?.items && Array.isArray(existingOrder.items)) {
+                    orderItemsFromDB = existingOrder.items;
                 }
             } else if (paystackRef) {
                 const { data: existingOrder } = await supabaseAdmin
@@ -294,7 +301,11 @@ export async function POST(req: Request) {
                     .eq("id", requestId);
             }
 
-            const parsedItems = parseItems(cartItems);
+            // Prefer items from the DB order record; fall back to metadata cartItems
+            // for backward compat with any in-flight webhooks from the old code.
+            const parsedItems = parseItems(cartItems).length > 0
+                ? parseItems(cartItems)
+                : orderItemsFromDB;
 
             // Decrement inventory — hybrid model: variant-level or product-level
             if (!isAlreadyProcessed && parsedItems.length > 0) {
