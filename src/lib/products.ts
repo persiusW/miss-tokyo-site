@@ -360,6 +360,32 @@ export async function getAllProductSlugs(): Promise<string[]> {
 
 export type VideoProduct = ShopProduct & { video_url: string };
 
+// Return sizes from available_sizes whose label matches an in_stock size_variant.
+// available_sizes entries look like "S — 8" or "Free Size"; size_variant labels are "S" / "Free Size".
+// If no size_variants data exists, all sizes are returned unchanged.
+function getInStockSizes(
+    sizes: string[] | null,
+    sizeVariants: { label: string; in_stock: boolean }[] | null
+): string[] | null {
+    if (!sizes) return sizes;
+    if (!sizeVariants || sizeVariants.length === 0) return sizes;
+    const inStock = new Set(sizeVariants.filter(v => v.in_stock).map(v => v.label));
+    if (inStock.size === 0) return [];
+    return sizes.filter(s => inStock.has(s.split(" — ")[0]));
+}
+
+// Same for colors: available_colors are plain names e.g. "Black", color_variant.name matches.
+function getInStockColors(
+    colors: string[] | null,
+    colorVariants: { name: string; in_stock: boolean }[] | null
+): string[] | null {
+    if (!colors) return colors;
+    if (!colorVariants || colorVariants.length === 0) return colors;
+    const inStock = new Set(colorVariants.filter(v => v.in_stock).map(v => v.name));
+    if (inStock.size === 0) return [];
+    return colors.filter(c => inStock.has(c));
+}
+
 export async function getVideoProducts(offset = 0): Promise<{
     videos: VideoProduct[];
     nextOffset: number;
@@ -373,6 +399,8 @@ export async function getVideoProducts(offset = 0): Promise<{
              available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, created_at`)
         .eq("is_active", true)
+        // Exclude products that track inventory and have none left
+        .or("track_inventory.eq.false,inventory_count.gt.0")
         .order("created_at", { ascending: false })
         .range(offset, offset + VIDEO_BATCH_SIZE - 1);
 
@@ -385,6 +413,9 @@ export async function getVideoProducts(offset = 0): Promise<{
             ) as string | undefined;
             return {
                 ...p,
+                // Only expose in-stock sizes and colors so the QuickView modal only offers what's available
+                available_sizes: getInStockSizes(p.available_sizes, p.size_variants),
+                available_colors: getInStockColors(p.available_colors, p.color_variants),
                 category_id: null,
                 is_featured: p.is_featured ?? false,
                 is_sale: p.is_sale ?? false,
