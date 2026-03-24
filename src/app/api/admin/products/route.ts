@@ -115,6 +115,21 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
+    // Fast path: toggle-only fields (is_active, is_sale, discount_value).
+    // When the body contains ONLY these fields, do a targeted update without
+    // touching any other columns — avoids nulling out price, name, etc.
+    const TOGGLE_FIELDS = new Set(["is_active", "is_sale", "discount_value"]);
+    if (Object.keys(fields).length > 0 && Object.keys(fields).every(k => TOGGLE_FIELDS.has(k))) {
+        const { error } = await supabaseAdmin.from("products").update(fields).eq("id", id);
+        if (error) {
+            console.error("[admin/products PATCH toggle]", error);
+            return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+        revalidatePath("/shop", "page");
+        revalidatePath("/catalog/products", "page");
+        return NextResponse.json({ success: true });
+    }
+
     const {
         name,
         slug,
