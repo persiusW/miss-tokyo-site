@@ -67,8 +67,12 @@ export default function CatalogProductsPage() {
     };
 
     const handleToggleActive = async (id: string, current: boolean) => {
-        const { error } = await supabase.from("products").update({ is_active: !current }).eq("id", id);
-        if (error) {
+        const res = await fetch(`/api/admin/products/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ is_active: !current }),
+        });
+        if (!res.ok) {
             toast.error("Failed to update visibility.");
         } else {
             setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: !current } : p));
