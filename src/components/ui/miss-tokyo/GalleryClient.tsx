@@ -73,6 +73,7 @@ function VideoCard({
             size: "One size",
             quantity: 1,
             imageUrl: product.image_urls?.[0] || "",
+            inventoryCount: product.inventory_count,
         }, false);
 
         setAddState("success");

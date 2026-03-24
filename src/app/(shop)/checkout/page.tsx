@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useCart } from "@/store/useCart";
+import { useCart, getEffectivePrice } from "@/store/useCart";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 
@@ -223,6 +223,8 @@ export default function CheckoutPage() {
             const data = await res.json();
             if (data.authorizationUrl) {
                 window.location.href = data.authorizationUrl;
+            } else if (res.status === 409) {
+                toast.error(data.error || "An item in your cart is out of stock. Please update your cart.");
             } else {
                 toast.error(data.error || "Failed to initialize checkout. Please try again.");
             }
@@ -439,7 +441,7 @@ export default function CheckoutPage() {
                                 <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>
                                 <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} · Qty: {item.quantity}</p>
                             </div>
-                            <p className="font-medium text-sm">GHS {(item.price * item.quantity).toFixed(2)}</p>
+                            <p className="font-medium text-sm">GHS {(getEffectivePrice(item) * item.quantity).toFixed(2)}</p>
                         </div>
                     ))}
                 </div>

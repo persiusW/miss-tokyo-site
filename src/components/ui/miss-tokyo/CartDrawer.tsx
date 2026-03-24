@@ -92,7 +92,8 @@ export function CartDrawer() {
                                                     <button
                                                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                                         aria-label="Increase quantity"
-                                                        className="flex items-center justify-center w-10 h-10 text-neutral-500 hover:text-black hover:bg-neutral-50"
+                                                        disabled={item.inventoryCount !== undefined && item.quantity >= item.inventoryCount}
+                                                        className="flex items-center justify-center w-10 h-10 text-neutral-500 hover:text-black hover:bg-neutral-50 disabled:opacity-30 disabled:cursor-not-allowed"
                                                     >
                                                         <Plus size={12} />
                                                     </button>

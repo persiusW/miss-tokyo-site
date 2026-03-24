@@ -51,7 +51,7 @@ export async function POST(request: Request) {
             const pIds = cartArr.length > 0 ? cartArr.map(i => i.productId) : [productId];
             const { data: dbProducts } = await supabaseAdmin
                 .from("products")
-                .select("id, price_ghs, is_sale, discount_value")
+                .select("id, price_ghs, is_sale, discount_value, inventory_count")
                 .in("id", pIds);
 
             const dbPriceMap = (dbProducts || []).reduce((acc: any, p: any) => {
@@ -59,6 +59,21 @@ export async function POST(request: Request) {
                 acc[p.id] = base;
                 return acc;
             }, {});
+
+            // Inventory guard — reject order if any item exceeds available stock
+            const dbStockMap = (dbProducts || []).reduce((acc: any, p: any) => {
+                acc[p.id] = p.inventory_count ?? 0;
+                return acc;
+            }, {});
+            for (const item of cartArr) {
+                const stock = dbStockMap[item.productId];
+                if (stock !== undefined && stock !== 9999 && item.quantity > stock) {
+                    return NextResponse.json(
+                        { error: `"${item.name}" only has ${stock} unit${stock === 1 ? "" : "s"} in stock.` },
+                        { status: 409 }
+                    );
+                }
+            }
 
             const { resolveWholesalePrice } = await import("@/lib/wholesale");
 

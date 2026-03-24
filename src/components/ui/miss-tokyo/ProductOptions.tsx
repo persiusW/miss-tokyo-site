@@ -257,6 +257,7 @@ export function ProductOptions(props: Props) {
             color: selectedColor || undefined,
             quantity: qty,
             imageUrl,
+            inventoryCount: effectiveInventory,
             isWholesale: isWholesalerState,
             wholesaleTiers,
         });

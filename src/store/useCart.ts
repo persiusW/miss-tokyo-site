@@ -13,6 +13,7 @@ export type CartItem = {
     stitching?: string;
     quantity: number;
     imageUrl: string;
+    inventoryCount?: number; // max purchasable quantity (undefined = unlimited)
     // Wholesale fields — only present for wholesale users
     isWholesale?: boolean;
     wholesaleTiers?: WholesaleTiers;
@@ -52,29 +53,36 @@ export const useCart = create<CartState>()(
                 set((state) => {
                     const existingItem = state.items.find(i => i.id === item.id);
                     if (existingItem) {
+                        const max = existingItem.inventoryCount ?? Infinity;
+                        const newQty = Math.min(existingItem.quantity + item.quantity, max);
                         return {
                             items: state.items.map(i =>
-                                i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
+                                i.id === item.id ? { ...i, quantity: newQty } : i
                             ),
                             isOpen: openDrawer ? true : state.isOpen,
                         };
                     }
-                    return { items: [...state.items, item], isOpen: openDrawer ? true : state.isOpen };
+                    const max = item.inventoryCount ?? Infinity;
+                    const clampedItem = { ...item, quantity: Math.min(item.quantity, max) };
+                    return { items: [...state.items, clampedItem], isOpen: openDrawer ? true : state.isOpen };
                 });
             },
             removeItem: (id) => set((state) => ({
                 items: state.items.filter(i => i.id !== id),
             })),
             updateQuantity: (id, quantity) => set((state) => ({
-                items: state.items.map(i =>
-                    i.id === id ? { ...i, quantity: Math.max(1, quantity) } : i
-                ),
+                items: state.items.map(i => {
+                    if (i.id !== id) return i;
+                    const max = i.inventoryCount ?? Infinity;
+                    return { ...i, quantity: Math.min(Math.max(1, quantity), max) };
+                }),
             })),
             clearCart: () => set({ items: [] }),
             totalAmount: () => {
-                return get().items.reduce((total, item) => {
+                const raw = get().items.reduce((total, item) => {
                     return total + getEffectivePrice(item) * item.quantity;
                 }, 0);
+                return parseFloat(raw.toFixed(2));
             },
             totalItems: () => {
                 return get().items.reduce((total, item) => total + item.quantity, 0);

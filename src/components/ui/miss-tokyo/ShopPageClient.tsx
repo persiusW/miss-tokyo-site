@@ -174,6 +174,7 @@ function ShopProductCard({
                                     size: "One Size",
                                     quantity: 1,
                                     imageUrl: product.image_urls?.[0] || "",
+                                    inventoryCount: product.inventory_count,
                                 }, false);
                                 setAddState("added");
                                 setTimeout(() => setAddState("idle"), 1500);
@@ -271,6 +272,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
             color: selectedColor || undefined,
             quantity: 1,
             imageUrl: product.image_urls?.[0] || "",
+            inventoryCount: product.inventory_count,
         }, false);
         setAdding(false);
         setAdded(true);
