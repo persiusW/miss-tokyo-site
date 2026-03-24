@@ -28,6 +28,9 @@ export interface SiteSettings {
   trust_bar_items: TrustBarItem[];
   nav_show_home: boolean;
   nav_show_shop: boolean;
+  nav_show_gallery: boolean;
+  nav_show_sale: boolean;
+  nav_show_dresses: boolean;
   nav_show_new_arrivals: boolean;
   nav_show_gift_card: boolean;
   nav_show_contact: boolean;

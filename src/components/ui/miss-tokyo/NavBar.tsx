@@ -10,9 +10,9 @@ import { supabase } from "@/lib/supabase";
 const NAV_LINKS = [
     { href: "/",             label: "Home",         navKey: "nav_show_home" },
     { href: "/shop",         label: "Shop",         navKey: "nav_show_shop" },
-    { href: "/gallery",      label: "Gallery",      navKey: null },
-    { href: "/shop?sale=true", label: "Sale",         navKey: null },
-    { href: "/shop?category=dresses", label: "Dresses", navKey: null },
+    { href: "/gallery",      label: "Gallery",      navKey: "nav_show_gallery" },
+    { href: "/shop?sale=true", label: "Sale",         navKey: "nav_show_sale" },
+    { href: "/shop?category=dresses", label: "Dresses", navKey: "nav_show_dresses" },
     { href: "/shop?sort=newest", label: "New Arrivals", navKey: "nav_show_new_arrivals" },
     { href: "/gift-cards",   label: "Gift Cards",   navKey: "nav_show_gift_card" },
     { href: "/contact",      label: "CONTACT",      navKey: "nav_show_contact" },
@@ -31,6 +31,9 @@ export function NavBar({ initialUser }: { initialUser?: { id: string } | null })
     const [navSettings, setNavSettings] = useState({
         nav_show_home: true,
         nav_show_shop: true,
+        nav_show_gallery: true,
+        nav_show_sale: true,
+        nav_show_dresses: true,
         nav_show_new_arrivals: true,
         nav_show_gift_card: true,
         nav_show_contact: true,
@@ -51,7 +54,7 @@ export function NavBar({ initialUser }: { initialUser?: { id: string } | null })
     useEffect(() => {
         supabase
             .from("site_settings")
-            .select("nav_show_home, nav_show_shop, nav_show_new_arrivals, nav_show_gift_card, nav_show_contact, nav_show_about")
+            .select("nav_show_home, nav_show_shop, nav_show_gallery, nav_show_sale, nav_show_dresses, nav_show_new_arrivals, nav_show_gift_card, nav_show_contact, nav_show_about")
             .eq("id", "singleton")
             .single()
             .then(({ data }: { data: any }) => {
