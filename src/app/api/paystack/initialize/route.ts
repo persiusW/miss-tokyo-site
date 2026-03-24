@@ -255,7 +255,8 @@ export async function POST(request: Request) {
                     ...clientMetadata,
                     productId,
                     orderId,
-                    cartItems: cartArr.length > 0 ? JSON.stringify(cartArr) : undefined,
+                    // cartItems intentionally omitted — already stored in orders.items in DB.
+                    // Sending large carts as metadata payload hits Paystack's size limit.
                     // Override client-supplied fee values with server-calculated ones
                     platform_fee_amount: platformFeeAmount > 0 ? platformFeeAmount : undefined,
                     platform_fee_label: platformFeeLabel,
