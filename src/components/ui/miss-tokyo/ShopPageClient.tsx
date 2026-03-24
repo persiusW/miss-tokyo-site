@@ -66,6 +66,10 @@ function ShopProductCard({
             ? product.price_ghs
             : null;
     const colors = product.available_colors ?? [];
+    const isOutOfStock = useMemo(() => {
+        if (product.track_inventory === false) return false;
+        return (product.inventory_count ?? 0) <= 0;
+    }, [product.track_inventory, product.inventory_count]);
 
     useEffect(() => {
         try {
@@ -126,7 +130,7 @@ function ShopProductCard({
                     )}
 
                     {/* Badge */}
-                    {product.inventory_count === 0 ? (
+                    {isOutOfStock ? (
                         <span
                             className="absolute top-[10px] left-[10px] z-10 text-[9px] font-medium tracking-[0.1em] uppercase px-2 py-[3px]"
                             style={{ borderRadius: 2, background: "#7A7167", color: "#fff" }}
@@ -159,10 +163,11 @@ function ShopProductCard({
                     {/* Quick Add — always visible on mobile, hover-only on desktop */}
                     <div className="absolute bottom-[10px] left-[10px] right-[10px] flex gap-[6px] z-10 md:opacity-0 md:translate-y-[6px] md:group-hover:opacity-100 md:group-hover:translate-y-0 md:transition-all md:duration-200">
                         <button
-                            disabled={product.inventory_count === 0}
+                            disabled={isOutOfStock}
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
+                                if (isOutOfStock) return;
                                 const hasVariants = (product.available_sizes?.length ?? 0) > 0 || (product.available_colors?.length ?? 0) > 0;
                                 if (hasVariants) { onQuickAdd(product); return; }
                                 addItem({
@@ -179,18 +184,18 @@ function ShopProductCard({
                                 setAddState("added");
                                 setTimeout(() => setAddState("idle"), 1500);
                             }}
-                            className="flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] transition-colors duration-150 disabled:cursor-not-allowed"
+                            className="flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-80"
                             style={{
-                                background: product.inventory_count === 0 ? "#E8D5C4" : addState === "added" ? "#22c55e" : "#fff",
-                                color: product.inventory_count === 0 ? "#7A7167" : addState === "added" ? "#fff" : "#141210",
+                                background: isOutOfStock ? "#E8D5C4" : addState === "added" ? "#22c55e" : "#fff",
+                                color: isOutOfStock ? "#7A7167" : addState === "added" ? "#fff" : "#141210",
                                 borderRadius: 2,
                                 border: "none",
                             }}
-                            onMouseEnter={e => { if (addState === "idle" && product.inventory_count > 0) { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
-                            onMouseLeave={e => { if (addState === "idle" && product.inventory_count > 0) { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; } }}
+                            onMouseEnter={e => { if (addState === "idle" && !isOutOfStock) { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
+                            onMouseLeave={e => { if (addState === "idle" && !isOutOfStock) { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; } }}
                         >
-                            {product.inventory_count === 0
-                                ? "Sold Out"
+                            {isOutOfStock
+                                ? "OUT OF STOCK"
                                 : addState === "added"
                                     ? <><Check size={12} strokeWidth={2.5} /> Added</>
                                     : <><ShoppingBag size={12} strokeWidth={1.8} /> Add to Cart</>
@@ -245,9 +250,25 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
     const [selectedSize, setSelectedSize] = useState("");
     const [adding, setAdding] = useState(false);
     const [added, setAdded] = useState(false);
+    const [variants, setVariants] = useState<any[]>([]);
     const colors = product.available_colors ?? [];
     const sizes = product.available_sizes ?? [];
     const isOnSale = !!(product.compare_at_price_ghs && product.compare_at_price_ghs > product.price_ghs);
+
+    // Fetch full variants if needed for strict Scenario C
+    useEffect(() => {
+        if (product.track_variant_inventory) {
+            import("@/lib/supabase").then(({ supabase }) => {
+                supabase
+                    .from("product_variants")
+                    .select("*")
+                    .eq("product_id", product.id)
+                    .then(({ data }: { data: any[] | null }) => {
+                        if (data) setVariants(data);
+                    });
+            });
+        }
+    }, [product.id, product.track_variant_inventory]);
 
     useEffect(() => {
         document.body.style.overflow = "hidden";
@@ -256,7 +277,19 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
         return () => { document.body.style.overflow = ""; document.removeEventListener("keydown", onKey); };
     }, [onClose]);
 
-    const isOutOfStock = product.inventory_count === 0;
+    const effectiveInventory = (() => {
+        if (!product.track_inventory) return 9999;
+        if (product.track_variant_inventory && variants.length > 0) {
+            const match = variants.find(v =>
+                (v.size ?? "") === selectedSize &&
+                (v.color ?? "") === selectedColor
+            );
+            return match?.inventory_count ?? 0;
+        }
+        return product.inventory_count;
+    })();
+
+    const isOutOfStock = effectiveInventory === 0;
 
     const handleAdd = () => {
         if (isOutOfStock) return;
@@ -272,7 +305,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
             color: selectedColor || undefined,
             quantity: 1,
             imageUrl: product.image_urls?.[0] || "",
-            inventoryCount: product.inventory_count,
+            inventoryCount: effectiveInventory,
         }, false);
         setAdding(false);
         setAdded(true);

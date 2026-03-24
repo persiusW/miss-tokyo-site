@@ -38,6 +38,7 @@ interface Props {
     wholesaleTiers?: WholesaleTiers;
     // Variant inventory
     trackVariantInventory?: boolean;
+    trackInventory?: boolean;
     productVariants?: ProductVariant[];
 }
 
@@ -97,6 +98,7 @@ export function ProductOptions(props: Props) {
         isWholesaler = false,
         wholesaleTiers,
         trackVariantInventory = false,
+        trackInventory = true,
         productVariants,
     } = props;
 
@@ -186,19 +188,23 @@ export function ProductOptions(props: Props) {
 
     /** Effective stock for the currently selected size + color combo */
     const effectiveInventory = useMemo(() => {
-        if (!trackVariantInventory || !productVariants?.length) return inventoryCount;
-        const match = productVariants.find(v =>
-            (v.size ?? "") === selectedSize &&
-            (v.color ?? "") === selectedColor
-        );
-        return match?.inventory_count ?? 0;
-    }, [trackVariantInventory, productVariants, selectedSize, selectedColor, inventoryCount]);
+        // Scenario A: If track_inventory is false, stock is infinite (sentinel 9999).
+        if (!trackInventory) return 9999;
+
+        // Scenario C: If track_variant_inventory is true, use per-combo variant data.
+        if (trackVariantInventory && productVariants?.length) {
+            const match = productVariants.find(v =>
+                (v.size ?? "") === selectedSize &&
+                (v.color ?? "") === selectedColor
+            );
+            return match?.inventory_count ?? 0;
+        }
+
+        // Scenario B: Traditional product-level inventory tracking.
+        return inventoryCount;
+    }, [trackInventory, trackVariantInventory, productVariants, selectedSize, selectedColor, inventoryCount]);
 
     // Out of stock when effectiveInventory is 0.
-    // effectiveInventory already handles both cases:
-    //   - variant tracking ON  → per-variant count for selected size+colour
-    //   - variant tracking OFF → product-level inventoryCount
-    // 9999 is the sentinel for "unlimited stock" and is never === 0.
     const isOutOfStock = effectiveInventory === 0;
     const [wishlisted, setWishlisted] = useState(false);
     const [sizeGuideOpen, setSizeGuideOpen] = useState(false);

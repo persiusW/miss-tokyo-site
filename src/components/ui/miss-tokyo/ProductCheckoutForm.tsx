@@ -17,6 +17,10 @@ interface ProductCheckoutFormProps {
     stitching: string[];
     availableSizes: string[] | null;
     wholesale?: WholesaleData | null;
+    trackInventory?: boolean;
+    trackVariantInventory?: boolean;
+    inventoryCount?: number;
+    productVariants?: any[];
     onAddedToCart?: () => void;
     openDrawerOnAdd?: boolean;
 }
@@ -24,7 +28,8 @@ interface ProductCheckoutFormProps {
 export function ProductCheckoutForm({
     productId, productName, productSlug, productImageUrl,
     priceNum, price, colors, stitching, availableSizes,
-    wholesale, onAddedToCart, openDrawerOnAdd,
+    wholesale, trackInventory = true, trackVariantInventory = false,
+    inventoryCount = 0, productVariants = [], onAddedToCart, openDrawerOnAdd,
 }: ProductCheckoutFormProps) {
     const { addItem } = useCart();
     const sizesToRender = (availableSizes && availableSizes.length > 0) ? availableSizes : ["39", "40", "41", "42", "43", "44", "45", "46"];
@@ -49,7 +54,23 @@ export function ProductCheckoutForm({
 
     const { perUnit, total, tier: activeTier } = getDisplayPrice();
 
+    // Inventory Logic
+    const effectiveInventory = (() => {
+        if (!trackInventory) return 9999;
+        if (trackVariantInventory && productVariants.length > 0) {
+            const match = productVariants.find(v =>
+                (v.size ?? "") === selectedSize &&
+                (v.color ?? "") === selectedColor
+            );
+            return match?.inventory_count ?? 0;
+        }
+        return inventoryCount;
+    })();
+
+    const isOutOfStock = effectiveInventory === 0;
+
     const handleAddToCart = () => {
+        if (isOutOfStock) return;
         if (!selectedSize) {
             const sizeSection = document.getElementById(`size-section-${productId}`);
             if (sizeSection) {
@@ -70,6 +91,7 @@ export function ProductCheckoutForm({
             stitching: selectedStitching,
             quantity,
             imageUrl: productImageUrl,
+            inventoryCount: effectiveInventory,
             ...(isWholesale ? { isWholesale: true } : {}),
         }, openDrawerOnAdd ?? true);
 
@@ -212,7 +234,15 @@ export function ProductCheckoutForm({
 
             {/* Add to cart */}
             <div className="pt-6 border-t border-neutral-100">
-                {isWholesale ? (
+                {isOutOfStock ? (
+                    <button
+                        type="button"
+                        disabled
+                        className="w-full py-6 bg-neutral-200 text-neutral-400 text-[11px] uppercase tracking-[0.4em] font-black cursor-not-allowed rounded-none"
+                    >
+                        Out of Stock
+                    </button>
+                ) : isWholesale ? (
                     <div className="space-y-3">
                         <div className="flex justify-between items-baseline px-1">
                             <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">

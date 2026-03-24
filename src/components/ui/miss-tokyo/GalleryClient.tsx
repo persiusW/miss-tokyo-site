@@ -58,7 +58,7 @@ function VideoCard({
     useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
 
     const handleQuickAdd = () => {
-        if (product.inventory_count === 0) return;
+        if (product.track_inventory && product.inventory_count === 0) return;
         if ((product.available_sizes?.length || 0) > 0 || (product.available_colors?.length || 0) > 0) {
             onOpenModal(product);
             return;
@@ -130,15 +130,17 @@ function VideoCard({
                     <div className="flex items-center gap-4">
                         <button
                             onClick={handleQuickAdd}
-                            disabled={addState !== "idle"}
+                            disabled={addState !== "idle" || (product.track_inventory && product.inventory_count === 0)}
                             className={`flex-1 text-[10px] font-bold uppercase tracking-[0.2em] py-4 rounded-none transition-all duration-300 flex items-center justify-center gap-2 ${
                                 addState === "success"
                                     ? "bg-emerald-600 text-white scale-[1.05]"
-                                    : "bg-white text-black hover:bg-neutral-100 disabled:opacity-80"
+                                    : (product.track_inventory && product.inventory_count === 0)
+                                        ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                                        : "bg-white text-black hover:bg-neutral-100 disabled:opacity-80"
                             }`}
                         >
-                            {addState === "loading" ? <Loader2 size={14} className="animate-spin" /> : addState === "success" ? <Check size={14} /> : <Plus size={14} />}
-                            {addState === "loading" ? "Adding..." : addState === "success" ? "Added!" : "Add to Cart"}
+                            {addState === "loading" ? <Loader2 size={14} className="animate-spin" /> : addState === "success" ? <Check size={14} /> : (product.track_inventory && product.inventory_count === 0) ? null : <Plus size={14} />}
+                            {addState === "loading" ? "Adding..." : addState === "success" ? "Added!" : (product.track_inventory && product.inventory_count === 0) ? "OUT OF STOCK" : "Add to Cart"}
                         </button>
                         <Link
                             href={`/products/${product.slug}`}
@@ -174,15 +176,17 @@ function VideoCard({
                     <div className="flex flex-col gap-4">
                         <button
                             onClick={handleQuickAdd}
-                            disabled={addState !== "idle"}
+                            disabled={addState !== "idle" || (product.track_inventory && product.inventory_count === 0)}
                             className={`w-full text-[11px] font-bold uppercase tracking-[0.3em] py-5 rounded-none transition-all duration-300 flex items-center justify-center gap-3 border shadow-sm ${
                                 addState === "success"
                                     ? "bg-emerald-600 text-white border-emerald-600 scale-105"
-                                    : "bg-black text-white border-black hover:bg-neutral-800 disabled:opacity-80"
+                                    : (product.track_inventory && product.inventory_count === 0)
+                                        ? "bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed"
+                                        : "bg-black text-white border-black hover:bg-neutral-800 disabled:opacity-80"
                             }`}
                         >
-                            {addState === "loading" ? <Loader2 size={16} className="animate-spin" /> : addState === "success" ? <Check size={16} /> : <Plus size={16} />}
-                            {addState === "loading" ? "Syncing..." : addState === "success" ? "Included in Bag" : "Buy this Piece"}
+                            {addState === "loading" ? <Loader2 size={16} className="animate-spin" /> : addState === "success" ? <Check size={16} /> : (product.track_inventory && product.inventory_count === 0) ? null : <Plus size={16} />}
+                            {addState === "loading" ? "Syncing..." : addState === "success" ? "Included in Bag" : (product.track_inventory && product.inventory_count === 0) ? "OUT OF STOCK" : "Buy this Piece"}
                         </button>
 
                         <Link
