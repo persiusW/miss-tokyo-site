@@ -97,7 +97,7 @@ export function CartDrawer() {
                                                 <Trash2 size={14} />
                                             </button>
                                         </div>
-                                        <p className="text-[10px] text-neutral-500 uppercase tracking-widest mb-1">Size: {item.size}</p>
+                                        <p className="text-[10px] text-neutral-500 uppercase tracking-widest mb-1">Size: {item.size}{item.color ? ` · ${item.color}` : ""}</p>
                                         {isWholesaleDiscounted && (
                                             <p className="text-[9px] text-emerald-600 uppercase tracking-widest mb-2 font-semibold">
                                                 Wholesale Rate Applied
