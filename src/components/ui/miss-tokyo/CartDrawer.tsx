@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useCart, getEffectivePrice } from "@/store/useCart";
 import { X, Trash2, Plus, Minus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { evaluateAutoDiscounts, type AutoDiscountResult } from "@/lib/autoDiscount";
 
 export function CartDrawer() {
     // PERF-18: granular selectors — each re-renders only when its slice changes
@@ -14,9 +15,34 @@ export function CartDrawer() {
     const removeItem = useCart(s => s.removeItem);
     const updateQuantity = useCart(s => s.updateQuantity);
     const [mounted, setMounted] = useState(false);
+    const [autoDiscountResult, setAutoDiscountResult] = useState<AutoDiscountResult | null>(null);
+    // Track the items fingerprint we last fetched for — avoids re-fetching on cart re-open
+    const lastFetchedKey = useRef<string>("");
     const router = useRouter();
 
     useEffect(() => { setMounted(true); }, []);
+
+    // Fetch auto discount preview only when items actually change
+    const fetchAutoDiscounts = useCallback(async () => {
+        if (!items.length) { setAutoDiscountResult(null); lastFetchedKey.current = ""; return; }
+        const productIds = [...new Set(items.map(i => i.productId))];
+        // Key = sorted product IDs + quantities so a qty change also triggers a re-fetch
+        const key = items.map(i => `${i.productId}:${i.quantity}`).sort().join(",");
+        if (key === lastFetchedKey.current) return; // same cart — skip
+        lastFetchedKey.current = key;
+        try {
+            const res = await fetch(`/api/checkout/auto-discount?productIds=${productIds.join(",")}`);
+            if (!res.ok) return;
+            const { rules, productCategoryMap } = await res.json();
+            setAutoDiscountResult(evaluateAutoDiscounts(items, rules, productCategoryMap));
+        } catch {
+            // Non-fatal — cart shows raw total if fetch fails
+        }
+    }, [items]);
+
+    useEffect(() => {
+        if (isOpen) fetchAutoDiscounts();
+    }, [isOpen, fetchAutoDiscounts]);
 
     if (!mounted || !isOpen) return null;
 
@@ -144,11 +170,67 @@ export function CartDrawer() {
 
                 {items.length > 0 && (
                     <div className="p-6 border-t border-neutral-100 bg-white space-y-4">
-                        <div className="flex justify-between items-center text-lg">
-                            <span className="font-serif tracking-widest uppercase">Total</span>
-                            <span className="font-medium">GHS {total.toFixed(2)}</span>
-                        </div>
+                        {/* Pricing breakdown — only shown when there's something to break down */}
+                        {(() => {
+                            const autoDiscount = autoDiscountResult?.totalAutoDiscount ?? 0;
+                            const hasWholesale = items.some(i => i.isWholesale && getEffectivePrice(i) < i.price);
+                            const showBreakdown = autoDiscount > 0 || hasWholesale;
+
+                            if (!showBreakdown) {
+                                return (
+                                    <div className="flex justify-between items-center text-lg">
+                                        <span className="font-serif tracking-widest uppercase">Total</span>
+                                        <span className="font-medium">GHS {total.toFixed(2)}</span>
+                                    </div>
+                                );
+                            }
+
+                            const retailSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+                            const finalTotal = Math.max(0, total - autoDiscount);
+                            const totalSavings = parseFloat((retailSubtotal - finalTotal).toFixed(2));
+
+                            return (
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-sm text-neutral-500">
+                                        <span className="uppercase tracking-widest text-xs">Subtotal</span>
+                                        <span>GHS {total.toFixed(2)}</span>
+                                    </div>
+
+                                    {hasWholesale && (
+                                        <div className="flex justify-between items-center text-xs text-emerald-600">
+                                            <span className="uppercase tracking-widest">Wholesale pricing</span>
+                                            <span>−GHS {(retailSubtotal - total).toFixed(2)}</span>
+                                        </div>
+                                    )}
+
+                                    {autoDiscount > 0 && autoDiscountResult?.appliedRules.map(rule => (
+                                        <div key={rule.id} className="flex justify-between items-center text-xs text-green-600">
+                                            <span className="uppercase tracking-widest">{rule.title}</span>
+                                            <span>−GHS {rule.discountAmount.toFixed(2)}</span>
+                                        </div>
+                                    ))}
+
+                                    <div className="flex justify-between items-center text-lg pt-2 border-t border-neutral-100">
+                                        <span className="font-serif tracking-widest uppercase">Total</span>
+                                        <span className="font-medium">GHS {finalTotal.toFixed(2)}</span>
+                                    </div>
+
+                                    {totalSavings > 0 && (
+                                        <p className="text-[10px] text-center text-green-600 font-semibold uppercase tracking-widest">
+                                            You save GHS {totalSavings.toFixed(2)}
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })()}
                         <p className="text-[10px] text-neutral-400 uppercase tracking-widest text-center">Shipping and taxes calculated at checkout.</p>
+
+                        {/* Auto discount nudges */}
+                        {autoDiscountResult?.nearMisses.map(miss => (
+                            <p key={miss.id} className="text-[10px] text-center text-amber-600 font-semibold uppercase tracking-widest">
+                                Add {miss.needed} more {miss.targetLabel} to unlock &ldquo;{miss.title}&rdquo;
+                            </p>
+                        ))}
 
                         <button
                             onClick={() => {

@@ -68,6 +68,7 @@ export function AdminSidebar({ isFullAccess, showCustomRequests, businessName }:
         { label: "Orders", href: "/sales/orders" },
         { label: "Abandoned Carts", href: "/customers/abandoned" },
         { label: "Discounts", href: "/catalog/discounts" },
+        { label: "Auto Discounts", href: "/catalog/auto-discounts" },
         { label: "Gift Cards", href: "/catalog/gift-cards" },
         ...(isFullAccess
             ? [

@@ -198,6 +198,7 @@ export async function POST(req: Request) {
                 whatsapp, instagram, snapchat, deliveryMethod, cartItems,
                 platform_fee_amount, platform_fee_label,
                 discount_code, discount_amount, discount_tag,
+                auto_discount_ids,
             } = metadata;
 
             // ── Idempotency Check ─────────────────────────────────────────────
@@ -462,6 +463,28 @@ export async function POST(req: Request) {
                     const orderRef = orderId.substring(0, 8).toUpperCase();
                     if (!emailAlreadySent) console.log('Webhook triggered email for order:', orderId);
                     
+                    // Increment auto discount usage counts (non-fatal)
+                    if (!isAlreadyProcessed && Array.isArray(auto_discount_ids) && auto_discount_ids.length > 0) {
+                        try {
+                            const { data: aRules } = await supabaseAdmin
+                                .from("automatic_discounts")
+                                .select("id, usage_count")
+                                .in("id", auto_discount_ids as string[]);
+                            if (aRules?.length) {
+                                await Promise.allSettled(
+                                    aRules.map(r =>
+                                        supabaseAdmin
+                                            .from("automatic_discounts")
+                                            .update({ usage_count: (r.usage_count || 0) + 1 })
+                                            .eq("id", r.id)
+                                    )
+                                );
+                            }
+                        } catch (e) {
+                            console.warn("[webhook] auto discount usage increment failed:", e);
+                        }
+                    }
+
                     const [emailResult, , smsResult, pushResult] = await Promise.allSettled([
                         emailAlreadySent ? Promise.resolve() : sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
                         isAlreadyProcessed ? Promise.resolve() : trackDiscountUsage(discount_code, discount_tag),

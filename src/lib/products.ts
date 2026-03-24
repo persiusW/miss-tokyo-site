@@ -211,8 +211,7 @@ export interface RatingDistribution {
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
-    const db = createClient();
-    const { data, error } = await db
+    const { data, error } = await supabaseAdmin
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
@@ -336,17 +335,15 @@ export function deriveSizes(products: ShopProduct[]): string[] {
 export const VIDEO_BATCH_SIZE = 20;
 
 // ── Static generation helper ───────────────────────────────────────────────
-// Used by generateStaticParams to pre-build the most recent product pages at
-// deploy time. Capped at 50 to keep builds fast — ISR (revalidate=60) handles
-// the rest on first request. Returns [] on error so builds don't hang if DB is slow.
+// Used by generateStaticParams to pre-build all active product pages at deploy
+// time. Returns [] on error so builds don't hang if DB is slow.
 export async function getAllProductSlugs(): Promise<string[]> {
     try {
         const { data } = await supabaseAdmin
             .from("products")
             .select("slug")
             .or("is_active.eq.true,is_active.is.null")
-            .order("created_at", { ascending: false })
-            .limit(50);
+            .order("created_at", { ascending: false });
         return (data ?? []).map((p: { slug: string }) => p.slug).filter(Boolean);
     } catch {
         return [];

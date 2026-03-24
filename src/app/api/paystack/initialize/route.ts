@@ -91,10 +91,69 @@ export async function POST(request: Request) {
             }
         }
 
-        // Apply discount server-side
-        const discountAmount = Number(clientMetadata?.discount_amount) || 0;
-        if (discountAmount > 0) {
-            amountInGHS = Math.max(0, parseFloat((amountInGHS - discountAmount).toFixed(2)));
+        // Apply automatic discounts server-side (re-evaluated independently of client)
+        let autoDiscountAmount = 0;
+        let autoDiscountLabel = "";
+        let appliedAutoDiscountIds: string[] = [];
+        if (cartArr.length > 0) {
+            const { evaluateAutoDiscounts } = await import("@/lib/autoDiscount");
+
+            // Fetch active rules
+            const { data: autoRules } = await supabaseAdmin
+                .from("automatic_discounts")
+                .select("id, title, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope, min_order_amount")
+                .eq("is_active", true)
+                .lte("starts_at", new Date().toISOString())
+                .or("ends_at.is.null,ends_at.gt." + new Date().toISOString());
+
+            if (autoRules && autoRules.length > 0) {
+                // Build productCategoryMap for category-scoped rules
+                const hasCategoryRules = autoRules.some((r: any) => r.applies_to === "SPECIFIC_CATEGORIES");
+                let productCategoryMap: Record<string, string[]> = {};
+
+                if (hasCategoryRules) {
+                    const cartProductIds = cartArr.map((i: any) => i.productId).filter(Boolean);
+                    const { data: prods } = await supabaseAdmin
+                        .from("products")
+                        .select("id, category_ids")
+                        .in("id", cartProductIds);
+                    for (const p of prods ?? []) {
+                        productCategoryMap[p.id] = Array.isArray(p.category_ids) ? p.category_ids : [];
+                    }
+                }
+
+                const autoResult = evaluateAutoDiscounts(cartArr, autoRules as any, productCategoryMap);
+                autoDiscountAmount = autoResult.totalAutoDiscount;
+                autoDiscountLabel = autoResult.label;
+                appliedAutoDiscountIds = autoResult.appliedRules.map(r => r.id);
+
+                if (autoDiscountAmount > 0) {
+                    amountInGHS = Math.max(0, parseFloat((amountInGHS - autoDiscountAmount).toFixed(2)));
+                }
+
+                // Coupon only applies to items NOT covered by auto discounts
+                const allCovered = cartArr.every(i => autoResult.coveredProductIds.has(i.productId));
+                if (allCovered) {
+                    // Block coupon when everything is auto-discounted
+                } else {
+                    const discountAmount = Number(clientMetadata?.discount_amount) || 0;
+                    if (discountAmount > 0) {
+                        amountInGHS = Math.max(0, parseFloat((amountInGHS - discountAmount).toFixed(2)));
+                    }
+                }
+            } else {
+                // No auto discount rules — apply manual coupon normally
+                const discountAmount = Number(clientMetadata?.discount_amount) || 0;
+                if (discountAmount > 0) {
+                    amountInGHS = Math.max(0, parseFloat((amountInGHS - discountAmount).toFixed(2)));
+                }
+            }
+        } else {
+            // Single product flow — apply manual discount normally
+            const discountAmount = Number(clientMetadata?.discount_amount) || 0;
+            if (discountAmount > 0) {
+                amountInGHS = Math.max(0, parseFloat((amountInGHS - discountAmount).toFixed(2)));
+            }
         }
 
         if (amountInGHS <= 0) {
@@ -142,6 +201,8 @@ export async function POST(request: Request) {
                 items: cartArr,
                 discount_code: clientMetadata?.discount_code || null,
                 discount_amount: Number(clientMetadata?.discount_amount) || 0,
+                auto_discount_title: autoDiscountLabel || null,
+                auto_discount_amount: autoDiscountAmount,
                 customer_metadata: {
                     whatsapp: clientMetadata?.whatsapp || null,
                     instagram: clientMetadata?.instagram || null,
@@ -196,6 +257,10 @@ export async function POST(request: Request) {
                     // Override client-supplied fee values with server-calculated ones
                     platform_fee_amount: platformFeeAmount > 0 ? platformFeeAmount : undefined,
                     platform_fee_label: platformFeeLabel,
+                    // Auto discount IDs for usage tracking in webhook
+                    ...(appliedAutoDiscountIds.length > 0 ? {
+                        auto_discount_ids: appliedAutoDiscountIds,
+                    } : {}),
                 },
             }),
         });

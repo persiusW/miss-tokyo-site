@@ -11,6 +11,12 @@ const nextConfig: NextConfig = {
       { source: "/shop/sale",         destination: "/shop?sale=true",    permanent: true },
       { source: "/shop/new-arrivals", destination: "/shop?sort=newest",  permanent: true },
       { source: "/new-arrivals",      destination: "/shop?sort=newest",  permanent: true },
+      // Old Wix product-page URLs → new /products/ route
+      { source: "/product-page/:slug*", destination: "/products/:slug*", permanent: true },
+      // Old Wix /category/:slug → shop filter page
+      { source: "/category/:slug",      destination: "/shop?category=:slug", permanent: true },
+      // Wix static pages with no Next.js equivalent
+      { source: "/accessibility-statement", destination: "/",            permanent: false },
     ];
   },
   poweredByHeader: false, // SPD-12: suppress X-Powered-By header

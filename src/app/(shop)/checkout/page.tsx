@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useCart, getEffectivePrice } from "@/store/useCart";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
+import { evaluateAutoDiscounts, type AutoDiscountResult } from "@/lib/autoDiscount";
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
@@ -79,6 +80,9 @@ export default function CheckoutPage() {
     // Validation errors
     const [errors, setErrors] = useState<Record<string, string>>({});
 
+    // Automatic discounts
+    const [autoDiscountResult, setAutoDiscountResult] = useState<AutoDiscountResult | null>(null);
+
     // Discount / Gift Card
     const [discountInput, setDiscountInput] = useState("");
     const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
@@ -112,6 +116,27 @@ export default function CheckoutPage() {
         });
     }, []);
 
+    const lastFetchedKey = useRef<string>("");
+
+    // Fetch automatic discount rules — skips if cart contents haven't changed
+    const fetchAutoDiscounts = useCallback(async () => {
+        if (!items.length) { setAutoDiscountResult(null); lastFetchedKey.current = ""; return; }
+        const key = items.map(i => `${i.productId}:${i.quantity}`).sort().join(",");
+        if (key === lastFetchedKey.current) return;
+        lastFetchedKey.current = key;
+        const productIds = [...new Set(items.map(i => i.productId))].join(",");
+        try {
+            const res = await fetch(`/api/checkout/auto-discount?productIds=${productIds}`);
+            if (!res.ok) return;
+            const { rules, productCategoryMap } = await res.json();
+            setAutoDiscountResult(evaluateAutoDiscounts(items, rules, productCategoryMap));
+        } catch {
+            // Non-fatal — auto discounts simply won't show
+        }
+    }, [items]);
+
+    useEffect(() => { fetchAutoDiscounts(); }, [fetchAutoDiscounts]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         const checked = (e.target as HTMLInputElement).checked;
@@ -141,17 +166,37 @@ export default function CheckoutPage() {
         return newErrors;
     };
 
+    // ── Auto discount helpers ──────────────────────────────────────────────────
+
+    const autoDiscount = autoDiscountResult?.totalAutoDiscount ?? 0;
+    const coveredProductIds = autoDiscountResult?.coveredProductIds ?? new Set<string>();
+    const allItemsCovered = items.length > 0 && items.every(i => coveredProductIds.has(i.productId));
+
+    // Subtotal of items NOT covered by an automatic discount (coupon applies to these only)
+    const remainingSubtotal = mounted
+        ? items.reduce((s, i) => {
+              if (coveredProductIds.has(i.productId)) return s;
+              return s + getEffectivePrice(i) * i.quantity;
+          }, 0)
+        : 0;
+
     // ── Discount code logic ────────────────────────────────────────────────────
 
     const applyCode = async () => {
         if (!discountInput.trim()) return;
+        // Gate: if every cart item is already auto-discounted, block manual codes
+        if (allItemsCovered) {
+            setCodeError("Discounts can't be stacked — your cart already has an automatic discount applied.");
+            return;
+        }
         setCodeLoading(true);
         setCodeError("");
         try {
             const res = await fetch("/api/checkout/validate-code", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ code: discountInput.trim(), subtotal }),
+                // Validate against the uncovered portion of the cart only
+                body: JSON.stringify({ code: discountInput.trim(), subtotal: remainingSubtotal }),
             });
             const data = await res.json();
             if (data.valid) {
@@ -176,7 +221,9 @@ export default function CheckoutPage() {
 
     const subtotal = mounted ? totalAmount() : 0;
     const discountAmount = appliedDiscount?.discount_amount ?? 0;
-    const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+    // autoDiscount, allItemsCovered, remainingSubtotal computed above (after fetchAutoDiscounts)
+    const afterAutoDiscount = Math.max(0, subtotal - autoDiscount);
+    const discountedSubtotal = Math.max(0, afterAutoDiscount - discountAmount);
     const feeAmount = parseFloat((discountedSubtotal * (feeSettings.platform_fee_percentage / 100)).toFixed(2));
     const finalTotal = parseFloat((discountedSubtotal + feeAmount).toFixed(2));
 
@@ -207,10 +254,15 @@ export default function CheckoutPage() {
                     deliveryMethod: form.deliveryMethod,
                     platform_fee_amount: feeAmount,
                     platform_fee_label: feeSettings.platform_fee_label,
-                    ...(appliedDiscount ? {
+                    ...(appliedDiscount && !allItemsCovered ? {
                         discount_code: appliedDiscount.code,
                         discount_amount: appliedDiscount.discount_amount,
                         discount_tag: appliedDiscount.type,
+                    } : {}),
+                    ...(autoDiscountResult && autoDiscountResult.appliedRules.length > 0 ? {
+                        auto_discount_ids: autoDiscountResult.appliedRules.map(r => r.id),
+                        auto_discount_amount: autoDiscountResult.totalAutoDiscount,
+                        auto_discount_label: autoDiscountResult.label,
                     } : {}),
                 },
             };
@@ -446,6 +498,21 @@ export default function CheckoutPage() {
                     ))}
                 </div>
 
+                {/* Automatic discount badges */}
+                {autoDiscountResult && autoDiscountResult.appliedRules.length > 0 && (
+                    <div className="space-y-2">
+                        {autoDiscountResult.appliedRules.map(rule => (
+                            <div key={rule.id} className="flex items-center justify-between bg-green-50 border border-green-200 px-4 py-2.5">
+                                <div>
+                                    <p className="text-[10px] font-semibold text-green-700 uppercase tracking-widest">Auto Discount</p>
+                                    <p className="text-xs text-green-600 mt-0.5">{rule.title}</p>
+                                </div>
+                                <span className="text-sm font-medium text-green-700">−GHS {rule.discountAmount.toFixed(2)}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {/* Discount / Gift Card input */}
                 <div className="space-y-3">
                     <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Gift Card or Discount Code</p>
@@ -491,10 +558,17 @@ export default function CheckoutPage() {
                         <span>GHS {subtotal.toFixed(2)}</span>
                     </div>
 
+                    {autoDiscount > 0 && (
+                        <div className="flex justify-between items-center text-sm text-green-600">
+                            <span className="uppercase tracking-widest text-xs">Auto Discount</span>
+                            <span>−GHS {autoDiscount.toFixed(2)}</span>
+                        </div>
+                    )}
+
                     {appliedDiscount && discountAmount > 0 && (
                         <div className="flex justify-between items-center text-sm text-green-600">
                             <span className="uppercase tracking-widest text-xs">Discount ({appliedDiscount.code})</span>
-                            <span>-GHS {discountAmount.toFixed(2)}</span>
+                            <span>−GHS {discountAmount.toFixed(2)}</span>
                         </div>
                     )}
 
