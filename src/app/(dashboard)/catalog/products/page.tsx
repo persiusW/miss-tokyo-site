@@ -67,10 +67,10 @@ export default function CatalogProductsPage() {
     };
 
     const handleToggleActive = async (id: string, current: boolean) => {
-        const res = await fetch(`/api/admin/products/${id}`, {
+        const res = await fetch("/api/admin/products", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ is_active: !current }),
+            body: JSON.stringify({ id, is_active: !current }),
         });
         if (!res.ok) {
             toast.error("Failed to update visibility.");
