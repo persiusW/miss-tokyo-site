@@ -54,14 +54,22 @@ export function ProductCheckoutForm({
 
     const { perUnit, total, tier: activeTier } = getDisplayPrice();
 
+    // Normalise a size label to its root for fuzzy matching.
+    // "M — 10" → "M", "Free Size" → "Free Size", "M" → "M"
+    const sizeKey = (s: string) => s.split(" — ")[0].trim();
+
     // Inventory Logic
     const effectiveInventory = (() => {
         if (!trackInventory) return 9999;
         if (trackVariantInventory && productVariants.length > 0) {
-            const match = productVariants.find(v =>
-                (v.size ?? "") === selectedSize &&
+            // Match by root size key so "M" and "M — 10" resolve to the same variant.
+            // When duplicates exist (e.g. stale zero-stock + current labelled entry),
+            // prefer the one with available inventory.
+            const matches = productVariants.filter(v =>
+                sizeKey(v.size ?? "") === sizeKey(selectedSize) &&
                 (v.color ?? "") === selectedColor
             );
+            const match = matches.find(v => (v.inventory_count ?? 0) > 0) ?? matches[0];
             return match?.inventory_count ?? 0;
         }
         return inventoryCount;
