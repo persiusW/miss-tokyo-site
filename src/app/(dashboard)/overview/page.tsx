@@ -28,7 +28,7 @@ export default async function DashboardOverviewPage() {
     ] = await Promise.all([
         fetchOrderStats(),
         fetchRecentActivity(5),
-        supabase.from("products").select("id").eq("is_active", true),
+        supabase.from("products").select("id, category_type").eq("is_active", true),
         supabase.from("orders").select("status"),
         supabase.from("products")
             .select("id, name, inventory_count")
