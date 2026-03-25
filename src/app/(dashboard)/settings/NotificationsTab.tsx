@@ -53,7 +53,7 @@ export function NotificationsTab() {
     const [template, setTemplate]         = useState<PushTemplate>({ title: DEFAULT_TITLE, body: DEFAULT_BODY });
     const [saving, setSaving]             = useState(false);
     const [testSending, setTestSending]   = useState(false);
-    const [vapidConfigured, setVapidConfigured] = useState(true);
+    const [vapidConfigured, setVapidConfigured] = useState(() => !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
 
     useEffect(() => {
