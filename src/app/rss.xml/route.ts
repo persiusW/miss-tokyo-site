@@ -17,14 +17,14 @@ export async function GET() {
 
     const { data: products } = await supabaseAdmin
         .from("products")
-        .select("name, slug, description, images, created_at")
+        .select("name, slug, description, image_urls, created_at")
         .eq("is_active", true)
         .eq("is_wholesale_only", false)
         .order("created_at", { ascending: false })
         .limit(20);
 
     const items = (products ?? []).map(p => {
-        const imageUrl = Array.isArray(p.images) ? p.images[0] : null;
+        const imageUrl = Array.isArray(p.image_urls) ? p.image_urls[0] : null;
         const desc = [
             p.description ? esc(p.description) : "",
             imageUrl ? `<br/><img src="${esc(imageUrl)}" alt="${esc(p.name)}" style="max-width:100%;" />` : "",

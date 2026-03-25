@@ -69,7 +69,7 @@ function toInputDate(d: Date) {
 }
 
 // ─── Aggregation helpers ──────────────────────────────────────────────────────
-type RawOrder = { id: string; status: string; total_amount: number; items: any; created_at: string };
+type RawOrder = { id: string; status: string; total_amount: number; items: any; created_at: string; customer_email?: string; customer_name?: string };
 
 function aggregateData(orders: RawOrder[], allOrders: RawOrder[]) {
     const revenueOrders = orders.filter(o => REVENUE_STATUSES.includes(o.status));
@@ -148,6 +148,13 @@ export default function AnalyticsPage() {
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [itemsSold, setItemsSold] = useState(0);
     const [totalOrders, setTotalOrders] = useState(0);
+    const [insightsData, setInsightsData] = useState<{
+        uniqueCustomers: number;
+        repeatBuyers: number;
+        repeatRate: number;
+        topCustomers: { email: string; name: string; orders: number; revenue: number }[];
+        avgRevenuePerCustomer: number;
+    } | null>(null);
 
     const dateRange = preset === "custom"
         ? { start: new Date(customStart), end: new Date(customEnd + "T23:59:59") }
@@ -163,7 +170,7 @@ export default function AnalyticsPage() {
 
         const { data: allOrders } = await supabase
             .from("orders")
-            .select("id, status, total_amount, items, created_at")
+            .select("id, status, total_amount, items, created_at, customer_email, customer_name")
             .gte("created_at", start.toISOString())
             .lte("created_at", end.toISOString())
             .order("created_at");
@@ -180,6 +187,32 @@ export default function AnalyticsPage() {
         setTotalRevenue(agg.totalRevenue);
         setItemsSold(agg.itemsSold);
         setTotalOrders(rows.length);
+        // Compute customer insights
+        const revenueRowsForInsights = rows.filter(o => REVENUE_STATUSES.includes(o.status));
+        const customerMap: Record<string, { name: string; orders: number; revenue: number }> = {};
+        for (const o of rows) {
+            const email = o.customer_email || "unknown";
+            if (!customerMap[email]) customerMap[email] = { name: o.customer_name || email, orders: 0, revenue: 0 };
+            customerMap[email].orders += 1;
+        }
+        for (const o of revenueRowsForInsights) {
+            const email = o.customer_email || "unknown";
+            if (customerMap[email]) customerMap[email].revenue += Number(o.total_amount ?? 0);
+        }
+        const allCustomers = Object.entries(customerMap);
+        const uniqueCustomers = allCustomers.length;
+        const repeatBuyers = allCustomers.filter(([, v]) => v.orders > 1).length;
+        const totalRevForAvg = revenueRowsForInsights.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
+        setInsightsData({
+            uniqueCustomers,
+            repeatBuyers,
+            repeatRate: uniqueCustomers > 0 ? Math.round((repeatBuyers / uniqueCustomers) * 100) : 0,
+            topCustomers: allCustomers
+                .sort(([, a], [, b]) => b.orders - a.orders)
+                .slice(0, 5)
+                .map(([email, v]) => ({ email, name: v.name, orders: v.orders, revenue: v.revenue })),
+            avgRevenuePerCustomer: uniqueCustomers > 0 ? totalRevForAvg / uniqueCustomers : 0,
+        });
         setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [preset, customStart, customEnd]);
@@ -323,12 +356,58 @@ export default function AnalyticsPage() {
             )}
 
             {activeTab === "insights" && (
-                <div className="bg-white rounded-2xl shadow-sm p-12 text-center space-y-4">
-                    <Lightbulb size={40} className="mx-auto text-neutral-200" />
-                    <p className="font-serif text-xl text-neutral-400">Behavioral Insights</p>
-                    <p className="text-[10px] uppercase tracking-widest text-neutral-300">
-                        Cart abandonment patterns, repeat customers, and cohort analysis coming soon.
-                    </p>
+                <div className="space-y-6">
+                    {loading || !insightsData ? (
+                        <div className="bg-white rounded-2xl shadow-sm h-48 animate-pulse" />
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {[
+                                    { label: "Unique Customers", value: String(insightsData.uniqueCustomers) },
+                                    { label: "Repeat Buyers", value: String(insightsData.repeatBuyers) },
+                                    { label: "Repeat Rate", value: `${insightsData.repeatRate}%` },
+                                    { label: "Avg Rev / Customer", value: `GH₵ ${insightsData.avgRevenuePerCustomer.toFixed(2)}` },
+                                ].map(({ label, value }) => (
+                                    <div key={label} className="bg-white rounded-2xl shadow-sm p-5">
+                                        <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold block mb-3">{label}</span>
+                                        <span className="text-2xl font-serif text-neutral-900">{value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            {insightsData.topCustomers.length > 0 && (
+                                <div className="bg-white rounded-2xl shadow-sm p-6">
+                                    <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Top Customers by Order Count</h2>
+                                    <table className="w-full text-left text-sm">
+                                        <thead>
+                                            <tr className="border-b border-neutral-100">
+                                                <th className="pb-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">Customer</th>
+                                                <th className="pb-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold text-right">Orders</th>
+                                                <th className="pb-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold text-right">Revenue</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-50">
+                                            {insightsData.topCustomers.map((c, i) => (
+                                                <tr key={i} className="hover:bg-neutral-50 transition-colors">
+                                                    <td className="py-3">
+                                                        <div className="font-medium text-neutral-900">{c.name !== c.email ? c.name : "—"}</div>
+                                                        <div className="text-[11px] text-neutral-400 font-mono">{c.email}</div>
+                                                    </td>
+                                                    <td className="py-3 text-right font-semibold text-neutral-800">{c.orders}</td>
+                                                    <td className="py-3 text-right font-mono text-neutral-700">GH₵ {c.revenue.toFixed(2)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                            {insightsData.uniqueCustomers === 0 && (
+                                <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+                                    <Lightbulb size={40} className="mx-auto text-neutral-200 mb-4" />
+                                    <p className="text-neutral-400 italic font-serif">No order data for this period.</p>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
             )}
         </div>

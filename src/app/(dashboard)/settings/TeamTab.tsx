@@ -55,6 +55,8 @@ const ROLE_COLORS: Record<string, string> = {
     sales_staff: "bg-neutral-100 text-neutral-700"
 };
 
+const DASHBOARD_ROLES = ["owner", "admin", "sales_staff"] as const;
+
 export function TeamTab() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<"members" | "pending" | "logs">("members");
@@ -87,10 +89,10 @@ export function TeamTab() {
             const { data } = await supabase
                 .from("profiles")
                 .select("id, email, full_name, role, created_at")
+                .in("role", DASHBOARD_ROLES)
                 .order("created_at", { ascending: true });
             if (data) {
                 setMembers(data);
-                setAllStaff(data.map((d: any) => ({ id: d.id, full_name: d.full_name || d.email })));
             }
         } else if (activeTab === "pending") {
             const { data } = await supabase
@@ -142,6 +144,21 @@ export function TeamTab() {
             fetchData(true);
         }
     }, [page]);
+
+    // Fetch staff list for logs filter — dashboard roles only, independent of active tab
+    useEffect(() => {
+        const fetchStaff = async () => {
+            const { data } = await supabase
+                .from("profiles")
+                .select("id, full_name, email, role")
+                .in("role", DASHBOARD_ROLES)
+                .order("full_name", { ascending: true });
+            if (data) {
+                setAllStaff(data.map((d: any) => ({ id: d.id, full_name: d.full_name || d.email })));
+            }
+        };
+        fetchStaff();
+    }, []); // empty deps — runs once on mount
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
