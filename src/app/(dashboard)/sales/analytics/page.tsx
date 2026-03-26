@@ -195,14 +195,14 @@ export default function AnalyticsPage() {
             if (!customerMap[email]) customerMap[email] = { name: o.customer_name || email, orders: 0, revenue: 0 };
             customerMap[email].orders += 1;
         }
-        for (const o of revenueRowsForInsights) {
+        for (const o of rows) {
             const email = o.customer_email || "unknown";
             if (customerMap[email]) customerMap[email].revenue += Number(o.total_amount ?? 0);
         }
         const allCustomers = Object.entries(customerMap);
         const uniqueCustomers = allCustomers.length;
         const repeatBuyers = allCustomers.filter(([, v]) => v.orders > 1).length;
-        const totalRevForAvg = revenueRowsForInsights.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
+        const totalRevForAvg = allCustomers.reduce((s, [, v]) => s + v.revenue, 0);
         setInsightsData({
             uniqueCustomers,
             repeatBuyers,
