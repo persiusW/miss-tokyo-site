@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { Analytics } from '@vercel/analytics/next';
 
 const geistSans = localFont({
   src: "../../public/fonts/geist.woff2",
@@ -82,6 +83,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${playfairDisplay.variable} ${cinzel.variable} antialiased font-[family-name:var(--font-cinzel)]`}
       >
         {children}
+        <Analytics />
       </body>
     </html>
   );
