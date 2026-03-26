@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     const bizName   = process.env.BIZ_NAME || "Miss Tokyo";
     const baseUrl   = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
-    const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "info@info.misstokyo.shop";
     const firstName = name?.split(" ")[0] || "there";
 
     // Generate a magic invite link (creates user without sending Supabase's default email)

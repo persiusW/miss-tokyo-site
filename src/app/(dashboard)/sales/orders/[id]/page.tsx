@@ -218,15 +218,31 @@ export default function OrderDetailPage() {
     const updateStatus = async (newStatus: string) => {
         if (!order) return;
         setUpdating(true);
+        if (newStatus === "fulfilled" || newStatus === "cancelled") setNotifStatus("sending");
         
         const res = await updateOrderStatus(order.id, newStatus);
         
         if (!res.success) {
             toast.error(res.error || "Failed to update status.");
+            setNotifStatus("idle");
         } else {
-            // Optimistic update was local, but we know it worked now
             setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
             toast.success(`Status updated to ${newStatus}.`);
+
+            // Trigger Email/SMS
+            if (newStatus === "fulfilled" || newStatus === "cancelled") {
+                try {
+                    await fetch("/api/email/fulfillment", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ orderId: order.id, type: newStatus }),
+                    });
+                    setNotifStatus("sent");
+                } catch (e) {
+                    console.error("Auto-email failed:", e);
+                    setNotifStatus("idle");
+                }
+            }
         }
         setUpdating(false);
     };

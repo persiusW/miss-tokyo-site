@@ -278,6 +278,17 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
             toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} → ${status}.`);
             setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, ...updateData } : o));
             setSelected(new Set());
+
+            // Trigger Email/SMS
+            if (status === "fulfilled" || status === "cancelled") {
+                ids.forEach(orderId => {
+                    fetch("/api/email/fulfillment", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ orderId, type: status }),
+                    }).catch(err => console.error("Auto-email failed for", orderId, err));
+                });
+            }
         }
         setBulkLoading(false);
     };

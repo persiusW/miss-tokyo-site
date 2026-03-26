@@ -67,5 +67,6 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
 
     revalidatePath(`/sales/orders/${orderId}`, "page");
     revalidatePath("/sales/orders", "page");
+
     return { success: true };
 }

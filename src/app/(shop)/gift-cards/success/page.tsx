@@ -48,7 +48,7 @@ async function activateGiftCard(reference: string) {
                 .single();
 
             const bizName = biz?.business_name || "Miss Tokyo";
-            const fromEmail = process.env.RESEND_FROM_EMAIL || biz?.email || "orders@info.misstokyo.shop";
+            const fromEmail = process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop";
             const storeUrl = biz?.website_url || process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
             const amtNum = Number(amount) || Number(tx.amount) / 100;
 

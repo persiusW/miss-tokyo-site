@@ -93,7 +93,7 @@ export async function POST(req: Request) {
 </body>
 </html>`;
 
-        const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+        const fromEmail = process.env.RESEND_FROM_EMAIL || "info@info.misstokyo.shop";
         const result = await sendEmail({
             to: email,
             subject: `[TEST] ${subj}`,
