@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   if (couponEnabled && settings?.store_email) {
     try {
       const bizName = settings.store_name || "Miss Tokyo";
-      const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "info@info.misstokyo.shop";
       const html = `
 <!DOCTYPE html><html><body style="font-family: Georgia, serif; background: #fafaf9; margin: 0; padding: 40px 20px;">
   <div style="max-width: 560px; margin: 0 auto; background: white; border: 1px solid #e5e5e5; padding: 48px;">

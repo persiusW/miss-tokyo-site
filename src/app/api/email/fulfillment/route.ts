@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
         if (isPickup) {
             // ── Ready for Pickup email ─────────────────────────────────────────
             await getResend().emails.send({
-                from: `${bizName} <${process.env.RESEND_FROM_EMAIL || "no-reply@resend.dev"}>`,
+                from: `${bizName} <${process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop"}>`,
                 to: [order.customer_email],
                 subject: `Your order #${orderRef} is ready for pickup!`,
                 html: `
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
         } else {
             // ── Shipped email ──────────────────────────────────────────────────
             await getResend().emails.send({
-                from: `${bizName} <${process.env.RESEND_FROM_EMAIL || "no-reply@resend.dev"}>`,
+                from: `${bizName} <${process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop"}>`,
                 to: [order.customer_email],
                 subject: `Your Order Has Shipped — #${orderRef}`,
                 html: `

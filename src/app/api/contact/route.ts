@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     const storeEmail = settings?.store_email || biz?.email || process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
     const storeName = biz?.business_name || settings?.store_name || "Miss Tokyo";
-    const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "info@info.misstokyo.shop";
     const resendKey = process.env.RESEND_API_KEY;
 
     if (resendKey) {

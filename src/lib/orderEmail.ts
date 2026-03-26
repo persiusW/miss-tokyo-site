@@ -127,7 +127,7 @@ export async function sendOrderConfirmation(opts: {
     </a>`;
 
     await getResend().emails.send({
-        from: `${bizName} <${process.env.RESEND_FROM_EMAIL || "no-reply@resend.dev"}>`,
+        from: `${bizName} <${process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop"}>`,
         to: [customerEmail],
         subject: `Order Confirmed — #${orderRef}`,
         html: `
