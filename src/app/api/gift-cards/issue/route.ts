@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
                 .from("business_settings").select("business_name, email").eq("id", "default").single();
 
             const bizName = biz?.business_name || "Miss Tokyo";
-            const fromEmail = biz?.email || "orders@misstokyo.shop";
+            const fromEmail = biz?.email || "orders@info.misstokyo.shop";
 
             await resend.emails.send({
                 from: `${bizName} <${fromEmail}>`,

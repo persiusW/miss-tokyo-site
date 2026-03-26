@@ -11,70 +11,70 @@ import { logActivity } from "@/lib/utils/logActivity";
  * Does NOT assign a rider — pickup orders are fulfilled manually when client arrives.
  */
 export async function POST(req: NextRequest) {
-    try {
-        const serverClient = await createClient();
-        const { data: { user } } = await serverClient.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
-        if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
+  try {
+    const serverClient = await createClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
-        const { orderIds } = await req.json();
+    const { orderIds } = await req.json();
 
-        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 100 || orderIds.some((id: unknown) => typeof id !== "string" || !UUID_RE.test(id))) {
-            return NextResponse.json({ error: "Invalid orderIds — must be an array of 1–100 UUIDs." }, { status: 400 });
-        }
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 100 || orderIds.some((id: unknown) => typeof id !== "string" || !UUID_RE.test(id))) {
+      return NextResponse.json({ error: "Invalid orderIds — must be an array of 1–100 UUIDs." }, { status: 400 });
+    }
 
-        // ── Fetch orders ──────────────────────────────────────────────────────
-        const { data: orders, error: ordersError } = await supabaseAdmin
-            .from("orders")
-            .select("id, customer_name, customer_email, customer_phone, total_amount")
-            .in("id", orderIds);
+    // ── Fetch orders ──────────────────────────────────────────────────────
+    const { data: orders, error: ordersError } = await supabaseAdmin
+      .from("orders")
+      .select("id, customer_name, customer_email, customer_phone, total_amount")
+      .in("id", orderIds);
 
-        if (ordersError || !orders) {
-            return NextResponse.json({ error: "Failed to fetch orders." }, { status: 500 });
-        }
+    if (ordersError || !orders) {
+      return NextResponse.json({ error: "Failed to fetch orders." }, { status: 500 });
+    }
 
-        // ── Update status to ready_for_pickup ─────────────────────────────────
-        const { error: updateError } = await supabaseAdmin
-            .from("orders")
-            .update({ status: "ready_for_pickup" })
-            .in("id", orderIds);
+    // ── Update status to ready_for_pickup ─────────────────────────────────
+    const { error: updateError } = await supabaseAdmin
+      .from("orders")
+      .update({ status: "ready_for_pickup" })
+      .in("id", orderIds);
 
-        if (updateError) {
-            return NextResponse.json({ error: "Failed to update orders." }, { status: 500 });
-        }
+    if (updateError) {
+      return NextResponse.json({ error: "Failed to update orders." }, { status: 500 });
+    }
 
-        // ── Fetch business settings ───────────────────────────────────────────
-        const { data: biz } = await supabaseAdmin
-            .from("business_settings")
-            .select("business_name, email, contact, address, business_hours")
-            .eq("id", "default")
-            .single();
+    // ── Fetch business settings ───────────────────────────────────────────
+    const { data: biz } = await supabaseAdmin
+      .from("business_settings")
+      .select("business_name, email, contact, address, business_hours")
+      .eq("id", "default")
+      .single();
 
-        const bizName = biz?.business_name || "Miss Tokyo";
-        const bizAddress = biz?.address || "";
-        const bizContact = biz?.contact || "";
-        const bizHours = biz?.business_hours || "Mon – Sat, 10am – 6pm";
+    const bizName = biz?.business_name || "Miss Tokyo";
+    const bizAddress = biz?.address || "";
+    const bizContact = biz?.contact || "";
+    const bizHours = biz?.business_hours || "Mon – Sat, 10am – 6pm";
 
-        // ── Send pickup-ready emails ───────────────────────────────────────────
-        if (process.env.RESEND_API_KEY) {
-            const { Resend } = await import("resend");
-            const resend = new Resend(process.env.RESEND_API_KEY);
-            const fromEmail = biz?.email || "orders@misstokyo.shop";
+    // ── Send pickup-ready emails ───────────────────────────────────────────
+    if (process.env.RESEND_API_KEY) {
+      const { Resend } = await import("resend");
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const fromEmail = biz?.email || "orders@info.misstokyo.shop";
 
-            const emailPromises = orders
-                .filter(o => !!o.customer_email)
-                .map(order => {
-                    const ref = order.id.substring(0, 8).toUpperCase();
+      const emailPromises = orders
+        .filter(o => !!o.customer_email)
+        .map(order => {
+          const ref = order.id.substring(0, 8).toUpperCase();
 
-                    return resend.emails.send({
-                        from: `${bizName} <${fromEmail}>`,
-                        to: order.customer_email!,
-                        subject: `Your order #${ref} is ready for pickup!`,
-                        html: `
+          return resend.emails.send({
+            from: `${bizName} <${fromEmail}>`,
+            to: order.customer_email!,
+            subject: `Your order #${ref} is ready for pickup!`,
+            html: `
 <!DOCTYPE html>
 <html>
 <body style="font-family: Georgia, serif; background: #fafaf9; margin: 0; padding: 40px 20px;">
@@ -127,49 +127,49 @@ export async function POST(req: NextRequest) {
   </div>
 </body>
 </html>`,
-                    });
-                });
-
-            await Promise.allSettled(emailPromises);
-        }
-
-        // ── Send pickup-ready SMS ─────────────────────────────────────────────
-        const smsPromises = orders
-            .filter(o => !!o.customer_phone)
-            .map(order => {
-                const ref = order.id.substring(0, 8).toUpperCase();
-                const parts = [
-                    `${bizName}: Hi ${order.customer_name || "there"}, your order #${ref} is ready for pickup!`,
-                    bizAddress ? `📍 ${bizAddress.replace(/\n/g, ", ")}` : "",
-                    bizContact ? `📞 ${bizContact}` : "",
-                    bizHours   ? `🕐 ${bizHours}` : "",
-                ].filter(Boolean).join(" | ");
-
-                return sendSMS({ to: order.customer_phone!, message: parts });
-            });
-
-        await Promise.allSettled(smsPromises);
-
-        // ── Log Activity ────────────────────────────────────────────────────────
-        const logPromises = orders.map(order => {
-            return logActivity({
-                userId: user.id,
-                userRole: caller.role,
-                actionType: "PACKED_ORDER", // Milestone for ready for pickup
-                resource: "order",
-                resourceId: order.id,
-                details: {
-                    order_number: order.id.slice(0, 8),
-                    previous_status: "processing",
-                    new_status: "ready_for_pickup"
-                }
-            });
+          });
         });
-        await Promise.allSettled(logPromises);
 
-        return NextResponse.json({ status: "ready_for_pickup", count: orderIds.length });
-    } catch (err: any) {
-        console.error("[pickup-ready]", err);
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+      await Promise.allSettled(emailPromises);
     }
+
+    // ── Send pickup-ready SMS ─────────────────────────────────────────────
+    const smsPromises = orders
+      .filter(o => !!o.customer_phone)
+      .map(order => {
+        const ref = order.id.substring(0, 8).toUpperCase();
+        const parts = [
+          `${bizName}: Hi ${order.customer_name || "there"}, your order #${ref} is ready for pickup!`,
+          bizAddress ? `📍 ${bizAddress.replace(/\n/g, ", ")}` : "",
+          bizContact ? `📞 ${bizContact}` : "",
+          bizHours ? `🕐 ${bizHours}` : "",
+        ].filter(Boolean).join(" | ");
+
+        return sendSMS({ to: order.customer_phone!, message: parts });
+      });
+
+    await Promise.allSettled(smsPromises);
+
+    // ── Log Activity ────────────────────────────────────────────────────────
+    const logPromises = orders.map(order => {
+      return logActivity({
+        userId: user.id,
+        userRole: caller.role,
+        actionType: "PACKED_ORDER", // Milestone for ready for pickup
+        resource: "order",
+        resourceId: order.id,
+        details: {
+          order_number: order.id.slice(0, 8),
+          previous_status: "processing",
+          new_status: "ready_for_pickup"
+        }
+      });
+    });
+    await Promise.allSettled(logPromises);
+
+    return NextResponse.json({ status: "ready_for_pickup", count: orderIds.length });
+  } catch (err: any) {
+    console.error("[pickup-ready]", err);
+    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+  }
 }
