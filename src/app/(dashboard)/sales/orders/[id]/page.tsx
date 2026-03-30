@@ -545,7 +545,7 @@ export default function OrderDetailPage() {
                                                         SKU: <span className="text-neutral-900 font-semibold font-mono">{item.sku || productSkus[item.productId]}</span>
                                                     </span>
                                                 )}
-                                                {item.stitching && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Stitching: <span className="text-neutral-900 font-semibold">{item.stitching}</span></span>}
+                                                {/* {item.stitching && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Stitching: <span className="text-neutral-900 font-semibold">{item.stitching}</span></span>} */}
                                                 <span className="text-[10px] uppercase tracking-widest text-neutral-500">Qty: <span className="text-neutral-900 font-semibold">{item.quantity || 1}</span></span>
                                             </div>
                                         </div>

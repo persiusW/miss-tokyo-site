@@ -132,7 +132,7 @@ export function QuickViewModal({
                                             priceNum={effectivePrice}
                                             price={`GH₵${effectivePrice.toFixed(2)}`}
                                             colors={product.available_colors || ["Noir", "Cognac", "Sand"]}
-                                            stitching={product.available_stitching || ["Tonal", "Contrast White"]}
+                                            // stitching={product.available_stitching || ["Tonal", "Contrast White"]}
                                             availableSizes={product.available_sizes || null}
                                             inventoryCount={product.inventory_count ?? 0}
                                             trackInventory={product.track_inventory ?? true}

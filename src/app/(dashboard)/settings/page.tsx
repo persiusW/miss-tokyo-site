@@ -108,16 +108,16 @@ export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<TabKey>("business");
 
     const tabs: { key: TabKey; label: string }[] = [
-        { key: "business",     label: "Business" },
-        { key: "store",        label: "Store" },
-        { key: "shipping",     label: "Shipping" },
-        { key: "seo",          label: "SEO" },
+        { key: "business", label: "Business" },
+        { key: "store", label: "Store" },
+        { key: "shipping", label: "Shipping" },
+        { key: "seo", label: "SEO" },
         { key: "product-page", label: "Product Page" },
-        { key: "emails",       label: "Emails" },
-        { key: "notifications",label: "Notifications" },
-        { key: "riders",       label: "Riders" },
-        { key: "size-guide",   label: "Size Guide" },
-        { key: "team",         label: "Team" },
+        { key: "emails", label: "Emails" },
+        { key: "notifications", label: "Notifications" },
+        { key: "riders", label: "Riders" },
+        { key: "size-guide", label: "Size Guide" },
+        { key: "team", label: "Team" },
     ];
 
     return (
@@ -134,11 +134,10 @@ export default function SettingsPage() {
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
-                            className={`whitespace-nowrap pb-4 px-1 border-b-2 text-xs uppercase tracking-widest font-semibold transition-all ${
-                                activeTab === tab.key
+                            className={`whitespace-nowrap pb-4 px-1 border-b-2 text-xs uppercase tracking-widest font-semibold transition-all ${activeTab === tab.key
                                     ? "border-black text-black"
                                     : "border-transparent text-neutral-400 hover:text-neutral-600"
-                            }`}
+                                }`}
                         >
                             {tab.label}
                         </button>
@@ -148,16 +147,16 @@ export default function SettingsPage() {
 
             {/* Full Width Content Area */}
             <div className="w-full">
-                {activeTab === "business"       && <><BusinessTab /><div className="mt-8"><BusinessSettingsTab /></div></>}
-                {activeTab === "store"          && <StoreTab />}
-                {activeTab === "shipping"       && <ShippingTab />}
-                {activeTab === "seo"            && <SEOTab />}
-                {activeTab === "emails"         && <EmailsTab />}
-                {activeTab === "notifications"  && <NotificationsTab />}
-                {activeTab === "riders"         && <RidersTab />}
-                {activeTab === "size-guide"     && <SizeGuideTab />}
-                {activeTab === "team"           && <TeamTab />}
-                {activeTab === "product-page"  && <ProductPageTab />}
+                {activeTab === "business" && <><BusinessTab /><div className="mt-8"><BusinessSettingsTab /></div></>}
+                {activeTab === "store" && <StoreTab />}
+                {activeTab === "shipping" && <ShippingTab />}
+                {activeTab === "seo" && <SEOTab />}
+                {activeTab === "emails" && <EmailsTab />}
+                {activeTab === "notifications" && <NotificationsTab />}
+                {activeTab === "riders" && <RidersTab />}
+                {activeTab === "size-guide" && <SizeGuideTab />}
+                {activeTab === "team" && <TeamTab />}
+                {activeTab === "product-page" && <ProductPageTab />}
             </div>
         </div>
     );
@@ -376,383 +375,382 @@ function StoreTab() {
 
     return (
         <>
-        <form onSubmit={handleSave} className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-            {/* Left column */}
-            <div className="space-y-8">
-            {/* Store Configuration */}
-            <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Store Configuration</h2>
+            <form onSubmit={handleSave} className="space-y-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                    {/* Left column */}
+                    <div className="space-y-8">
+                        {/* Store Configuration */}
+                        <div className="bg-white border border-neutral-200 p-8 space-y-6">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Store Configuration</h2>
 
-                <div>
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={form.enable_store_pickup}
-                            onChange={(e) => setForm(p => ({ ...p, enable_store_pickup: e.target.checked }))}
-                            className="w-4 h-4 accent-black"
-                        />
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Store Pickup</span>
-                    </label>
-                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Allow customers to pick up orders directly from the atelier.</p>
-                </div>
+                            <div>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.enable_store_pickup}
+                                        onChange={(e) => setForm(p => ({ ...p, enable_store_pickup: e.target.checked }))}
+                                        className="w-4 h-4 accent-black"
+                                    />
+                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Store Pickup</span>
+                                </label>
+                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Allow customers to pick up orders directly from the atelier.</p>
+                            </div>
 
-                <div className="pt-4 border-t border-neutral-100">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={form.maintenance_mode}
-                            onChange={(e) => setForm(p => ({ ...p, maintenance_mode: e.target.checked }))}
-                            className="w-4 h-4 accent-black"
-                        />
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Coming Soon / Maintenance Mode</span>
-                    </label>
-                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Restrict access to the shop and show a coming soon placeholder.</p>
-                </div>
+                            <div className="pt-4 border-t border-neutral-100">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.maintenance_mode}
+                                        onChange={(e) => setForm(p => ({ ...p, maintenance_mode: e.target.checked }))}
+                                        className="w-4 h-4 accent-black"
+                                    />
+                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Coming Soon / Maintenance Mode</span>
+                                </label>
+                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Restrict access to the shop and show a coming soon placeholder.</p>
+                            </div>
 
-                <div className="pt-4 border-t border-neutral-100 mt-6 grid grid-cols-1 gap-6">
-                    <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Shoe Sizes</label>
-                        <TagInput
-                            value={form.global_sizes}
-                            onChange={(tags) => setForm(p => ({ ...p, global_sizes: tags }))}
-                            placeholder="Type a size and press Enter…"
-                        />
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each size.</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Colors</label>
-                        <TagInput
-                            value={form.global_colors}
-                            onChange={(tags) => setForm(p => ({ ...p, global_colors: tags }))}
-                            placeholder="Type a color and press Enter…"
-                        />
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each color.</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Stitching Options</label>
-                        <TagInput
-                            value={form.global_stitching}
-                            onChange={(tags) => setForm(p => ({ ...p, global_stitching: tags }))}
-                            placeholder="Type an option and press Enter…"
-                        />
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each stitching style.</p>
-                    </div>
-                </div>
-            </div>
-            </div>{/* end left column */}
-
-            {/* Right column */}
-            <div className="space-y-8">
-            {/* Visual Merchandising */}
-            <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Visual Merchandising</h2>
-                <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
-                    Control the product columns on desktop and how many items appear in the homepage featured grid. Mobile stays 2-column, tablet stays 2-column.
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Homepage Grid Columns</label>
-                        <div className="flex gap-3">
-                            {([2, 3, 4, 5] as const).map(n => (
-                                <button
-                                    key={n}
-                                    type="button"
-                                    onClick={() => setForm(p => ({ ...p, home_grid_cols: n }))}
-                                    className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.home_grid_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                                >
-                                    {n}
-                                </button>
-                            ))}
-                        </div>
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Columns on the homepage collection grid.</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page Grid Columns</label>
-                        <div className="flex gap-3">
-                            {([2, 3, 4, 5] as const).map(n => (
-                                <button
-                                    key={n}
-                                    type="button"
-                                    onClick={() => setForm(p => ({ ...p, shop_grid_cols: n }))}
-                                    className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_grid_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                                >
-                                    {n}
-                                </button>
-                            ))}
-                        </div>
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Columns on the full shop listing grid.</p>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page Mobile Columns</label>
-                        <div className="flex gap-3 max-w-[160px]">
-                            {([1, 2] as const).map(n => (
-                                <button
-                                    key={n}
-                                    type="button"
-                                    onClick={() => setForm(p => ({ ...p, shop_mobile_cols: n }))}
-                                    className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_mobile_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                                >
-                                    {n}
-                                </button>
-                            ))}
-                        </div>
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Grid columns on mobile devices.</p>
-                    </div>
-                </div>
-
-                <div className="pt-6 border-t border-neutral-100">
-                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Featured Products on Homepage</label>
-                    <div className="flex gap-3 max-w-xs">
-                        {([4, 6, 8, 12] as const).map(n => (
-                            <button
-                                key={n}
-                                type="button"
-                                onClick={() => setForm(p => ({ ...p, home_product_limit: n }))}
-                                className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.home_product_limit === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                            >
-                                {n}
-                            </button>
-                        ))}
-                    </div>
-                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Number of products shown in the homepage collection grid.</p>
-                </div>
-
-                <div className="pt-6 border-t border-neutral-100">
-                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page — Products Per Page</label>
-                    <div className="flex gap-3 max-w-sm">
-                        {([8, 12, 16, 24, 32] as const).map(n => (
-                            <button
-                                key={n}
-                                type="button"
-                                onClick={() => setForm(p => ({ ...p, shop_product_limit: n }))}
-                                className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_product_limit === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                            >
-                                {n}
-                            </button>
-                        ))}
-                    </div>
-                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Total products loaded per page on the shop listing.</p>
-                </div>
-
-                <div className="pt-6 border-t border-neutral-100">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={form.shop_show_title}
-                            onChange={(e) => setForm(p => ({ ...p, shop_show_title: e.target.checked }))}
-                            className="w-4 h-4 accent-black"
-                        />
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Show Shop Page Title &amp; Subtitle</span>
-                    </label>
-                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Display the hero text header above the product grid on the shop page.</p>
-                </div>
-
-                <div className="pt-6 border-t border-neutral-100">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={form.shop_image_stretch}
-                            onChange={(e) => setForm(p => ({ ...p, shop_image_stretch: e.target.checked }))}
-                            className="w-4 h-4 accent-black"
-                        />
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stretch Product Images to Fill Frame</span>
-                    </label>
-                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">When on, images fill the card exactly (may distort). When off, images are cropped to fit.</p>
-                </div>
-            </div>
-
-            </div>{/* end right column */}
-            </div>{/* end grid */}
-
-            {/* Platform Fees */}
-            <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Platform Fees</h2>
-                <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
-                    A percentage-based fee applied to all orders, invoices, and payment links to offset processing charges.
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Fee Percentage (%)</label>
-                        <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={form.platform_fee_percentage}
-                            onChange={(e) => setForm(p => ({ ...p, platform_fee_percentage: parseFloat(e.target.value) || 0 }))}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="2.5"
-                        />
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">e.g. 2.5 adds 2.5% to every order total.</p>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Fee Label</label>
-                        <input
-                            type="text"
-                            value={form.platform_fee_label}
-                            onChange={(e) => setForm(p => ({ ...p, platform_fee_label: e.target.value }))}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="Service Charge"
-                        />
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Label shown to customers on receipts.</p>
-                    </div>
-                </div>
-
-                <div className="pt-4 border-t border-neutral-100">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={form.show_fee_at_checkout}
-                            onChange={(e) => setForm(p => ({ ...p, show_fee_at_checkout: e.target.checked }))}
-                            className="w-4 h-4 accent-black"
-                        />
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Show Fee as Itemised Line at Checkout</span>
-                    </label>
-                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">
-                        When off, the fee is silently rolled into "Shipping &amp; Handling" so the total still adds up without a visible surcharge line.
-                    </p>
-                </div>
-            </div>
-
-            {/* Feature Toggles */}
-            <div className="bg-white border border-neutral-200 p-8 space-y-5">
-                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Feature Toggles</h2>
-                <p className="text-[10px] text-neutral-400 tracking-wider uppercase">Enable or disable storefront sections. Hidden sections are removed from the navigation.</p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8">
-                {([
-                    { key: "enable_gift_cards" as const, label: "Gift Cards", desc: "Show the gift card purchase page in the navbar." },
-                    { key: "enable_gallery" as const,    label: "Gallery",    desc: "Show the gallery page and nav link." },
-                    { key: "enable_craft" as const,      label: "The Craft",  desc: "Show the craft / process page in the navbar." },
-                    { key: "enable_whitelabel" as const,       label: "White Labelling",  desc: "Show the white labelling / custom order page." },
-                    { key: "enable_custom_requests" as const, label: "Custom Requests",   desc: "Enable the custom order request form and admin submissions inbox." },
-                ] as const).map(({ key, label, desc }) => (
-                    <div key={key} className="py-4 border-b border-neutral-100 last:border-b-0">
-                        <label className="flex items-center gap-3 cursor-pointer">
-                            <input type="checkbox" checked={form[key]}
-                                onChange={(e) => setForm(p => ({ ...p, [key]: e.target.checked }))}
-                                className="w-4 h-4 accent-black" />
-                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">{label}</span>
-                        </label>
-                        <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">{desc}</p>
-                    </div>
-                ))}
-                </div>
-            </div>
-
-            {/* Wholesale Configuration */}
-            <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                <div>
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Wholesale / B2B Configuration</h2>
-                    <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">
-                        Enable B2B wholesale pricing with quantity-based tiers. Wholesale users see custom pricing instead of retail prices on the storefront.
-                    </p>
-                </div>
-
-                <div>
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={form.wholesale_enabled}
-                            onChange={(e) => setForm(p => ({ ...p, wholesale_enabled: e.target.checked }))}
-                            className="w-4 h-4 accent-black"
-                        />
-                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Global Tier-Based Pricing</span>
-                    </label>
-                    <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">
-                        When on, users with the Wholesale role see tier-based pricing on product pages.
-                    </p>
-                </div>
-
-                <div className="pt-6 border-t border-neutral-100 space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-[10px] uppercase tracking-[0.1em] font-bold text-black">Wholesale Exclusive Categories</h3>
-                        <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded">Access Protection</span>
-                    </div>
-                    <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
-                        Toggle categories that should be restricted to wholesale users only. Products assigned ONLY to these will be hidden from retail customers.
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {allCategories.map(cat => (
-                            <button
-                                key={cat.id}
-                                type="button"
-                                onClick={() => {
-                                    const next = new Set(wholesaleCatIds);
-                                    if (next.has(cat.id)) next.delete(cat.id);
-                                    else next.add(cat.id);
-                                    setWholesaleCatIds(next);
-                                }}
-                                className={`flex items-center gap-3 px-3 py-2.5 border text-[9px] font-bold uppercase tracking-widest transition-all ${
-                                    wholesaleCatIds.has(cat.id)
-                                        ? "bg-black text-white border-black"
-                                        : "bg-white text-neutral-400 border-neutral-100 hover:border-neutral-200"
-                                }`}
-                            >
-                                <div className={`w-1.5 h-1.5 rounded-full ${wholesaleCatIds.has(cat.id) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-neutral-100"}`} />
-                                {cat.name}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {form.wholesale_enabled && (
-                    <div className="pt-6 border-t border-neutral-100 space-y-6">
-                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
-                            Define the quantity range for each pricing tier. These ranges apply globally across all products.
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {([1, 2, 3] as const).map(tier => (
-                                <div key={tier} className="space-y-4 p-5 border border-neutral-100 bg-neutral-50">
-                                    <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Tier {tier}</p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-[9px] uppercase tracking-widest text-neutral-400 mb-1">Min Qty</label>
-                                            <input
-                                                type="number" min="1"
-                                                value={form[`wholesale_tier_${tier}_min` as keyof StoreSettings] as number}
-                                                onChange={e => setForm(p => ({ ...p, [`wholesale_tier_${tier}_min`]: parseInt(e.target.value) || 1 }))}
-                                                className="w-full border-b border-neutral-300 bg-transparent py-1.5 outline-none focus:border-black text-sm text-center transition-colors"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[9px] uppercase tracking-widest text-neutral-400 mb-1">Max Qty</label>
-                                            <input
-                                                type="number" min="1"
-                                                value={form[`wholesale_tier_${tier}_max` as keyof StoreSettings] as number}
-                                                onChange={e => setForm(p => ({ ...p, [`wholesale_tier_${tier}_max`]: parseInt(e.target.value) || 1 }))}
-                                                className="w-full border-b border-neutral-300 bg-transparent py-1.5 outline-none focus:border-black text-sm text-center transition-colors"
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="text-[9px] text-neutral-400 tracking-widest uppercase">
-                                        {form[`wholesale_tier_${tier}_min` as keyof StoreSettings]} – {form[`wholesale_tier_${tier}_max` as keyof StoreSettings]} units
-                                    </p>
+                            <div className="pt-4 border-t border-neutral-100 mt-6 grid grid-cols-1 gap-6">
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Shoe Sizes</label>
+                                    <TagInput
+                                        value={form.global_sizes}
+                                        onChange={(tags) => setForm(p => ({ ...p, global_sizes: tags }))}
+                                        placeholder="Type a size and press Enter…"
+                                    />
+                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each size.</p>
                                 </div>
+
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Colors</label>
+                                    <TagInput
+                                        value={form.global_colors}
+                                        onChange={(tags) => setForm(p => ({ ...p, global_colors: tags }))}
+                                        placeholder="Type a color and press Enter…"
+                                    />
+                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each color.</p>
+                                </div>
+
+                                {/* <div>
+                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Stitching Options</label>
+                                    <TagInput
+                                        value={form.global_stitching}
+                                        onChange={(tags) => setForm(p => ({ ...p, global_stitching: tags }))}
+                                        placeholder="Type an option and press Enter…"
+                                    />
+                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each stitching style.</p>
+                                </div> */}
+                            </div>
+                        </div>
+                    </div>{/* end left column */}
+
+                    {/* Right column */}
+                    <div className="space-y-8">
+                        {/* Visual Merchandising */}
+                        <div className="bg-white border border-neutral-200 p-8 space-y-6">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Visual Merchandising</h2>
+                            <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
+                                Control the product columns on desktop and how many items appear in the homepage featured grid. Mobile stays 2-column, tablet stays 2-column.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Homepage Grid Columns</label>
+                                    <div className="flex gap-3">
+                                        {([2, 3, 4, 5] as const).map(n => (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                onClick={() => setForm(p => ({ ...p, home_grid_cols: n }))}
+                                                className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.home_grid_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Columns on the homepage collection grid.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page Grid Columns</label>
+                                    <div className="flex gap-3">
+                                        {([2, 3, 4, 5] as const).map(n => (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                onClick={() => setForm(p => ({ ...p, shop_grid_cols: n }))}
+                                                className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_grid_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Columns on the full shop listing grid.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page Mobile Columns</label>
+                                    <div className="flex gap-3 max-w-[160px]">
+                                        {([1, 2] as const).map(n => (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                onClick={() => setForm(p => ({ ...p, shop_mobile_cols: n }))}
+                                                className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_mobile_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Grid columns on mobile devices.</p>
+                                </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-neutral-100">
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Featured Products on Homepage</label>
+                                <div className="flex gap-3 max-w-xs">
+                                    {([4, 6, 8, 12] as const).map(n => (
+                                        <button
+                                            key={n}
+                                            type="button"
+                                            onClick={() => setForm(p => ({ ...p, home_product_limit: n }))}
+                                            className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.home_product_limit === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                                        >
+                                            {n}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Number of products shown in the homepage collection grid.</p>
+                            </div>
+
+                            <div className="pt-6 border-t border-neutral-100">
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page — Products Per Page</label>
+                                <div className="flex gap-3 max-w-sm">
+                                    {([8, 12, 16, 24, 32] as const).map(n => (
+                                        <button
+                                            key={n}
+                                            type="button"
+                                            onClick={() => setForm(p => ({ ...p, shop_product_limit: n }))}
+                                            className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_product_limit === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                                        >
+                                            {n}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Total products loaded per page on the shop listing.</p>
+                            </div>
+
+                            <div className="pt-6 border-t border-neutral-100">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.shop_show_title}
+                                        onChange={(e) => setForm(p => ({ ...p, shop_show_title: e.target.checked }))}
+                                        className="w-4 h-4 accent-black"
+                                    />
+                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Show Shop Page Title &amp; Subtitle</span>
+                                </label>
+                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Display the hero text header above the product grid on the shop page.</p>
+                            </div>
+
+                            <div className="pt-6 border-t border-neutral-100">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.shop_image_stretch}
+                                        onChange={(e) => setForm(p => ({ ...p, shop_image_stretch: e.target.checked }))}
+                                        className="w-4 h-4 accent-black"
+                                    />
+                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stretch Product Images to Fill Frame</span>
+                                </label>
+                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">When on, images fill the card exactly (may distort). When off, images are cropped to fit.</p>
+                            </div>
+                        </div>
+
+                    </div>{/* end right column */}
+                </div>{/* end grid */}
+
+                {/* Platform Fees */}
+                <div className="bg-white border border-neutral-200 p-8 space-y-6">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Platform Fees</h2>
+                    <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
+                        A percentage-based fee applied to all orders, invoices, and payment links to offset processing charges.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Fee Percentage (%)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={form.platform_fee_percentage}
+                                onChange={(e) => setForm(p => ({ ...p, platform_fee_percentage: parseFloat(e.target.value) || 0 }))}
+                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                                placeholder="2.5"
+                            />
+                            <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">e.g. 2.5 adds 2.5% to every order total.</p>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Fee Label</label>
+                            <input
+                                type="text"
+                                value={form.platform_fee_label}
+                                onChange={(e) => setForm(p => ({ ...p, platform_fee_label: e.target.value }))}
+                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                                placeholder="Service Charge"
+                            />
+                            <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Label shown to customers on receipts.</p>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-neutral-100">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={form.show_fee_at_checkout}
+                                onChange={(e) => setForm(p => ({ ...p, show_fee_at_checkout: e.target.checked }))}
+                                className="w-4 h-4 accent-black"
+                            />
+                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Show Fee as Itemised Line at Checkout</span>
+                        </label>
+                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">
+                            When off, the fee is silently rolled into "Shipping &amp; Handling" so the total still adds up without a visible surcharge line.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Feature Toggles */}
+                <div className="bg-white border border-neutral-200 p-8 space-y-5">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Feature Toggles</h2>
+                    <p className="text-[10px] text-neutral-400 tracking-wider uppercase">Enable or disable storefront sections. Hidden sections are removed from the navigation.</p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8">
+                        {([
+                            { key: "enable_gift_cards" as const, label: "Gift Cards", desc: "Show the gift card purchase page in the navbar." },
+                            { key: "enable_gallery" as const, label: "Gallery", desc: "Show the gallery page and nav link." },
+                            { key: "enable_craft" as const, label: "The Craft", desc: "Show the craft / process page in the navbar." },
+                            { key: "enable_whitelabel" as const, label: "White Labelling", desc: "Show the white labelling / custom order page." },
+                            { key: "enable_custom_requests" as const, label: "Custom Requests", desc: "Enable the custom order request form and admin submissions inbox." },
+                        ] as const).map(({ key, label, desc }) => (
+                            <div key={key} className="py-4 border-b border-neutral-100 last:border-b-0">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" checked={form[key]}
+                                        onChange={(e) => setForm(p => ({ ...p, [key]: e.target.checked }))}
+                                        className="w-4 h-4 accent-black" />
+                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">{label}</span>
+                                </label>
+                                <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">{desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Wholesale Configuration */}
+                <div className="bg-white border border-neutral-200 p-8 space-y-6">
+                    <div>
+                        <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Wholesale / B2B Configuration</h2>
+                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">
+                            Enable B2B wholesale pricing with quantity-based tiers. Wholesale users see custom pricing instead of retail prices on the storefront.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={form.wholesale_enabled}
+                                onChange={(e) => setForm(p => ({ ...p, wholesale_enabled: e.target.checked }))}
+                                className="w-4 h-4 accent-black"
+                            />
+                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Global Tier-Based Pricing</span>
+                        </label>
+                        <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">
+                            When on, users with the Wholesale role see tier-based pricing on product pages.
+                        </p>
+                    </div>
+
+                    <div className="pt-6 border-t border-neutral-100 space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-[10px] uppercase tracking-[0.1em] font-bold text-black">Wholesale Exclusive Categories</h3>
+                            <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded">Access Protection</span>
+                        </div>
+                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
+                            Toggle categories that should be restricted to wholesale users only. Products assigned ONLY to these will be hidden from retail customers.
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {allCategories.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    type="button"
+                                    onClick={() => {
+                                        const next = new Set(wholesaleCatIds);
+                                        if (next.has(cat.id)) next.delete(cat.id);
+                                        else next.add(cat.id);
+                                        setWholesaleCatIds(next);
+                                    }}
+                                    className={`flex items-center gap-3 px-3 py-2.5 border text-[9px] font-bold uppercase tracking-widest transition-all ${wholesaleCatIds.has(cat.id)
+                                            ? "bg-black text-white border-black"
+                                            : "bg-white text-neutral-400 border-neutral-100 hover:border-neutral-200"
+                                        }`}
+                                >
+                                    <div className={`w-1.5 h-1.5 rounded-full ${wholesaleCatIds.has(cat.id) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-neutral-100"}`} />
+                                    {cat.name}
+                                </button>
                             ))}
                         </div>
                     </div>
-                )}
-</div>
 
-            <div className="flex justify-end items-center gap-6">
-                {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved successfully</span>}
-                <button
-                    type="submit" disabled={saving}
-                    className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                >
-                    {saving ? "Saving..." : "Save Store Settings"}
-                </button>
-            </div>
-        </form>
-        <CarouselConfigSection />
+                    {form.wholesale_enabled && (
+                        <div className="pt-6 border-t border-neutral-100 space-y-6">
+                            <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
+                                Define the quantity range for each pricing tier. These ranges apply globally across all products.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {([1, 2, 3] as const).map(tier => (
+                                    <div key={tier} className="space-y-4 p-5 border border-neutral-100 bg-neutral-50">
+                                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Tier {tier}</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[9px] uppercase tracking-widest text-neutral-400 mb-1">Min Qty</label>
+                                                <input
+                                                    type="number" min="1"
+                                                    value={form[`wholesale_tier_${tier}_min` as keyof StoreSettings] as number}
+                                                    onChange={e => setForm(p => ({ ...p, [`wholesale_tier_${tier}_min`]: parseInt(e.target.value) || 1 }))}
+                                                    className="w-full border-b border-neutral-300 bg-transparent py-1.5 outline-none focus:border-black text-sm text-center transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] uppercase tracking-widest text-neutral-400 mb-1">Max Qty</label>
+                                                <input
+                                                    type="number" min="1"
+                                                    value={form[`wholesale_tier_${tier}_max` as keyof StoreSettings] as number}
+                                                    onChange={e => setForm(p => ({ ...p, [`wholesale_tier_${tier}_max`]: parseInt(e.target.value) || 1 }))}
+                                                    className="w-full border-b border-neutral-300 bg-transparent py-1.5 outline-none focus:border-black text-sm text-center transition-colors"
+                                                />
+                                            </div>
+                                        </div>
+                                        <p className="text-[9px] text-neutral-400 tracking-widest uppercase">
+                                            {form[`wholesale_tier_${tier}_min` as keyof StoreSettings]} – {form[`wholesale_tier_${tier}_max` as keyof StoreSettings]} units
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex justify-end items-center gap-6">
+                    {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved successfully</span>}
+                    <button
+                        type="submit" disabled={saving}
+                        className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                    >
+                        {saving ? "Saving..." : "Save Store Settings"}
+                    </button>
+                </div>
+            </form>
+            <CarouselConfigSection />
         </>
     );
 }
@@ -764,8 +762,8 @@ interface CarouselTabConfig {
 }
 
 const DEFAULT_CAROUSEL_TABS: CarouselTabConfig[] = [
-    { label: "New In",      mode: "newest",     category_name: "" },
-    { label: "Bestsellers", mode: "sort_order",  category_name: "" },
+    { label: "New In", mode: "newest", category_name: "" },
+    { label: "Bestsellers", mode: "sort_order", category_name: "" },
 ];
 
 function CarouselConfigSection() {
@@ -899,10 +897,10 @@ function SEOTab() {
         if (existing) {
             setFormData({
                 ...existing,
-                keywords:     existing.keywords     ?? "",
+                keywords: existing.keywords ?? "",
                 og_image_url: existing.og_image_url ?? "",
-                title:        existing.title        ?? "",
-                description:  existing.description  ?? "",
+                title: existing.title ?? "",
+                description: existing.description ?? "",
             });
         } else {
             setFormData({
@@ -1093,7 +1091,7 @@ type CommTemplate = {
 
 const COMM_EVENTS = [
     { key: "order_confirmed", label: "Order Confirmed" },
-    { key: "order_shipped",   label: "Order Shipped" },
+    { key: "order_shipped", label: "Order Shipped" },
     { key: "order_cancelled", label: "Order Cancelled" },
     { key: "order_fulfilled", label: "Order Fulfilled" },
 ];
@@ -1170,9 +1168,8 @@ function CommunicationsTab() {
                         <button
                             key={ch}
                             onClick={() => setChannel(ch)}
-                            className={`px-6 py-3 text-xs font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
-                                channel === ch ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"
-                            }`}
+                            className={`px-6 py-3 text-xs font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors ${channel === ch ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"
+                                }`}
                         >
                             {ch === "email" ? "Email" : "SMS"}
                         </button>

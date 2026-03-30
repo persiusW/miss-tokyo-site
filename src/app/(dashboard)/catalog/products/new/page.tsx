@@ -20,8 +20,8 @@ export default function NewProductPage() {
     const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
     const [globalColors, setGlobalColors] = useState<string[]>([]);
     const [selectedColors, setSelectedColors] = useState<string[]>([]);
-    const [globalStitching, setGlobalStitching] = useState<string[]>([]);
-    const [selectedStitching, setSelectedStitching] = useState<string[]>([]);
+    // const [globalStitching, setGlobalStitching] = useState<string[]>([]);
+    // const [selectedStitching, setSelectedStitching] = useState<string[]>([]);
     const [trackInventory, setTrackInventory] = useState(true);
     const [wholesaleTierConfig, setWholesaleTierConfig] = useState<{ enabled: boolean; tier1Min: number; tier1Max: number; tier2Min: number; tier2Max: number; tier3Min: number; tier3Max: number } | null>(null);
     const [wholesalePrices, setWholesalePrices] = useState({ tier1: "", tier2: "", tier3: "" });
@@ -54,10 +54,10 @@ export default function NewProductPage() {
                     // Colors start unticked — admin selects which apply to this product
                     setSelectedColors([]);
                 }
-                if (storeData.global_stitching) {
-                    setGlobalStitching(storeData.global_stitching);
-                    setSelectedStitching(storeData.global_stitching);
-                }
+                // if (storeData.global_stitching) {
+                //     setGlobalStitching(storeData.global_stitching);
+                //     setSelectedStitching(storeData.global_stitching);
+                // }
                 if (storeData.wholesale_enabled) {
                     setWholesaleTierConfig({
                         enabled: true,
@@ -95,9 +95,9 @@ export default function NewProductPage() {
         setSelectedColors(prev => prev.includes(col) ? prev.filter(s => s !== col) : [...prev, col]);
     };
 
-    const toggleStitching = (stitch: string) => {
-        setSelectedStitching(prev => prev.includes(stitch) ? prev.filter(s => s !== stitch) : [...prev, stitch]);
-    };
+    // const toggleStitching = (stitch: string) => {
+    //     setSelectedStitching(prev => prev.includes(stitch) ? prev.filter(s => s !== stitch) : [...prev, stitch]);
+    // };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -120,7 +120,7 @@ export default function NewProductPage() {
                     image_urls: imageUrls,
                     available_sizes: selectedSizes,
                     available_colors: selectedColors,
-                    available_stitching: selectedStitching,
+                    // available_stitching: selectedStitching,
                     wholesale_override: wholesaleOverride,
                     wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
                     wholesale_price_tier_2: wholesaleOverride && wholesalePrices.tier2 ? Number(wholesalePrices.tier2) : null,
@@ -330,7 +330,7 @@ export default function NewProductPage() {
                                 )}
                             </div>
 
-                            <div className="pt-6 border-t border-neutral-100">
+                            {/* <div className="pt-6 border-t border-neutral-100">
                                 <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Stitching</label>
                                 {globalStitching.length === 0 ? (
                                     <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading stitching from store settings...</p>
@@ -349,7 +349,7 @@ export default function NewProductPage() {
                                         ))}
                                     </div>
                                 )}
-                            </div>
+                            </div> */}
                         </div>
                     </div>
 
