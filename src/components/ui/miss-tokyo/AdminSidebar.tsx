@@ -65,6 +65,8 @@ export function AdminSidebar({ isFullAccess, showCustomRequests, businessName }:
     const displayName = businessName || "Miss Tokyo";
 
     const salesItems: NavItem[] = [
+        { label: "Point of Sale", href: "/pos" },
+        { label: "POS History", href: "/pos/history" },
         { label: "Orders", href: "/sales/orders" },
         { label: "Abandoned Carts", href: "/customers/abandoned" },
         { label: "Discounts", href: "/catalog/discounts" },

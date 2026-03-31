@@ -47,10 +47,6 @@ next-env.d.ts
 .mcp.json
 CLAUDE.md
 claude-flow.config.json
-# Ruflo / Claude Flow — never commit these
-.claude/
-.claude-flow/
-.swarm/
-.mcp.json
-CLAUDE.md
-claude-flow.config.json
+
+# Tooling / AI docs — auto-generated, not source
+docs/superpowers/
