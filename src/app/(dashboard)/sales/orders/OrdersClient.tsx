@@ -114,7 +114,7 @@ function DispatchModal({
     const [confirming, setConfirming] = useState(false);
 
     useEffect(() => {
-        supabase.from("riders").select("*").eq("is_active", true).order("full_name")
+        supabase.from("riders").select("id, full_name, phone_number, bike_reg, image_url, is_active").eq("is_active", true).order("full_name")
             .then(({ data, error }: { data: any, error: any }) => {
                 if (error) {
                     console.error("Failed to load riders:", error);

@@ -10,7 +10,7 @@ export function QuickViewModal({ slug, onClose }: { slug: string; onClose: () =>
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        supabase.from("products").select("*").eq("slug", slug).single()
+        supabase.from("products").select("id, name, slug, price_ghs, image_urls, available_colors, available_sizes").eq("slug", slug).single()
             .then(({ data }: { data: any }) => {
                 setProduct(data);
                 setLoading(false);

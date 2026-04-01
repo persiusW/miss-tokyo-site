@@ -261,7 +261,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
             import("@/lib/supabase").then(({ supabase }) => {
                 supabase
                     .from("product_variants")
-                    .select("*")
+                    .select("size, color, inventory_count")
                     .eq("product_id", product.id)
                     .then(({ data }: { data: any[] | null }) => {
                         if (data) setVariants(data);

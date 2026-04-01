@@ -1,5 +1,6 @@
 // src/app/(shop)/pay/[pos_id]/page.tsx
 import { notFound } from 'next/navigation';
+import Image from 'next/image';
 import type { PosSessionPublic } from '@/types/pos';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://misstokyo.shop';
@@ -92,8 +93,8 @@ export default async function PosPaymentPage({ params }: { params: Promise<{ pos
                         <div key={i} className="flex gap-4 px-4 py-4">
                             {/* Thumbnail */}
                             {item.image_url ? (
-                                <div className="w-16 h-20 shrink-0 bg-neutral-50 overflow-hidden">
-                                    <img src={item.image_url} alt={item.name} className="w-full h-full object-cover object-top" />
+                                <div className="w-16 h-20 shrink-0 bg-neutral-50 overflow-hidden relative">
+                                    <Image src={item.image_url} alt={item.name} fill className="object-cover object-top" sizes="64px" />
                                 </div>
                             ) : (
                                 <div className="w-16 h-20 shrink-0 bg-neutral-100 flex items-center justify-center">
