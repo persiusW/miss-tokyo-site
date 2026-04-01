@@ -5,6 +5,7 @@ import { useCart, getEffectivePrice } from "@/store/useCart";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { evaluateAutoDiscounts, type AutoDiscountResult } from "@/lib/autoDiscount";
+import Image from "next/image";
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
@@ -295,6 +296,10 @@ export default function CheckoutPage() {
             });
             const data = await res.json();
             if (data.authorizationUrl) {
+                // Store any OOS-excluded items so the success page can display them
+                if (data.oosItems?.length) {
+                    sessionStorage.setItem("checkout_oos", JSON.stringify(data.oosItems));
+                }
                 window.location.href = data.authorizationUrl;
             } else if (res.status === 409) {
                 toast.error(data.error || "An item in your cart is out of stock. Please update your cart.");
@@ -507,8 +512,8 @@ export default function CheckoutPage() {
                 <div className="space-y-6">
                     {items.map(item => (
                         <div key={item.id} className="flex gap-4 items-center">
-                            <div className="w-16 h-16 bg-white overflow-hidden flex-shrink-0 border border-neutral-200">
-                                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                            <div className="w-16 h-16 bg-white overflow-hidden flex-shrink-0 border border-neutral-200 relative">
+                                <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="64px" />
                             </div>
                             <div className="flex-1">
                                 <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>

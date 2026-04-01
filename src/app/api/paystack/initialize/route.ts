@@ -18,6 +18,9 @@ export async function POST(request: Request) {
 
         const cartArr: any[] = Array.isArray(cartItems) ? cartItems : [];
 
+        // Hoisted — populated inside the cart block, returned in the success response
+        let oosItems: string[] = [];
+
         // Calculate amount exclusively server-side — never trust client-supplied amounts
         let amountInGHS = 0;
         if (cartArr.length > 0 || productId) {
@@ -73,6 +76,30 @@ export async function POST(request: Request) {
                         { status: 409 }
                     );
                 }
+            }
+
+            // OOS enforcement — filter items where tracked inventory has zero stock
+            const productIds = cartArr.map((i: any) => i.productId).filter(Boolean);
+            const { data: stockProducts } = await supabaseAdmin
+                .from("products")
+                .select("id, available_stock, track_inventory, name")
+                .in("id", productIds);
+
+            const stockMap = Object.fromEntries((stockProducts ?? []).map((p: any) => [p.id, p]));
+
+            for (const item of cartArr) {
+                const p = stockMap[item.productId];
+                if (p && p.track_inventory && (p.available_stock ?? 0) < (item.quantity ?? 1)) {
+                    oosItems.push(item.name ?? item.productId);
+                }
+            }
+
+            // If all items are OOS, abort with 409
+            if (oosItems.length > 0 && oosItems.length === cartArr.length) {
+                return NextResponse.json(
+                    { error: "All items in your cart are out of stock.", oosItems },
+                    { status: 409 }
+                );
             }
 
             const { resolveWholesalePrice } = await import("@/lib/wholesale");
@@ -292,6 +319,7 @@ export async function POST(request: Request) {
                 authorizationUrl: data.data.authorization_url,
                 reference: data.data.reference,
                 orderId,
+                oosItems: oosItems ?? [],
             });
         } else {
             // Paystack init failed — mark pending order as cancelled
