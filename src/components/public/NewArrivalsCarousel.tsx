@@ -4,6 +4,16 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
+function isVideoUrl(url: string): boolean {
+    const lower = url.toLowerCase().split("?")[0];
+    return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov");
+}
+
+/** First non-video URL in the array, used as video poster fallback. */
+function posterUrl(urls: string[] | null): string | undefined {
+    return urls?.find(u => !isVideoUrl(u));
+}
+
 interface Product {
     slug: string;
     name: string;
@@ -40,13 +50,30 @@ export function NewArrivalsCarousel({ products }: NewArrivalsCarouselProps) {
                     return (
                         <Link key={p.slug} href={`/products/${p.slug}`} className="group block">
                             <div className="relative aspect-[3/4] overflow-hidden bg-neutral-100">
-                                <Image
-                                    src={p.image_urls?.[0] || FALLBACK}
-                                    alt={p.name}
-                                    fill
-                                    className="object-cover object-top group-hover:scale-105 transition-transform duration-700"
-                                    sizes="(max-width: 768px) 50vw, 25vw"
-                                />
+                                {(() => {
+                                    const primaryUrl = p.image_urls?.[0];
+                                    if (primaryUrl && isVideoUrl(primaryUrl)) {
+                                        return (
+                                            <video
+                                                src={primaryUrl}
+                                                poster={posterUrl(p.image_urls)}
+                                                preload="metadata"
+                                                muted
+                                                playsInline
+                                                className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
+                                            />
+                                        );
+                                    }
+                                    return (
+                                        <Image
+                                            src={primaryUrl || FALLBACK}
+                                            alt={p.name}
+                                            fill
+                                            className="object-cover object-top group-hover:scale-105 transition-transform duration-700"
+                                            sizes="(max-width: 768px) 50vw, 25vw"
+                                        />
+                                    );
+                                })()}
                                 <span className="absolute top-2.5 left-2.5 bg-black text-white text-[9px] tracking-[0.15em] uppercase px-2 py-1 font-bold leading-none">
                                     NEW
                                 </span>

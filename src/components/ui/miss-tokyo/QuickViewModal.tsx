@@ -5,6 +5,11 @@ import { supabase } from "@/lib/supabase";
 import { ProductCheckoutForm } from "./ProductCheckoutForm";
 import Image from "next/image";
 
+function isVideoUrl(url: string): boolean {
+    const lower = url.toLowerCase().split("?")[0];
+    return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov");
+}
+
 /** Minimum product fields the modal needs to render. */
 export interface QuickViewProduct {
     id: string;
@@ -89,12 +94,24 @@ export function QuickViewModal({
                         {/* Image side */}
                         <div className="w-full md:w-1/2 relative bg-neutral-50 h-64 md:h-auto">
                             {product.image_urls?.[0] ? (
-                                <Image
-                                    src={product.image_urls[0]}
-                                    alt={product.name}
-                                    fill
-                                    className="object-cover"
-                                />
+                                isVideoUrl(product.image_urls[0]) ? (
+                                    <video
+                                        src={product.image_urls[0]}
+                                        poster={product.image_urls.find(u => !isVideoUrl(u))}
+                                        preload="metadata"
+                                        muted
+                                        playsInline
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <Image
+                                        src={product.image_urls[0]}
+                                        alt={product.name}
+                                        fill
+                                        sizes="(max-width: 768px) 100vw, 50vw"
+                                        className="object-cover"
+                                    />
+                                )
                             ) : (
                                 <div className="absolute inset-0 flex items-center justify-center text-neutral-300 text-xs uppercase tracking-widest">
                                     No image

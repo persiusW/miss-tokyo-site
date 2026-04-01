@@ -32,7 +32,25 @@ export function ProductCheckoutForm({
     inventoryCount = 0, productVariants = [], onAddedToCart, openDrawerOnAdd,
 }: ProductCheckoutFormProps) {
     const { addItem } = useCart();
-    const sizesToRender = (availableSizes && availableSizes.length > 0) ? availableSizes : ["39", "40", "41", "42", "43", "44", "45", "46"];
+    // Map plain size labels to "Label — UK number" format for consistent display
+    const UK_SIZE_MAP: Record<string, number> = {
+        XS: 6, S: 8, M: 10, L: 12, XL: 14, XXL: 16, XXXL: 18, '4XL': 20, '5XL': 22,
+    };
+    const formatSize = (s: string) => {
+        if (s.includes(' — ')) return s; // already formatted
+        const uk = UK_SIZE_MAP[s.toUpperCase()];
+        return uk ? `${s} — ${uk}` : s;
+    };
+
+    // Deduplicate by root key (sizeKey strips " — 8" suffix), then format for display
+    const seen = new Set<string>();
+    const rawSizes = (availableSizes && availableSizes.length > 0) ? availableSizes : ["39", "40", "41", "42", "43", "44", "45", "46"];
+    const sizesToRender = rawSizes.filter(s => {
+        const k = sizeKey(s);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+    }).map(formatSize);
 
     const [selectedSize, setSelectedSize] = useState<string>("");
     const [selectedColor, setSelectedColor] = useState<string>(colors[0] || "");
