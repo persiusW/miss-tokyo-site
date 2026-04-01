@@ -70,3 +70,24 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
 
     return { success: true };
 }
+
+export async function updateFulfillmentStatus(orderId: string, fulfillment_status: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "Unauthorized" };
+
+    const { error } = await supabaseAdmin
+        .from("orders")
+        .update({ fulfillment_status })
+        .eq("id", orderId);
+
+    if (error) {
+        console.error("Failed to update fulfillment status:", error);
+        return { success: false, error: error.message };
+    }
+
+    revalidatePath(`/sales/orders/${orderId}`, "page");
+    revalidatePath("/sales/orders", "page");
+
+    return { success: true };
+}
