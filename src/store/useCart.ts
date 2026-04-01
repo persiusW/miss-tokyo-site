@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { resolveWholesalePrice, WholesaleTiers } from '@/lib/wholesale';
+import { toast } from '@/lib/toast';
 
 export type CartItem = {
     id: string; // productId + "-" + size + "-" + color
@@ -50,6 +51,11 @@ export const useCart = create<CartState>()(
             isOpen: false,
             setIsOpen: (isOpen) => set({ isOpen }),
             addItem: (item, openDrawer = true) => {
+                // Block if inventory is tracked (inventoryCount defined) and stock is zero
+                if (item.inventoryCount !== undefined && item.inventoryCount <= 0) {
+                    toast.error(`${item.name} is out of stock`);
+                    return;
+                }
                 set((state) => {
                     const existingItem = state.items.find(i => i.id === item.id);
                     if (existingItem) {
