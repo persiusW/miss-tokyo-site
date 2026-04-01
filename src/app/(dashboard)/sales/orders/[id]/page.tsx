@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "@/lib/toast";
-import { updateOrderStatus } from "../actions";
+import { updateOrderStatus, updateFulfillmentStatus } from "../actions";
 
 import { Printer, X } from "lucide-react";
 
@@ -17,6 +17,8 @@ type Order = {
     delivery_method?: string;
     total_amount: number;
     status: string;
+    payment_status?: string | null;
+    fulfillment_status?: string | null;
     paystack_reference: string | null;
     created_at: string;
     shipping_address?: any;
@@ -164,7 +166,7 @@ export default function OrderDetailPage() {
 
     useEffect(() => {
         Promise.all([
-            supabase.from("orders").select("*").eq("id", id).single(),
+            supabase.from("orders").select("id, customer_email, customer_name, customer_phone, delivery_method, total_amount, status, payment_status, fulfillment_status, paystack_reference, created_at, shipping_address, items, discount_code, discount_amount, customer_metadata, assigned_rider_id").eq("id", id).single(),
             supabase.from("business_settings").select("business_name, email, contact, address").eq("id", "default").single(),
             supabase.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
         ]).then(async ([{ data: ord }, { data: biz }, { data: ss }]) => {
@@ -243,6 +245,20 @@ export default function OrderDetailPage() {
                     setNotifStatus("idle");
                 }
             }
+        }
+        setUpdating(false);
+    };
+
+    // Fulfillment status update (separate from payment/order status)
+    const updateFulfillmentStatusLocal = async (newFulfillmentStatus: string) => {
+        if (!order) return;
+        setUpdating(true);
+        const res = await updateFulfillmentStatus(order.id, newFulfillmentStatus);
+        if (!res.success) {
+            toast.error(res.error || "Failed to update fulfillment status.");
+        } else {
+            setOrder(prev => prev ? { ...prev, fulfillment_status: newFulfillmentStatus } : prev);
+            toast.success(`Fulfillment status updated to ${newFulfillmentStatus}.`);
         }
         setUpdating(false);
     };
@@ -573,11 +589,11 @@ export default function OrderDetailPage() {
                         {[
                             ["Provider",    order.paystack_reference ? "Paystack" : "N/A"],
                             ["Reference",   order.paystack_reference || "—"],
-                            ["Status",      ["paid", "processing", "fulfilled", "delivered"].includes(order.status) ? "Successful" : order.status === "pending" ? "Pending" : "Failed"],
+                            ["Status",      order.payment_status === "paid" ? "Successful" : order.payment_status === "refunded" ? "Refunded" : order.payment_status === "cancelled" ? "Cancelled" : "Pending"],
                         ].map(([label, value]) => (
                             <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
                                 <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
-                                <span className={`font-medium font-mono ${label === "Status" && value === "Successful" ? "text-green-700" : label === "Status" && value === "Failed" ? "text-red-600" : "text-neutral-900"}`}>
+                                <span className={`font-medium font-mono ${label === "Status" && value === "Successful" ? "text-green-700" : label === "Status" && value === "Refunded" ? "text-neutral-500" : label === "Status" && value === "Cancelled" ? "text-red-600" : label === "Status" && value === "Pending" ? "text-amber-600" : "text-neutral-900"}`}>
                                     {value}
                                 </span>
                             </div>
@@ -611,6 +627,34 @@ export default function OrderDetailPage() {
                                     className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${
                                         order.status === s
                                             ? "bg-black text-white cursor-default"
+                                            : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                                    } disabled:opacity-50`}
+                                >
+                                    {s === "ready_for_pickup" ? "Ready for Pickup" : s}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Fulfillment Status */}
+                    <div className="bg-white border border-neutral-200 p-6 space-y-5">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xs uppercase tracking-widest font-semibold">Fulfillment Status</h2>
+                            {order.fulfillment_status && (
+                                <span className="text-[10px] uppercase tracking-widest font-semibold bg-blue-50 text-blue-700 px-2 py-1">
+                                    {order.fulfillment_status === "ready_for_pickup" ? "Ready for Pickup" : order.fulfillment_status}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {(["inbox", "processing", "packed", "shipped", "ready_for_pickup", "delivered"] as const).map(s => (
+                                <button
+                                    key={s}
+                                    onClick={() => updateFulfillmentStatusLocal(s)}
+                                    disabled={updating || order.fulfillment_status === s}
+                                    className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${
+                                        order.fulfillment_status === s
+                                            ? "bg-blue-600 text-white cursor-default"
                                             : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
                                     } disabled:opacity-50`}
                                 >
