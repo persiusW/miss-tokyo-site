@@ -114,6 +114,27 @@ export default function CheckoutPage() {
                 });
             }
         });
+
+        // Auto-fill for logged-in users
+        supabase.auth.getUser().then(async ({ data }: { data: { user: import('@supabase/supabase-js').User | null } }) => {
+            const user = data.user;
+            if (!user) return;
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name, email, phone, address, region, country')
+                .eq('id', user.id)
+                .single();
+            if (!profile) return;
+            setForm(prev => ({
+                ...prev,
+                fullName: profile.full_name || prev.fullName,
+                email:    profile.email    || user.email || prev.email,
+                phone:    profile.phone    || prev.phone,
+                address:  profile.address  || prev.address,
+                region:   profile.region   || prev.region,
+                country:  profile.country  || prev.country,
+            }));
+        });
     }, []);
 
     const lastFetchedKey = useRef<string>("");
