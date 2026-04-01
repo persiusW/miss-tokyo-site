@@ -227,6 +227,7 @@ export async function POST(req: Request) {
                     total_amount: posSession.total_amount,
                     discount_amount: 0,
                     status: "paid",
+                    payment_status: "paid",
                     paystack_reference: posSession.paystack_reference,
                     delivery_method: "pickup",
                     source: "pos",
@@ -326,6 +327,7 @@ export async function POST(req: Request) {
                         total_amount: posSession.total_amount,
                         discount_amount: 0,
                         status: "paid",
+                        payment_status: "paid",
                         paystack_reference: paystackRef,
                         delivery_method: "pickup",
                         source: "pos",
@@ -625,10 +627,12 @@ export async function POST(req: Request) {
                                 const { data: currentOrderData } = await supabaseAdmin.from("orders").select("customer_metadata").eq("id", orderId).single();
                 const currentMeta = (currentOrderData?.customer_metadata as object) || {};
 
+                // Only set payment_status — never overwrite fulfillment_status or status
+                // Idempotency guard: only update payment_status if still pending
                 const { error } = await supabaseAdmin
                     .from("orders")
                     .update({
-                        status: "paid",
+                        payment_status: "paid",
                         paystack_reference: paystackRef,
                         customer_name: fullName || null,
                         customer_phone: phone || null,
@@ -647,7 +651,8 @@ export async function POST(req: Request) {
                         },
                         ...(customerId ? { customer_id: customerId } : {}),
                     })
-                    .eq("id", orderId);
+                    .eq("id", orderId)
+                    .in("payment_status", ["pending"]); // idempotency: only update if still pending
 
                 if (error) {
                     console.error("Webhook: Failed to update order:", error);
@@ -714,6 +719,7 @@ export async function POST(req: Request) {
                             delivery_method: deliveryMethod || null,
                             total_amount: amountGHS,
                             status: "paid",
+                            payment_status: "paid",
                             paystack_reference: paystackRef,
                             items: parsedItems,
                             discount_code: discount_code || null,
