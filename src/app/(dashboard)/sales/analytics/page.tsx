@@ -7,11 +7,9 @@ import { RevenueLineChart, OrdersBarChart, TopItemsList, type DailyPoint, type T
 import { SalesByItemTable, SalesByVariantTable, type ItemRow, type VariantRow } from "./ReportsTab";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-// const REVENUE_STATUSES = ["paid", "processing", "packed", "fulfilled", "delivered"];
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-// Note: Double check your database to see if "ready for pickup" uses spaces or underscores (e.g., "ready_for_pickup")
-const REVENUE_STATUSES = ["paid", "packed", "processing", "ready for pickup", "shipped", "fulfilled", "delivered"];
+// After dual-status migration, filter by payment_status directly in the query.
+// REVENUE_STATUSES is no longer needed for the primary filter.
+// const REVENUE_STATUSES = ["paid", "packed", "processing", "ready for pickup", "shipped", "fulfilled", "delivered"];
 
 type Preset = "today" | "yesterday" | "7d" | "30d" | "ytd" | "custom";
 type Tab = "highlights" | "traffic" | "reports" | "insights";
@@ -73,7 +71,7 @@ function toInputDate(d: Date) {
 }
 
 // ─── Aggregation helpers ──────────────────────────────────────────────────────
-type RawOrder = { id: string; status: string; total_amount: number; items: any; created_at: string; customer_email?: string; customer_name?: string };
+type RawOrder = { id: string; status: string; payment_status?: string; total_amount: number; items: any; created_at: string; customer_email?: string; customer_name?: string };
 
 // function aggregateData(orders: RawOrder[], allOrders: RawOrder[]) {
 //     // const revenueOrders = orders.filter(o => REVENUE_STATUSES.includes(o.status));
@@ -321,21 +319,25 @@ export default function AnalyticsPage() {
         setLoading(true);
         const { start, end } = dateRange;
 
+        // Fetch all orders for the order-count chart (unfiltered by payment_status)
         const { data: allOrders } = await supabase
             .from("orders")
-            .select("id, status, total_amount, items, created_at, customer_email, customer_name")
+            .select("id, status, payment_status, total_amount, items, created_at, customer_email, customer_name")
+            .gte("created_at", start.toISOString())
+            .lte("created_at", end.toISOString())
+            .order("created_at");
+
+        // Fetch only paid orders for revenue metrics (filtered by payment_status)
+        const { data: paidOrders } = await supabase
+            .from("orders")
+            .select("id, status, payment_status, total_amount, items, created_at, customer_email, customer_name")
+            .eq("payment_status", "paid")
             .gte("created_at", start.toISOString())
             .lte("created_at", end.toISOString())
             .order("created_at");
 
         const rows = (allOrders ?? []) as RawOrder[];
-
-        // BULLETPROOF STATUS FILTER: Lowercase and trim to catch "Paid ", "PAID", etc.
-        const revenueRows = rows.filter(o => {
-            const normalizedStatus = (o.status || "").toLowerCase().trim();
-            // We check against your allowed statuses, plus catch the 'furfilled' typo just in case!
-            return REVENUE_STATUSES.includes(normalizedStatus) || normalizedStatus === "furfilled";
-        });
+        const revenueRows = (paidOrders ?? []) as RawOrder[];
 
         const agg = aggregateData(revenueRows, rows);
         setRevenueChart(agg.revenueChart);
