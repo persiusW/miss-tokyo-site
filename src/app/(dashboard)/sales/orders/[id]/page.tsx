@@ -589,7 +589,13 @@ export default function OrderDetailPage() {
                         {[
                             ["Provider",    order.paystack_reference ? "Paystack" : "N/A"],
                             ["Reference",   order.paystack_reference || "—"],
-                            ["Status",      order.payment_status === "paid" ? "Successful" : order.payment_status === "refunded" ? "Refunded" : order.payment_status === "cancelled" ? "Cancelled" : "Pending"],
+                            ["Status",      (() => {
+                                // Derive from payment_status; fall back to status for orders that predate the migration
+                                const ps = (!order.payment_status || order.payment_status === "pending")
+                                    ? (["paid","processing","packed","shipped","ready_for_pickup","fulfilled","delivered"].includes(order.status) ? "paid" : order.status === "refunded" ? "refunded" : order.status === "cancelled" ? "cancelled" : "pending")
+                                    : order.payment_status;
+                                return ps === "paid" ? "Successful" : ps === "refunded" ? "Refunded" : ps === "cancelled" ? "Cancelled" : "Pending";
+                            })()],
                         ].map(([label, value]) => (
                             <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
                                 <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>

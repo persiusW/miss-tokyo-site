@@ -122,18 +122,14 @@ export default function CheckoutPage() {
             if (!user) return;
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('full_name, email, phone, address, region, country')
+                .select('full_name, email')
                 .eq('id', user.id)
                 .single();
-            if (!profile) return;
+            // profiles only stores full_name + email; phone/address live on orders history
             setForm(prev => ({
                 ...prev,
-                fullName: profile.full_name || prev.fullName,
-                email:    profile.email    || user.email || prev.email,
-                phone:    profile.phone    || prev.phone,
-                address:  profile.address  || prev.address,
-                region:   profile.region   || prev.region,
-                country:  profile.country  || prev.country,
+                fullName: profile?.full_name || prev.fullName,
+                email:    profile?.email     || user.email || prev.email,
             }));
         });
     }, []);
