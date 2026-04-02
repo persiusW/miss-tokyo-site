@@ -62,6 +62,7 @@ export function HeroSlider({ slides }: HeroSliderProps) {
           alt={firstSlide.headline_line1}
           fill
           priority
+          loading="eager"
           sizes="100vw"
           className={`object-cover object-center transition-opacity duration-1000 ${current === 0 ? "opacity-100" : "opacity-0"}`}
         />
