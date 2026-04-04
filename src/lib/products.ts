@@ -227,13 +227,20 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         .or("is_active.eq.true,is_active.is.null")
         .maybeSingle();
 
-    // LOG-07: throw on DB error so Next.js shows a 500 (transient), not a false 404
     if (error) {
-        // PGRST002 is a transient 503 during PostgREST schema cache reload (e.g. DB restart).
-        // Retry once after a short delay rather than surface a false 404.
+        // PGRST002: transient PostgREST schema cache reload — retry once.
         if ((error as any).code === "PGRST002") {
             await new Promise(r => setTimeout(r, 500));
             return getProductBySlug(slug);
+        }
+        // Transient gateway error (Supabase/Cloudflare 502/503 during Vercel build or at runtime).
+        // The Supabase JS client surfaces these as an error whose message contains raw HTML.
+        // Throwing here crashes the SSG build worker for every product; returning null lets the
+        // page call notFound() gracefully and ISR will rehydrate on the next request.
+        const msg = String((error as any)?.message ?? "");
+        if (msg.includes("<!DOCTYPE") || msg.includes("Bad gateway") || msg.includes("502") || msg.includes("503")) {
+            console.warn("[getProductBySlug] Transient gateway error for slug:", slug, "— skipping pre-render");
+            return null;
         }
         console.error("[getProductBySlug]", error);
         throw error;
