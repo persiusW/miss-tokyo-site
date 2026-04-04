@@ -42,16 +42,18 @@ export default function LoginPage() {
         setLoading(true);
         setError("");
 
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${siteUrl}/account/reset-password`,
-        });
-
-        setLoading(false);
-        if (resetError) {
-            setError("Could not send reset email. Please try again.");
-        } else {
+        try {
+            await fetch("/api/auth/forgot-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            // Always show success — never reveal whether account exists
             setResetSent(true);
+        } catch {
+            setError("Could not send reset email. Please try again.");
+        } finally {
+            setLoading(false);
         }
     };
 
