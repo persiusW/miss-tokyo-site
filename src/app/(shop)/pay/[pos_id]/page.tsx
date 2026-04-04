@@ -1,6 +1,7 @@
 // src/app/(shop)/pay/[pos_id]/page.tsx
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import type { PosSessionPublic } from '@/types/pos';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://misstokyo.shop';
@@ -39,9 +40,9 @@ export default async function PosPaymentPage({ params }: { params: Promise<{ pos
                     <p className="text-sm text-neutral-500 tracking-wide">
                         This payment link has expired. Please contact the store to generate a new one.
                     </p>
-                    <a href="/" className="block text-[11px] uppercase tracking-widest text-neutral-400 hover:text-black transition-colors">
+                    <Link href="/" className="block text-[11px] uppercase tracking-widest text-neutral-400 hover:text-black transition-colors">
                         Return to Store
-                    </a>
+                    </Link>
                 </div>
             </main>
         );
@@ -54,9 +55,9 @@ export default async function PosPaymentPage({ params }: { params: Promise<{ pos
                     <p className="text-[10px] uppercase tracking-[0.4em] text-neutral-400">Miss Tokyo</p>
                     <h1 className="text-2xl uppercase tracking-widest font-bold">Already Paid</h1>
                     <p className="text-sm text-neutral-500 tracking-wide">This order has already been paid. Thank you!</p>
-                    <a href="/" className="block text-[11px] uppercase tracking-widest text-neutral-400 hover:text-black transition-colors">
+                    <Link href="/" className="block text-[11px] uppercase tracking-widest text-neutral-400 hover:text-black transition-colors">
                         Return to Store
-                    </a>
+                    </Link>
                 </div>
             </main>
         );
