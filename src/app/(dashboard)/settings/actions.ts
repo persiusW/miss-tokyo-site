@@ -142,3 +142,68 @@ export async function removeTeamMember(userId: string) {
 
     return { success: true };
 }
+
+export async function sendPasswordResetLink(targetEmail: string) {
+    const supabase = await createClient();
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return { success: false, error: "Unauthorized" };
+
+    const { data: callerData } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userData.user.id)
+        .single();
+    if (!callerData || (callerData.role !== "admin" && callerData.role !== "owner")) {
+        return { success: false, error: "Forbidden: Only admins and owners can send reset links." };
+    }
+
+    const { createClient: createServiceClient } = await import("@supabase/supabase-js");
+    const adminClient = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+        type: "recovery",
+        email: targetEmail,
+        options: { redirectTo: `${siteUrl}/account/reset-password` },
+    });
+
+    if (linkError || !linkData) {
+        console.error("[sendPasswordResetLink] generateLink failed:", linkError);
+        return { success: false, error: "Failed to generate reset link." };
+    }
+
+    const resetLink = (linkData as any)?.properties?.action_link;
+    if (!resetLink) return { success: false, error: "Could not retrieve reset link." };
+
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "info@misstokyo.shop";
+    const { error: emailError } = await resend.emails.send({
+        from: `Miss Tokyo <${fromEmail}>`,
+        to: targetEmail,
+        subject: "Reset your Miss Tokyo password",
+        html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:40px 24px;color:#111">
+                <p style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#999;margin-bottom:32px">Miss Tokyo</p>
+                <h1 style="font-size:22px;font-weight:400;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px">Password Reset</h1>
+                <p style="font-size:14px;color:#555;line-height:1.6;margin-bottom:32px">
+                    A password reset was requested for your account. Click the button below to set a new password.
+                    This link expires in 1 hour.
+                </p>
+                <a href="${resetLink}" style="display:inline-block;background:#000;color:#fff;padding:14px 32px;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;text-decoration:none">
+                    Reset Password
+                </a>
+                <p style="font-size:12px;color:#999;margin-top:32px">If you did not request this, you can safely ignore this email.</p>
+            </div>
+        `,
+    });
+
+    if (emailError) {
+        console.error("[sendPasswordResetLink] email send failed:", emailError);
+        return { success: false, error: "Reset link generated but email failed to send." };
+    }
+
+    return { success: true };
+}

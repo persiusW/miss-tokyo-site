@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { X, Mail, UserPlus, CheckCircle, Clock } from "lucide-react";
-import { inviteTeamMember, removeTeamMember } from "@/app/(dashboard)/settings/actions";
+import { X, Mail, UserPlus, CheckCircle, Clock, KeyRound } from "lucide-react";
+import { inviteTeamMember, removeTeamMember, sendPasswordResetLink } from "@/app/(dashboard)/settings/actions";
 
 type TeamMember = {
     id: string;
@@ -206,6 +206,24 @@ export function TeamTab() {
     };
 
     const [removingId, setRemovingId] = useState<string | null>(null);
+    const [sendingResetId, setSendingResetId] = useState<string | null>(null);
+
+    const handleSendReset = async (member: TeamMember) => {
+        if (!confirm(`Send a password reset link to ${member.email}?`)) return;
+        setSendingResetId(member.id);
+        try {
+            const res = await sendPasswordResetLink(member.email);
+            if (!res.success) {
+                toast.error(res.error || "Failed to send reset link.");
+            } else {
+                toast.success(`Reset link sent to ${member.email}.`);
+            }
+        } catch {
+            toast.error("An unexpected error occurred.");
+        } finally {
+            setSendingResetId(null);
+        }
+    };
 
     const handleRemove = async (member: TeamMember) => {
         if (member.role === "owner" || member.role === "admin") {
@@ -304,15 +322,26 @@ export function TeamTab() {
                                                 {new Date(member.created_at).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                {(member.role !== "owner" && member.role !== "admin") && (
-                                                    <button 
-                                                        onClick={() => handleRemove(member)}
-                                                        disabled={removingId === member.id}
-                                                        className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                <div className="flex items-center justify-end gap-3">
+                                                    <button
+                                                        onClick={() => handleSendReset(member)}
+                                                        disabled={sendingResetId === member.id}
+                                                        title="Send password reset link"
+                                                        className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-black transition-colors disabled:opacity-50"
                                                     >
-                                                        {removingId === member.id ? "Removing..." : "Remove"}
+                                                        <KeyRound size={12} />
+                                                        {sendingResetId === member.id ? "Sending..." : "Reset"}
                                                     </button>
-                                                )}
+                                                    {(member.role !== "owner" && member.role !== "admin") && (
+                                                        <button
+                                                            onClick={() => handleRemove(member)}
+                                                            disabled={removingId === member.id}
+                                                            className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {removingId === member.id ? "Removing..." : "Remove"}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
