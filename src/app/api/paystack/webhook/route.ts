@@ -189,10 +189,191 @@ export async function POST(req: Request) {
 
         const event = JSON.parse(rawBody);
 
+        // ── POS: invoice.payment handler ──────────────────────────────────
+        if (event.event === "invoice.payment") {
+            const meta = event.data?.metadata ?? {};
+
+            // Only handle POS payments — ignore standard invoice payments (source='invoice')
+            if (meta?.source !== "pos" || !meta?.pos_session_id) {
+                return NextResponse.json({ received: true });
+            }
+
+            const posSessionId: string = meta.pos_session_id;
+
+            // Fetch session (idempotency: skip if already paid)
+            const { data: posSession } = await supabaseAdmin
+                .from("pos_sessions")
+                .select("*")
+                .eq("id", posSessionId)
+                .single();
+
+            if (!posSession || posSession.status === "paid") {
+                return NextResponse.json({ received: true });
+            }
+
+            const items: any[] = Array.isArray(posSession.items) ? posSession.items : [];
+
+            // Create the real order
+            const { data: newOrder } = await supabaseAdmin
+                .from("orders")
+                .insert({
+                    customer_email: posSession.customer_email,
+                    customer_name: posSession.customer_name,
+                    customer_phone: posSession.customer_phone,
+                    shipping_address: posSession.customer_address
+                        ? { address: posSession.customer_address }
+                        : null,
+                    items: posSession.items,
+                    total_amount: posSession.total_amount,
+                    discount_amount: 0,
+                    status: "paid",
+                    paystack_reference: posSession.paystack_reference,
+                    delivery_method: "pickup",
+                    source: "pos",
+                    notes: posSession.notes,
+                    customer_id: posSession.contact_id,
+                })
+                .select("id")
+                .single();
+
+            // Update session
+            await supabaseAdmin
+                .from("pos_sessions")
+                .update({
+                    status: "paid",
+                    paid_at: new Date().toISOString(),
+                    order_id: newOrder?.id ?? null,
+                })
+                .eq("id", posSessionId);
+
+            // Release inventory reservations
+            await supabaseAdmin
+                .from("pos_reservations")
+                .delete()
+                .eq("pos_session_id", posSessionId);
+
+            // Decrement inventory from pos_session.items (not Paystack metadata)
+            // POS items carry variantId as a UUID directly — do NOT use size/color key lookup
+            if (items.length > 0) {
+                const productIds = [...new Set(items.map((i: any) => i.productId).filter(Boolean))];
+                const { data: products } = await supabaseAdmin
+                    .from("products")
+                    .select("id, inventory_count, track_variant_inventory")
+                    .in("id", productIds);
+                const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
+
+                await Promise.allSettled(items.map(async (item: any) => {
+                    const product = productMap.get(item.productId);
+                    if (!product) return;
+                    const qty = item.quantity ?? 1;
+                    if (product.track_variant_inventory && item.variantId) {
+                        const { data: variant } = await supabaseAdmin
+                            .from("product_variants")
+                            .select("inventory_count")
+                            .eq("id", item.variantId)
+                            .single();
+                        if (variant && typeof variant.inventory_count === "number") {
+                            await supabaseAdmin
+                                .from("product_variants")
+                                .update({ inventory_count: Math.max(0, variant.inventory_count - qty) })
+                                .eq("id", item.variantId);
+                        }
+                    } else if (!product.track_variant_inventory && typeof product.inventory_count === "number") {
+                        await supabaseAdmin
+                            .from("products")
+                            .update({ inventory_count: Math.max(0, product.inventory_count - qty) })
+                            .eq("id", item.productId);
+                    } else {
+                        // track_variant_inventory=true but no variantId — POS cart should never produce this
+                        console.warn("[POS webhook] inventory skip: track_variant_inventory=true but variantId missing", { productId: item.productId });
+                    }
+                }));
+            }
+
+            return NextResponse.json({ received: true });
+        }
+        // ── END POS handler ────────────────────────────────────────────────
+
         if (event.event === "charge.success") {
             const data = event.data;
             const paystackRef: string = data.reference || "";
             const metadata = data.metadata || {};
+
+            // ── POS: charge.success from transaction/initialize ────────────────
+            if (metadata.source === "pos" && metadata.pos_session_id) {
+                const posSessionId: string = metadata.pos_session_id;
+
+                const { data: posSession } = await supabaseAdmin
+                    .from("pos_sessions")
+                    .select("*")
+                    .eq("id", posSessionId)
+                    .single();
+
+                if (!posSession || posSession.status === "paid") {
+                    return NextResponse.json({ received: true });
+                }
+
+                const items: any[] = Array.isArray(posSession.items) ? posSession.items : [];
+
+                const { data: newOrder } = await supabaseAdmin
+                    .from("orders")
+                    .insert({
+                        customer_email: posSession.customer_email,
+                        customer_name: posSession.customer_name,
+                        customer_phone: posSession.customer_phone,
+                        shipping_address: posSession.customer_address ? { address: posSession.customer_address } : null,
+                        items: posSession.items,
+                        total_amount: posSession.total_amount,
+                        discount_amount: 0,
+                        status: "paid",
+                        paystack_reference: paystackRef,
+                        delivery_method: "pickup",
+                        source: "pos",
+                        notes: posSession.notes,
+                        customer_id: posSession.contact_id,
+                    })
+                    .select("id")
+                    .single();
+
+                await supabaseAdmin
+                    .from("pos_sessions")
+                    .update({ status: "paid", paid_at: new Date().toISOString(), order_id: newOrder?.id ?? null })
+                    .eq("id", posSessionId);
+
+                await supabaseAdmin.from("pos_reservations").delete().eq("pos_session_id", posSessionId);
+
+                if (items.length > 0) {
+                    const productIds = [...new Set(items.map((i: any) => i.productId).filter(Boolean))];
+                    const { data: products } = await supabaseAdmin
+                        .from("products")
+                        .select("id, inventory_count, track_variant_inventory")
+                        .in("id", productIds);
+                    const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
+
+                    await Promise.allSettled(items.map(async (item: any) => {
+                        const product = productMap.get(item.productId);
+                        if (!product) return;
+                        const qty = item.quantity ?? 1;
+                        if (product.track_variant_inventory && item.variantId) {
+                            const { data: variant } = await supabaseAdmin
+                                .from("product_variants").select("inventory_count").eq("id", item.variantId).single();
+                            if (variant && typeof variant.inventory_count === "number") {
+                                await supabaseAdmin.from("product_variants")
+                                    .update({ inventory_count: Math.max(0, variant.inventory_count - qty) })
+                                    .eq("id", item.variantId);
+                            }
+                        } else if (!product.track_variant_inventory && typeof product.inventory_count === "number") {
+                            await supabaseAdmin.from("products")
+                                .update({ inventory_count: Math.max(0, product.inventory_count - qty) })
+                                .eq("id", item.productId);
+                        }
+                    }));
+                }
+
+                return NextResponse.json({ received: true });
+            }
+            // ── END POS charge.success handler ─────────────────────────────────
+
             const {
                 orderId, requestId, productId, fullName, phone, address, country, region,
                 whatsapp, instagram, snapchat, deliveryMethod, cartItems,
@@ -205,21 +386,28 @@ export async function POST(req: Request) {
             // Verify if this transaction has already been processed to prevent double inventory/logic
             let isAlreadyProcessed = false;
             let emailAlreadySent = false;
-            
+            // Items fetched from DB — avoids relying on cartItems in Paystack metadata
+            // (large carts hit Paystack's metadata size limit).
+            let orderItemsFromDB: any[] = [];
+
             if (orderId) {
                 const { data: existingOrder } = await supabaseAdmin
                     .from("orders")
-                    .select("status, paystack_reference, customer_metadata")
+                    .select("status, paystack_reference, customer_metadata, items")
                     .eq("id", orderId)
                     .single();
-                
+
                 if (existingOrder && (existingOrder.status === "paid" || existingOrder.status === "confirmed" || existingOrder.paystack_reference === paystackRef)) {
                     console.log(`[webhook] Order ${orderId} already processed in DB. Skipping inventory deductions but will trigger email.`);
                     isAlreadyProcessed = true;
                 }
-                
+
                 if (existingOrder && (existingOrder.customer_metadata as any)?.webhook_email_sent) {
                     emailAlreadySent = true;
+                }
+
+                if (existingOrder?.items && Array.isArray(existingOrder.items)) {
+                    orderItemsFromDB = existingOrder.items;
                 }
             } else if (paystackRef) {
                 const { data: existingOrder } = await supabaseAdmin
@@ -294,7 +482,11 @@ export async function POST(req: Request) {
                     .eq("id", requestId);
             }
 
-            const parsedItems = parseItems(cartItems);
+            // Prefer items from the DB order record; fall back to metadata cartItems
+            // for backward compat with any in-flight webhooks from the old code.
+            const parsedItems = parseItems(cartItems).length > 0
+                ? parseItems(cartItems)
+                : orderItemsFromDB;
 
             // Decrement inventory — hybrid model: variant-level or product-level
             if (!isAlreadyProcessed && parsedItems.length > 0) {

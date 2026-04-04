@@ -47,12 +47,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Dynamic Product routes
     const { data: products } = await supabase
         .from('products')
-        .select('slug, updated_at')
+        .select('slug, created_at')
         .eq('is_active', true);
 
     const productRoutes: MetadataRoute.Sitemap = (products || []).map((product: any) => ({
         url: `${BASE_URL}/products/${product.slug}`,
-        lastModified: product.updated_at ? new Date(product.updated_at) : new Date(),
+        lastModified: product.created_at ? new Date(product.created_at) : new Date(),
         changeFrequency: 'weekly',
         priority: 0.9,
     }));

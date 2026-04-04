@@ -13,9 +13,9 @@ type Category = { id: string; name: string; slug: string; is_wholesale: boolean 
 
 type VariantStore = Record<string, { sku: string; inventory_count: number }>;
 
-function makeVariantKey(size: string, color: string, stitching: string): string {
-    return `${size}||${color}||${stitching}`;
-}
+// function makeVariantKey(size: string, color: string, stitching: string): string {
+//     return `${size}||${color}||${stitching}`;
+// }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -91,8 +91,8 @@ export default function EditProductPage() {
     const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
     const [globalColors, setGlobalColors] = useState<string[]>([]);
     const [selectedColors, setSelectedColors] = useState<string[]>([]);
-    const [globalStitching, setGlobalStitching] = useState<string[]>([]);
-    const [selectedStitching, setSelectedStitching] = useState<string[]>([]);
+    // const [globalStitching, setGlobalStitching] = useState<string[]>([]);
+    // const [selectedStitching, setSelectedStitching] = useState<string[]>([]);
     const [trackInventory, setTrackInventory] = useState(true);
     const [trackVariantInventory, setTrackVariantInventory] = useState(false);
     const [variantData, setVariantData] = useState<VariantStore>({});
@@ -155,10 +155,10 @@ export default function EditProductPage() {
                 setGlobalColors(storeData.global_colors);
                 setSelectedColors(product.available_colors || []);
             }
-            if (storeData.global_stitching) {
-                setGlobalStitching(storeData.global_stitching);
-                setSelectedStitching(product.available_stitching || storeData.global_stitching);
-            }
+            // if (storeData.global_stitching) {
+            //     setGlobalStitching(storeData.global_stitching);
+            //     setSelectedStitching(product.available_stitching || storeData.global_stitching);
+            // }
             setSelectedCategoryIds(Array.isArray(product.category_ids) ? product.category_ids : []);
             setWholesaleOverride(product.wholesale_override === true);
             setWholesalePrices({
@@ -184,7 +184,8 @@ export default function EditProductPage() {
         if (existingVariants && existingVariants.length > 0) {
             const store: VariantStore = {};
             for (const v of existingVariants) {
-                const key = makeVariantKey(v.size || "", v.color || "", v.stitching || "");
+                // const key = makeVariantKey(v.size || "", v.color || "", v.stitching || "");
+                const key = `${v.size || ""}||${v.color || ""}||`; // Stitching removed from key
                 store[key] = { sku: v.sku || "", inventory_count: v.inventory_count ?? 0 };
             }
             setVariantData(store);
@@ -199,13 +200,14 @@ export default function EditProductPage() {
     const variantCombos = useMemo(() => {
         const ss = selectedSizes.length > 0 ? selectedSizes : [""];
         const cc = selectedColors.length > 0 ? selectedColors : [""];
-        const st = selectedStitching.length > 0 ? selectedStitching : [""];
+        // const st = selectedStitching.length > 0 ? selectedStitching : [""];
         const combos: Array<{ size: string; color: string; stitching: string; key: string }> = [];
-        for (const s of ss) for (const c of cc) for (const t of st) {
-            combos.push({ size: s, color: c, stitching: t, key: makeVariantKey(s, c, t) });
+        for (const s of ss) for (const c of cc) {
+            const key = `${s}||${c}||`;
+            combos.push({ size: s, color: c, stitching: "", key });
         }
         return combos;
-    }, [selectedSizes, selectedColors, selectedStitching]);
+    }, [selectedSizes, selectedColors]);
 
     const handleChange = useCallback((e: any) => {
         const { id: fieldId, value, type } = e.target;
@@ -223,9 +225,9 @@ export default function EditProductPage() {
         setSelectedColors(prev => prev.includes(col) ? prev.filter(s => s !== col) : [...prev, col]);
     };
 
-    const toggleStitching = (stitch: string) => {
-        setSelectedStitching(prev => prev.includes(stitch) ? prev.filter(s => s !== stitch) : [...prev, stitch]);
-    };
+    // const toggleStitching = (stitch: string) => {
+    //     setSelectedStitching(prev => prev.includes(stitch) ? prev.filter(s => s !== stitch) : [...prev, stitch]);
+    // };
 
     const updateVariantCell = (key: string, field: "sku" | "inventory_count", value: string | number) => {
         setVariantData(prev => ({
@@ -259,9 +261,8 @@ export default function EditProductPage() {
                     category_type: formData.category_type,
                     category_ids: selectedCategoryIds,
                     image_urls: imageUrls,
-                    available_sizes: selectedSizes,
                     available_colors: selectedColors,
-                    available_stitching: selectedStitching,
+                    // available_stitching: selectedStitching,
                     is_active: formData.is_active,
                     wholesale_override: wholesaleOverride,
                     wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
@@ -499,7 +500,7 @@ export default function EditProductPage() {
                                 )}
                             </div>
 
-                            <div className="pt-6 border-t border-neutral-100">
+                            {/* <div className="pt-6 border-t border-neutral-100">
                                 <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Stitching</label>
                                 {globalStitching.length === 0 ? (
                                     <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading stitching from store settings...</p>
@@ -518,7 +519,7 @@ export default function EditProductPage() {
                                         ))}
                                     </div>
                                 )}
-                            </div>
+                            </div> */}
 
                             {/* ── Variant Inventory Matrix ───────────────────── */}
                             {trackInventory && trackVariantInventory && (
@@ -539,9 +540,9 @@ export default function EditProductPage() {
                                                     {selectedColors.length > 0 && (
                                                         <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Color</th>
                                                     )}
-                                                    {selectedStitching.length > 0 && (
+                                                    {/* {selectedStitching.length > 0 && (
                                                         <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stitching</th>
-                                                    )}
+                                                    )} */}
                                                     <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">SKU</th>
                                                     <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stock</th>
                                                 </tr>
@@ -555,9 +556,9 @@ export default function EditProductPage() {
                                                         {selectedColors.length > 0 && (
                                                             <td className="px-3 py-2 text-neutral-600">{combo.color}</td>
                                                         )}
-                                                        {selectedStitching.length > 0 && (
+                                                        {/* {selectedStitching.length > 0 && (
                                                             <td className="px-3 py-2 text-neutral-600">{combo.stitching}</td>
-                                                        )}
+                                                        )} */}
                                                         <td className="px-3 py-2">
                                                             <input
                                                                 type="text"

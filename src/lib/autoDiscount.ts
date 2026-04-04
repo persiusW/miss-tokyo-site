@@ -96,7 +96,14 @@ function checkQuantityRequirement(
     rule: AutoDiscountRule,
 ): CartItem[] {
     if (rule.quantity_scope === "PER_PRODUCT") {
-        return eligible.filter(i => i.quantity >= rule.min_quantity);
+        // Sum all variant rows for the same productId (e.g. 1× Red + 1× Green
+        // of the same shirt = 2 units), then keep rows whose product-level
+        // total meets the minimum.
+        const qtyByProduct: Record<string, number> = {};
+        for (const i of eligible) {
+            qtyByProduct[i.productId] = (qtyByProduct[i.productId] ?? 0) + i.quantity;
+        }
+        return eligible.filter(i => qtyByProduct[i.productId] >= rule.min_quantity);
     }
     // ACROSS_TARGET
     const totalQty = eligible.reduce((s, i) => s + i.quantity, 0);
@@ -223,10 +230,15 @@ export function evaluateAutoDiscounts(
                 });
             }
         } else {
-            // PER_PRODUCT — report the smallest gap (most actionable nudge)
-            const shortItems = eligible.filter(i => i.quantity > 0 && i.quantity < rule.min_quantity);
-            if (shortItems.length > 0) {
-                const minNeeded = Math.min(...shortItems.map(i => rule.min_quantity - i.quantity));
+            // PER_PRODUCT — aggregate variants by productId before checking gap
+            const qtyByProduct: Record<string, number> = {};
+            for (const i of eligible) {
+                qtyByProduct[i.productId] = (qtyByProduct[i.productId] ?? 0) + i.quantity;
+            }
+            const shortProducts = [...new Set(eligible.map(i => i.productId))]
+                .filter(pid => qtyByProduct[pid] > 0 && qtyByProduct[pid] < rule.min_quantity);
+            if (shortProducts.length > 0) {
+                const minNeeded = Math.min(...shortProducts.map(pid => rule.min_quantity - qtyByProduct[pid]));
                 nearMisses.push({
                     id: rule.id,
                     title: rule.title,

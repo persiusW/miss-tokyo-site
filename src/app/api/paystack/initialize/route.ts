@@ -219,13 +219,15 @@ export async function POST(request: Request) {
 
         const orderId = pendingOrder.id;
 
-        const amountInPesewas = amountWithFee * 100;
+        const amountInPesewas = Math.round(amountWithFee * 100);
         const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
         const siteUrl = rawSiteUrl.replace(/\/+$/, "");
 
-        // --- SPLIT GROUP (SPL_xxx) — active for testing ---
+        // --- SPLIT GROUP (SPL_xxx) — only applied when amount is above Paystack's
+        // minimum subaccount payout (~GHS 5). Below that, the 2.5% allocation
+        // rounds to less than 1 pesewa and Paystack returns "No active channel".
         const paystackSplitCode = process.env.PAYSTACK_SPLIT_CODE;
-        const splitPayload = paystackSplitCode ? { split_code: paystackSplitCode } : {};
+        const splitPayload = (paystackSplitCode && amountWithFee >= 5) ? { split_code: paystackSplitCode } : {};
 
         // --- SUBACCOUNT (ACCT_xxx) — commented out while testing split groups ---
         // const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
@@ -253,7 +255,8 @@ export async function POST(request: Request) {
                     ...clientMetadata,
                     productId,
                     orderId,
-                    cartItems: cartArr.length > 0 ? JSON.stringify(cartArr) : undefined,
+                    // cartItems intentionally omitted — already stored in orders.items in DB.
+                    // Sending large carts as metadata payload hits Paystack's size limit.
                     // Override client-supplied fee values with server-calculated ones
                     platform_fee_amount: platformFeeAmount > 0 ? platformFeeAmount : undefined,
                     platform_fee_label: platformFeeLabel,

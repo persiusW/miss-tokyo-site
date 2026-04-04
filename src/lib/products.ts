@@ -23,6 +23,8 @@ export interface ShopProduct {
     is_sale: boolean;
     discount_value: number;
     inventory_count: number;
+    track_inventory: boolean;
+    track_variant_inventory: boolean;
     category_ids: string[] | null;
     created_at: string;
 }
@@ -92,7 +94,7 @@ const getCachedProducts = unstable_cache(
                 `id, name, slug, description, price_ghs, compare_at_price_ghs,
                  image_urls, is_featured, is_active, category_id, category_type, category_ids,
                  available_colors, available_sizes, color_variants, size_variants,
-                 bundle_label, badge, is_sale, discount_value, inventory_count, sku, created_at`,
+                 bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, sku, created_at`,
                 { count: "exact" }
             );
 
@@ -135,6 +137,8 @@ const getCachedProducts = unstable_cache(
                 ...p,
                 category_name: matchedCat?.name ?? p.category_type ?? null,
                 category_slug: matchedCat?.slug ?? null,
+                track_inventory: p.track_inventory ?? true,
+                track_variant_inventory: p.track_variant_inventory ?? false,
             };
         });
 
@@ -216,7 +220,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
-             bundle_label, badge, is_sale, discount_value, inventory_count,
+             bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory,
              sku, features_list, care_instructions, rating_average, review_count, created_at,
              wholesale_override, wholesale_price_tier_1, wholesale_price_tier_2, wholesale_price_tier_3`)
         .eq("slug", slug)
@@ -250,6 +254,8 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         is_sale: data.is_sale ?? false,
         discount_value: data.discount_value ?? 0,
         inventory_count: data.inventory_count ?? 0,
+        track_inventory: data.track_inventory ?? true,
+        track_variant_inventory: data.track_variant_inventory ?? false,
         rating_average: Number(data.rating_average ?? 0),
         review_count: Number(data.review_count ?? 0),
         category_name: matchedCat?.name ?? data.category_type ?? null,
@@ -265,7 +271,7 @@ export async function getRelatedProducts(categoryType: string, currentSlug: stri
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
-             bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
+             bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, created_at`)
         .eq("is_active", true)
         .ilike("category_type", categoryType)
         .neq("slug", currentSlug)
@@ -278,6 +284,8 @@ export async function getRelatedProducts(categoryType: string, currentSlug: stri
         category_id: null,
         is_featured: p.is_featured ?? false,
         is_sale: p.is_sale ?? false,
+        track_inventory: p.track_inventory ?? true,
+        track_variant_inventory: p.track_variant_inventory ?? false,
         discount_value: p.discount_value ?? 0,
         inventory_count: p.inventory_count ?? 0,
         category_name: p.category_type ?? null,
@@ -352,6 +360,32 @@ export async function getAllProductSlugs(): Promise<string[]> {
 
 export type VideoProduct = ShopProduct & { video_url: string };
 
+// Return sizes from available_sizes whose label matches an in_stock size_variant.
+// available_sizes entries look like "S — 8" or "Free Size"; size_variant labels are "S" / "Free Size".
+// If no size_variants data exists, all sizes are returned unchanged.
+function getInStockSizes(
+    sizes: string[] | null,
+    sizeVariants: { label: string; in_stock: boolean }[] | null
+): string[] | null {
+    if (!sizes) return sizes;
+    if (!sizeVariants || sizeVariants.length === 0) return sizes;
+    const inStock = new Set(sizeVariants.filter(v => v.in_stock).map(v => v.label));
+    if (inStock.size === 0) return [];
+    return sizes.filter(s => inStock.has(s.split(" — ")[0]));
+}
+
+// Same for colors: available_colors are plain names e.g. "Black", color_variant.name matches.
+function getInStockColors(
+    colors: string[] | null,
+    colorVariants: { name: string; in_stock: boolean }[] | null
+): string[] | null {
+    if (!colors) return colors;
+    if (!colorVariants || colorVariants.length === 0) return colors;
+    const inStock = new Set(colorVariants.filter(v => v.in_stock).map(v => v.name));
+    if (inStock.size === 0) return [];
+    return colors.filter(c => inStock.has(c));
+}
+
 export async function getVideoProducts(offset = 0): Promise<{
     videos: VideoProduct[];
     nextOffset: number;
@@ -363,8 +397,10 @@ export async function getVideoProducts(offset = 0): Promise<{
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, color_variants, size_variants,
-             bundle_label, badge, is_sale, discount_value, inventory_count, created_at`)
+             bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, created_at`)
         .eq("is_active", true)
+        // Exclude products that track inventory and have none left
+        .or("track_inventory.eq.false,inventory_count.gt.0")
         .order("created_at", { ascending: false })
         .range(offset, offset + VIDEO_BATCH_SIZE - 1);
 
@@ -377,11 +413,16 @@ export async function getVideoProducts(offset = 0): Promise<{
             ) as string | undefined;
             return {
                 ...p,
+                // Only expose in-stock sizes and colors so the QuickView modal only offers what's available
+                available_sizes: getInStockSizes(p.available_sizes, p.size_variants),
+                available_colors: getInStockColors(p.available_colors, p.color_variants),
                 category_id: null,
                 is_featured: p.is_featured ?? false,
                 is_sale: p.is_sale ?? false,
                 discount_value: p.discount_value ?? 0,
                 inventory_count: p.inventory_count ?? 0,
+                track_inventory: p.track_inventory ?? true,
+                track_variant_inventory: p.track_variant_inventory ?? false,
                 category_name: p.category_type ?? null,
                 category_slug: null,
                 video_url,

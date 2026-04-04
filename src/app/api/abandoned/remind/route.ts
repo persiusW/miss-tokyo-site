@@ -3,39 +3,39 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 
 export async function POST(req: NextRequest) {
-    try {
-        const serverClient = await createClient();
-        const { data: { user } } = await serverClient.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
-        if (!caller || !["admin", "owner"].includes(caller.role)) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
+  try {
+    const serverClient = await createClient();
+    const { data: { user } } = await serverClient.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+    if (!caller || !["admin", "owner"].includes(caller.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
-        const { orderId, customerEmail, customerName } = await req.json();
+    const { orderId, customerEmail, customerName } = await req.json();
 
-        if (!customerEmail) {
-            return NextResponse.json({ error: "customerEmail is required." }, { status: 400 });
-        }
+    if (!customerEmail) {
+      return NextResponse.json({ error: "customerEmail is required." }, { status: 400 });
+    }
 
-        const { data: biz } = await supabaseAdmin
-            .from("business_settings").select("business_name, email").eq("id", "default").single();
+    const { data: biz } = await supabaseAdmin
+      .from("business_settings").select("business_name, email").eq("id", "default").single();
 
-        const bizName = biz?.business_name || "Miss Tokyo";
-        const fromEmail = biz?.email || "orders@misstokyo.shop";
+    const bizName = biz?.business_name || "Miss Tokyo";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop";
 
-        if (!process.env.RESEND_API_KEY) {
-            return NextResponse.json({ status: "skipped", reason: "No RESEND_API_KEY" });
-        }
+    if (!process.env.RESEND_API_KEY) {
+      return NextResponse.json({ status: "skipped", reason: "No RESEND_API_KEY" });
+    }
 
-        const { Resend } = await import("resend");
-        const resend = new Resend(process.env.RESEND_API_KEY);
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
-        await resend.emails.send({
-            from: `${bizName} <${fromEmail}>`,
-            to: customerEmail,
-            subject: `You left something behind at ${bizName}`,
-            html: `
+    await resend.emails.send({
+      from: `${bizName} <${fromEmail}>`,
+      to: customerEmail,
+      subject: `You left something behind at ${bizName}`,
+      html: `
             <div style="font-family:Georgia,serif;background:#fafaf9;padding:40px 20px;">
               <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;padding:48px;">
                 <h1 style="font-size:20px;letter-spacing:.15em;text-transform:uppercase;margin:0 0 6px;">${bizName}</h1>
@@ -56,11 +56,11 @@ export async function POST(req: NextRequest) {
                 </div>
               </div>
             </div>`,
-        });
+    });
 
-        return NextResponse.json({ status: "sent" });
-    } catch (err: any) {
-        console.error("[abandoned/remind]", err);
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
-    }
+    return NextResponse.json({ status: "sent" });
+  } catch (err: any) {
+    console.error("[abandoned/remind]", err);
+    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+  }
 }

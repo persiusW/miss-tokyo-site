@@ -30,7 +30,7 @@ export async function sendEmail(payload: EmailPayload): Promise<{ ok: boolean; e
     const fromName  = process.env.BIZ_NAME        || "Miss Tokyo";
     // RESEND_FROM_EMAIL must be a domain verified in your Resend dashboard.
     // Falls back to Resend's shared sender (works without verification, good for dev).
-    const fromAddr  = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+    const fromAddr  = process.env.RESEND_FROM_EMAIL || "info@info.misstokyo.shop";
     const from      = payload.from ?? `${fromName} <${fromAddr}>`;
 
     try {

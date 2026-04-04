@@ -249,6 +249,14 @@ export function NavBar({ initialUser }: { initialUser?: { id: string } | null })
                                 </Link>
                             );
                         })}
+                        <div className="w-12 h-[1px] bg-white/20 my-2" />
+                        <Link
+                            href={isLoggedIn ? "/account/orders" : "/login"}
+                            onClick={() => setMenuOpen(false)}
+                            className="font-serif text-3xl sm:text-4xl tracking-[0.1em] uppercase text-neutral-500 hover:text-white transition-colors py-2"
+                        >
+                            {isLoggedIn ? "Account" : "Log In"}
+                        </Link>
                     </nav>
                 </div>
             )}

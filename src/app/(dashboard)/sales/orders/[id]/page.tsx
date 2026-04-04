@@ -160,6 +160,7 @@ export default function OrderDetailPage() {
     const [notifStatus, setNotifStatus] = useState<"idle" | "sending" | "sent">("idle");
     const [showRiderPicker, setShowRiderPicker] = useState(false);
     const [assignedRider, setAssignedRider] = useState<AssignedRider | null>(null);
+    const [productSkus, setProductSkus] = useState<Record<string, string>>({});
 
     useEffect(() => {
         Promise.all([
@@ -169,6 +170,27 @@ export default function OrderDetailPage() {
         ]).then(async ([{ data: ord }, { data: biz }, { data: ss }]) => {
             if (ord) {
                 setOrder(ord);
+                // Fetch SKUs for order items
+                if (ord.items && Array.isArray(ord.items)) {
+                    const productIds = ord.items
+                        .map((i: any) => i.productId)
+                        .filter(Boolean) as string[];
+                    if (productIds.length > 0) {
+                        supabase
+                            .from("products")
+                            .select("id, sku")
+                            .in("id", productIds)
+                            .then(({ data: skuData }: { data: any }) => {
+                                if (skuData) {
+                                    const map: Record<string, string> = {};
+                                    for (const p of skuData) {
+                                        if (p.sku) map[p.id] = p.sku;
+                                    }
+                                    setProductSkus(map);
+                                }
+                            });
+                    }
+                }
                 if (ord.assigned_rider_id) {
                     const { data: riderData } = await supabase
                         .from("riders")
@@ -196,15 +218,31 @@ export default function OrderDetailPage() {
     const updateStatus = async (newStatus: string) => {
         if (!order) return;
         setUpdating(true);
+        if (newStatus === "fulfilled" || newStatus === "cancelled") setNotifStatus("sending");
         
         const res = await updateOrderStatus(order.id, newStatus);
         
         if (!res.success) {
             toast.error(res.error || "Failed to update status.");
+            setNotifStatus("idle");
         } else {
-            // Optimistic update was local, but we know it worked now
             setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
             toast.success(`Status updated to ${newStatus}.`);
+
+            // Trigger Email/SMS
+            if (newStatus === "fulfilled" || newStatus === "cancelled") {
+                try {
+                    await fetch("/api/email/fulfillment", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ orderId: order.id, type: newStatus }),
+                    });
+                    setNotifStatus("sent");
+                } catch (e) {
+                    console.error("Auto-email failed:", e);
+                    setNotifStatus("idle");
+                }
+            }
         }
         setUpdating(false);
     };
@@ -502,7 +540,12 @@ export default function OrderDetailPage() {
                                             <div className="flex flex-wrap gap-x-3 gap-y-0.5">
                                                 {item.size && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Size: <span className="text-neutral-900 font-semibold">{item.size}</span></span>}
                                                 {item.color && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Color: <span className="text-neutral-900 font-semibold">{item.color}</span></span>}
-                                                {item.stitching && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Stitching: <span className="text-neutral-900 font-semibold">{item.stitching}</span></span>}
+                                                {(item.sku || (item.productId && productSkus[item.productId])) && (
+                                                    <span className="text-[10px] uppercase tracking-widest text-neutral-500">
+                                                        SKU: <span className="text-neutral-900 font-semibold font-mono">{item.sku || productSkus[item.productId]}</span>
+                                                    </span>
+                                                )}
+                                                {/* {item.stitching && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Stitching: <span className="text-neutral-900 font-semibold">{item.stitching}</span></span>} */}
                                                 <span className="text-[10px] uppercase tracking-widest text-neutral-500">Qty: <span className="text-neutral-900 font-semibold">{item.quantity || 1}</span></span>
                                             </div>
                                         </div>

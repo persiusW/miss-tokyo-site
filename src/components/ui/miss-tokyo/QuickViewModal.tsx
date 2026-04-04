@@ -18,6 +18,9 @@ export interface QuickViewProduct {
     available_colors: string[] | null;
     available_stitching?: string[] | null;
     available_sizes: string[] | null;
+    inventory_count?: number;
+    track_inventory?: boolean;
+    track_variant_inventory?: boolean;
 }
 
 interface QuickViewModalProps {
@@ -51,7 +54,7 @@ export function QuickViewModal({
         setLoading(true);
         supabase
             .from("products")
-            .select("id, name, slug, price_ghs, compare_at_price_ghs, is_sale, discount_value, image_urls, available_colors, available_stitching, available_sizes")
+            .select("id, name, slug, price_ghs, compare_at_price_ghs, is_sale, discount_value, image_urls, available_colors, available_stitching, available_sizes, inventory_count, track_inventory, track_variant_inventory")
             .eq("slug", slug)
             .single()
             .then(({ data }: { data: any }) => {
@@ -129,8 +132,11 @@ export function QuickViewModal({
                                             priceNum={effectivePrice}
                                             price={`GH₵${effectivePrice.toFixed(2)}`}
                                             colors={product.available_colors || ["Noir", "Cognac", "Sand"]}
-                                            stitching={product.available_stitching || ["Tonal", "Contrast White"]}
+                                            // stitching={product.available_stitching || ["Tonal", "Contrast White"]}
                                             availableSizes={product.available_sizes || null}
+                                            inventoryCount={product.inventory_count ?? 0}
+                                            trackInventory={product.track_inventory ?? true}
+                                            trackVariantInventory={product.track_variant_inventory ?? false}
                                             onAddedToCart={onClose}
                                             openDrawerOnAdd={openDrawerOnAdd}
                                         />

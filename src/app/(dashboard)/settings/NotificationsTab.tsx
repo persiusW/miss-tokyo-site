@@ -53,6 +53,7 @@ export function NotificationsTab() {
     const [template, setTemplate]         = useState<PushTemplate>({ title: DEFAULT_TITLE, body: DEFAULT_BODY });
     const [saving, setSaving]             = useState(false);
     const [testSending, setTestSending]   = useState(false);
+    const [vapidConfigured, setVapidConfigured] = useState(() => !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
 
     useEffect(() => {
@@ -61,6 +62,7 @@ export function NotificationsTab() {
             return;
         }
         setPermission(Notification.permission);
+        setVapidConfigured(!!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
 
         // Register SW if not already registered
         navigator.serviceWorker.register("/sw.js").catch(console.error);
@@ -208,6 +210,14 @@ export function NotificationsTab() {
 
                 {supported && (
                     <>
+                        {!vapidConfigured && (
+                            <div className="bg-amber-50 border border-amber-200 px-4 py-3 rounded-sm space-y-1">
+                                <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-widest">VAPID Key Not Configured</p>
+                                <p className="text-[11px] text-amber-600 leading-relaxed">
+                                    Push notifications require <code className="bg-amber-100 px-1 rounded">NEXT_PUBLIC_VAPID_PUBLIC_KEY</code> and <code className="bg-amber-100 px-1 rounded">VAPID_PRIVATE_KEY</code> in your environment variables. Generate them using the setup instructions below.
+                                </p>
+                            </div>
+                        )}
                         <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${subscribed ? "bg-emerald-400" : "bg-neutral-300"}`} />
                             <span className="text-xs text-neutral-600">

@@ -335,6 +335,7 @@ export default async function ProductPage({
                             isWholesaler={false}
                             wholesaleTiers={wholesaleTiers}
                             trackVariantInventory={trackVariantInventory}
+                            trackInventory={product.track_inventory}
                             productVariants={productVariants}
                         />
 
