@@ -86,7 +86,11 @@ export function CartDrawer() {
                             return (
                                 <div key={item.id} className="flex gap-4 border-b border-neutral-100 pb-6">
                                     <div className="w-24 h-24 bg-neutral-50 flex-shrink-0 relative">
-                                        <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="96px" />
+                                        {item.imageUrl ? (
+                                            <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="96px" />
+                                        ) : (
+                                            <div className="w-full h-full bg-neutral-100" />
+                                        )}
                                     </div>
                                     <div className="flex-1 flex flex-col pt-1">
                                         <div className="flex justify-between items-start mb-1">

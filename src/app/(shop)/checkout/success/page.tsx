@@ -195,7 +195,7 @@ function Receipt({ order, orderRef }: { order: Order; orderRef: string }) {
                                                 background: "#f5f5f5", overflow: "hidden", borderRadius: 2,
                                                 position: "relative",
                                             }}>
-                                                <Image src={item.imageUrl} alt={item.name} fill sizes="60px" style={{ objectFit: "cover" }} />
+                                                {item.imageUrl && <Image src={item.imageUrl} alt={item.name} fill sizes="60px" style={{ objectFit: "cover" }} />}
                                             </div>
                                         )}
                                         <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
