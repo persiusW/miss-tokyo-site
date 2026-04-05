@@ -91,9 +91,9 @@ export default async function ShopCatalog({
             colors: p.available_colors || [],
             sizes: p.available_sizes || [],
             createdAt: p.created_at,
-            ribbon: p.ribbon
-                || (p.track_inventory && (p.available_stock ?? 0) <= 0 ? "Sold Out" : null)
-                || (p.track_inventory && (p.available_stock ?? 0) > 0 && (p.available_stock ?? 0) <= 3 ? `Only ${p.available_stock} Left` : null),
+            ribbon: (p.track_inventory && (p.available_stock ?? 0) <= 0 ? "Sold Out" : null)
+                || (p.track_inventory && (p.available_stock ?? 0) > 0 && (p.available_stock ?? 0) <= 3 ? `Only ${p.available_stock} Left` : null)
+                || p.ribbon,
             isOnSale,
             salePrice,
         };
