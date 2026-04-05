@@ -120,16 +120,20 @@ export default function CheckoutPage() {
         supabase.auth.getUser().then(async ({ data }: { data: { user: import('@supabase/supabase-js').User | null } }) => {
             const user = data.user;
             if (!user) return;
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('full_name, email')
-                .eq('id', user.id)
-                .single();
-            // profiles only stores full_name + email; phone/address live on orders history
+            const [{ data: profile }, { data: lastOrders }] = await Promise.all([
+                supabase.from('profiles').select('full_name, email, phone').eq('id', user.id).single(),
+                supabase.from('orders').select('shipping_address, customer_phone').eq('customer_email', user.email ?? '').order('created_at', { ascending: false }).limit(1),
+            ]);
+            const lastOrder = lastOrders?.[0];
+            const lastAddress = lastOrder?.shipping_address;
             setForm(prev => ({
                 ...prev,
                 fullName: profile?.full_name || prev.fullName,
                 email:    profile?.email     || user.email || prev.email,
+                phone:    profile?.phone     || lastOrder?.customer_phone || prev.phone,
+                address:  lastAddress?.text  || prev.address,
+                country:  lastAddress?.country || prev.country,
+                region:   lastAddress?.region  || prev.region,
             }));
         });
     }, []);
