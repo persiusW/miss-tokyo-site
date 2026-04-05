@@ -10,8 +10,8 @@ const SECURITY_HEADERS: Record<string, string> = {
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Content-Security-Policy": [
         "default-src 'self'",
-        // blob: for FFmpeg Web Worker inline scripts; https://vercel.live for Live Preview toolbar
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://vercel.live blob:",
+        // blob: for FFmpeg Web Worker inline scripts; https://vercel.live for Live Preview toolbar; https://va.vercel-scripts.com for Vercel Analytics
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://vercel.live https://va.vercel-scripts.com blob:",
         "style-src 'self' 'unsafe-inline'",
         // https://vercel.live fonts used by the Vercel preview toolbar
         "font-src 'self' https://vercel.live data:",

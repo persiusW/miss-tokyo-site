@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useCart, getEffectivePrice } from "@/store/useCart";
 import { X, Trash2, Plus, Minus } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { evaluateAutoDiscounts, type AutoDiscountResult } from "@/lib/autoDiscount";
 
@@ -84,8 +85,8 @@ export function CartDrawer() {
                             const isWholesaleDiscounted = item.isWholesale && effectivePrice < item.price;
                             return (
                                 <div key={item.id} className="flex gap-4 border-b border-neutral-100 pb-6">
-                                    <div className="w-24 h-24 bg-neutral-50 flex-shrink-0">
-                                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                    <div className="w-24 h-24 bg-neutral-50 flex-shrink-0 relative">
+                                        <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="96px" />
                                     </div>
                                     <div className="flex-1 flex flex-col pt-1">
                                         <div className="flex justify-between items-start mb-1">

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { X, Mail, UserPlus, CheckCircle, Clock } from "lucide-react";
-import { inviteTeamMember, removeTeamMember } from "@/app/(dashboard)/settings/actions";
+import { X, Mail, UserPlus, CheckCircle, Clock, KeyRound } from "lucide-react";
+import { inviteTeamMember, removeTeamMember, sendPasswordResetLink } from "@/app/(dashboard)/settings/actions";
 
 type TeamMember = {
     id: string;
@@ -55,6 +55,8 @@ const ROLE_COLORS: Record<string, string> = {
     sales_staff: "bg-neutral-100 text-neutral-700"
 };
 
+const DASHBOARD_ROLES = ["owner", "admin", "sales_staff"] as const;
+
 export function TeamTab() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<"members" | "pending" | "logs">("members");
@@ -87,10 +89,10 @@ export function TeamTab() {
             const { data } = await supabase
                 .from("profiles")
                 .select("id, email, full_name, role, created_at")
+                .in("role", DASHBOARD_ROLES)
                 .order("created_at", { ascending: true });
             if (data) {
                 setMembers(data);
-                setAllStaff(data.map((d: any) => ({ id: d.id, full_name: d.full_name || d.email })));
             }
         } else if (activeTab === "pending") {
             const { data } = await supabase
@@ -143,6 +145,21 @@ export function TeamTab() {
         }
     }, [page]);
 
+    // Fetch staff list for logs filter — dashboard roles only, independent of active tab
+    useEffect(() => {
+        const fetchStaff = async () => {
+            const { data } = await supabase
+                .from("profiles")
+                .select("id, full_name, email, role")
+                .in("role", DASHBOARD_ROLES)
+                .order("full_name", { ascending: true });
+            if (data) {
+                setAllStaff(data.map((d: any) => ({ id: d.id, full_name: d.full_name || d.email })));
+            }
+        };
+        fetchStaff();
+    }, []); // empty deps — runs once on mount
+
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
         setInviting(true);
@@ -189,6 +206,24 @@ export function TeamTab() {
     };
 
     const [removingId, setRemovingId] = useState<string | null>(null);
+    const [sendingResetId, setSendingResetId] = useState<string | null>(null);
+
+    const handleSendReset = async (member: TeamMember) => {
+        if (!confirm(`Send a password reset link to ${member.email}?`)) return;
+        setSendingResetId(member.id);
+        try {
+            const res = await sendPasswordResetLink(member.email);
+            if (!res.success) {
+                toast.error(res.error || "Failed to send reset link.");
+            } else {
+                toast.success(`Reset link sent to ${member.email}.`);
+            }
+        } catch {
+            toast.error("An unexpected error occurred.");
+        } finally {
+            setSendingResetId(null);
+        }
+    };
 
     const handleRemove = async (member: TeamMember) => {
         if (member.role === "owner" || member.role === "admin") {
@@ -287,15 +322,26 @@ export function TeamTab() {
                                                 {new Date(member.created_at).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                {(member.role !== "owner" && member.role !== "admin") && (
-                                                    <button 
-                                                        onClick={() => handleRemove(member)}
-                                                        disabled={removingId === member.id}
-                                                        className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                <div className="flex items-center justify-end gap-3">
+                                                    <button
+                                                        onClick={() => handleSendReset(member)}
+                                                        disabled={sendingResetId === member.id}
+                                                        title="Send password reset link"
+                                                        className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-black transition-colors disabled:opacity-50"
                                                     >
-                                                        {removingId === member.id ? "Removing..." : "Remove"}
+                                                        <KeyRound size={12} />
+                                                        {sendingResetId === member.id ? "Sending..." : "Reset"}
                                                     </button>
-                                                )}
+                                                    {(member.role !== "owner" && member.role !== "admin") && (
+                                                        <button
+                                                            onClick={() => handleRemove(member)}
+                                                            disabled={removingId === member.id}
+                                                            className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {removingId === member.id ? "Removing..." : "Remove"}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

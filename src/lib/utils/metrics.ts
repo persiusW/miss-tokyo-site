@@ -56,15 +56,17 @@ export type RecentActivity = {
 export async function fetchTotalRevenue(): Promise<number> {
     const { data, error } = await supabase
         .from("orders")
-        .select("total_amount")
-        .in("status", [...REVENUE_STATUSES]);
+        .select("total_amount, status, payment_status");
 
     if (error) {
         console.error("[metrics] fetchTotalRevenue:", error.message, error.details);
         return 0;
     }
 
-    return (data || []).reduce((sum, o) => sum + Number(o.total_amount ?? 0), 0);
+    const LEGACY_PAID = ["paid", "processing", "fulfilled", "delivered", "packed", "ready_for_pickup", "shipped"];
+    return (data || [])
+        .filter(o => o.payment_status === "paid" || (!o.payment_status && LEGACY_PAID.includes(o.status ?? "")))
+        .reduce((sum, o) => sum + Number(o.total_amount ?? 0), 0);
 }
 
 /**
@@ -73,40 +75,56 @@ export async function fetchTotalRevenue(): Promise<number> {
  * Status breakdown: lightweight status-only query (no amount columns fetched).
  */
 export async function fetchOrderStats(): Promise<OrderStats> {
-    const [rpcRes, countsRes] = await Promise.all([
-        supabase.rpc("get_order_stats"),
-        supabase.from("orders").select("status"),
-    ]);
+    const { data, error } = await supabase
+        .from("orders")
+        .select("status, payment_status, fulfillment_status, total_amount");
 
-    if (rpcRes.error) {
-        console.error("[metrics] fetchOrderStats (rpc):", rpcRes.error.message);
-    }
-    if (countsRes.error) {
-        console.error("[metrics] fetchOrderStats (counts):", countsRes.error.message, countsRes.error.details);
+    if (error) {
+        console.error("[metrics] fetchOrderStats:", error.message, error.details);
     }
 
-    const stats = rpcRes.data as { total_revenue: number; order_count: number } | null;
-    const totalRevenue = Number(stats?.total_revenue ?? 0);
-    const revenueOrderCount = Number(stats?.order_count ?? 0);
+    const orders = (data ?? []) as {
+        status: string;
+        payment_status: string | null;
+        fulfillment_status: string | null;
+        total_amount: number | null;
+    }[];
 
-    const orders = (countsRes.data ?? []) as { status: string }[];
     const totalOrders = orders.length;
+
+    // Revenue: prefer payment_status='paid'; fall back to legacy status for orders
+    // created before the dual-status migration (payment_status may still be null).
+    const LEGACY_PAID = ["paid", "processing", "fulfilled", "delivered", "packed", "ready_for_pickup", "shipped"];
+    const paidOrders = orders.filter(o =>
+        o.payment_status === "paid" ||
+        (!o.payment_status && LEGACY_PAID.includes(o.status))
+    );
+    const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount ?? 0), 0);
+    const revenueOrderCount = paidOrders.length;
+
+    // Paid but not yet delivered
+    const unfulfilledPaidCount = paidOrders.filter(o =>
+        o.fulfillment_status !== "delivered"
+    ).length;
+
+    // Delivered orders
+    const fulfilledCount = orders.filter(o =>
+        o.fulfillment_status === "delivered" || ["fulfilled", "delivered"].includes(o.status)
+    ).length;
 
     return {
         totalRevenue,
         revenueOrderCount,
-        pendingCount: orders.filter(o => o.status === "pending").length,
-        processingCount: orders.filter(o => o.status === "processing").length,
-        fulfilledCount: orders.filter(o =>
-            ["fulfilled", "delivered"].includes(o.status)
-        ).length,
+        pendingCount: unfulfilledPaidCount,
+        processingCount: 0,
+        fulfilledCount,
         cancelledCount: orders.filter(o =>
             ["cancelled", "refunded"].includes(o.status)
         ).length,
         totalOrders,
         avgOrderValue: revenueOrderCount > 0 ? totalRevenue / revenueOrderCount : 0,
         conversionRate: totalOrders > 0
-            ? ((revenueOrderCount / totalOrders) * 100).toFixed(1)
+            ? ((fulfilledCount / totalOrders) * 100).toFixed(1)
             : "0.0",
     };
 }
@@ -120,8 +138,7 @@ export async function fetchSalesByCategory(): Promise<CategoryRevenue[]> {
     const [ordersRes, productsRes] = await Promise.all([
         supabase
             .from("orders")
-            .select("items, total_amount")
-            .in("status", [...REVENUE_STATUSES]),
+            .select("items, total_amount, status, payment_status"),
         supabase
             .from("products")
             .select("id, category_type"),
@@ -140,9 +157,14 @@ export async function fetchSalesByCategory(): Promise<CategoryRevenue[]> {
         catMap[p.id] = p.category_type?.trim() || "Uncategorised";
     }
 
+    const LEGACY_PAID = ["paid", "processing", "fulfilled", "delivered", "packed", "ready_for_pickup", "shipped"];
+    const paidOrders = (ordersRes.data ?? []).filter((o: any) =>
+        o.payment_status === "paid" || (!o.payment_status && LEGACY_PAID.includes(o.status ?? ""))
+    );
+
     const categoryRevenue: Record<string, number> = {};
 
-    for (const order of (ordersRes.data ?? [])) {
+    for (const order of paidOrders) {
         const items: any[] = Array.isArray(order.items) ? order.items : [];
         const orderAmt = Number(order.total_amount ?? 0);
 
@@ -184,8 +206,7 @@ export async function fetchMonthlyRevenue(monthsBack = 6): Promise<MonthlyRevenu
 
     const { data, error } = await supabase
         .from("orders")
-        .select("total_amount, created_at")
-        .in("status", [...REVENUE_STATUSES])
+        .select("total_amount, created_at, status, payment_status")
         .gte("created_at", since.toISOString())
         .order("created_at", { ascending: true });
 
@@ -193,7 +214,10 @@ export async function fetchMonthlyRevenue(monthsBack = 6): Promise<MonthlyRevenu
         console.error("[metrics] fetchMonthlyRevenue:", error.message, error.details);
     }
 
-    const orders = data ?? [];
+    const LEGACY_PAID = ["paid", "processing", "fulfilled", "delivered", "packed", "ready_for_pickup", "shipped"];
+    const orders = (data ?? []).filter((o: any) =>
+        o.payment_status === "paid" || (!o.payment_status && LEGACY_PAID.includes(o.status ?? ""))
+    );
     const now = new Date();
 
     return Array.from({ length: monthsBack }, (_, i) => {

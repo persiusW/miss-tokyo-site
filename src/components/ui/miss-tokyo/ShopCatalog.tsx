@@ -23,7 +23,9 @@ export default async function ShopCatalog({
 }: ShopCatalogProps) {
     
     // Build the products query dynamically
-    let productsQuery = supabase.from("products").select("*").eq("is_active", true);
+    // Exclude out-of-stock products: show only items that don't track inventory OR have stock > 0
+    let productsQuery = supabase.from("products").select("id, slug, name, price_ghs, image_urls, category_type, category_ids, available_colors, available_sizes, created_at, sort_order, ribbon, track_inventory, stock_quantity, is_sale, discount_value, available_stock").eq("is_active", true)
+        .or("track_inventory.eq.false,available_stock.gt.0");
 
     if (isSaleOnly) {
         productsQuery = productsQuery.eq("is_sale", true);

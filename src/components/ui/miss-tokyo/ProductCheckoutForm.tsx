@@ -14,7 +14,7 @@ interface ProductCheckoutFormProps {
     priceNum: number;
     price: string;
     colors: string[];
-    stitching: string[];
+    stitching?: string[];
     availableSizes: string[] | null;
     wholesale?: WholesaleData | null;
     trackInventory?: boolean;
@@ -27,12 +27,30 @@ interface ProductCheckoutFormProps {
 
 export function ProductCheckoutForm({
     productId, productName, productSlug, productImageUrl,
-    priceNum, price, colors, stitching, availableSizes,
+    priceNum, price, colors, stitching = [], availableSizes,
     wholesale, trackInventory = true, trackVariantInventory = false,
     inventoryCount = 0, productVariants = [], onAddedToCart, openDrawerOnAdd,
 }: ProductCheckoutFormProps) {
     const { addItem } = useCart();
-    const sizesToRender = (availableSizes && availableSizes.length > 0) ? availableSizes : ["39", "40", "41", "42", "43", "44", "45", "46"];
+    // Map plain size labels to "Label — UK number" format for consistent display
+    const UK_SIZE_MAP: Record<string, number> = {
+        XS: 6, S: 8, M: 10, L: 12, XL: 14, XXL: 16, XXXL: 18, '4XL': 20, '5XL': 22,
+    };
+    const formatSize = (s: string) => {
+        if (s.includes(' — ')) return s; // already formatted
+        const uk = UK_SIZE_MAP[s.toUpperCase()];
+        return uk ? `${s} — ${uk}` : s;
+    };
+
+    // Deduplicate by root key (sizeKey strips " — 8" suffix), then format for display
+    const seen = new Set<string>();
+    const rawSizes = (availableSizes && availableSizes.length > 0) ? availableSizes : ["39", "40", "41", "42", "43", "44", "45", "46"];
+    const sizesToRender = rawSizes.filter(s => {
+        const k = sizeKey(s);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+    }).map(formatSize);
 
     const [selectedSize, setSelectedSize] = useState<string>("");
     const [selectedColor, setSelectedColor] = useState<string>(colors[0] || "");
@@ -134,7 +152,7 @@ export function ProductCheckoutForm({
             </div>
 
             {/* Stitching Selection */}
-            {stitching.length > 0 && (
+            {/* {stitching.length > 0 && (
                 <div>
                     <span className="block text-[10px] uppercase tracking-[0.3em] font-bold mb-5 text-neutral-400">Stitching Option</span>
                     <div className="flex gap-2 flex-wrap">
@@ -149,7 +167,7 @@ export function ProductCheckoutForm({
                         ))}
                     </div>
                 </div>
-            )}
+            )} */}
 
             {/* Size Selection */}
             <div id={`size-section-${productId}`} className="transition-all duration-300">
@@ -215,11 +233,10 @@ export function ProductCheckoutForm({
                                 return (
                                     <div
                                         key={tier}
-                                        className={`flex justify-between items-center px-4 py-3 border transition-all ${
-                                            isActive
+                                        className={`flex justify-between items-center px-4 py-3 border transition-all ${isActive
                                                 ? "border-black bg-black text-white"
                                                 : "border-neutral-100 text-neutral-600"
-                                        }`}
+                                            }`}
                                     >
                                         <div>
                                             <span className={`text-[10px] uppercase tracking-widest font-bold ${isActive ? "text-white" : "text-neutral-500"}`}>
@@ -261,9 +278,8 @@ export function ProductCheckoutForm({
                         <button
                             type="button"
                             onClick={handleAddToCart}
-                            className={`w-full py-6 bg-black text-white text-[11px] uppercase tracking-[0.4em] font-black transition-all duration-500 rounded-none shadow-2xl ${
-                                !selectedSize ? "opacity-30 cursor-not-allowed grayscale" : "hover:bg-white hover:text-black border border-black"
-                            }`}
+                            className={`w-full py-6 bg-black text-white text-[11px] uppercase tracking-[0.4em] font-black transition-all duration-500 rounded-none shadow-2xl ${!selectedSize ? "opacity-30 cursor-not-allowed grayscale" : "hover:bg-white hover:text-black border border-black"
+                                }`}
                         >
                             {selectedSize
                                 ? `Add ${quantity} to Cart — GH₵ ${total.toFixed(2)}`
@@ -274,9 +290,8 @@ export function ProductCheckoutForm({
                     <button
                         type="button"
                         onClick={handleAddToCart}
-                        className={`w-full py-6 bg-black text-white text-[11px] uppercase tracking-[0.4em] font-black transition-all duration-500 rounded-none shadow-2xl ${
-                            !selectedSize ? "opacity-30 cursor-not-allowed grayscale" : "hover:bg-white hover:text-black border border-black"
-                        }`}
+                        className={`w-full py-6 bg-black text-white text-[11px] uppercase tracking-[0.4em] font-black transition-all duration-500 rounded-none shadow-2xl ${!selectedSize ? "opacity-30 cursor-not-allowed grayscale" : "hover:bg-white hover:text-black border border-black"
+                            }`}
                     >
                         {selectedSize ? `Add to Cart — ${price}` : `Select a Size to Continue`}
                     </button>

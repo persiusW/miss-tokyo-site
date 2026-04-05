@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     if (profile?.email) {
         const bizName  = process.env.BIZ_NAME || "Miss Tokyo";
         const baseUrl  = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
-        const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+        const fromEmail = process.env.RESEND_FROM_EMAIL || "info@info.misstokyo.shop";
         const firstName = profile.first_name || profile.full_name?.split(" ")[0] || "there";
 
         // Fetch template from DB

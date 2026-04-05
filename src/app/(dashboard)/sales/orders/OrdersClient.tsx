@@ -114,7 +114,7 @@ function DispatchModal({
     const [confirming, setConfirming] = useState(false);
 
     useEffect(() => {
-        supabase.from("riders").select("*").eq("is_active", true).order("full_name")
+        supabase.from("riders").select("id, full_name, phone_number, bike_reg, image_url, is_active").eq("is_active", true).order("full_name")
             .then(({ data, error }: { data: any, error: any }) => {
                 if (error) {
                     console.error("Failed to load riders:", error);
@@ -278,6 +278,17 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
             toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} → ${status}.`);
             setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, ...updateData } : o));
             setSelected(new Set());
+
+            // Trigger Email/SMS
+            if (status === "fulfilled" || status === "cancelled") {
+                ids.forEach(orderId => {
+                    fetch("/api/email/fulfillment", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ orderId, type: status }),
+                    }).catch(err => console.error("Auto-email failed for", orderId, err));
+                });
+            }
         }
         setBulkLoading(false);
     };

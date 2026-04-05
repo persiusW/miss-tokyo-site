@@ -7,6 +7,11 @@ import { Plus } from "lucide-react";
 
 const FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f0f0f0'/%3E%3C/svg%3E";
 
+function isVideoUrl(url: string): boolean {
+    const lower = url.toLowerCase().split("?")[0];
+    return lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov");
+}
+
 interface ProductCardProps {
     slug: string;
     name: string;
@@ -29,16 +34,26 @@ export function ProductCard({ slug, name, price, imageUrl, hoverImageUrl, catego
         <div className="group block w-full relative">
             <Link href={`/products/${slug}`} className="block">
                 <div className="relative aspect-[4/5] w-full bg-neutral-100 overflow-hidden mb-4 rounded-none">
-                    <Image
-                        src={imgSrc}
-                        alt={name}
-                        fill
-                        quality={85}
-                        sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                        onError={() => setImgSrc(FALLBACK)}
-                        className={`${imageStretch ? "object-fill" : "object-cover object-center"} transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)] ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.05]"}`}
-                    />
-                    {hoverSrc && (
+                    {isVideoUrl(imgSrc) ? (
+                        <video
+                            src={imgSrc}
+                            preload="metadata"
+                            muted
+                            playsInline
+                            className={`absolute inset-0 w-full h-full ${imageStretch ? "object-fill" : "object-cover object-center"} transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)] ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.05]"}`}
+                        />
+                    ) : (
+                        <Image
+                            src={imgSrc}
+                            alt={name}
+                            fill
+                            quality={85}
+                            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                            onError={() => setImgSrc(FALLBACK)}
+                            className={`${imageStretch ? "object-fill" : "object-cover object-center"} transition-all duration-1000 ease-[cubic-bezier(0.2,1,0.3,1)] ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.05]"}`}
+                        />
+                    )}
+                    {hoverSrc && !isVideoUrl(hoverSrc) && (
                         <Image
                             src={hoverSrc}
                             alt={`${name} alternate view`}

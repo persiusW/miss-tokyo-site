@@ -356,7 +356,7 @@ export default async function TrackOrderPage({
                                             <div className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-neutral-500">
                                                 {item.size && <span>Size: {item.size}</span>}
                                                 {item.color && <span>Colour: {item.color}</span>}
-                                                {item.stitching && <span>Stitching: {item.stitching}</span>}
+                                                {/* {item.stitching && <span>Stitching: {item.stitching}</span>} */}
                                                 <span>Qty: {itemQty(item)}</span>
                                             </div>
                                         </div>

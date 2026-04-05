@@ -1,13 +1,17 @@
 import { supabase } from "@/lib/supabase";
 
 export default async function PaymentsPage() {
-    const { data: payments } = await supabase
+    const { data: allOrders } = await supabase
         .from("orders")
-        .select("id, customer_email, total_amount, paystack_reference, created_at")
-        .eq("status", "paid")
+        .select("id, customer_email, total_amount, paystack_reference, created_at, status, payment_status")
         .order("created_at", { ascending: false });
 
-    const total = (payments || []).reduce((sum: number, p: any) => sum + Number(p.total_amount), 0);
+    const LEGACY_PAID = ["paid", "processing", "fulfilled", "delivered", "packed", "ready_for_pickup", "shipped"];
+    const payments = (allOrders || []).filter((p: any) =>
+        p.payment_status === "paid" || (!p.payment_status && LEGACY_PAID.includes(p.status ?? ""))
+    );
+
+    const total = payments.reduce((sum: number, p: any) => sum + Number(p.total_amount), 0);
     const thisMonth = new Date();
     thisMonth.setDate(1);
     thisMonth.setHours(0, 0, 0, 0);

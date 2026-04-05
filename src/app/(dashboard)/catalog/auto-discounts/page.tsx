@@ -73,7 +73,7 @@ export default function AutoDiscountsPage() {
 
     const fetchAll = async () => {
         setLoading(true);
-        const [{ data: ruleData }, { data: catData }, { data: prodData }] = await Promise.all([
+        const [{ data: ruleData }, { data: catData }, { data: prodData }, { data: discountOrders }] = await Promise.all([
             supabase
                 .from("automatic_discounts")
                 .select("*")
@@ -89,8 +89,30 @@ export default function AutoDiscountsPage() {
                 .or("is_active.eq.true,is_active.is.null")
                 .order("name")
                 .limit(200),
+            // Count actual usage from orders (auto_discount_title is comma-separated rule titles)
+            supabase
+                .from("orders")
+                .select("auto_discount_title")
+                .not("auto_discount_title", "is", null),
         ]);
-        setRules(ruleData ?? []);
+
+        // Build title → order count map from real order data
+        const usageMap: Record<string, number> = {};
+        for (const o of discountOrders ?? []) {
+            if (!o.auto_discount_title) continue;
+            for (const t of o.auto_discount_title.split(",")) {
+                const title = t.trim();
+                if (title) usageMap[title] = (usageMap[title] ?? 0) + 1;
+            }
+        }
+
+        // Merge computed usage into rules (overrides stale webhook-tracked usage_count)
+        const rulesWithUsage = (ruleData ?? []).map((r: AutoDiscount) => ({
+            ...r,
+            usage_count: usageMap[r.title] ?? 0,
+        }));
+
+        setRules(rulesWithUsage);
         setCategories(catData ?? []);
         setProducts(prodData ?? []);
         setLoading(false);

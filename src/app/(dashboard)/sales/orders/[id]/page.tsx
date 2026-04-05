@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "@/lib/toast";
-import { updateOrderStatus } from "../actions";
+import { updateOrderStatus, updateFulfillmentStatus } from "../actions";
 
 import { Printer, X } from "lucide-react";
 
@@ -17,12 +17,16 @@ type Order = {
     delivery_method?: string;
     total_amount: number;
     status: string;
+    payment_status?: string | null;
+    fulfillment_status?: string | null;
     paystack_reference: string | null;
     created_at: string;
     shipping_address?: any;
     items?: any[];
     discount_code?: string | null;
     discount_amount?: number | null;
+    auto_discount_title?: string | null;
+    auto_discount_amount?: number | null;
     customer_metadata?: { whatsapp?: string; instagram?: string; snapchat?: string } | null;
     assigned_rider_id?: string | null;
 };
@@ -41,7 +45,7 @@ type Rider = {
     bike_reg: string | null;
 };
 
-const STATUSES = ["pending", "paid", "processing", "packed", "shipped", "ready_for_pickup", "fulfilled", "delivered", "refunded", "cancelled"];
+const STATUSES = ["pending", "paid", "refunded", "cancelled"];
 
 const STATUS_STYLES: Record<string, string> = {
     pending:          "bg-amber-50 text-amber-700",
@@ -160,15 +164,37 @@ export default function OrderDetailPage() {
     const [notifStatus, setNotifStatus] = useState<"idle" | "sending" | "sent">("idle");
     const [showRiderPicker, setShowRiderPicker] = useState(false);
     const [assignedRider, setAssignedRider] = useState<AssignedRider | null>(null);
+    const [productSkus, setProductSkus] = useState<Record<string, string>>({});
 
     useEffect(() => {
         Promise.all([
-            supabase.from("orders").select("*").eq("id", id).single(),
+            supabase.from("orders").select("id, customer_email, customer_name, customer_phone, delivery_method, total_amount, status, payment_status, fulfillment_status, paystack_reference, created_at, shipping_address, items, discount_code, discount_amount, auto_discount_title, auto_discount_amount, customer_metadata, assigned_rider_id").eq("id", id).single(),
             supabase.from("business_settings").select("business_name, email, contact, address").eq("id", "default").single(),
             supabase.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
         ]).then(async ([{ data: ord }, { data: biz }, { data: ss }]) => {
             if (ord) {
                 setOrder(ord);
+                // Fetch SKUs for order items
+                if (ord.items && Array.isArray(ord.items)) {
+                    const productIds = ord.items
+                        .map((i: any) => i.productId)
+                        .filter(Boolean) as string[];
+                    if (productIds.length > 0) {
+                        supabase
+                            .from("products")
+                            .select("id, sku")
+                            .in("id", productIds)
+                            .then(({ data: skuData }: { data: any }) => {
+                                if (skuData) {
+                                    const map: Record<string, string> = {};
+                                    for (const p of skuData) {
+                                        if (p.sku) map[p.id] = p.sku;
+                                    }
+                                    setProductSkus(map);
+                                }
+                            });
+                    }
+                }
                 if (ord.assigned_rider_id) {
                     const { data: riderData } = await supabase
                         .from("riders")
@@ -196,15 +222,50 @@ export default function OrderDetailPage() {
     const updateStatus = async (newStatus: string) => {
         if (!order) return;
         setUpdating(true);
+        if (newStatus === "fulfilled" || newStatus === "cancelled") setNotifStatus("sending");
         
         const res = await updateOrderStatus(order.id, newStatus);
         
         if (!res.success) {
             toast.error(res.error || "Failed to update status.");
+            setNotifStatus("idle");
         } else {
-            // Optimistic update was local, but we know it worked now
-            setOrder(prev => prev ? { ...prev, status: newStatus } : prev);
+            const PAYMENT_STATUSES = ["pending", "paid", "refunded", "cancelled"];
+            setOrder(prev => prev ? {
+                ...prev,
+                status: newStatus,
+                ...(PAYMENT_STATUSES.includes(newStatus) ? { payment_status: newStatus } : {}),
+            } : prev);
             toast.success(`Status updated to ${newStatus}.`);
+
+            // Trigger Email/SMS
+            if (newStatus === "fulfilled" || newStatus === "cancelled") {
+                try {
+                    await fetch("/api/email/fulfillment", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ orderId: order.id, type: newStatus }),
+                    });
+                    setNotifStatus("sent");
+                } catch (e) {
+                    console.error("Auto-email failed:", e);
+                    setNotifStatus("idle");
+                }
+            }
+        }
+        setUpdating(false);
+    };
+
+    // Fulfillment status update (separate from payment/order status)
+    const updateFulfillmentStatusLocal = async (newFulfillmentStatus: string) => {
+        if (!order) return;
+        setUpdating(true);
+        const res = await updateFulfillmentStatus(order.id, newFulfillmentStatus);
+        if (!res.success) {
+            toast.error(res.error || "Failed to update fulfillment status.");
+        } else {
+            setOrder(prev => prev ? { ...prev, fulfillment_status: newFulfillmentStatus } : prev);
+            toast.success(`Fulfillment status updated to ${newFulfillmentStatus}.`);
         }
         setUpdating(false);
     };
@@ -350,8 +411,8 @@ export default function OrderDetailPage() {
                         <h1 className="font-serif text-3xl tracking-widest uppercase">
                             #{orderNum}
                         </h1>
-                        <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-semibold rounded ${STATUS_STYLES[order.status] || "bg-neutral-100 text-neutral-600"}`}>
-                            {order.status === "ready_for_pickup" ? "Ready for Pickup" : order.status}
+                        <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-semibold rounded ${STATUS_STYLES[(order.payment_status && order.payment_status !== "pending") ? order.payment_status : order.status] || "bg-neutral-100 text-neutral-600"}`}>
+                            {(order.payment_status && order.payment_status !== "pending") ? order.payment_status : order.status}
                         </span>
                         <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded-sm ${pickup ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-500"}`}>
                             {pickup ? "Pickup" : "Delivery"}
@@ -502,7 +563,12 @@ export default function OrderDetailPage() {
                                             <div className="flex flex-wrap gap-x-3 gap-y-0.5">
                                                 {item.size && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Size: <span className="text-neutral-900 font-semibold">{item.size}</span></span>}
                                                 {item.color && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Color: <span className="text-neutral-900 font-semibold">{item.color}</span></span>}
-                                                {item.stitching && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Stitching: <span className="text-neutral-900 font-semibold">{item.stitching}</span></span>}
+                                                {(item.sku || (item.productId && productSkus[item.productId])) && (
+                                                    <span className="text-[10px] uppercase tracking-widest text-neutral-500">
+                                                        SKU: <span className="text-neutral-900 font-semibold font-mono">{item.sku || productSkus[item.productId]}</span>
+                                                    </span>
+                                                )}
+                                                {/* {item.stitching && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Stitching: <span className="text-neutral-900 font-semibold">{item.stitching}</span></span>} */}
                                                 <span className="text-[10px] uppercase tracking-widest text-neutral-500">Qty: <span className="text-neutral-900 font-semibold">{item.quantity || 1}</span></span>
                                             </div>
                                         </div>
@@ -530,25 +596,42 @@ export default function OrderDetailPage() {
                         {[
                             ["Provider",    order.paystack_reference ? "Paystack" : "N/A"],
                             ["Reference",   order.paystack_reference || "—"],
-                            ["Status",      ["paid", "processing", "fulfilled", "delivered"].includes(order.status) ? "Successful" : order.status === "pending" ? "Pending" : "Failed"],
+                            ["Status",      (() => {
+                                // Derive from payment_status; fall back to status for orders that predate the migration
+                                const ps = (!order.payment_status || order.payment_status === "pending")
+                                    ? (["paid","processing","packed","shipped","ready_for_pickup","fulfilled","delivered"].includes(order.status) ? "paid" : order.status === "refunded" ? "refunded" : order.status === "cancelled" ? "cancelled" : "pending")
+                                    : order.payment_status;
+                                return ps === "paid" ? "Successful" : ps === "refunded" ? "Refunded" : ps === "cancelled" ? "Cancelled" : "Pending";
+                            })()],
                         ].map(([label, value]) => (
                             <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
                                 <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
-                                <span className={`font-medium font-mono ${label === "Status" && value === "Successful" ? "text-green-700" : label === "Status" && value === "Failed" ? "text-red-600" : "text-neutral-900"}`}>
+                                <span className={`font-medium font-mono ${label === "Status" && value === "Successful" ? "text-green-700" : label === "Status" && value === "Refunded" ? "text-neutral-500" : label === "Status" && value === "Cancelled" ? "text-red-600" : label === "Status" && value === "Pending" ? "text-amber-600" : "text-neutral-900"}`}>
                                     {value}
                                 </span>
                             </div>
                         ))}
-                        {order.discount_code && Number(order.discount_amount ?? 0) > 0 && (
+                        {(
+                            (order.discount_code && Number(order.discount_amount ?? 0) > 0) ||
+                            (order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0)
+                        ) && (
                             <>
                                 <div className="px-6 py-3 flex justify-between items-center text-sm">
                                     <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Subtotal</span>
-                                    <span className="font-medium font-mono text-neutral-900">GH₵ {(Number(order.total_amount) + Number(order.discount_amount)).toFixed(2)}</span>
+                                    <span className="font-medium font-mono text-neutral-900">GH₵ {(Number(order.total_amount) + Number(order.discount_amount ?? 0) + Number(order.auto_discount_amount ?? 0)).toFixed(2)}</span>
                                 </div>
-                                <div className="px-6 py-3 flex justify-between items-center text-sm">
-                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Discount ({order.discount_code})</span>
-                                    <span className="font-medium font-mono text-green-600">-GH₵ {Number(order.discount_amount).toFixed(2)}</span>
-                                </div>
+                                {order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0 && (
+                                    <div className="px-6 py-3 flex justify-between items-center text-sm">
+                                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Auto Discount ({order.auto_discount_title})</span>
+                                        <span className="font-medium font-mono text-green-600">-GH₵ {Number(order.auto_discount_amount).toFixed(2)}</span>
+                                    </div>
+                                )}
+                                {order.discount_code && Number(order.discount_amount ?? 0) > 0 && (
+                                    <div className="px-6 py-3 flex justify-between items-center text-sm">
+                                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Discount ({order.discount_code})</span>
+                                        <span className="font-medium font-mono text-green-600">-GH₵ {Number(order.discount_amount).toFixed(2)}</span>
+                                    </div>
+                                )}
                             </>
                         )}
                         <div className="px-6 py-3 flex justify-between items-center text-sm">
@@ -558,16 +641,53 @@ export default function OrderDetailPage() {
                     </div>
 
                     <div className="bg-white border border-neutral-200 p-6 space-y-5">
-                        <h2 className="text-xs uppercase tracking-widest font-semibold">Change Status</h2>
+                        <h2 className="text-xs uppercase tracking-widest font-semibold">Payment Status</h2>
                         <div className="flex flex-wrap gap-2">
-                            {STATUSES.map(s => (
+                            {STATUSES.map(s => {
+                                // payment_status='pending' is just the DB default (not meaningful),
+                                // so if payment_status is 'pending' or null, fall back to order.status.
+                                const effectivePaymentStatus =
+                                    (order.payment_status && order.payment_status !== "pending")
+                                        ? order.payment_status
+                                        : order.status;
+                                const isActive = effectivePaymentStatus === s;
+                                return (
                                 <button
                                     key={s}
                                     onClick={() => updateStatus(s)}
-                                    disabled={updating || order.status === s}
+                                    disabled={updating || isActive}
                                     className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${
-                                        order.status === s
+                                        isActive
                                             ? "bg-black text-white cursor-default"
+                                            : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                                    } disabled:opacity-50`}
+                                >
+                                    {s}
+                                </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Fulfillment Status */}
+                    <div className="bg-white border border-neutral-200 p-6 space-y-5">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xs uppercase tracking-widest font-semibold">Fulfillment Status</h2>
+                            {order.fulfillment_status && (
+                                <span className="text-[10px] uppercase tracking-widest font-semibold bg-blue-50 text-blue-700 px-2 py-1">
+                                    {order.fulfillment_status === "ready_for_pickup" ? "Ready for Pickup" : order.fulfillment_status}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {(["inbox", "processing", "packed", "shipped", "ready_for_pickup", "delivered"] as const).map(s => (
+                                <button
+                                    key={s}
+                                    onClick={() => updateFulfillmentStatusLocal(s)}
+                                    disabled={updating || order.fulfillment_status === s}
+                                    className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${
+                                        order.fulfillment_status === s
+                                            ? "bg-blue-600 text-white cursor-default"
                                             : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
                                     } disabled:opacity-50`}
                                 >
@@ -721,16 +841,27 @@ export default function OrderDetailPage() {
 
             <div className="flex justify-end border-t border-neutral-200 pt-4">
                 <div className="w-56 space-y-2 text-sm">
-                    {order.discount_code && Number(order.discount_amount ?? 0) > 0 && (
+                    {(
+                        (order.discount_code && Number(order.discount_amount ?? 0) > 0) ||
+                        (order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0)
+                    ) && (
                         <>
                             <div className="flex justify-between text-neutral-500">
                                 <span>Subtotal</span>
-                                <span>GH₵ {(Number(order.total_amount ?? 0) + Number(order.discount_amount ?? 0)).toFixed(2)}</span>
+                                <span>GH₵ {(Number(order.total_amount ?? 0) + Number(order.discount_amount ?? 0) + Number(order.auto_discount_amount ?? 0)).toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between text-green-600">
-                                <span>Discount ({order.discount_code})</span>
-                                <span>-GH₵ {Number(order.discount_amount ?? 0).toFixed(2)}</span>
-                            </div>
+                            {order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0 && (
+                                <div className="flex justify-between text-green-600">
+                                    <span>Auto Discount ({order.auto_discount_title})</span>
+                                    <span>-GH₵ {Number(order.auto_discount_amount ?? 0).toFixed(2)}</span>
+                                </div>
+                            )}
+                            {order.discount_code && Number(order.discount_amount ?? 0) > 0 && (
+                                <div className="flex justify-between text-green-600">
+                                    <span>Discount ({order.discount_code})</span>
+                                    <span>-GH₵ {Number(order.discount_amount ?? 0).toFixed(2)}</span>
+                                </div>
+                            )}
                         </>
                     )}
                     <div className="flex justify-between font-semibold text-base">

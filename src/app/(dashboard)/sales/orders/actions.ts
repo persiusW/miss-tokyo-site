@@ -5,6 +5,28 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { logActivity } from "@/lib/utils/logActivity";
 import { revalidatePath } from "next/cache";
 
+// Keep status and fulfillment_status in sync so tab filtering is always consistent.
+// OrdersClient filters by `status`; order detail page updates `fulfillment_status`.
+// Without this sync, changing fulfillment from the detail page leaves `status = "paid"` → order reappears in Inbox.
+const FULFILLMENT_TO_STATUS: Record<string, string> = {
+    inbox:             "paid",
+    processing:        "processing",
+    packed:            "packed",
+    shipped:           "shipped",
+    ready_for_pickup:  "ready_for_pickup",
+    delivered:         "delivered",
+};
+
+const STATUS_TO_FULFILLMENT: Record<string, string> = {
+    paid:             "inbox",
+    processing:       "processing",
+    packed:           "packed",
+    shipped:          "shipped",
+    ready_for_pickup: "ready_for_pickup",
+    fulfilled:        "delivered",
+    delivered:        "delivered",
+};
+
 export async function updateOrderStatus(orderId: string, newStatus: string, extraData?: any) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -17,7 +39,14 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
     const { data: oldData } = await supabaseAdmin.from("orders").select("*, riders(full_name)").eq("id", orderId).single();
     if (!oldData) return { success: false, error: "Order not found" };
 
-    const updateData: any = { status: newStatus, ...extraData };
+    const syncedFulfillment = STATUS_TO_FULFILLMENT[newStatus];
+    const PAYMENT_STATUSES = ["pending", "paid", "refunded", "cancelled"];
+    const updateData: any = {
+        status: newStatus,
+        ...(PAYMENT_STATUSES.includes(newStatus) ? { payment_status: newStatus } : {}),
+        ...(syncedFulfillment ? { fulfillment_status: syncedFulfillment } : {}),
+        ...extraData,
+    };
     if (newStatus === "packed" && !oldData.packed_by) {
         updateData.packed_by = user.id;
     }
@@ -67,5 +96,32 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
 
     revalidatePath(`/sales/orders/${orderId}`, "page");
     revalidatePath("/sales/orders", "page");
+
+    return { success: true };
+}
+
+export async function updateFulfillmentStatus(orderId: string, fulfillment_status: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "Unauthorized" };
+
+    // Sync the legacy `status` column so Inbox/Packed/Shipped tabs remain accurate.
+    const syncedStatus = FULFILLMENT_TO_STATUS[fulfillment_status];
+    const { error } = await supabaseAdmin
+        .from("orders")
+        .update({
+            fulfillment_status,
+            ...(syncedStatus ? { status: syncedStatus } : {}),
+        })
+        .eq("id", orderId);
+
+    if (error) {
+        console.error("Failed to update fulfillment status:", error);
+        return { success: false, error: error.message };
+    }
+
+    revalidatePath(`/sales/orders/${orderId}`, "page");
+    revalidatePath("/sales/orders", "page");
+
     return { success: true };
 }

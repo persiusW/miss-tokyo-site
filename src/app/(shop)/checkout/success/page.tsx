@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/store/useCart";
 import { supabase } from "@/lib/supabase";
@@ -109,11 +110,22 @@ function GuestModal({ onClose }: { onClose: () => void }) {
 function Receipt({ order, orderRef }: { order: Order; orderRef: string }) {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [guestModalOpen, setGuestModalOpen] = useState(false);
+    const [oosItems, setOosItems] = useState<string[]>([]);
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data }: { data: { user: any } }) => {
             setIsLoggedIn(!!data.user);
         });
+        // Read and clear OOS items stored before Paystack redirect
+        try {
+            const stored = sessionStorage.getItem("checkout_oos");
+            if (stored) {
+                setOosItems(JSON.parse(stored) as string[]);
+                sessionStorage.removeItem("checkout_oos");
+            }
+        } catch {
+            // sessionStorage unavailable or parse error — silently skip
+        }
     }, []);
 
     const items: OrderItem[] = Array.isArray(order.items) ? order.items : [];
@@ -148,6 +160,24 @@ function Receipt({ order, orderRef }: { order: Order; orderRef: string }) {
                     </p>
                 </div>
 
+                {/* OOS exclusion notice */}
+                {oosItems.length > 0 && (
+                    <div style={{
+                        border: "1px solid #fde68a", background: "#fffbeb",
+                        borderRadius: 4, padding: "16px 20px", marginBottom: 16,
+                    }}>
+                        <p style={{
+                            fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase",
+                            color: "#92400e", marginBottom: 6, fontWeight: 600,
+                        }}>
+                            Note
+                        </p>
+                        <p style={{ fontSize: 13, color: "#b45309", lineHeight: 1.6 }}>
+                            The following items were out of stock and not included in your order: {oosItems.join(", ")}.
+                        </p>
+                    </div>
+                )}
+
                 {/* Receipt card */}
                 <div style={{ background: "#fff", border: "1px solid #e5e5e5", borderRadius: 4, overflow: "hidden", marginBottom: 16 }}>
                     {/* Items */}
@@ -163,8 +193,9 @@ function Receipt({ order, orderRef }: { order: Order; orderRef: string }) {
                                             <div style={{
                                                 width: 60, height: 80, flexShrink: 0,
                                                 background: "#f5f5f5", overflow: "hidden", borderRadius: 2,
+                                                position: "relative",
                                             }}>
-                                                <img src={item.imageUrl} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                <Image src={item.imageUrl} alt={item.name} fill sizes="60px" style={{ objectFit: "cover" }} />
                                             </div>
                                         )}
                                         <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>

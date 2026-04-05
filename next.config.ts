@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false, // SPD-12: suppress X-Powered-By header
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [75, 85, 90],
     // Image optimization enabled — Vercel Pro plan
     remotePatterns: [
       {
@@ -34,6 +35,12 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'dfhrtuiszsumvtzsfzic.supabase.co',
         port: '',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        // Wildcard catches any future Supabase project or CDN edge hostname
+        protocol: 'https',
+        hostname: '*.supabase.co',
         pathname: '/storage/v1/object/public/**',
       },
       {

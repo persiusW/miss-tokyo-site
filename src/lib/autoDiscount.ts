@@ -112,7 +112,28 @@ function checkQuantityRequirement(
 
 /** Calculates the raw discount amount for a set of qualifying items. */
 function calculateRuleDiscount(items: CartItem[], rule: AutoDiscountRule): number {
-    const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+    let subtotal: number;
+
+    if (rule.quantity_scope === "PER_PRODUCT" && rule.min_quantity > 1) {
+        // "N for price" deals: only discount complete groups of min_quantity items.
+        // E.g. "2 for 150" with 3 items of the same product → discount 2 items, 1 at full price.
+        // With 4 items → discount all 4 (two complete groups of 2).
+        const qtyByProduct: Record<string, number> = {};
+        for (const i of items) {
+            qtyByProduct[i.productId] = (qtyByProduct[i.productId] ?? 0) + i.quantity;
+        }
+        subtotal = 0;
+        for (const i of items) {
+            const totalQty = qtyByProduct[i.productId];
+            const discountableQty = Math.floor(totalQty / rule.min_quantity) * rule.min_quantity;
+            // This variant's proportional share of the discountable quantity
+            const proportional = (i.quantity / totalQty) * discountableQty;
+            subtotal += i.price * proportional;
+        }
+    } else {
+        subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+    }
+
     if (subtotal <= 0) return 0;
     if (rule.discount_type === "PERCENTAGE") {
         return parseFloat((subtotal * (rule.discount_value / 100)).toFixed(2));
