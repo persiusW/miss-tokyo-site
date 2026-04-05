@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
                 amount: amountInPesewas,
                 currency: "GHS",
                 callback_url: `${siteUrl}/gift-cards/success`,
-                channels: ["card", "mobile_money", "bank", "bank_transfer", "ussd"],
+                channels: ["mobile_money", "card", "bank", "bank_transfer", "ussd"],
                 metadata: {
                     type: "gift_card",
                     gift_card_id: card.id,

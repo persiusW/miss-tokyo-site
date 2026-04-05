@@ -276,7 +276,7 @@ export async function POST(request: Request) {
                 amount: amountInPesewas,
                 currency: "GHS",
                 callback_url: `${siteUrl}/checkout/success`,
-                channels: ["card", "mobile_money", "bank", "bank_transfer", "ussd"],
+                channels: ["mobile_money", "card", "bank", "bank_transfer", "ussd"],
                 ...splitPayload,
                 metadata: {
                     ...clientMetadata,

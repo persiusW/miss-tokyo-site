@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
             description: `Payment for invoice #${invoiceId.substring(0, 8).toUpperCase()}`,
             amount: amountInPesewas,
             currency: "GHS",
-            channels: ["card", "mobile_money", "bank", "bank_transfer", "ussd"],
+            channels: ["mobile_money", "card", "bank", "bank_transfer", "ussd"],
             ...splitPayload,
             metadata: {
                 invoice_id: invoiceId,

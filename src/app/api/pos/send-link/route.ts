@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
         email: session.customer_email,
         amount: amountPesewas,
         currency: 'GHS',
-        channels: ['card', 'mobile_money', 'bank', 'bank_transfer', 'ussd'],
+        channels: ['mobile_money', 'card', 'bank', 'bank_transfer', 'ussd'],
         metadata: {
             pos_session_id: sessionId,
             source: 'pos',
