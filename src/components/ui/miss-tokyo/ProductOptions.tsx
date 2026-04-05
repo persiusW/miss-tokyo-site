@@ -174,17 +174,24 @@ export function ProductOptions(props: Props) {
         return result;
     }, [trackVariantInventory, productVariants, selectedSize]);
 
-    // When the selected size changes and the current color is no longer available
-    // for that size, auto-advance to the first in-stock color.
+    // On mount: once variant stock data is ready, advance size to first in-stock option.
+    useEffect(() => {
+        if (!sizesWithStock) return;
+        if (selectedSize && sizesWithStock.has(selectedSize)) return;
+        const first = sizes.find(s => sizesWithStock.has(s.label));
+        if (first) setSelectedSize(first.label);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sizesWithStock]);
+
+    // When the selected size changes (or on mount after sizesWithStock resolves),
+    // advance color to the first in-stock option for that size.
     useEffect(() => {
         if (!colorsWithStock) return;
-        if (selectedColor && !colorsWithStock.has(selectedColor)) {
-            const first = colors.find(c => colorsWithStock.has(c.name));
-            setSelectedColor(first?.name ?? "");
-        }
-        // Only run when the size changes — colorsWithStock is derived from selectedSize
+        if (selectedColor && colorsWithStock.has(selectedColor)) return;
+        const first = colors.find(c => colorsWithStock.has(c.name));
+        setSelectedColor(first?.name ?? "");
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedSize]);
+    }, [selectedSize, colorsWithStock]);
 
     /** Effective stock for the currently selected size + color combo */
     const effectiveInventory = useMemo(() => {

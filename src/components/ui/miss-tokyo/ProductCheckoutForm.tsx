@@ -53,7 +53,17 @@ export function ProductCheckoutForm({
     }).map(formatSize);
 
     const [selectedSize, setSelectedSize] = useState<string>("");
-    const [selectedColor, setSelectedColor] = useState<string>(colors[0] || "");
+    // Default to first color that has any in-stock variant; fall back to colors[0]
+    const defaultColor = (() => {
+        if (trackVariantInventory && productVariants.length > 0) {
+            const inStockColor = colors.find(c =>
+                productVariants.some(v => (v.color ?? "") === c && (v.inventory_count ?? 0) > 0)
+            );
+            return inStockColor || colors[0] || "";
+        }
+        return colors[0] || "";
+    })();
+    const [selectedColor, setSelectedColor] = useState<string>(defaultColor);
     const [selectedStitching, setSelectedStitching] = useState<string>(stitching[0] || "");
     const [quantity, setQuantity] = useState<number>(1);
 
