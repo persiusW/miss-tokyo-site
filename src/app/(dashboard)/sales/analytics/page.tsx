@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Calendar, TrendingUp, BarChart2, FileText, Lightbulb } from "lucide-react";
 import { RevenueLineChart, OrdersBarChart, TopItemsList, type DailyPoint, type TopItem } from "./HighlightsTab";
-import { SalesByItemTable, SalesByVariantTable, type ItemRow, type VariantRow } from "./ReportsTab";
+import { SalesByItemTable, SalesByVariantTable, SalesBySourceTable, DiscountPerformanceTable, type ItemRow, type VariantRow, type SourceRow, type DiscountRow } from "./ReportsTab";
+import { TrafficTab, type HourlyPoint, type WeekdayPoint, type RegionRow, type NewCustomerPoint, type DemandSignals } from "./TrafficTab";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // After dual-status migration, filter by payment_status directly in the query.
@@ -32,30 +33,31 @@ const TABS: { key: Tab; label: string; Icon: any }[] = [
 
 function getPresetRange(preset: Preset): { start: Date; end: Date } {
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Use UTC midnight so date boundaries match Supabase's UTC-stored timestamps
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     switch (preset) {
         case "today":
-            return { start: today, end: now };
+            return { start: todayUTC, end: now };
         case "yesterday": {
-            const y = new Date(today);
-            y.setDate(y.getDate() - 1);
-            return { start: y, end: today };
+            const y = new Date(todayUTC);
+            y.setUTCDate(y.getUTCDate() - 1);
+            return { start: y, end: todayUTC };
         }
         case "7d": {
-            const d = new Date(today);
-            d.setDate(d.getDate() - 7);
+            const d = new Date(todayUTC);
+            d.setUTCDate(d.getUTCDate() - 7);
             return { start: d, end: now };
         }
         case "30d": {
-            const d = new Date(today);
-            d.setDate(d.getDate() - 30);
+            const d = new Date(todayUTC);
+            d.setUTCDate(d.getUTCDate() - 30);
             return { start: d, end: now };
         }
         case "ytd":
-            return { start: new Date(now.getFullYear(), 0, 1), end: now };
+            return { start: new Date(Date.UTC(now.getUTCFullYear(), 0, 1)), end: now };
         default: {
-            const d = new Date(today);
-            d.setDate(d.getDate() - 30);
+            const d = new Date(todayUTC);
+            d.setUTCDate(d.getUTCDate() - 30);
             return { start: d, end: now };
         }
     }
@@ -71,7 +73,7 @@ function toInputDate(d: Date) {
 }
 
 // ─── Aggregation helpers ──────────────────────────────────────────────────────
-type RawOrder = { id: string; status: string; payment_status?: string; total_amount: number; items: any; created_at: string; customer_email?: string; customer_name?: string };
+type RawOrder = { id: string; status: string; payment_status?: string; total_amount: number; items: any; created_at: string; customer_email?: string; customer_name?: string; source?: string; discount_code?: string | null; discount_amount?: number | null; auto_discount_title?: string | null; paystack_reference?: string | null; shipping_address?: any };
 
 // function aggregateData(orders: RawOrder[], allOrders: RawOrder[]) {
 //     // const revenueOrders = orders.filter(o => REVENUE_STATUSES.includes(o.status));
@@ -246,6 +248,17 @@ export default function AnalyticsPage() {
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [itemsSold, setItemsSold] = useState(0);
     const [totalOrders, setTotalOrders] = useState(0);
+    const [paidOrdersCount, setPaidOrdersCount] = useState(0);
+
+    // Reports + Traffic
+    const [sourceRows, setSourceRows] = useState<SourceRow[]>([]);
+    const [discountRows, setDiscountRows] = useState<DiscountRow[]>([]);
+    const [hourlyOrders, setHourlyOrders] = useState<HourlyPoint[]>([]);
+    const [weekdayOrders, setWeekdayOrders] = useState<WeekdayPoint[]>([]);
+    const [newCustomers, setNewCustomers] = useState<NewCustomerPoint[]>([]);
+    const [regionRows, setRegionRows] = useState<RegionRow[]>([]);
+    const [demandSignals, setDemandSignals] = useState<DemandSignals>({ newsletterSignups: 0, customRequests: 0, uniqueCustomers: 0, repeatBuyers: 0 });
+
     const [insightsData, setInsightsData] = useState<{
         uniqueCustomers: number;
         repeatBuyers: number;
@@ -319,25 +332,35 @@ export default function AnalyticsPage() {
         setLoading(true);
         const { start, end } = dateRange;
 
-        // Fetch all orders for the order-count chart (unfiltered by payment_status)
+        const SELECT_FIELDS = "id, status, payment_status, total_amount, items, created_at, customer_email, customer_name, source, discount_code, discount_amount, auto_discount_title, paystack_reference, shipping_address";
+
+        // Fetch all orders (for order-count + traffic patterns)
         const { data: allOrders } = await supabase
             .from("orders")
-            .select("id, status, payment_status, total_amount, items, created_at, customer_email, customer_name")
+            .select(SELECT_FIELDS)
             .gte("created_at", start.toISOString())
             .lte("created_at", end.toISOString())
             .order("created_at");
 
-        // Fetch only paid orders for revenue metrics (filtered by payment_status)
-        const { data: paidOrders } = await supabase
-            .from("orders")
-            .select("id, status, payment_status, total_amount, items, created_at, customer_email, customer_name")
-            .eq("payment_status", "paid")
-            .gte("created_at", start.toISOString())
-            .lte("created_at", end.toISOString())
-            .order("created_at");
+        // Demand signals: newsletter signups + bespoke inquiries in this period
+        const [{ count: newsletterCount }, { count: inquiryCount }] = await Promise.all([
+            supabase.from("newsletter_subs").select("id", { count: "exact", head: true })
+                .gte("created_at", start.toISOString())
+                .lte("created_at", end.toISOString()),
+            supabase.from("custom_requests").select("id", { count: "exact", head: true })
+                .gte("created_at", start.toISOString())
+                .lte("created_at", end.toISOString()),
+        ]);
 
         const rows = (allOrders ?? []) as RawOrder[];
-        const revenueRows = (paidOrders ?? []) as RawOrder[];
+
+        // Revenue orders: prefer payment_status='paid'; fall back to legacy status
+        // for orders created before the dual-status migration (payment_status may be null).
+        const LEGACY_PAID = ["paid", "processing", "fulfilled", "delivered", "packed", "ready_for_pickup", "shipped"];
+        const revenueRows = rows.filter(o =>
+            o.payment_status === "paid" ||
+            (!o.payment_status && LEGACY_PAID.includes(o.status))
+        );
 
         const agg = aggregateData(revenueRows, rows);
         setRevenueChart(agg.revenueChart);
@@ -347,7 +370,127 @@ export default function AnalyticsPage() {
         setVariantRows(agg.variantRows);
         setTotalRevenue(agg.totalRevenue);
         setItemsSold(agg.itemsSold);
-        setTotalOrders(revenueRows.length);
+        setTotalOrders(rows.length);
+        setPaidOrdersCount(revenueRows.length);
+
+        // ── Traffic & Reports aggregations ─────────────────────────────────
+
+        // Peak ordering hours (0–23, from all orders)
+        const hourMap: Record<number, number> = {};
+        for (const o of rows) {
+            const h = new Date(o.created_at).getHours();
+            hourMap[h] = (hourMap[h] ?? 0) + 1;
+        }
+        setHourlyOrders(
+            Array.from({ length: 24 }, (_, h) => ({
+                hour: String(h).padStart(2, "0"),
+                value: hourMap[h] ?? 0,
+            }))
+        );
+
+        // Peak ordering days (Mon–Sun, from all orders)
+        const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const dayMap: Record<number, number> = {};
+        for (const o of rows) {
+            const d = new Date(o.created_at).getDay();
+            dayMap[d] = (dayMap[d] ?? 0) + 1;
+        }
+        // Reorder Mon–Sun
+        setWeekdayOrders(
+            [1, 2, 3, 4, 5, 6, 0].map(d => ({ day: DAY_LABELS[d], value: dayMap[d] ?? 0 }))
+        );
+
+        // New customer acquisition (first order per email per day, from all orders)
+        const seenEmails = new Set<string>();
+        const newCustByDate: Record<string, number> = {};
+        for (const o of rows) {
+            const email = (o.customer_email || "").toLowerCase().trim();
+            if (email && !seenEmails.has(email)) {
+                seenEmails.add(email);
+                const d = o.created_at.substring(0, 10);
+                const [, m, dd] = d.split("-");
+                newCustByDate[`${dd}/${m}`] = (newCustByDate[`${dd}/${m}`] ?? 0) + 1;
+            }
+        }
+        setNewCustomers(
+            Object.entries(newCustByDate).map(([date, value]) => ({ date, value }))
+        );
+
+        // Sales by source (all orders for counts, paid orders for revenue)
+        const srcMap: Record<string, { orders: number; revenue: number }> = {};
+        for (const o of rows) {
+            const s = o.source || "storefront";
+            if (!srcMap[s]) srcMap[s] = { orders: 0, revenue: 0 };
+            srcMap[s].orders += 1;
+        }
+        for (const o of revenueRows) {
+            const s = o.source || "storefront";
+            if (!srcMap[s]) srcMap[s] = { orders: 0, revenue: 0 };
+            srcMap[s].revenue += Number(o.total_amount ?? 0);
+        }
+        setSourceRows(
+            Object.entries(srcMap)
+                .map(([source, v]) => ({ source, orders: v.orders, revenue: v.revenue }))
+                .sort((a, b) => b.revenue - a.revenue)
+        );
+
+        // Discount performance (paid orders only) — with order-level details
+        const discMap: Record<string, { name: string; type: string; uses: number; savings: number; revenue: number; orders: { orderId: string; reference: string | null; customer: string; amount: number; date: string }[] }> = {};
+        for (const o of revenueRows) {
+            if (!o.discount_code) continue;
+            const code = o.discount_code.toUpperCase();
+            // auto_discount_title is set on the order for automatic discounts; null/absent = manual coupon
+            const isAuto = !!o.auto_discount_title;
+            const name = isAuto ? o.auto_discount_title! : code;
+            if (!discMap[code]) discMap[code] = { name, type: isAuto ? "automatic" : "coupon", uses: 0, savings: 0, revenue: 0, orders: [] };
+            discMap[code].uses += 1;
+            discMap[code].savings += Number(o.discount_amount ?? 0);
+            discMap[code].revenue += Number(o.total_amount ?? 0);
+            const dateStr = o.created_at.substring(0, 10);
+            const [yr, m, d] = dateStr.split("-");
+            discMap[code].orders.push({
+                orderId: o.id,
+                reference: o.paystack_reference || null,
+                customer: o.customer_name || o.customer_email || "—",
+                amount: Number(o.total_amount ?? 0),
+                date: `${d}/${m}/${yr.substring(2)}`,
+            });
+        }
+        setDiscountRows(
+            Object.entries(discMap)
+                .map(([code, v]) => ({ code, ...v }))
+                .sort((a, b) => b.revenue - a.revenue)
+        );
+
+        // Geographic breakdown from shipping_address.region
+        const regionMap: Record<string, number> = {};
+        for (const o of rows) {
+            const addr = (o as any).shipping_address;
+            const region = addr?.region || addr?.city || null;
+            if (!region) continue;
+            const key = String(region).trim();
+            if (key) regionMap[key] = (regionMap[key] ?? 0) + 1;
+        }
+        setRegionRows(
+            Object.entries(regionMap)
+                .map(([region, orders]) => ({ region, orders }))
+                .sort((a, b) => b.orders - a.orders)
+        );
+
+        // Demand signals
+        const uniqueCusts = new Set(revenueRows.map(o => (o.customer_email || "").toLowerCase().trim()).filter(Boolean));
+        const custOrderCounts: Record<string, number> = {};
+        for (const o of revenueRows) {
+            const e = (o.customer_email || "").toLowerCase().trim();
+            if (e) custOrderCounts[e] = (custOrderCounts[e] ?? 0) + 1;
+        }
+        const repeatBuyerCount = Object.values(custOrderCounts).filter(c => c > 1).length;
+        setDemandSignals({
+            newsletterSignups: newsletterCount ?? 0,
+            customRequests: inquiryCount ?? 0,
+            uniqueCustomers: uniqueCusts.size,
+            repeatBuyers: repeatBuyerCount,
+        });
 
         // BULLETPROOF INSIGHTS CALCULATION
         const customerMap: Record<string, { name: string; orders: number; revenue: number }> = {};
@@ -402,7 +545,7 @@ export default function AnalyticsPage() {
     //     ? (totalRevenue / revenueChart.reduce((s, d) => s + (d.value > 0 ? 1 : 0), 0) || totalRevenue)
     //     : 0;
 
-    const avgOrder = totalOrders > 0 ? (totalRevenue / totalOrders) : 0;
+    const avgOrder = paidOrdersCount > 0 ? (totalRevenue / paidOrdersCount) : 0;
 
     const kpis = [
         { label: "Revenue", value: `GH₵ ${totalRevenue.toFixed(2)}` },
@@ -513,23 +656,31 @@ export default function AnalyticsPage() {
             )}
 
             {activeTab === "traffic" && (
-                <div className="bg-white rounded-2xl shadow-sm p-12 text-center space-y-4">
-                    <BarChart2 size={40} className="mx-auto text-neutral-200" />
-                    <p className="font-serif text-xl text-neutral-400">Traffic Analytics</p>
-                    <p className="text-[10px] uppercase tracking-widest text-neutral-300">
-                        Connect an analytics provider (e.g. Plausible, Vercel Analytics) to see visitor data here.
-                    </p>
-                </div>
+                <TrafficTab
+                    loading={loading}
+                    hourlyOrders={hourlyOrders}
+                    weekdayOrders={weekdayOrders}
+                    sourceRows={sourceRows}
+                    regionRows={regionRows}
+                    newCustomers={newCustomers}
+                    demandSignals={demandSignals}
+                />
             )}
 
             {activeTab === "reports" && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                     {loading ? (
-                        <div className="bg-white rounded-2xl shadow-sm h-48 animate-pulse" />
+                        <div className="space-y-4">
+                            {[1, 2, 3, 4].map(i => (
+                                <div key={i} className="bg-white rounded-2xl shadow-sm h-16 animate-pulse" />
+                            ))}
+                        </div>
                     ) : (
                         <>
                             <SalesByItemTable items={itemRows} dateLabel={dateLabel} />
                             <SalesByVariantTable variants={variantRows} dateLabel={dateLabel} />
+                            <SalesBySourceTable rows={sourceRows} dateLabel={dateLabel} />
+                            <DiscountPerformanceTable rows={discountRows} dateLabel={dateLabel} />
                         </>
                     )}
                 </div>

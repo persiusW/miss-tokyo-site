@@ -40,8 +40,10 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
     if (!oldData) return { success: false, error: "Order not found" };
 
     const syncedFulfillment = STATUS_TO_FULFILLMENT[newStatus];
+    const PAYMENT_STATUSES = ["pending", "paid", "refunded", "cancelled"];
     const updateData: any = {
         status: newStatus,
+        ...(PAYMENT_STATUSES.includes(newStatus) ? { payment_status: newStatus } : {}),
         ...(syncedFulfillment ? { fulfillment_status: syncedFulfillment } : {}),
         ...extraData,
     };

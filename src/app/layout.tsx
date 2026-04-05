@@ -26,6 +26,7 @@ const cinzel = localFont({
   fallback: ["serif"],
 });
 
+import { Analytics } from "@vercel/analytics/next";
 import { unstable_cache } from "next/cache";
 import { supabase } from "@/lib/supabase";
 
@@ -82,6 +83,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${playfairDisplay.variable} ${cinzel.variable} antialiased font-[family-name:var(--font-cinzel)]`}
       >
         {children}
+        <Analytics />
       </body>
     </html>
   );
