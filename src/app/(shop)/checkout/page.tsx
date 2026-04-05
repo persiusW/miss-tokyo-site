@@ -122,18 +122,26 @@ export default function CheckoutPage() {
             if (!user) return;
             const [{ data: profile }, { data: lastOrders }] = await Promise.all([
                 supabase.from('profiles').select('full_name, email, phone').eq('id', user.id).single(),
-                supabase.from('orders').select('shipping_address, customer_phone').eq('customer_email', user.email ?? '').order('created_at', { ascending: false }).limit(1),
+                supabase.from('orders').select('shipping_address, customer_phone, customer_metadata').eq('customer_email', user.email ?? '').order('created_at', { ascending: false }).limit(1),
             ]);
             const lastOrder = lastOrders?.[0];
             const lastAddress = lastOrder?.shipping_address;
+            const meta = lastOrder?.customer_metadata ?? {};
+            const savedPhone = profile?.phone || lastOrder?.customer_phone || "";
+            const savedWhatsapp = meta.whatsapp || "";
+            const whatsappSame = !savedWhatsapp || savedWhatsapp === savedPhone;
             setForm(prev => ({
                 ...prev,
-                fullName: profile?.full_name || prev.fullName,
-                email:    profile?.email     || user.email || prev.email,
-                phone:    profile?.phone     || lastOrder?.customer_phone || prev.phone,
-                address:  lastAddress?.text  || prev.address,
-                country:  lastAddress?.country || prev.country,
-                region:   lastAddress?.region  || prev.region,
+                fullName:           profile?.full_name    || prev.fullName,
+                email:              profile?.email        || user.email || prev.email,
+                phone:              savedPhone            || prev.phone,
+                address:            lastAddress?.text     || prev.address,
+                country:            lastAddress?.country  || prev.country,
+                region:             lastAddress?.region   || prev.region,
+                whatsappSameAsPhone: whatsappSame,
+                whatsapp:           whatsappSame ? "" : savedWhatsapp,
+                instagram:          meta.instagram        || prev.instagram,
+                snapchat:           meta.snapchat         || prev.snapchat,
             }));
         });
     }, []);
