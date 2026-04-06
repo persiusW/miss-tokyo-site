@@ -128,16 +128,31 @@ export function ProductOptions(props: Props) {
     // Deduplicate by normalized display label so mixed-format DB arrays (e.g. both
     // "M — 10" and "M" in available_sizes) don't produce duplicate buttons.
     const sizes: SizeVariant[] = (() => {
-        const raw = availableSizes && availableSizes.length > 0
-            ? availableSizes.map(l => ({ label: l, in_stock: true }))
-            : (sizeVariants || []);
+        let raw: SizeVariant[];
+        if (availableSizes && availableSizes.length > 0) {
+            raw = availableSizes.map(l => ({ label: l, in_stock: true }));
+        } else if (sizeVariants && sizeVariants.length > 0) {
+            raw = sizeVariants;
+        } else if (trackVariantInventory && productVariants?.length) {
+            // Derive sizes from variant data when no explicit size list exists
+            const seen = new Map<string, SizeVariant>();
+            for (const v of productVariants) {
+                if (!v.size) continue;
+                const key = displaySizeLabel(v.size);
+                if (!seen.has(key)) seen.set(key, { label: key, in_stock: (v.inventory_count ?? 0) > 0 });
+                else if ((v.inventory_count ?? 0) > 0) seen.get(key)!.in_stock = true;
+            }
+            raw = Array.from(seen.values());
+        } else {
+            raw = [];
+        }
         const seen = new Set<string>();
         return raw.filter(s => {
             const key = displaySizeLabel(s.label);
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
-        });
+        }).map(s => ({ ...s, label: displaySizeLabel(s.label) }));
     })();
 
     const [selectedColor, setSelectedColor] = useState<string>(colors[0]?.name ?? "");
@@ -154,7 +169,8 @@ export function ProductOptions(props: Props) {
         if (!trackVariantInventory || !productVariants?.length) return null;
         const result = new Set<string>();
         for (const v of productVariants) {
-            if ((v.inventory_count ?? 0) > 0 && v.size != null) result.add(v.size);
+            // Normalize variant size to canonical label so it matches sizes[].label
+            if ((v.inventory_count ?? 0) > 0 && v.size != null) result.add(displaySizeLabel(v.size));
         }
         return result;
     }, [trackVariantInventory, productVariants]);
@@ -168,7 +184,8 @@ export function ProductOptions(props: Props) {
         if (!trackVariantInventory || !productVariants?.length) return null;
         const result = new Set<string>();
         for (const v of productVariants) {
-            const sizeMatch = selectedSize ? (v.size ?? "") === selectedSize : true;
+            // Normalize variant size for comparison with selectedSize (canonical label)
+            const sizeMatch = selectedSize ? displaySizeLabel(v.size ?? "") === selectedSize : true;
             if (sizeMatch && (v.inventory_count ?? 0) > 0 && v.color != null) result.add(v.color);
         }
         return result;
@@ -201,7 +218,7 @@ export function ProductOptions(props: Props) {
         // Scenario C: If track_variant_inventory is true, use per-combo variant data.
         if (trackVariantInventory && productVariants?.length) {
             const match = productVariants.find(v =>
-                (v.size ?? "") === selectedSize &&
+                displaySizeLabel(v.size ?? "") === selectedSize &&
                 (v.color ?? "") === selectedColor
             );
             return match?.inventory_count ?? 0;
