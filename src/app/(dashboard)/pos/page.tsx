@@ -14,7 +14,7 @@ function ProductCard({ product, onAdd }: { product: PosProduct; onAdd: (p: PosPr
     const [selectedSize, setSelectedSize] = useState<string | null>(product.available_sizes?.[0] ?? null);
     const [selectedColor, setSelectedColor] = useState<string | null>(product.available_colors?.[0] ?? null);
     // For variant-tracked products we can't determine availability without a variant; treat as available
-    const unavailable = product.track_inventory && !product.track_variant_inventory && product.available_stock <= 0;
+    const unavailable = product.track_inventory && !product.track_variant_inventory && product.inventory_count <= 0;
 
     return (
         <div className={`border border-neutral-100 p-2 space-y-2 ${unavailable ? 'opacity-40' : ''}`}>
@@ -27,14 +27,14 @@ function ProductCard({ product, onAdd }: { product: PosProduct; onAdd: (p: PosPr
                 <p className="text-[10px] font-bold uppercase tracking-wider line-clamp-2 leading-tight">{product.name}</p>
                 <p className="text-[10px] text-neutral-500 mt-0.5">GH&#8373;{Number(product.price_ghs).toFixed(2)}</p>
                 {product.track_inventory && !product.track_variant_inventory && (
-                    <p className={`text-[9px] uppercase tracking-widest mt-0.5 ${product.available_stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                        {product.available_stock > 0 ? `${product.available_stock} left` : 'Out of stock'}
+                    <p className={`text-[9px] uppercase tracking-widest mt-0.5 ${product.inventory_count > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {product.inventory_count > 0 ? `${product.inventory_count} left` : 'Out of stock'}
                     </p>
                 )}
             </div>
             {product.available_sizes && product.available_sizes.length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                    {product.available_sizes.map(s => (
+                    {[...new Set(product.available_sizes)].map(s => (
                         <button key={s} onClick={() => setSelectedSize(s)}
                             className={`px-1.5 py-0.5 text-[9px] uppercase tracking-widest border transition-colors ${selectedSize === s ? 'bg-black text-white border-black' : 'border-neutral-200 text-neutral-600 hover:border-black'}`}>
                             {s}
@@ -44,7 +44,7 @@ function ProductCard({ product, onAdd }: { product: PosProduct; onAdd: (p: PosPr
             )}
             {product.available_colors && product.available_colors.length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                    {product.available_colors.map(c => (
+                    {[...new Set(product.available_colors)].map(c => (
                         <button key={c} onClick={() => setSelectedColor(c)}
                             className={`px-1.5 py-0.5 text-[9px] uppercase tracking-widest border transition-colors ${selectedColor === c ? 'bg-black text-white border-black' : 'border-neutral-200 text-neutral-600 hover:border-black'}`}>
                             {c}
@@ -87,7 +87,7 @@ export default function POSPage() {
         const { data } = await dbQuery;
         setProducts((data ?? []).map((p: any) => ({
             ...p,
-            available_stock: p.inventory_count ?? 0,
+            inventory_count: p.inventory_count ?? 0,
         })));
     }, []);
 

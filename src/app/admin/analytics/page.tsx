@@ -19,6 +19,8 @@ export default function AnalyticsPage() {
     const [staffStats, setStaffStats] = useState<StaffStat[]>([]);
     const [riderStats, setRiderStats] = useState<RiderStat[]>([]);
     const [loading, setLoading] = useState(true);
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -116,7 +118,7 @@ export default function AnalyticsPage() {
                 <div className="bg-white border border-gray-100 p-8 space-y-6 shadow-sm rounded-xl">
                     <h2 className="text-[11px] uppercase tracking-[0.2em] font-bold text-black border-b border-gray-50 pb-4">Revenue Over Time (GHS)</h2>
                     <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                        {mounted && <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={revenueData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis 
@@ -140,7 +142,7 @@ export default function AnalyticsPage() {
                                     activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }}
                                 />
                             </LineChart>
-                        </ResponsiveContainer>
+                        </ResponsiveContainer>}
                     </div>
                 </div>
 
@@ -148,7 +150,7 @@ export default function AnalyticsPage() {
                 <div className="bg-white border border-gray-100 p-8 space-y-6 shadow-sm rounded-xl">
                     <h2 className="text-[11px] uppercase tracking-[0.2em] font-bold text-black border-b border-gray-50 pb-4">Sales by Category</h2>
                     <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                        {mounted && <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
                                     data={categoryData}
@@ -173,7 +175,7 @@ export default function AnalyticsPage() {
                                     formatter={(value) => <span className="text-[10px] uppercase tracking-widest font-bold text-black">{value}</span>}
                                 />
                             </PieChart>
-                        </ResponsiveContainer>
+                        </ResponsiveContainer>}
                     </div>
                 </div>
             </div>

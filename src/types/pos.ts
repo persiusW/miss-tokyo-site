@@ -57,7 +57,7 @@ export interface PosProduct {
     sku: string | null;
     price_ghs: number;
     image_urls: string[] | null;
-    available_stock: number;
+    inventory_count: number;
     track_inventory: boolean;
     track_variant_inventory: boolean;
     available_sizes: string[] | null;
