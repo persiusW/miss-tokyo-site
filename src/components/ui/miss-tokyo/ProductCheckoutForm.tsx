@@ -32,6 +32,9 @@ export function ProductCheckoutForm({
     inventoryCount = 0, productVariants = [], onAddedToCart, openDrawerOnAdd,
 }: ProductCheckoutFormProps) {
     const { addItem } = useCart();
+    // Must be declared before sizesToRender (const is not hoisted)
+    const sizeKey = (s: string) => s.split(" — ")[0].trim();
+
     // Map plain size labels to "Label — UK number" format for consistent display
     const UK_SIZE_MAP: Record<string, number> = {
         XS: 6, S: 8, M: 10, L: 12, XL: 14, XXL: 16, XXXL: 18, '4XL': 20, '5XL': 22,
@@ -82,9 +85,7 @@ export function ProductCheckoutForm({
 
     const { perUnit, total, tier: activeTier } = getDisplayPrice();
 
-    // Normalise a size label to its root for fuzzy matching.
-    // "M — 10" → "M", "Free Size" → "Free Size", "M" → "M"
-    const sizeKey = (s: string) => s.split(" — ")[0].trim();
+    // sizeKey declared above (before sizesToRender)
 
     // Inventory Logic
     const effectiveInventory = (() => {

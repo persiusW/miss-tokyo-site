@@ -24,8 +24,8 @@ export default async function ShopCatalog({
     
     // Build the products query dynamically
     // Exclude out-of-stock products: show only items that don't track inventory OR have stock > 0
-    let productsQuery = supabase.from("products").select("id, slug, name, price_ghs, image_urls, category_type, category_ids, available_colors, available_sizes, created_at, sort_order, ribbon, track_inventory, stock_quantity, is_sale, discount_value, available_stock").eq("is_active", true)
-        .or("track_inventory.eq.false,available_stock.gt.0");
+    let productsQuery = supabase.from("products").select("id, slug, name, price_ghs, image_urls, category_type, category_ids, available_colors, available_sizes, created_at, sort_order, ribbon, track_inventory, track_variant_inventory, inventory_count, is_sale, discount_value, product_variants(inventory_count)").eq("is_active", true)
+        .or("track_inventory.eq.false,inventory_count.gt.0");
 
     if (isSaleOnly) {
         productsQuery = productsQuery.eq("is_sale", true);
@@ -91,9 +91,17 @@ export default async function ShopCatalog({
             colors: p.available_colors || [],
             sizes: p.available_sizes || [],
             createdAt: p.created_at,
-            ribbon: (p.track_inventory && (p.available_stock ?? 0) <= 0 ? "Sold Out" : null)
-                || (p.track_inventory && (p.available_stock ?? 0) > 0 && (p.available_stock ?? 0) <= 3 ? `Only ${p.available_stock} Left` : null)
-                || p.ribbon,
+            ribbon: (() => {
+                if (!p.track_inventory) return p.ribbon ?? null;
+                // track_variant_inventory: sum variant counts (product.inventory_count = 9999 sentinel)
+                // product-level tracking: use inventory_count directly (9999 = unlimited)
+                const stock = p.track_variant_inventory
+                    ? (p.product_variants || []).reduce((sum: number, v: any) => sum + (v.inventory_count ?? 0), 0)
+                    : (p.inventory_count === 9999 ? 9999 : (p.inventory_count ?? 0));
+                if (stock <= 0) return "Sold Out";
+                if (stock > 0 && stock <= 3) return `Only ${stock} Left`;
+                return p.ribbon ?? null;
+            })(),
             isOnSale,
             salePrice,
         };
