@@ -50,7 +50,7 @@ export const useCart = create<CartState>()(
             items: [],
             isOpen: false,
             setIsOpen: (isOpen) => set({ isOpen }),
-            addItem: (item, openDrawer = true) => {
+            addItem: (item, openDrawer = false) => {
                 // Block if inventory is tracked (inventoryCount defined) and stock is zero
                 if (item.inventoryCount !== undefined && item.inventoryCount <= 0) {
                     toast.error(`${item.name} is out of stock`);

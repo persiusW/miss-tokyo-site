@@ -2,44 +2,81 @@
  * Centralised test data for Miss Tokyo E2E suites.
  *
  * Keep test-specific values here so every spec imports from one place.
- * Update these when seeding the Supabase test / staging DB.
+ *
+ * NOTE: Admin credentials are read from env vars. Set them in .env.test
+ * (gitignored). Storefront credentials are intentionally absent — account
+ * portal tests validate structure only, not authenticated content.
  */
 
+// ── Routes ────────────────────────────────────────────────────────────────────
+
 export const ROUTES = {
+    // Storefront
     home:     "/",
     shop:     "/shop",
     gallery:  "/gallery",
     checkout: "/checkout",
     login:    "/login",
+
+    // Admin
+    adminLogin: "/admin/login",
+    overview:   "/overview",
+
+    // Dashboard sections
+    orders:     "/sales/orders",
+    catalog:    "/catalog/products",
+    customers:  "/customers",
+    settings:   "/settings",
+    cms:        "/cms",
+    finance:    "/finance",
+    analytics:  "/sales/analytics",
+    seo:        "/seo",
+
+    // Account portal
+    account:          "/account",
+    accountOrders:    "/account/orders",
+    accountProfile:   "/account/profile",
+    accountAddresses: "/account/addresses",
 } as const;
 
-/** A known, always-active retail product in the staging / dev database. */
+// ── Admin auth ────────────────────────────────────────────────────────────────
+
+/** Read from env vars. See .env.test (gitignored). */
+export const ADMIN_AUTH = {
+    email:    process.env.TEST_ADMIN_EMAIL    ?? "",
+    password: process.env.TEST_ADMIN_PASSWORD ?? "",
+} as const;
+
+// ── Retail product (used by checkout.spec.ts) ────────────────────────────────
+
+/**
+ * A known retail product used for checkout flow tests.
+ * The slug here is a fallback — storefront.spec.ts picks real slugs dynamically.
+ * Update after confirming a product exists in the live DB.
+ */
 export const RETAIL_PRODUCT = {
-    slug:         "test-retail-dress",          // update after seeding
+    slug:         "test-retail-dress",
     name:         "Test Retail Dress",
-    price:        "GH₵",                        // prefix — price varies
+    price:        "GH₵",
     size:         "M",
     color:        "Black",
     categoryName: "Dresses",
 } as const;
 
+// ── Wholesale product ─────────────────────────────────────────────────────────
+
 /**
  * A product that belongs exclusively to a wholesale category.
  * Visiting this slug as a guest should return 404.
- * Replace with a real slug from your DB once seeded.
  */
 export const WHOLESALE_PRODUCT = {
-    slug:         "test-wholesale-item",        // update after seeding
-    categoryName: "Wholesale",                  // must match `categories.name` where is_wholesale=true
+    slug:         "test-wholesale-item",
+    categoryName: "Wholesale",
 } as const;
 
-/**
- * A valid gift-card / coupon code that exists in the staging DB.
- * Replace with a real seeded code before running checkout tests.
- */
-export const GIFT_CARD_CODE = "TESTGIFT100";
+// ── Checkout form ─────────────────────────────────────────────────────────────
 
-/** Checkout form — fictional but structurally valid. */
+/** Fictional but structurally valid customer. */
 export const CHECKOUT_CUSTOMER = {
     fullName: "Abena Playwright",
     email:    "playwright+test@misstokyo.shop",
@@ -48,3 +85,6 @@ export const CHECKOUT_CUSTOMER = {
     country:  "Ghana",
     region:   "Greater Accra",
 } as const;
+
+/** A gift-card code intercepted at the network layer in tests — no real DB entry needed. */
+export const GIFT_CARD_CODE = "TESTGIFT100";

@@ -298,7 +298,8 @@ export function ProductOptions(props: Props) {
         if (addedToBag) return;
         if (doAddToCart()) {
             setAddedToBag(true);
-            setCartOpen(true);
+            // Cart stays in its current open/closed state — user opens it manually.
+            // Auto-opening was removed to avoid interrupting large shopping sessions.
             if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current);
             addedToBagTimer.current = setTimeout(() => setAddedToBag(false), 2000);
         }
