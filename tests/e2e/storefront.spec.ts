@@ -276,11 +276,17 @@ test.describe("Product Detail Page — real product", () => {
         await addToBag.waitFor({ state: "visible", timeout: 45_000 });
         await addToBag.click();
 
-        // Cart does NOT auto-open on add — wait for the "Added to Bag ✓" confirmation.
-        await page.getByRole("button", { name: /added to bag/i })
-            .waitFor({ state: "visible", timeout: 10_000 })
-            .catch(() => {});
-        await page.waitForTimeout(200);
+        // Cart does NOT auto-open on add. Wait for Zustand to persist the item to localStorage.
+        await page.waitForFunction(
+            () => {
+                try {
+                    const raw = localStorage.getItem("miss-tokyo-cart-storage");
+                    const store = JSON.parse(raw ?? "{}");
+                    return (store?.state?.items?.length ?? 0) > 0;
+                } catch { return false; }
+            },
+            { timeout: 10_000 },
+        );
 
         // Open the drawer manually via the CartButton (aria-label: "View shopping bag, N items").
         const cartBtn = page.locator('[aria-label*="shopping bag" i]').first();

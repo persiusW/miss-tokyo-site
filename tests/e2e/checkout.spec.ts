@@ -28,65 +28,40 @@ import {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Picks the first real product from the live /shop page, then navigates
- * to its PDP, selects the first available size, and clicks "Add to Bag".
+ * Injects a synthetic cart item directly into Zustand's persisted localStorage
+ * store BEFORE the page loads. Call this before page.goto() — it registers an
+ * initScript that fires on every navigation in this context.
  *
- * This is fully dynamic — no hardcoded slugs needed.
+ * This is the fast path for tests that need a non-empty cart at /checkout but
+ * don't need to verify the add-to-bag UI interaction specifically.
+ * The Paystack and gift-card API calls are intercepted in those tests anyway,
+ * so a real product ID is not required.
  */
-async function addProductToCart(page: Page): Promise<void> {
-    // 1. Find a real product slug from the live shop page.
-    await page.goto(ROUTES.shop, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    const firstLink = page.locator('a[href^="/products/"]').first();
-    await firstLink.waitFor({ state: "visible", timeout: 30_000 });
-    const href = (await firstLink.getAttribute("href")) ?? "";
-    const slug = href.replace("/products/", "").split("?")[0];
-
-    // 2. Navigate to the PDP.
-    // Use domcontentloaded — the PDP may have large media (video/images) that block the
-    // load event indefinitely. The "Add to Bag" button comes from a client component
-    // that hydrates after JS executes, so we wait explicitly for it below.
-    await page.goto(`/products/${slug}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 20_000 });
-
-    // 3. Wait for "Add to Bag" to be visible — React client-component hydration.
-    const addToBag = page.getByRole("button", { name: /add to (bag|cart)/i });
-    await addToBag.waitFor({ state: "visible", timeout: 45_000 });
-
-    // 4. Select a size if "Select a size" placeholder is visible.
-    //    ProductOptions size buttons use inline styles (no class/data-testid),
-    //    but have a title attribute set to the size label (e.g. "S-8") for in-stock
-    //    or "S-8 — out of stock" for OOS ones. Select the first non-OOS button.
-    // exact: true ensures we match the <span> only, not its parent <div>
-    // (parent div contains "Size Select a size" so non-exact would overshoot).
-    const selectSizeText = page.getByText("Select a size", { exact: true });
-    if (await selectSizeText.isVisible({ timeout: 2_000 }).catch(() => false)) {
-        // Navigate up from the "Select a size" span (span → div.header → div.sizeSection)
-        // so the button search is scoped to the SIZE section only — not color buttons
-        // or social-share buttons that also have title attributes.
-        const sizeSection = selectSizeText.locator('xpath=../..');
-        const sizeBtn = sizeSection.locator('button[title]:not([disabled]):not([title*="out of stock"])').first();
-        if (await sizeBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-            await sizeBtn.click();
-            // Wait for the size placeholder to disappear before clicking Add to Bag.
-            await selectSizeText.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
-        }
-    }
-
-    // 5. Click "Add to Cart".
-    await addToBag.click();
-
-    // 6. Confirm the item was added by waiting for the button to show the
-    //    "Added to Bag ✓" green confirmation state (lasts ~2 s, then resets).
-    //    The cart drawer does NOT auto-open — this is intentional UX so users
-    //    can add multiple items without having to dismiss the drawer each time.
-    await page.getByRole("button", { name: /added to bag/i })
-        .waitFor({ state: "visible", timeout: 10_000 })
-        .catch(() => {
-            // Some products show a different confirmation or the timer is very fast —
-            // continue anyway; the Zustand persist write is synchronous.
-        });
-    // Give Zustand a tick to flush the localStorage write.
-    await page.waitForTimeout(200);
+async function injectCartItem(page: Page): Promise<void> {
+    await page.addInitScript(() => {
+        localStorage.setItem(
+            "miss-tokyo-cart-storage",
+            JSON.stringify({
+                state: {
+                    items: [
+                        {
+                            id: "playwright-test-M-",
+                            productId: "playwright-test-product",
+                            name: "Playwright Test Item",
+                            slug: "playwright-test-item",
+                            price: 200,
+                            size: "M",
+                            quantity: 1,
+                            imageUrl: "",
+                            inventoryCount: 10,
+                        },
+                    ],
+                    isOpen: false,
+                },
+                version: 0,
+            }),
+        );
+    });
 }
 
 /**
@@ -169,61 +144,33 @@ test.describe("Shop → Cart → Checkout critical path", () => {
         await expect(modal).toBeVisible({ timeout: 5_000 });
     });
 
-    // ── 4. Cart drawer shows line item after adding from PDP ──────────────────
+    // ── 4. Cart drawer shows line item ───────────────────────────────────────
     test("cart drawer displays added item", async ({ page }) => {
-        // Navigate to PDP and add without closing the drawer (to confirm it opened).
-        await page.goto(ROUTES.shop, { waitUntil: "domcontentloaded", timeout: 60_000 });
-        const firstLink = page.locator('a[href^="/products/"]').first();
-        await firstLink.waitFor({ state: "visible", timeout: 30_000 });
-        const href = (await firstLink.getAttribute("href")) ?? "";
-        const slug = href.replace("/products/", "").split("?")[0];
+        // Inject a cart item into localStorage before the page loads so the test
+        // doesn't need to navigate to the PDP (which is slow on dev server).
+        // This verifies the cart DRAWER displays items correctly, not the add-to-bag
+        // UI interaction (that is covered by storefront.spec.ts "adding item opens cart drawer").
+        await injectCartItem(page);
 
-        await page.goto(`/products/${slug}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-        await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 20_000 });
+        // Any page with the shop layout will do — home works.
+        await page.goto(ROUTES.home, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
-        const addToBag = page.getByRole("button", { name: /add to (bag|cart)/i });
-        await addToBag.waitFor({ state: "visible", timeout: 45_000 });
-
-        // Explicitly select the first available size to ensure selectedSize is set
-        // before clicking Add to Cart (avoids "Please select a size" toast).
-        // exact: true ensures we match the <span> only, not its parent <div>.
-        const selectSizeTxt = page.getByText("Select a size", { exact: true });
-        if (await selectSizeTxt.isVisible({ timeout: 2_000 }).catch(() => false)) {
-            // Scope to the size section (xpath up: span → header div → sizeSection div)
-            // to avoid accidentally clicking color or social-share buttons.
-            const sizeSection = selectSizeTxt.locator('xpath=../..');
-            const sizeBtn = sizeSection.locator('button[title]:not([disabled]):not([title*="out of stock"])').first();
-            if (await sizeBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-                await sizeBtn.click();
-                // Wait for "Select a size" to disappear (React state update completed).
-                await selectSizeTxt.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
-            }
-        }
-
-        await addToBag.click();
-
-        // Wait for the "Added to Bag ✓" confirmation (cart does NOT auto-open).
-        await page.getByRole("button", { name: /added to bag/i })
-            .waitFor({ state: "visible", timeout: 10_000 })
-            .catch(() => {});
-        await page.waitForTimeout(200);
-
-        // Open the cart drawer manually via the CartButton in the nav.
-        // aria-label format: "View shopping bag, N items"
+        // Open the cart drawer via the CartButton (aria-label: "View shopping bag, N items").
         const cartBtn = page.locator('[aria-label*="shopping bag" i]').first();
+        await cartBtn.waitFor({ state: "visible", timeout: 10_000 });
         await cartBtn.click();
 
-        // Verify the drawer opened with the item inside.
+        // CartDrawer renders an h2 "Your Cart" when open.
         const cartHeading = page.locator('h2').filter({ hasText: /your cart/i });
         await expect(cartHeading).toBeVisible({ timeout: 10_000 });
 
-        // At least one price must be visible inside the drawer.
+        // The injected item has price 200 → formatted as "GH₵ 200" in the drawer.
         await expect(page.getByText(/GH[₵S]/).first()).toBeVisible({ timeout: 5_000 });
     });
 
     // ── 5. Checkout page loads with cart items ────────────────────────────────
     test("navigating to checkout with items shows the form", async ({ page }) => {
-        await addProductToCart(page);
+        await injectCartItem(page);
 
         // Navigate to checkout — cart is persisted in localStorage by Zustand.
         await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -236,7 +183,7 @@ test.describe("Shop → Cart → Checkout critical path", () => {
 
     // ── 6. Gift card / coupon code is applied at checkout ─────────────────────
     test("applying a valid gift card reduces the total", async ({ page }) => {
-        await addProductToCart(page);
+        await injectCartItem(page);
         await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
 
         // Wait for the checkout form to hydrate (Zustand rehydration from localStorage).
@@ -277,7 +224,7 @@ test.describe("Shop → Cart → Checkout critical path", () => {
 
     // ── 7. Form validation — required fields ──────────────────────────────────
     test("checkout form shows errors when submitted empty", async ({ page }) => {
-        await addProductToCart(page);
+        await injectCartItem(page);
         await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
         await expect(page.locator('input[name="fullName"]')).toBeVisible({ timeout: 20_000 });
 
@@ -292,7 +239,7 @@ test.describe("Shop → Cart → Checkout critical path", () => {
 
     // ── 8. Happy-path form fill (stops before Paystack redirect) ──────────────
     test("fully filled checkout form reaches Paystack initialisation", async ({ page }) => {
-        await addProductToCart(page);
+        await injectCartItem(page);
         await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
         await expect(page.locator('input[name="fullName"]')).toBeVisible({ timeout: 20_000 });
 
@@ -313,17 +260,6 @@ test.describe("Shop → Cart → Checkout critical path", () => {
 
         // Intercept the navigation to Paystack so the test doesn't leave the app.
         const paystackNavigation = page.waitForRequest("**/checkout.paystack.com/**", { timeout: 5_000 }).catch(() => null);
-
-        // Close any cart drawer that may have re-opened (its isOpen state persists
-        // in Zustand localStorage). The fixed backdrop would otherwise block the Pay click.
-        const cartDrawerHeading = page.locator('h2').filter({ hasText: /your cart/i });
-        if (await cartDrawerHeading.isVisible({ timeout: 2_000 }).catch(() => false)) {
-            await page.keyboard.press("Escape");
-            // Click backdrop as fallback.
-            const backdrop = page.locator('[class*="backdrop-blur"]').first();
-            if (await backdrop.isVisible().catch(() => false)) await backdrop.click();
-            await cartDrawerHeading.waitFor({ state: "hidden", timeout: 3_000 }).catch(() => {});
-        }
 
         const submitBtn = page.getByRole("button", { name: /pay|place order|checkout|confirm/i }).first();
         await submitBtn.click();
