@@ -277,9 +277,57 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
         return () => { document.body.style.overflow = ""; document.removeEventListener("keydown", onKey); };
     }, [onClose]);
 
-    const effectiveInventory = (() => {
+    // Set of sizes that have at least one in-stock variant (across all colors).
+    const sizesWithStock = useMemo<Set<string> | null>(() => {
+        if (!product.track_variant_inventory || variants.length === 0) return null;
+        const result = new Set<string>();
+        for (const v of variants) {
+            if ((v.inventory_count ?? 0) > 0 && v.size != null) result.add(v.size);
+        }
+        return result;
+    }, [product.track_variant_inventory, variants]);
+
+    // Set of colors in-stock for the currently selected size.
+    // When no size is chosen yet, shows all colors that have stock across any size.
+    const colorsWithStock = useMemo<Set<string> | null>(() => {
+        if (!product.track_variant_inventory || variants.length === 0) return null;
+        const result = new Set<string>();
+        for (const v of variants) {
+            const sizeMatch = selectedSize ? (v.size ?? "") === selectedSize : true;
+            if (sizeMatch && (v.inventory_count ?? 0) > 0 && v.color != null) result.add(v.color);
+        }
+        return result;
+    }, [product.track_variant_inventory, variants, selectedSize]);
+
+    // Once variant stock resolves, advance selectedSize to first in-stock option.
+    useEffect(() => {
+        if (!sizesWithStock) return;
+        if (selectedSize && sizesWithStock.has(selectedSize)) return;
+        const first = sizes.find(s => sizesWithStock.has(s));
+        if (first) setSelectedSize(first);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sizesWithStock]);
+
+    // When selectedSize changes, advance selectedColor to first in-stock for that size.
+    useEffect(() => {
+        if (!colorsWithStock) return;
+        if (selectedColor && colorsWithStock.has(selectedColor)) return;
+        const first = colors.find(c => colorsWithStock.has(c));
+        setSelectedColor(first ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSize, colorsWithStock]);
+
+    const effectiveInventory = useMemo(() => {
         if (!product.track_inventory) return 9999;
         if (product.track_variant_inventory && variants.length > 0) {
+            // Only resolve to a specific combo when both dimensions are chosen.
+            // Without a size selection, return the total stock across all combos for
+            // the selected color so the button doesn't falsely show Out of Stock.
+            if (!selectedSize) {
+                return variants
+                    .filter(v => (v.color ?? "") === selectedColor && (v.inventory_count ?? 0) > 0)
+                    .reduce((sum: number, v: any) => sum + (v.inventory_count ?? 0), 0);
+            }
             const match = variants.find(v =>
                 (v.size ?? "") === selectedSize &&
                 (v.color ?? "") === selectedColor
@@ -287,7 +335,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
             return match?.inventory_count ?? 0;
         }
         return product.inventory_count;
-    })();
+    }, [product.track_inventory, product.track_variant_inventory, variants, selectedSize, selectedColor, product.inventory_count]);
 
     const isOutOfStock = effectiveInventory === 0;
 
@@ -363,17 +411,34 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
                                 Colour — <span style={{ color: "#141210" }}>{selectedColor}</span>
                             </p>
                             <div className="flex gap-2 flex-wrap">
-                                {colors.map(c => (
-                                    <button key={c} onClick={() => setSelectedColor(c)}
-                                        className="w-7 h-7 rounded-full transition-all"
-                                        style={{
-                                            background: getHex(c),
-                                            border: "2px solid transparent",
-                                            boxShadow: selectedColor === c ? "0 0 0 2px #fff, 0 0 0 3.5px #141210" : "none",
-                                        }}
-                                        title={c}
-                                    />
-                                ))}
+                                {colors.map(c => {
+                                    const inStock = colorsWithStock !== null ? colorsWithStock.has(c) : true;
+                                    const isSelected = selectedColor === c;
+                                    return (
+                                        <button key={c}
+                                            onClick={() => { if (inStock) setSelectedColor(c); }}
+                                            disabled={!inStock}
+                                            title={inStock ? c : `${c} — out of stock`}
+                                            className="relative w-7 h-7 rounded-full transition-all overflow-hidden"
+                                            style={{
+                                                background: getHex(c),
+                                                border: "2px solid transparent",
+                                                boxShadow: isSelected ? "0 0 0 2px #fff, 0 0 0 3.5px #141210" : "none",
+                                                opacity: inStock ? 1 : 0.35,
+                                                cursor: inStock ? "pointer" : "not-allowed",
+                                            }}
+                                        >
+                                            {!inStock && (
+                                                <span className="absolute inset-0 pointer-events-none">
+                                                    <svg viewBox="0 0 28 28" width="28" height="28" style={{ position: "absolute", inset: 0 }}>
+                                                        <line x1="4" y1="24" x2="24" y2="4" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" />
+                                                        <line x1="4" y1="24" x2="24" y2="4" stroke="rgba(0,0,0,0.3)" strokeWidth="1" strokeLinecap="round" />
+                                                    </svg>
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -382,19 +447,34 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
                         <div className="mb-[22px]">
                             <p className="text-[10px] font-medium tracking-[0.12em] uppercase mb-2" style={{ color: "#7A7167" }}>Size</p>
                             <div className="flex flex-wrap gap-[7px]">
-                                {sizes.map(s => (
-                                    <button key={s} onClick={() => setSelectedSize(s)}
-                                        className="px-[14px] py-[7px] text-[12px] transition-all"
-                                        style={{
-                                            borderRadius: 2,
-                                            border: `1px solid ${selectedSize === s ? "#141210" : "rgba(20,18,16,0.15)"}`,
-                                            background: selectedSize === s ? "#141210" : "transparent",
-                                            color: selectedSize === s ? "#fff" : "#141210",
-                                        }}
-                                    >
-                                        {s}
-                                    </button>
-                                ))}
+                                {sizes.map(s => {
+                                    const inStock = sizesWithStock !== null ? sizesWithStock.has(s) : true;
+                                    const isActive = selectedSize === s;
+                                    return (
+                                        <button key={s}
+                                            onClick={() => { if (inStock) setSelectedSize(s); }}
+                                            disabled={!inStock}
+                                            title={inStock ? s : `${s} — out of stock`}
+                                            className="relative px-[14px] py-[7px] text-[12px] transition-all overflow-hidden"
+                                            style={{
+                                                borderRadius: 2,
+                                                border: `1px solid ${isActive ? "#141210" : inStock ? "rgba(20,18,16,0.15)" : "rgba(20,18,16,0.08)"}`,
+                                                background: isActive ? "#141210" : "transparent",
+                                                color: isActive ? "#fff" : inStock ? "#141210" : "rgba(20,18,16,0.3)",
+                                                cursor: inStock ? "pointer" : "not-allowed",
+                                            }}
+                                        >
+                                            {s}
+                                            {!inStock && (
+                                                <span className="absolute inset-0 pointer-events-none overflow-hidden">
+                                                    <svg width="100%" height="100%" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
+                                                        <line x1="0" y1="100%" x2="100%" y2="0" stroke="rgba(20,18,16,0.2)" strokeWidth="1" />
+                                                    </svg>
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                             <Link href="/size-guide" className="block mt-2 text-[11px] underline" style={{ color: "#7A7167" }}>
                                 Size guide →

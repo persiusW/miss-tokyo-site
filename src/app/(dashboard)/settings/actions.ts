@@ -130,7 +130,7 @@ export async function removeTeamMember(userId: string) {
     }
 
     // Force sign-out so the removed member's session ends immediately.
-    await supabaseAdmin.auth.admin.signOut(userId, { scope: "global" });
+    await supabaseAdmin.auth.admin.signOut(userId, "global");
 
     // LOG ACTIVITY
     await logActivity({
