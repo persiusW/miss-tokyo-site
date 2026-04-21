@@ -204,6 +204,17 @@ export async function PATCH(req: NextRequest) {
             console.error("[admin/products PATCH] variant insert failed:", variantErr.message);
             return NextResponse.json({ error: `Variant save failed: ${variantErr.message}` }, { status: 500 });
         }
+
+        // Sync product-level inventory_count to real variant sum so shop grid,
+        // sold-out ribbons, and JSON-LD reflect actual stock rather than the 9999 sentinel.
+        const variantSum = variants.reduce(
+            (sum: number, v: { inventory_count?: number }) => sum + (v.inventory_count ?? 0),
+            0
+        );
+        await supabaseAdmin
+            .from("products")
+            .update({ inventory_count: variantSum })
+            .eq("id", id);
     }
 
     // LOG ACTIVITY
