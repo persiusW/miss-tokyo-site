@@ -15,7 +15,7 @@ export async function POST(req: Request) {
         const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
             type: "recovery",
             email,
-            options: { redirectTo: `${siteUrl}/account/reset-password` },
+            options: { redirectTo: `${siteUrl}/reset-password` },
         });
 
         // Always return 200 — never reveal whether an account exists
