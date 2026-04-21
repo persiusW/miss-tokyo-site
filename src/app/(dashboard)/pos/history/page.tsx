@@ -42,7 +42,7 @@ export default function POSHistoryPage() {
     const [selected, setSelected] = useState<SessionRow | null>(null);
     const [cancelling, setCancelling] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-    const [userRole, setUserRole] = useState<string | null>(null);
+    const [userRole, setUserRole] = useState<'admin' | 'owner' | 'sales_staff' | null>(null);
 
     const fetchSessions = useCallback(async (userId: string, role: string) => {
         setLoading(true);
@@ -58,7 +58,12 @@ export default function POSHistoryPage() {
             query = query.eq('created_by', userId);
         }
 
-        const { data: rows } = await query;
+        const { data: rows, error: fetchError } = await query;
+        if (fetchError) {
+            toast.error('Failed to load sessions');
+            setLoading(false);
+            return;
+        }
         const sessionList = rows ?? [];
 
         let nameMap: Record<string, string> = {};
@@ -84,15 +89,19 @@ export default function POSHistoryPage() {
     useEffect(() => {
         (async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user) { setLoading(false); return; }
 
-            const { data: profile } = await supabase
+            const { data: profile, error: profileError } = await supabase
                 .from('profiles')
                 .select('role')
                 .eq('id', user.id)
                 .single();
 
-            const role = profile?.role ?? 'sales_staff';
+            if (profileError && profileError.code !== 'PGRST116') {
+                console.error('[POSHistory] profile fetch error:', profileError);
+            }
+
+            const role = (profile?.role as 'admin' | 'owner' | 'sales_staff') ?? 'sales_staff';
             setCurrentUserId(user.id);
             setUserRole(role);
             fetchSessions(user.id, role);
