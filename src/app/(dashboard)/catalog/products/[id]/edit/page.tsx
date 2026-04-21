@@ -155,7 +155,9 @@ export default function EditProductPage() {
             }
             if (storeData.global_colors) {
                 setGlobalColors(storeData.global_colors);
-                setSelectedColors(product.available_colors || []);
+                setSelectedColors(
+                    product.available_colors?.length ? product.available_colors : []
+                );
             }
             // if (storeData.global_stitching) {
             //     setGlobalStitching(storeData.global_stitching);
