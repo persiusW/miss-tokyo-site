@@ -36,7 +36,7 @@ export async function inviteTeamMember(data: InviteData) {
     const dynamicHost = await getUrl();
     const inviteLink = `${dynamicHost}/invite?token=${token}`;
 
-    const { error: insertError } = await supabase.from("team_invitations").insert({
+    const { error: insertError } = await supabaseAdmin.from("team_invitations").insert({
         full_name: data.fullName,
         email: data.email,
         phone: data.phone || null,

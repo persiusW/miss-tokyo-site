@@ -47,7 +47,26 @@ export async function acceptInvite(data: any) {
             return { success: false, error: authError.message };
         }
 
-        // 3. Mark the invitation as accepted
+        // 3. Explicitly set profile role — DB trigger creates the profile but defaults to
+        //    'customer'. We must upsert with the invited role so dashboard access works.
+        const { error: profileError } = await supabaseAdmin
+            .from("profiles")
+            .upsert(
+                {
+                    id: authData.user.id,
+                    email: data.email,
+                    full_name: data.fullName,
+                    role: invite.role,
+                },
+                { onConflict: "id" }
+            );
+
+        if (profileError) {
+            console.error("Failed to set profile role:", profileError);
+            // Non-fatal — auth user was created; log and continue
+        }
+
+        // 4. Mark the invitation as accepted
         const { error: updateInviteError } = await supabaseAdmin
             .from("team_invitations")
             .update({ status: "accepted" })
