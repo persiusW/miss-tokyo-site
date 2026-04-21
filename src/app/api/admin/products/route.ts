@@ -207,14 +207,21 @@ export async function PATCH(req: NextRequest) {
 
         // Sync product-level inventory_count to real variant sum so shop grid,
         // sold-out ribbons, and JSON-LD reflect actual stock rather than the 9999 sentinel.
-        const variantSum = variants.reduce(
-            (sum: number, v: { inventory_count?: number }) => sum + (v.inventory_count ?? 0),
-            0
-        );
-        await supabaseAdmin
-            .from("products")
-            .update({ inventory_count: variantSum })
-            .eq("id", id);
+        // Only applies when tracking is active — avoids overwriting the 9999 sentinel
+        // for untracked products that happen to have variant rows.
+        if (track_inventory && track_variant_inventory) {
+            const variantSum = variants.reduce(
+                (sum: number, v: { inventory_count?: number }) => sum + (v.inventory_count ?? 0),
+                0
+            );
+            const { error: syncErr } = await supabaseAdmin
+                .from("products")
+                .update({ inventory_count: variantSum })
+                .eq("id", id);
+            if (syncErr) {
+                console.error("[admin/products PATCH] inventory_count sync failed:", syncErr.message);
+            }
+        }
     }
 
     // LOG ACTIVITY
