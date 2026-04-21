@@ -1,7 +1,7 @@
 // src/app/(dashboard)/pos/history/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { ArrowLeft, ExternalLink, X } from 'lucide-react';
@@ -41,18 +41,31 @@ export default function POSHistoryPage() {
     const [filter, setFilter] = useState<FilterTab>('all');
     const [selected, setSelected] = useState<SessionRow | null>(null);
     const [cancelling, setCancelling] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [userRole, setUserRole] = useState<'admin' | 'owner' | 'sales_staff' | null>(null);
 
-    const fetchSessions = async () => {
+    const fetchSessions = useCallback(async (userId: string, role: string) => {
         setLoading(true);
-        const { data: rows } = await supabase
+        const isStaff = role === 'sales_staff';
+
+        let query = supabase
             .from('pos_sessions')
             .select('id, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by')
             .order('created_at', { ascending: false })
             .limit(100);
 
+        if (isStaff) {
+            query = query.eq('created_by', userId);
+        }
+
+        const { data: rows, error: fetchError } = await query;
+        if (fetchError) {
+            toast.error('Failed to load sessions');
+            setLoading(false);
+            return;
+        }
         const sessionList = rows ?? [];
 
-        // Fetch staff display names from profiles (separate query — created_by FK is on auth.users not profiles)
         let nameMap: Record<string, string> = {};
         const staffIds = [...new Set(sessionList.map((r: any) => r.created_by).filter(Boolean))];
         if (staffIds.length > 0) {
@@ -71,9 +84,33 @@ export default function POSHistoryPage() {
             items: Array.isArray(row.items) ? row.items : [],
         })));
         setLoading(false);
-    };
+    }, []);
 
-    useEffect(() => { fetchSessions(); }, []);
+    useEffect(() => {
+        (async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) { setLoading(false); return; }
+
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+
+            if (profileError && profileError.code !== 'PGRST116') {
+                console.error('[POSHistory] profile fetch error:', profileError);
+            }
+
+            const role = (profile?.role as 'admin' | 'owner' | 'sales_staff') ?? 'sales_staff';
+            setCurrentUserId(user.id);
+            setUserRole(role);
+            fetchSessions(user.id, role);
+        })();
+    }, [fetchSessions]);
+
+    const refetch = () => {
+        if (currentUserId && userRole) fetchSessions(currentUserId, userRole);
+    };
 
     const filtered = filter === 'all' ? sessions : sessions.filter(s => s.status === filter);
 
@@ -89,7 +126,7 @@ export default function POSHistoryPage() {
             if (!res.ok) throw new Error((await res.json()).error ?? 'Cancel failed');
             toast.success('Session cancelled');
             setSelected(null);
-            fetchSessions();
+            refetch();
         } catch (e: any) {
             toast.error(e.message);
         } finally {
@@ -112,7 +149,9 @@ export default function POSHistoryPage() {
                 <Link href="/pos" className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-400 hover:text-black transition-colors">
                     <ArrowLeft size={12} /> Back to POS
                 </Link>
-                <h1 className="text-sm font-bold uppercase tracking-[0.3em]">POS History</h1>
+                <h1 className="text-sm font-bold uppercase tracking-[0.3em]">
+                    POS History{userRole === 'sales_staff' ? ' — My Orders' : ''}
+                </h1>
             </div>
 
             <div className="flex gap-1 mb-6 border-b border-neutral-100">
