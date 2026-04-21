@@ -149,7 +149,9 @@ export default function EditProductPage() {
         if (storeData) {
             if (storeData.global_sizes) {
                 setGlobalSizes(storeData.global_sizes);
-                setSelectedSizes(product.available_sizes || storeData.global_sizes);
+                setSelectedSizes(
+                    product.available_sizes?.length ? product.available_sizes : storeData.global_sizes
+                );
             }
             if (storeData.global_colors) {
                 setGlobalColors(storeData.global_colors);
@@ -261,6 +263,7 @@ export default function EditProductPage() {
                     category_type: formData.category_type,
                     category_ids: selectedCategoryIds,
                     image_urls: imageUrls,
+                    available_sizes: selectedSizes,
                     available_colors: selectedColors,
                     // available_stitching: selectedStitching,
                     is_active: formData.is_active,
