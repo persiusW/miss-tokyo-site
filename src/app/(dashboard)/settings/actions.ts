@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabaseServer";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getUrl } from "@/lib/utils/getUrl";
 import { Resend } from "resend";
 import { sendSMS } from "@/lib/sms";
@@ -116,20 +117,20 @@ export async function removeTeamMember(userId: string) {
         return { success: false, error: "Forbidden: Only admins and owners can remove members." };
     }
 
-    // Use Service Role to delete the user from Auth fully (which cascades to profiles)
-    const { createClient: createServiceClient } = await import("@supabase/supabase-js");
-    const supabaseAdmin = createServiceClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    // Demote role to 'customer' so they lose dashboard access without destroying
+    // their account or triggering FK constraint failures on orders/pos_sessions/logs.
+    const { error: demoteError } = await supabaseAdmin
+        .from("profiles")
+        .update({ role: "customer" })
+        .eq("id", userId);
 
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    
-    if (deleteError) {
-        console.error("Failed to delete user ID", userId, deleteError);
-        return { success: false, error: "Failed to delete from Auth layer." };
+    if (demoteError) {
+        console.error("Failed to demote user ID", userId, demoteError);
+        return { success: false, error: "Failed to remove team member." };
     }
+
+    // Force sign-out so the removed member's session ends immediately.
+    await supabaseAdmin.auth.admin.signOut(userId, { scope: "global" });
 
     // LOG ACTIVITY
     await logActivity({
