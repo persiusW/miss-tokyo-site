@@ -100,9 +100,9 @@ export default function POSPage() {
             // Search contacts table AND orders (order customers aren't always in contacts)
             const [contactsRes, ordersRes] = await Promise.all([
                 supabase.from('contacts').select('id, name, email, phone')
-                    .or(`name.ilike.%${q}%,email.ilike.%${q}%`).limit(6),
+                    .or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`).limit(6),
                 supabase.from('orders').select('customer_name, customer_email, customer_phone')
-                    .or(`customer_name.ilike.%${q}%,customer_email.ilike.%${q}%`)
+                    .or(`customer_name.ilike.%${q}%,customer_email.ilike.%${q}%,customer_phone.ilike.%${q}%`)
                     .order('created_at', { ascending: false }).limit(8),
             ]);
             const seen = new Set<string>();
@@ -271,7 +271,7 @@ export default function POSPage() {
                     {customerMode === 'search' ? (
                         <div className="space-y-2">
                             <input
-                                type="text" placeholder="Search by name or email..." value={contactSearch}
+                                type="text" placeholder="Search by name, email or phone..." value={contactSearch}
                                 onChange={e => {
                                     const val = e.target.value;
                                     setContactSearch(val);
