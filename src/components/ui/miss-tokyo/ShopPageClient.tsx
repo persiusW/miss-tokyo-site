@@ -277,52 +277,61 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
         return () => { document.body.style.overflow = ""; document.removeEventListener("keydown", onKey); };
     }, [onClose]);
 
-    // Set of sizes that have at least one in-stock variant (across all colors).
-    const sizesWithStock = useMemo<Set<string> | null>(() => {
+    // Colors that have ANY in-stock variant across all sizes.
+    // A color is only unavailable if it has zero stock in every size.
+    const colorsWithAnyStock = useMemo<Set<string> | null>(() => {
         if (!product.track_variant_inventory || variants.length === 0) return null;
         const result = new Set<string>();
         for (const v of variants) {
-            if ((v.inventory_count ?? 0) > 0 && v.size != null) result.add(v.size);
+            if ((v.inventory_count ?? 0) > 0 && v.color != null) result.add(v.color);
         }
         return result;
     }, [product.track_variant_inventory, variants]);
 
-    // Set of colors in-stock for the currently selected size.
-    // When no size is chosen yet, shows all colors that have stock across any size.
-    const colorsWithStock = useMemo<Set<string> | null>(() => {
-        if (!product.track_variant_inventory || variants.length === 0) return null;
+    // Sizes that have a variant row for the selected color (in-stock OR out-of-stock).
+    // Preserves the admin-managed order from available_sizes.
+    // Falls back to all sizes when variant tracking is off or no color is chosen.
+    const sizesForSelectedColor = useMemo<string[]>(() => {
+        if (!product.track_variant_inventory || variants.length === 0 || !selectedColor) return sizes;
+        const colorVariantSizes = new Set(
+            variants.filter(v => (v.color ?? "") === selectedColor && v.size != null).map((v: any) => v.size as string)
+        );
+        const ordered = sizes.filter(s => colorVariantSizes.has(s));
+        return ordered.length > 0 ? ordered : Array.from(colorVariantSizes);
+    }, [product.track_variant_inventory, variants, selectedColor, sizes]);
+
+    // Sizes with stock > 0 for the selected color — used for OOS display of size buttons.
+    const sizesInStockForColor = useMemo<Set<string>>(() => {
+        if (!product.track_variant_inventory || variants.length === 0 || !selectedColor) return new Set(sizes);
         const result = new Set<string>();
         for (const v of variants) {
-            const sizeMatch = selectedSize ? (v.size ?? "") === selectedSize : true;
-            if (sizeMatch && (v.inventory_count ?? 0) > 0 && v.color != null) result.add(v.color);
+            if ((v.color ?? "") === selectedColor && (v.inventory_count ?? 0) > 0 && v.size != null) result.add(v.size);
         }
         return result;
-    }, [product.track_variant_inventory, variants, selectedSize]);
+    }, [product.track_variant_inventory, variants, selectedColor, sizes]);
 
-    // Once variant stock resolves, advance selectedSize to first in-stock option.
+    // Once variants load, advance selectedColor to first color with any stock.
     useEffect(() => {
-        if (!sizesWithStock) return;
-        if (selectedSize && sizesWithStock.has(selectedSize)) return;
-        const first = sizes.find(s => sizesWithStock.has(s));
-        if (first) setSelectedSize(first);
+        if (!colorsWithAnyStock) return;
+        if (selectedColor && colorsWithAnyStock.has(selectedColor)) return;
+        const first = colors.find(c => colorsWithAnyStock.has(c));
+        setSelectedColor(first ?? colors[0] ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sizesWithStock]);
+    }, [colorsWithAnyStock]);
 
-    // When selectedSize changes, advance selectedColor to first in-stock for that size.
+    // When color changes or variants load, advance selectedSize to first in-stock size
+    // for the selected color. If the current size is still valid, keep it.
     useEffect(() => {
-        if (!colorsWithStock) return;
-        if (selectedColor && colorsWithStock.has(selectedColor)) return;
-        const first = colors.find(c => colorsWithStock.has(c));
-        setSelectedColor(first ?? "");
+        if (!selectedColor || sizesForSelectedColor.length === 0) return;
+        if (selectedSize && sizesInStockForColor.has(selectedSize)) return;
+        const first = sizesForSelectedColor.find(s => sizesInStockForColor.has(s));
+        setSelectedSize(first ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedSize, colorsWithStock]);
+    }, [selectedColor, sizesForSelectedColor, sizesInStockForColor]);
 
     const effectiveInventory = useMemo(() => {
         if (!product.track_inventory) return 9999;
         if (product.track_variant_inventory && variants.length > 0) {
-            // Only resolve to a specific combo when both dimensions are chosen.
-            // Without a size selection, return the total stock across all combos for
-            // the selected color so the button doesn't falsely show Out of Stock.
             if (!selectedSize) {
                 return variants
                     .filter(v => (v.color ?? "") === selectedColor && (v.inventory_count ?? 0) > 0)
@@ -341,7 +350,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
 
     const handleAdd = () => {
         if (isOutOfStock) return;
-        if (sizes.length > 0 && !selectedSize) return;
+        if (sizesForSelectedColor.length > 0 && !selectedSize) return;
         setAdding(true);
         addItem({
             id: `${product.id}-${selectedSize}-${selectedColor}`,
@@ -412,7 +421,7 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
                             </p>
                             <div className="flex gap-2 flex-wrap">
                                 {colors.map(c => {
-                                    const inStock = colorsWithStock !== null ? colorsWithStock.has(c) : true;
+                                    const inStock = colorsWithAnyStock !== null ? colorsWithAnyStock.has(c) : true;
                                     const isSelected = selectedColor === c;
                                     return (
                                         <button key={c}
@@ -443,12 +452,12 @@ function QuickAddModal({ product, onClose }: { product: ShopProduct; onClose: ()
                         </div>
                     )}
 
-                    {sizes.length > 0 && (
+                    {sizesForSelectedColor.length > 0 && (
                         <div className="mb-[22px]">
                             <p className="text-[10px] font-medium tracking-[0.12em] uppercase mb-2" style={{ color: "#7A7167" }}>Size</p>
                             <div className="flex flex-wrap gap-[7px]">
-                                {sizes.map(s => {
-                                    const inStock = sizesWithStock !== null ? sizesWithStock.has(s) : true;
+                                {sizesForSelectedColor.map(s => {
+                                    const inStock = sizesInStockForColor.has(s);
                                     const isActive = selectedSize === s;
                                     return (
                                         <button key={s}
