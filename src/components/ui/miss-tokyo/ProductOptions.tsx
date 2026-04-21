@@ -43,10 +43,17 @@ interface Props {
 }
 
 const COLOR_HEX: Record<string, string> = {
-    Black: "#141210", White: "#FAFAFA", Red: "#E8485A", Pink: "#F5A7B3",
-    Blue: "#3B82F6", Navy: "#1E3A5F", Green: "#10B981", Turquoise: "#14B8A6",
-    Purple: "#8B5CF6", Yellow: "#FBBF24", Orange: "#F97316", Beige: "#E8D5C4",
-    Brown: "#8B5E3C", Grey: "#9CA3AF", Maroon: "#7F1D1D", Gold: "#C9A96E",
+    Black:"#0f0f0f", White:"#f5f5f5", Red:"#e8485a", Pink:"#f4a0b5",
+    Nude:"#d4a574", Navy:"#1e3a5f", Green:"#22c55e", Orange:"#f97316",
+    Apricot:"#fbceb1", Brown:"#92400e", Turquoise:"#14b8a6", Turqouise:"#14b8a6",
+    Curry:"#c8963c", Blue:"#3b82f6", Yellow:"#eab308", Purple:"#8b5cf6",
+    Grey:"#6b7280", Gray:"#6b7280", ButterYellow:"#f5d76e", Coffee:"#6f4e37",
+    Wine:"#722f37", Peach:"#ffcba4", SeaBlue:"#2e86ab", Cream:"#f5f0e8",
+    BlueBlack:"#1c1f36", Gold:"#c9a84c", Silver:"#c0c0c0", RoseGold:"#b76e79",
+    Violet:"#7c3aed", ButterGreen:"#a8c97f", Burgundy:"#800020",
+    Beige:"#d4b896", Khaki:"#c3b091", Teal:"#0d9488", Camel:"#c19a6b",
+    Ivory:"#f8f4e8", Maroon:"#800000", Lilac:"#c8a2c8", Sage:"#bcceab",
+    Mint:"#98d8c8", Chocolate:"#3d1c02", Mustard:"#e1ad01",
 };
 
 const SIZE_TABLE = [
@@ -176,20 +183,34 @@ export function ProductOptions(props: Props) {
     }, [trackVariantInventory, productVariants]);
 
     /**
-     * Set of colors that have stock for the currently selected size.
-     * When no size is chosen, checks across ALL sizes.
+     * Set of colors that have stock in ANY size.
+     * A color stays available as long as at least one of its size variants has inventory.
      * null → variant inventory not tracked, fall back to colorVariant.in_stock.
      */
     const colorsWithStock = useMemo<Set<string> | null>(() => {
         if (!trackVariantInventory || !productVariants?.length) return null;
         const result = new Set<string>();
         for (const v of productVariants) {
-            // Normalize variant size for comparison with selectedSize (canonical label)
-            const sizeMatch = selectedSize ? displaySizeLabel(v.size ?? "") === selectedSize : true;
-            if (sizeMatch && (v.inventory_count ?? 0) > 0 && v.color != null) result.add(v.color);
+            if ((v.inventory_count ?? 0) > 0 && v.color != null) result.add(v.color);
         }
         return result;
-    }, [trackVariantInventory, productVariants, selectedSize]);
+    }, [trackVariantInventory, productVariants]);
+
+    /**
+     * Set of sizes that have stock specifically for the currently selected color.
+     * Used to auto-advance size when the user switches colors.
+     * null → variant inventory not tracked (global sizesWithStock is used instead).
+     */
+    const sizesInStockForSelectedColor = useMemo<Set<string> | null>(() => {
+        if (!trackVariantInventory || !productVariants?.length || !selectedColor) return null;
+        const result = new Set<string>();
+        for (const v of productVariants) {
+            if ((v.color ?? "") === selectedColor && (v.inventory_count ?? 0) > 0 && v.size != null) {
+                result.add(displaySizeLabel(v.size));
+            }
+        }
+        return result;
+    }, [trackVariantInventory, productVariants, selectedColor]);
 
     // On mount: once variant stock data is ready, advance size to first in-stock option.
     useEffect(() => {
@@ -200,15 +221,24 @@ export function ProductOptions(props: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sizesWithStock]);
 
-    // When the selected size changes (or on mount after sizesWithStock resolves),
-    // advance color to the first in-stock option for that size.
+    // When color changes, if the selected size has no stock for that color, advance to
+    // the first size that does — so the user is never stuck on an OOS combo.
+    useEffect(() => {
+        if (!sizesInStockForSelectedColor) return;
+        if (selectedSize && sizesInStockForSelectedColor.has(selectedSize)) return;
+        const first = sizes.find(s => sizesInStockForSelectedColor!.has(s.label));
+        setSelectedSize(first?.label ?? "");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedColor, sizesInStockForSelectedColor]);
+
+    // When colorsWithStock resolves and current color has no stock anywhere, advance color.
     useEffect(() => {
         if (!colorsWithStock) return;
         if (selectedColor && colorsWithStock.has(selectedColor)) return;
         const first = colors.find(c => colorsWithStock.has(c.name));
         setSelectedColor(first?.name ?? "");
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedSize, colorsWithStock]);
+    }, [colorsWithStock]);
 
     /** Effective stock for the currently selected size + color combo */
     const effectiveInventory = useMemo(() => {
@@ -494,11 +524,14 @@ export function ProductOptions(props: Props) {
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                         {sizes.map(s => {
-                            // If variant inventory is tracked, derive availability from
-                            // variant data; otherwise fall back to sizeVariant.in_stock.
-                            const inStock = sizesWithStock !== null
-                                ? sizesWithStock.has(s.label)
-                                : s.in_stock;
+                            // When a color is selected and variant tracking is on, check
+                            // availability for that specific color. Fall back to global
+                            // sizesWithStock, then sizeVariant.in_stock.
+                            const inStock = sizesInStockForSelectedColor !== null
+                                ? sizesInStockForSelectedColor.has(s.label)
+                                : sizesWithStock !== null
+                                    ? sizesWithStock.has(s.label)
+                                    : s.in_stock;
                             const isActive = selectedSize === s.label;
                             return (
                                 <button

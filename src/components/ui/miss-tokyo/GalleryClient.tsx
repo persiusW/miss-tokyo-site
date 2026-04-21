@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { Plus, ChevronLeft, Loader2, Check } from "lucide-react";
-import { QuickViewModal } from "@/components/ui/miss-tokyo/QuickViewModal";
+import { QuickAddModal } from "@/components/ui/miss-tokyo/QuickAddModal";
 import { useCart } from "@/store/useCart";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import type { VideoProduct } from "@/lib/products";
@@ -333,15 +333,12 @@ export function GalleryClient({
                 )}
             </div>
 
-            {/* Quick View Modal */}
+            {/* Quick Add Modal */}
             {selectedProduct && (
-                <div className="animate-in fade-in zoom-in-95 duration-300">
-                    <QuickViewModal
-                        product={selectedProduct}
-                        onClose={() => setSelectedProduct(null)}
-                        openDrawerOnAdd={false}
-                    />
-                </div>
+                <QuickAddModal
+                    product={selectedProduct}
+                    onClose={() => setSelectedProduct(null)}
+                />
             )}
         </div>
     );
