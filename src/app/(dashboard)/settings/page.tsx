@@ -44,6 +44,7 @@ type StoreSettings = {
     enable_craft: boolean;
     enable_whitelabel: boolean;
     enable_custom_requests: boolean;
+    homepage_route: "home" | "shop" | "gallery";
     // Wholesale
     wholesale_enabled: boolean;
     wholesale_tier_1_min: number;
@@ -84,6 +85,7 @@ const DEFAULT_STORE: StoreSettings = {
     enable_craft: true,
     enable_whitelabel: true,
     enable_custom_requests: true,
+    homepage_route: "home",
     wholesale_enabled: false,
     wholesale_tier_1_min: 3,
     wholesale_tier_1_max: 5,
@@ -326,6 +328,7 @@ function StoreTab() {
                         enable_craft: sData.enable_craft ?? true,
                         enable_whitelabel: sData.enable_whitelabel ?? true,
                         enable_custom_requests: sData.enable_custom_requests ?? true,
+                        homepage_route: (sData.homepage_route ?? "home") as "home" | "shop" | "gallery",
                         wholesale_enabled: sData.wholesale_enabled ?? false,
                         wholesale_tier_1_min: sData.wholesale_tier_1_min ?? 3,
                         wholesale_tier_1_max: sData.wholesale_tier_1_max ?? 5,
@@ -407,6 +410,27 @@ function StoreTab() {
                                     <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Coming Soon / Maintenance Mode</span>
                                 </label>
                                 <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Restrict access to the shop and show a coming soon placeholder.</p>
+                            </div>
+
+                            <div className="pt-4 border-t border-neutral-100">
+                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Default Landing Page</label>
+                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mb-3">Choose which page customers land on when they visit the site root (/).</p>
+                                <div className="flex gap-3">
+                                    {([
+                                        { value: "home", label: "Home" },
+                                        { value: "shop", label: "Shop" },
+                                        { value: "gallery", label: "Gallery" },
+                                    ] as const).map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setForm(p => ({ ...p, homepage_route: opt.value }))}
+                                            className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.homepage_route === opt.value ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             <div className="pt-4 border-t border-neutral-100 mt-6 grid grid-cols-1 gap-6">
