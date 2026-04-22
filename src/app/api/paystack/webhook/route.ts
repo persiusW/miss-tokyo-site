@@ -259,15 +259,16 @@ export async function POST(req: Request) {
                 const productIds = [...new Set(items.map((i: any) => i.productId).filter(Boolean))];
                 const { data: products } = await supabaseAdmin
                     .from("products")
-                    .select("id, inventory_count, track_variant_inventory")
+                    .select("id, inventory_count, track_inventory, track_variant_inventory")
                     .in("id", productIds);
                 const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
 
                 await Promise.allSettled(items.map(async (item: any) => {
                     const product = productMap.get(item.productId);
-                    if (!product) return;
+                    if (!product || !product.track_inventory) return;
                     const qty = item.quantity ?? 1;
                     if (product.track_variant_inventory && item.variantId) {
+                        // Deduct variant stock
                         const { data: variant } = await supabaseAdmin
                             .from("product_variants")
                             .select("inventory_count")
@@ -279,13 +280,19 @@ export async function POST(req: Request) {
                                 .update({ inventory_count: Math.max(0, variant.inventory_count - qty) })
                                 .eq("id", item.variantId);
                         }
+                        // Also deduct product-level stock
+                        if (typeof product.inventory_count === "number") {
+                            await supabaseAdmin
+                                .from("products")
+                                .update({ inventory_count: Math.max(0, product.inventory_count - qty) })
+                                .eq("id", item.productId);
+                        }
                     } else if (!product.track_variant_inventory && typeof product.inventory_count === "number") {
                         await supabaseAdmin
                             .from("products")
                             .update({ inventory_count: Math.max(0, product.inventory_count - qty) })
                             .eq("id", item.productId);
                     } else {
-                        // track_variant_inventory=true but no variantId — POS cart should never produce this
                         console.warn("[POS webhook] inventory skip: track_variant_inventory=true but variantId missing", { productId: item.productId });
                     }
                 }));
@@ -348,21 +355,28 @@ export async function POST(req: Request) {
                     const productIds = [...new Set(items.map((i: any) => i.productId).filter(Boolean))];
                     const { data: products } = await supabaseAdmin
                         .from("products")
-                        .select("id, inventory_count, track_variant_inventory")
+                        .select("id, inventory_count, track_inventory, track_variant_inventory")
                         .in("id", productIds);
                     const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
 
                     await Promise.allSettled(items.map(async (item: any) => {
                         const product = productMap.get(item.productId);
-                        if (!product) return;
+                        if (!product || !product.track_inventory) return;
                         const qty = item.quantity ?? 1;
                         if (product.track_variant_inventory && item.variantId) {
+                            // Deduct variant stock
                             const { data: variant } = await supabaseAdmin
                                 .from("product_variants").select("inventory_count").eq("id", item.variantId).single();
                             if (variant && typeof variant.inventory_count === "number") {
                                 await supabaseAdmin.from("product_variants")
                                     .update({ inventory_count: Math.max(0, variant.inventory_count - qty) })
                                     .eq("id", item.variantId);
+                            }
+                            // Also deduct product-level stock
+                            if (typeof product.inventory_count === "number") {
+                                await supabaseAdmin.from("products")
+                                    .update({ inventory_count: Math.max(0, product.inventory_count - qty) })
+                                    .eq("id", item.productId);
                             }
                         } else if (!product.track_variant_inventory && typeof product.inventory_count === "number") {
                             await supabaseAdmin.from("products")
@@ -494,40 +508,42 @@ export async function POST(req: Request) {
             if (!isAlreadyProcessed && parsedItems.length > 0) {
                 const productIds = [...new Set(parsedItems.map(i => i.productId).filter(Boolean))];
 
-                // Fetch products with track_variant_inventory flag
+                // Fetch products with tracking flags
                 const { data: products } = await supabaseAdmin
                     .from("products")
-                    .select("id, slug, inventory_count, track_variant_inventory")
+                    .select("id, slug, inventory_count, track_inventory, track_variant_inventory")
                     .in("id", productIds);
 
                 if (products) {
                     const productMap = new Map(
-                        products.map(p => [p.id, { stock: p.inventory_count as number, trackVariant: p.track_variant_inventory as boolean }])
+                        products.map(p => [p.id, {
+                            stock: p.inventory_count as number,
+                            trackInventory: p.track_inventory as boolean,
+                            trackVariant: p.track_variant_inventory as boolean,
+                        }])
                     );
 
-                    // Separate items by deduction strategy
-                    const globalItems = parsedItems.filter(item =>
-                        item.productId && productMap.has(item.productId) && !productMap.get(item.productId)!.trackVariant
-                    );
-                    const variantItems = parsedItems.filter(item =>
-                        item.productId && productMap.has(item.productId) && productMap.get(item.productId)!.trackVariant
+                    // Only process items for products with inventory tracking enabled
+                    const trackedItems = parsedItems.filter(item =>
+                        item.productId && productMap.get(item.productId)?.trackInventory
                     );
 
-                    // Strategy A: deduct from products.inventory_count
+                    // Separate by deduction strategy
+                    const globalItems = trackedItems.filter(item => !productMap.get(item.productId)!.trackVariant);
+                    const variantItems = trackedItems.filter(item => productMap.get(item.productId)!.trackVariant);
+
+                    // Strategy A: deduct from products.inventory_count only
                     await Promise.allSettled(
                         globalItems.map(item => {
                             const { stock } = productMap.get(item.productId)!;
-                            if (typeof stock === "number" && stock >= item.quantity) {
-                                return supabaseAdmin
-                                    .from("products")
-                                    .update({ inventory_count: stock - item.quantity })
-                                    .eq("id", item.productId);
-                            }
-                            return Promise.resolve();
+                            return supabaseAdmin
+                                .from("products")
+                                .update({ inventory_count: Math.max(0, stock - item.quantity) })
+                                .eq("id", item.productId);
                         })
                     );
 
-                    // Strategy B: deduct from product_variants.inventory_count
+                    // Strategy B: deduct from product_variants AND products.inventory_count
                     // Batch-fetch all variants for relevant products in one query, then match in memory
                     if (variantItems.length > 0) {
                         const variantProductIds = [...new Set(variantItems.map(i => i.productId))];
@@ -542,17 +558,34 @@ export async function POST(req: Request) {
                             return acc;
                         }, {} as Record<string, { id: string; inventory_count: number | null }>);
 
+                        // Deduct variant-level stock
                         await Promise.allSettled(
                             variantItems.map(item => {
                                 const key = `${item.productId}|${item.size ?? "null"}|${item.color ?? "null"}|${item.stitching ?? "null"}`;
                                 const variant = variantMap[key];
-                                if (variant && typeof variant.inventory_count === "number" && variant.inventory_count >= item.quantity) {
+                                if (variant && typeof variant.inventory_count === "number") {
                                     return supabaseAdmin
                                         .from("product_variants")
-                                        .update({ inventory_count: variant.inventory_count - item.quantity })
+                                        .update({ inventory_count: Math.max(0, variant.inventory_count - item.quantity) })
                                         .eq("id", variant.id);
                                 }
                                 return Promise.resolve();
+                            })
+                        );
+
+                        // Also deduct product-level stock (aggregate qty per product)
+                        const qtyByProduct = variantItems.reduce((acc, item) => {
+                            acc[item.productId] = (acc[item.productId] ?? 0) + item.quantity;
+                            return acc;
+                        }, {} as Record<string, number>);
+                        const qtyEntries = Object.entries(qtyByProduct) as [string, number][];
+                        await Promise.allSettled(
+                            qtyEntries.map(([productId, totalQty]) => {
+                                const { stock } = productMap.get(productId)!;
+                                return supabaseAdmin
+                                    .from("products")
+                                    .update({ inventory_count: Math.max(0, stock - totalQty) })
+                                    .eq("id", productId);
                             })
                         );
                     }
