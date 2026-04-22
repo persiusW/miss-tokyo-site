@@ -82,14 +82,14 @@ export async function POST(request: Request) {
             const productIds = cartArr.map((i: any) => i.productId).filter(Boolean);
             const { data: stockProducts } = await supabaseAdmin
                 .from("products")
-                .select("id, available_stock, track_inventory, name")
+                .select("id, inventory_count, track_inventory, name")
                 .in("id", productIds);
 
             const stockMap = Object.fromEntries((stockProducts ?? []).map((p: any) => [p.id, p]));
 
             for (const item of cartArr) {
                 const p = stockMap[item.productId];
-                if (p && p.track_inventory && (p.available_stock ?? 0) < (item.quantity ?? 1)) {
+                if (p && p.track_inventory && (p.inventory_count ?? 0) < (item.quantity ?? 1)) {
                     oosItems.push(item.name ?? item.productId);
                 }
             }
