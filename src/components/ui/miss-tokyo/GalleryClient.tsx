@@ -7,6 +7,8 @@ import { QuickAddModal } from "@/components/ui/miss-tokyo/QuickAddModal";
 import { useCart } from "@/store/useCart";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import type { VideoProduct } from "@/lib/products";
+import { getApplicableRule } from "@/lib/autoDiscount";
+import type { AutoDiscountRule } from "@/lib/autoDiscount";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -230,9 +232,17 @@ export function GalleryClient({
     const [activeIndex, setActiveIndex] = useState(0);
     const [selectedProduct, setSelectedProduct] = useState<VideoProduct | null>(null);
     const [hasMounted, setHasMounted] = useState(false);
+    const [autoDiscountRules, setAutoDiscountRules] = useState<AutoDiscountRule[]>([]);
     const totalItems = useCart(s => s.totalItems());
 
     useEffect(() => { setHasMounted(true); }, []);
+
+    useEffect(() => {
+        fetch("/api/checkout/auto-discount")
+            .then(r => r.ok ? r.json() : { rules: [] })
+            .then(data => { if (Array.isArray(data.rules)) setAutoDiscountRules(data.rules); })
+            .catch(() => {});
+    }, []);
 
     // Stable callback so VideoCard's useEffect doesn't re-run on every render
     const handleVisible = useCallback((index: number) => {
@@ -338,6 +348,7 @@ export function GalleryClient({
                 <QuickAddModal
                     product={selectedProduct}
                     onClose={() => setSelectedProduct(null)}
+                    autoDiscountRule={getApplicableRule(selectedProduct.id, selectedProduct.category_ids ?? null, autoDiscountRules)}
                 />
             )}
         </div>

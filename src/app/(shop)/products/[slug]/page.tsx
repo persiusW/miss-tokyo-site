@@ -5,6 +5,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { getProductBySlug, getRelatedProducts, getProductReviews, getAllProductSlugs } from "@/lib/products";
+import { getApplicableRule } from "@/lib/autoDiscount";
 
 // PERF-23: deduplicate — generateMetadata and ProductPage both call this;
 // React cache() deduplicates within one render cycle so only one DB query fires.
@@ -15,6 +16,18 @@ import { ProductGallery } from "@/components/ui/miss-tokyo/ProductGallery";
 import { ProductOptions } from "@/components/ui/miss-tokyo/ProductOptions";
 import { ProductAccordions } from "@/components/ui/miss-tokyo/ProductAccordions";
 import { ReviewsSection } from "@/components/ui/miss-tokyo/ReviewsSection";
+
+const getActiveAutoDiscounts = unstable_cache(
+    async () => {
+        const { data } = await supabaseAdmin
+            .from("automatic_discounts")
+            .select("id, title, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope, min_order_amount")
+            .eq("is_active", true);
+        return data ?? [];
+    },
+    ["active-auto-discounts-pdp"],
+    { revalidate: 300 }
+);
 
 // ── ISR-SAFE caches ────────────────────────────────────────────────────────────
 // These use supabaseAdmin (no cookies) and change rarely.
@@ -138,7 +151,7 @@ export default async function ProductPage({
         wholesaleTiersData: null,
     }));
 
-    const [related, { reviews, distribution }, variantRes, variantMetaRes] = await Promise.all([
+    const [related, { reviews, distribution }, variantRes, variantMetaRes, autoDiscountRules] = await Promise.all([
         getRelatedProducts(product.category_type ?? "", slug),
         getProductReviews(product.id),
         supabaseAdmin
@@ -150,6 +163,7 @@ export default async function ProductPage({
             .select("track_variant_inventory")
             .eq("id", product.id)
             .maybeSingle(),
+        getActiveAutoDiscounts().catch(() => []),
     ]);
 
     const productVariants = variantRes.data ?? [];
@@ -212,6 +226,8 @@ export default async function ProductPage({
     const ageMs = Date.now() - new Date(product.created_at).getTime();
     const isNew = ageMs < 14 * 24 * 60 * 60 * 1000;
     const badgeLabel = product.badge || (isSale ? null : isNew ? "New" : null);
+    const applicableAutoRule = getApplicableRule(product.id, product.category_ids ?? null, autoDiscountRules as any[]);
+    const autoDiscountRibbon = !isSale ? (applicableAutoRule?.title ?? null) : null;
 
     const ratingAvg = Number(product.rating_average ?? 0);
     const reviewCount = Number(product.review_count ?? 0);
@@ -288,6 +304,7 @@ export default async function ProductPage({
                             name={product.name}
                             badge={badgeLabel}
                             isSale={isSale}
+                            autoDiscountRibbon={autoDiscountRibbon}
                         />
                     </div>
 
@@ -337,6 +354,7 @@ export default async function ProductPage({
                             trackVariantInventory={trackVariantInventory}
                             trackInventory={product.track_inventory}
                             productVariants={productVariants}
+                            autoDiscountRule={applicableAutoRule as any}
                         />
 
                         {/* Accordions */}

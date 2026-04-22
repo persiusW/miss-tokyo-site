@@ -118,7 +118,7 @@ export async function PATCH(req: NextRequest) {
     // Fast path: toggle-only fields (is_active, is_sale, discount_value).
     // When the body contains ONLY these fields, do a targeted update without
     // touching any other columns — avoids nulling out price, name, etc.
-    const TOGGLE_FIELDS = new Set(["is_active", "is_sale", "discount_value"]);
+    const TOGGLE_FIELDS = new Set(["is_active", "is_sale", "discount_value", "compare_at_price_ghs"]);
     if (Object.keys(fields).length > 0 && Object.keys(fields).every(k => TOGGLE_FIELDS.has(k))) {
         const { error } = await supabaseAdmin.from("products").update(fields).eq("id", id);
         if (error) {
@@ -135,6 +135,9 @@ export async function PATCH(req: NextRequest) {
         slug,
         sku,
         price_ghs,
+        compare_at_price_ghs,
+        is_sale,
+        discount_value,
         inventory_count,
         track_inventory,
         track_variant_inventory,
@@ -165,6 +168,9 @@ export async function PATCH(req: NextRequest) {
         slug,
         sku: sku ?? null,
         price_ghs: Number(price_ghs),
+        compare_at_price_ghs: compare_at_price_ghs != null && compare_at_price_ghs !== "" ? Number(compare_at_price_ghs) : null,
+        is_sale: is_sale ?? false,
+        discount_value: discount_value != null ? Number(discount_value) : 0,
         inventory_count: track_inventory ? Number(inventory_count) : 9999,
         track_inventory: track_inventory ?? true,
         track_variant_inventory: track_variant_inventory ?? false,

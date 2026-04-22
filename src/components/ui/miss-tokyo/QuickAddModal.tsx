@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ShoppingBag, X } from "lucide-react";
 import { useCart } from "@/store/useCart";
 import type { ShopProduct } from "@/lib/products";
+import type { AutoDiscountRule } from "@/lib/autoDiscount";
 
 const COLOR_HEX: Record<string, string> = {
     Black:"#0f0f0f", White:"#f5f5f5", Red:"#e8485a", Pink:"#f4a0b5",
@@ -29,9 +30,11 @@ const FALLBACK_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/sv
 export function QuickAddModal({
     product,
     onClose,
+    autoDiscountRule,
 }: {
     product: ShopProduct;
     onClose: () => void;
+    autoDiscountRule?: AutoDiscountRule | null;
 }) {
     const { addItem } = useCart();
     const [selectedColor, setSelectedColor] = useState(product.available_colors?.[0] || "");
@@ -41,7 +44,30 @@ export function QuickAddModal({
     const [variants, setVariants] = useState<any[]>([]);
     const colors = product.available_colors ?? [];
     const sizes = product.available_sizes ?? [];
-    const isOnSale = !!(product.compare_at_price_ghs && product.compare_at_price_ghs > product.price_ghs);
+
+    // Product-level sale paths
+    const hasSaleFromCompare = !!(product.compare_at_price_ghs && product.compare_at_price_ghs > product.price_ghs);
+    const hasSaleFromDiscount = !!(product.is_sale && (product.discount_value ?? 0) > 0);
+    const productSalePrice = hasSaleFromDiscount && !hasSaleFromCompare
+        ? product.price_ghs * (1 - (product.discount_value ?? 0) / 100)
+        : product.price_ghs;
+    const productOriginalPrice = hasSaleFromCompare
+        ? product.compare_at_price_ghs!
+        : hasSaleFromDiscount ? product.price_ghs : null;
+    const isProductOnSale = hasSaleFromCompare || hasSaleFromDiscount;
+
+    // Auto-discount overlay (ribbon + effective price) — only for single-item rules
+    const adSingleItem = autoDiscountRule && autoDiscountRule.min_quantity <= 1 ? autoDiscountRule : null;
+    const adEffectivePrice = adSingleItem
+        ? adSingleItem.discount_type === "PERCENTAGE"
+            ? product.price_ghs * (1 - adSingleItem.discount_value / 100)
+            : Math.max(0, product.price_ghs - adSingleItem.discount_value)
+        : null;
+
+    // Final display values: product-level sale takes priority over auto-discount display
+    const displayPrice = isProductOnSale ? productSalePrice : (adEffectivePrice ?? product.price_ghs);
+    const strikethroughPrice = isProductOnSale ? productOriginalPrice : (adEffectivePrice != null ? product.price_ghs : null);
+    const ribbonLabel = isProductOnSale ? "Sale" : (autoDiscountRule?.title ?? null);
 
     useEffect(() => {
         if (product.track_variant_inventory) {
@@ -140,7 +166,7 @@ export function QuickAddModal({
             productId: product.id,
             name: product.name,
             slug: product.slug,
-            price: product.price_ghs,
+            price: isProductOnSale ? productSalePrice : product.price_ghs,
             size: selectedSize || "One Size",
             color: selectedColor || undefined,
             quantity: 1,
@@ -178,22 +204,30 @@ export function QuickAddModal({
 
                 {/* Info */}
                 <div className="flex-1 flex flex-col p-8 overflow-y-auto">
-                    <p className="text-[10px] tracking-[0.15em] uppercase mb-2" style={{ color: "#7A7167" }}>
-                        {product.category_name || ""}
-                    </p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <p className="text-[10px] tracking-[0.15em] uppercase" style={{ color: "#7A7167" }}>
+                            {product.category_name || ""}
+                        </p>
+                        {ribbonLabel && (
+                            <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5"
+                                style={{ background: isProductOnSale ? "#E8485A" : "#141210", color: "#fff", borderRadius: 2 }}>
+                                {ribbonLabel}
+                            </span>
+                        )}
+                    </div>
                     <h2 className="mb-3" style={{ fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 400, lineHeight: 1.15, color: "#141210" }}>
                         {product.name}
                     </h2>
                     <div className="flex items-center gap-[10px] text-[18px] font-medium mb-5">
-                        {isOnSale ? (
+                        {strikethroughPrice != null ? (
                             <>
-                                <span style={{ color: "#E8485A" }}>GH₵{product.price_ghs.toFixed(2)}</span>
+                                <span style={{ color: "#E8485A" }}>GH₵{displayPrice.toFixed(2)}</span>
                                 <span className="text-sm font-normal line-through" style={{ color: "#7A7167" }}>
-                                    GH₵{product.compare_at_price_ghs!.toFixed(2)}
+                                    GH₵{strikethroughPrice.toFixed(2)}
                                 </span>
                             </>
                         ) : (
-                            <span>GH₵{product.price_ghs.toFixed(2)}</span>
+                            <span>GH₵{displayPrice.toFixed(2)}</span>
                         )}
                     </div>
 

@@ -8,6 +8,8 @@ import { ShoppingBag, Heart, X, ChevronDown, SlidersHorizontal, Check } from "lu
 import { useCart } from "@/store/useCart";
 import type { ShopProduct, ShopCategory } from "@/lib/products";
 import { QuickAddModal } from "@/components/ui/miss-tokyo/QuickAddModal";
+import { getApplicableRule } from "@/lib/autoDiscount";
+import type { AutoDiscountRule } from "@/lib/autoDiscount";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const COLOR_HEX: Record<string, string> = {
@@ -46,9 +48,10 @@ function getBadge(p: ShopProduct): { label: string; type: "new" | "sale" | "bund
 
 // ── ShopProductCard ───────────────────────────────────────────────────────────
 function ShopProductCard({
-    product, onQuickAdd, priority = false,
+    product, onQuickAdd, priority = false, autoDiscountRule,
 }: {
     product: ShopProduct; onQuickAdd: (p: ShopProduct) => void; priority?: boolean;
+    autoDiscountRule?: AutoDiscountRule | null;
 }) {
     const [wishlist, setWishlist] = useState(false);
     const [imgSrc, setImgSrc] = useState(product.image_urls?.[0] || FALLBACK_IMG);
@@ -56,12 +59,11 @@ function ShopProductCard({
     const [addState, setAddState] = useState<"idle" | "added">("idle");
     const { addItem } = useCart();
     const badge = getBadge(product);
-    // Mirror the "You May Also Like" logic from the PDP:
     // Prefer compare_at_price_ghs; fall back to is_sale + discount_value percentage.
     const hasSaleFromCompare = !!(product.compare_at_price_ghs && product.compare_at_price_ghs > product.price_ghs);
     const hasSaleFromDiscount = !!(product.is_sale && (product.discount_value ?? 0) > 0);
     const isOnSale = hasSaleFromCompare || hasSaleFromDiscount;
-    const displayPrice = hasSaleFromDiscount && !hasSaleFromCompare
+    const productSalePrice = hasSaleFromDiscount && !hasSaleFromCompare
         ? product.price_ghs * (1 - (product.discount_value ?? 0) / 100)
         : product.price_ghs;
     const origPrice = hasSaleFromCompare
@@ -69,6 +71,16 @@ function ShopProductCard({
         : hasSaleFromDiscount
             ? product.price_ghs
             : null;
+    // Auto-discount display (only single-item rules affect shown price)
+    const adSingleItem = autoDiscountRule && autoDiscountRule.min_quantity <= 1 ? autoDiscountRule : null;
+    const adEffectivePrice = adSingleItem
+        ? adSingleItem.discount_type === "PERCENTAGE"
+            ? product.price_ghs * (1 - adSingleItem.discount_value / 100)
+            : Math.max(0, product.price_ghs - adSingleItem.discount_value)
+        : null;
+    const displayPrice = isOnSale ? productSalePrice : (adEffectivePrice ?? product.price_ghs);
+    const strikethroughPrice = isOnSale ? origPrice : (adEffectivePrice != null ? product.price_ghs : null);
+    const ribbonLabel = isOnSale ? null : (autoDiscountRule?.title ?? null);
     const colors = product.available_colors ?? [];
     const isOutOfStock = useMemo(() => {
         if (product.track_inventory === false) return false;
@@ -140,6 +152,13 @@ function ShopProductCard({
                             style={{ borderRadius: 2, background: "#7A7167", color: "#fff" }}
                         >
                             Sold Out
+                        </span>
+                    ) : ribbonLabel ? (
+                        <span
+                            className="absolute top-[10px] left-[10px] z-10 text-[9px] font-medium tracking-[0.1em] uppercase px-2 py-[3px]"
+                            style={{ borderRadius: 2, background: "#141210", color: "#fff" }}
+                        >
+                            {ribbonLabel}
                         </span>
                     ) : badge && (
                         <span
@@ -216,12 +235,12 @@ function ShopProductCard({
                 </p>
                 <p className="text-[13px] mb-[5px]" style={{ color: "#141210" }}>{product.name}</p>
                 <div className="flex items-center gap-[6px] flex-wrap text-[13px] font-medium">
-                    {isOnSale ? (
+                    {strikethroughPrice != null ? (
                         <>
                             <span className="line-through text-[12px] font-normal" style={{ color: "#7A7167" }}>
-                                GH₵{origPrice!.toFixed(2)}
+                                GH₵{strikethroughPrice.toFixed(2)}
                             </span>
-                            <span style={{ color: "#E8485A" }}>GH₵{displayPrice.toFixed(2)}</span>
+                            <span style={{ color: isOnSale ? "#E8485A" : "#141210" }}>GH₵{displayPrice.toFixed(2)}</span>
                         </>
                     ) : (
                         <span style={{ color: "#141210" }}>GH₵{displayPrice.toFixed(2)}</span>
@@ -325,11 +344,13 @@ interface ShopPageClientProps {
     maxPrice: number;
     paginationType: "load_more" | "pagination";
     mobileCols?: 1 | 2;
+    autoDiscountRules?: AutoDiscountRule[];
 }
 
 export function ShopPageClient({
     initialProducts, categories, allColors, allSizes,
     total, minPrice, maxPrice, paginationType, mobileCols = 2,
+    autoDiscountRules = [],
 }: ShopPageClientProps) {
     const router = useRouter();
     const pathname = usePathname();
@@ -660,7 +681,8 @@ export function ShopPageClient({
                         <>
                             <div key={searchParams.toString()} className={`grid gap-[20px_16px] ${gridClass} shop-grid-animate`}>
                                 {products.map((p, i) => (
-                                    <ShopProductCard key={p.id} product={p} onQuickAdd={setQuickAddProduct} priority={i < 4} />
+                                    <ShopProductCard key={p.id} product={p} onQuickAdd={setQuickAddProduct} priority={i < 4}
+                                        autoDiscountRule={getApplicableRule(p.id, p.category_ids ?? null, autoDiscountRules)} />
                                 ))}
                             </div>
 
@@ -742,7 +764,11 @@ export function ShopPageClient({
 
             {/* Quick Add Modal */}
             {quickAddProduct && (
-                <QuickAddModal product={quickAddProduct} onClose={() => setQuickAddProduct(null)} />
+                <QuickAddModal
+                    product={quickAddProduct}
+                    onClose={() => setQuickAddProduct(null)}
+                    autoDiscountRule={getApplicableRule(quickAddProduct.id, quickAddProduct.category_ids ?? null, autoDiscountRules)}
+                />
             )}
         </div>
     );

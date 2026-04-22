@@ -8,6 +8,7 @@ interface Props {
     name: string;
     badge?: string | null;
     isSale?: boolean;
+    autoDiscountRibbon?: string | null;
 }
 
 const FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='533'%3E%3Crect width='400' height='533' fill='%23E8D5C4'/%3E%3C/svg%3E";
@@ -45,7 +46,7 @@ function ManagedVideo({ src, active, alwaysPlay = false, priority = false }: { s
     );
 }
 
-export function ProductGallery({ images, name, badge, isSale }: Props) {
+export function ProductGallery({ images, name, badge, isSale, autoDiscountRibbon }: Props) {
     const imgs = images.length > 0 ? images : [FALLBACK];
     const [current, setCurrent] = useState(0);
     const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -66,7 +67,7 @@ export function ProductGallery({ images, name, badge, isSale }: Props) {
         };
     }, [lightboxOpen]);
 
-    const badgeLabel = isSale ? "Sale" : badge;
+    const badgeLabel = isSale ? "Sale" : (autoDiscountRibbon ?? badge);
     const badgeBg = isSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)";
 
     return (

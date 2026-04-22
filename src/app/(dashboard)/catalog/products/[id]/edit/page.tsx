@@ -104,6 +104,9 @@ export default function EditProductPage() {
         slug: "",
         sku: "",
         price_ghs: 0,
+        compare_at_price_ghs: "" as string | number,
+        is_sale: false,
+        discount_value: 0,
         inventory_count: 0,
         description: "",
         category_type: "",
@@ -138,6 +141,9 @@ export default function EditProductPage() {
             slug: product.slug || "",
             sku: product.sku || "",
             price_ghs: product.price_ghs || 0,
+            compare_at_price_ghs: product.compare_at_price_ghs ?? "",
+            is_sale: product.is_sale ?? false,
+            discount_value: product.discount_value ?? 0,
             inventory_count: product.inventory_count || 0,
             description: product.description || "",
             category_type: product.category_type || "",
@@ -258,6 +264,9 @@ export default function EditProductPage() {
                     slug: formData.slug,
                     sku: formData.sku || null,
                     price_ghs: Number(formData.price_ghs),
+                    compare_at_price_ghs: formData.compare_at_price_ghs !== "" ? Number(formData.compare_at_price_ghs) : null,
+                    is_sale: formData.is_sale,
+                    discount_value: formData.is_sale ? Number(formData.discount_value) : 0,
                     inventory_count: trackInventory && !trackVariantInventory ? Number(formData.inventory_count) : 9999,
                     track_inventory: trackInventory,
                     track_variant_inventory: trackVariantInventory,
@@ -613,6 +622,56 @@ export default function EditProductPage() {
                                     required
                                     className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
                                 />
+                            </div>
+
+                            {/* Compare-at price (was price / strikethrough) */}
+                            <div>
+                                <label htmlFor="compare_at_price_ghs" className="block text-xs uppercase tracking-widest font-semibold mb-3">Compare-at Price / Was Price (GHS)</label>
+                                <DebouncedInput
+                                    type="number"
+                                    id="compare_at_price_ghs"
+                                    value={formData.compare_at_price_ghs}
+                                    onChange={handleChange}
+                                    min="0"
+                                    step="0.01"
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
+                                    placeholder="Leave blank to clear"
+                                />
+                                <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Shows strikethrough original price on cards and product pages. Leave blank if unused.</p>
+                            </div>
+
+                            {/* Sale toggle + discount percentage */}
+                            <div className="flex items-start gap-3 p-4 bg-neutral-50 border border-neutral-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(p => ({ ...p, is_sale: !p.is_sale }))}
+                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none mt-0.5 ${formData.is_sale ? "bg-[#E8485A]" : "bg-neutral-300"}`}
+                                >
+                                    <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${formData.is_sale ? "translate-x-4" : "translate-x-0"}`} />
+                                </button>
+                                <div className="flex-1">
+                                    <p className="text-xs uppercase tracking-widest font-semibold">On Sale</p>
+                                    <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">Shows Sale ribbon. Enter a percentage discount below to slash the price.</p>
+                                    {formData.is_sale && (
+                                        <div className="mt-3">
+                                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Discount % (e.g. 20 for 20% off)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="1"
+                                                value={formData.discount_value}
+                                                onChange={e => setFormData(p => ({ ...p, discount_value: Number(e.target.value) }))}
+                                                className="w-32 border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none text-sm"
+                                            />
+                                            {formData.discount_value > 0 && (
+                                                <p className="text-[10px] text-[#E8485A] mt-1 uppercase tracking-wider font-semibold">
+                                                    Effective price: GH₵{(Number(formData.price_ghs) * (1 - Number(formData.discount_value) / 100)).toFixed(2)} (was GH₵{Number(formData.price_ghs).toFixed(2)})
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Track Inventory toggle */}

@@ -5,6 +5,18 @@ import { getProducts, getCategories, deriveColors, deriveSizes } from "@/lib/pro
 import { ShopPageClient } from "@/components/ui/miss-tokyo/ShopPageClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+const getAutoDiscountRules = unstable_cache(
+    async () => {
+        const { data } = await supabaseAdmin
+            .from("automatic_discounts")
+            .select("id, title, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope, min_order_amount")
+            .eq("is_active", true);
+        return data ?? [];
+    },
+    ["active-auto-discounts"],
+    { revalidate: 300 }
+);
+
 // Cache admin-controlled settings for 5 minutes — they change rarely and this
 // fetch fires on every dynamic /shop render, contributing ~0.5-1s per invocation.
 const getShopSettings = unstable_cache(
@@ -86,11 +98,10 @@ export default async function ShopPage({
     // in ShopPageClient can upgrade the view after hydration if needed.
     const role: string | undefined = undefined;
 
-    // Settings are cached at module level — no DB round-trip on cache hit
-    const { paginationSetting, mobileCols } = await getShopSettings().catch(() => ({
-        paginationSetting: "load_more" as const,
-        mobileCols: 2 as const,
-    }));
+    const [{ paginationSetting, mobileCols }, autoDiscountRules] = await Promise.all([
+        getShopSettings().catch(() => ({ paginationSetting: "load_more" as const, mobileCols: 2 as const })),
+        getAutoDiscountRules().catch(() => []),
+    ]);
 
     const [{ products, total, minPrice, maxPrice }, categories] = await Promise.all([
         getProducts({
@@ -175,6 +186,7 @@ export default async function ShopPage({
                 maxPrice={maxPrice}
                 paginationType={paginationSetting}
                 mobileCols={mobileCols}
+                autoDiscountRules={autoDiscountRules}
             />
         </Suspense>
     );

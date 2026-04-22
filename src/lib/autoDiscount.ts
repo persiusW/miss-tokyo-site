@@ -63,6 +63,33 @@ export type AutoDiscountResult = {
     nearMisses: NearMissRule[];
 };
 
+/**
+ * Given a product's id + category ids and a list of active rules, return the
+ * single best rule to surface as a ribbon on a product card / PDP.
+ *
+ * Priority: single-item applicable rules (min_quantity ≤ 1) with the highest
+ * discount_value win. Falls back to the first multi-item rule (ribbon only).
+ * Returns null when no rule matches.
+ */
+export function getApplicableRule(
+    productId: string,
+    categoryIds: string[] | null,
+    rules: AutoDiscountRule[],
+): AutoDiscountRule | null {
+    const cats = categoryIds ?? [];
+    const matching = rules.filter(r => {
+        if (r.applies_to === "ALL_PRODUCTS") return true;
+        if (r.applies_to === "SPECIFIC_PRODUCTS") return r.target_product_ids.includes(productId);
+        if (r.applies_to === "SPECIFIC_CATEGORIES") return cats.some(cid => r.target_category_ids.includes(cid));
+        return false;
+    });
+    if (matching.length === 0) return null;
+    const singleItem = matching.filter(r => r.min_quantity <= 1);
+    if (singleItem.length > 0)
+        return singleItem.reduce((a, b) => b.discount_value > a.discount_value ? b : a);
+    return matching[0];
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 /** Returns cart items that match the rule's applies_to scope. */

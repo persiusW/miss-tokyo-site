@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/store/useCart";
 import { toast } from "@/lib/toast";
 import { resolveWholesalePrice, WholesaleTiers } from "@/lib/wholesale";
+import type { AutoDiscountRule } from "@/lib/autoDiscount";
 
 export interface ColorVariant { name: string; hex: string; in_stock: boolean; }
 export interface SizeVariant { label: string; in_stock: boolean; }
@@ -40,6 +41,7 @@ interface Props {
     trackVariantInventory?: boolean;
     trackInventory?: boolean;
     productVariants?: ProductVariant[];
+    autoDiscountRule?: AutoDiscountRule | null;
 }
 
 const COLOR_HEX: Record<string, string> = {
@@ -107,6 +109,7 @@ export function ProductOptions(props: Props) {
         trackVariantInventory = false,
         trackInventory = true,
         productVariants,
+        autoDiscountRule,
     } = props;
 
     const router = useRouter();
@@ -292,11 +295,33 @@ export function ProductOptions(props: Props) {
         toast.success("Link copied to clipboard");
     };
 
-    const baseProductPrice = isSale && discountValue > 0 ? price * (1 - discountValue / 100) : price;
+    // Product-level sale price (is_sale + discount_value)
+    const hasSaleFromDiscount = isSale && discountValue > 0;
+    const hasSaleFromCompare = !!(compareAtPrice && compareAtPrice > price);
+    const isProductOnSale = hasSaleFromDiscount || hasSaleFromCompare;
+    const baseProductPrice = hasSaleFromDiscount ? price * (1 - discountValue / 100) : price;
+
+    // Auto-discount display (single-item rules only affect displayed price)
+    const adSingleItem = autoDiscountRule && autoDiscountRule.min_quantity <= 1 ? autoDiscountRule : null;
+    const adEffectivePrice = adSingleItem
+        ? adSingleItem.discount_type === "PERCENTAGE"
+            ? price * (1 - adSingleItem.discount_value / 100)
+            : Math.max(0, price - adSingleItem.discount_value)
+        : null;
+    const adRibbonLabel = !isProductOnSale ? (autoDiscountRule?.title ?? null) : null;
+
+    const displayBasePrice = isProductOnSale ? baseProductPrice : (adEffectivePrice ?? price);
+    const strikethroughPrice = hasSaleFromCompare
+        ? compareAtPrice!
+        : hasSaleFromDiscount
+            ? price
+            : adEffectivePrice != null
+                ? price
+                : null;
 
     const unitPrice = (isWholesalerState && wholesaleTiers)
-        ? resolveWholesalePrice(qty, baseProductPrice, wholesaleTiers)
-        : baseProductPrice;
+        ? resolveWholesalePrice(qty, displayBasePrice, wholesaleTiers)
+        : displayBasePrice;
 
     const doAddToCart = (): boolean => {
         if (sizes.length > 0 && !selectedSize) {
@@ -361,18 +386,32 @@ export function ProductOptions(props: Props) {
                 </div>
             )}
 
+            {/* Auto-discount ribbon (shown above price when applicable) */}
+            {adRibbonLabel && (
+                <div style={{ marginBottom: 8 }}>
+                    <span style={{
+                        display: "inline-block",
+                        fontSize: 9, fontWeight: 700, letterSpacing: "0.12em",
+                        textTransform: "uppercase", padding: "3px 8px",
+                        background: "#141210", color: "#fff", borderRadius: 2,
+                    }}>
+                        {adRibbonLabel}
+                    </span>
+                </div>
+            )}
+
             {/* Price row */}
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
                 <span style={{
                     fontFamily: "var(--font-display, Georgia, serif)",
                     fontSize: 36, fontWeight: 400,
-                    color: isSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)",
+                    color: isProductOnSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)",
                 }}>
                     GH₵{unitPrice.toFixed(2)}
                 </span>
-                {compareAtPrice && compareAtPrice > unitPrice && (
+                {strikethroughPrice != null && strikethroughPrice > unitPrice && (
                     <span style={{ fontSize: 18, color: "var(--muted, #7A7167)", textDecoration: "line-through", fontWeight: 300 }}>
-                        GH₵{compareAtPrice.toFixed(2)}
+                        GH₵{strikethroughPrice.toFixed(2)}
                     </span>
                 )}
                 {isWholesalerState && (
