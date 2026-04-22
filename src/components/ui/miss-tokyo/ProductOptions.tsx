@@ -393,7 +393,7 @@ export function ProductOptions(props: Props) {
                         display: "inline-block",
                         fontSize: 9, fontWeight: 700, letterSpacing: "0.12em",
                         textTransform: "uppercase", padding: "3px 8px",
-                        background: "#141210", color: "#fff", borderRadius: 2,
+                        background: "#E8485A", color: "#fff", borderRadius: 2,
                     }}>
                         {adRibbonLabel}
                     </span>

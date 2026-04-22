@@ -210,7 +210,7 @@ export function QuickAddModal({
                         </p>
                         {ribbonLabel && (
                             <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-2 py-0.5"
-                                style={{ background: isProductOnSale ? "#E8485A" : "#141210", color: "#fff", borderRadius: 2 }}>
+                                style={{ background: "#E8485A", color: "#fff", borderRadius: 2 }}>
                                 {ribbonLabel}
                             </span>
                         )}

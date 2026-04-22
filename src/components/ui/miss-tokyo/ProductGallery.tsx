@@ -68,7 +68,7 @@ export function ProductGallery({ images, name, badge, isSale, autoDiscountRibbon
     }, [lightboxOpen]);
 
     const badgeLabel = isSale ? "Sale" : (autoDiscountRibbon ?? badge);
-    const badgeBg = isSale ? "var(--accent, #E8485A)" : "var(--ink, #141210)";
+    const badgeBg = (isSale || autoDiscountRibbon) ? "var(--accent, #E8485A)" : "var(--ink, #141210)";
 
     return (
         <>
