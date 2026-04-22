@@ -18,6 +18,9 @@ export type CartItem = {
     // Wholesale fields — only present for wholesale users
     isWholesale?: boolean;
     wholesaleTiers?: WholesaleTiers;
+    // Pre-order fields
+    isPreOrder?: boolean;
+    estimatedAvailability?: string; // ISO date e.g. "2026-08-01"
 };
 
 /** Computes the effective per-unit price for a cart item (wholesale-aware). */
@@ -51,8 +54,8 @@ export const useCart = create<CartState>()(
             isOpen: false,
             setIsOpen: (isOpen) => set({ isOpen }),
             addItem: (item, openDrawer = true) => {
-                // Block if inventory is tracked (inventoryCount defined) and stock is zero
-                if (item.inventoryCount !== undefined && item.inventoryCount <= 0) {
+                // Pre-order items bypass the OOS block — they're intentionally zero-stock
+                if (!item.isPreOrder && item.inventoryCount !== undefined && item.inventoryCount <= 0) {
                     toast.error(`${item.name} is out of stock`);
                     return;
                 }
