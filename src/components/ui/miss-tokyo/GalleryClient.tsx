@@ -26,12 +26,14 @@ function VideoCard({
     priority,
     onOpenModal,
     onVisible,
+    autoDiscountRules,
 }: {
     product: VideoProduct;
     index: number;
     priority: boolean;
     onOpenModal: (product: VideoProduct) => void;
     onVisible: (index: number) => void;
+    autoDiscountRules: AutoDiscountRule[];
 }) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,6 +50,28 @@ function VideoCard({
         product.size_variants.length > 0 &&
         product.size_variants.every((v: { label: string; in_stock: boolean }) => v.in_stock === false);
     const isOutOfStock = masterOOS || allSizesOOS;
+
+    // Price + ribbon calculations
+    const hasSaleFromCompare = !!(product.compare_at_price_ghs && product.compare_at_price_ghs > product.price_ghs);
+    const hasSaleFromDiscount = !!(product.is_sale && (product.discount_value ?? 0) > 0);
+    const isProductOnSale = hasSaleFromCompare || hasSaleFromDiscount;
+    const productSalePrice = hasSaleFromDiscount && !hasSaleFromCompare
+        ? product.price_ghs * (1 - (product.discount_value ?? 0) / 100)
+        : product.price_ghs;
+    const applicableRule = getApplicableRule(product.id, product.category_ids ?? null, autoDiscountRules);
+    const adSingle = !isProductOnSale && applicableRule && applicableRule.min_quantity <= 1 ? applicableRule : null;
+    const adEffective = adSingle
+        ? adSingle.discount_type === "PERCENTAGE"
+            ? product.price_ghs * (1 - adSingle.discount_value / 100)
+            : Math.max(0, product.price_ghs - adSingle.discount_value)
+        : null;
+    const displayPrice = isProductOnSale ? productSalePrice : (adEffective ?? product.price_ghs);
+    const slashedPrice = hasSaleFromCompare
+        ? product.compare_at_price_ghs!
+        : hasSaleFromDiscount ? product.price_ghs
+        : adEffective != null ? product.price_ghs
+        : null;
+    const ribbonLabel = isProductOnSale ? "Sale" : (applicableRule?.title ?? null);
 
     // Use the shared hook for viewport detection — threshold 0.8 matches the old inline observer
     const [containerRef, isVisible] = useIntersectionObserver<HTMLDivElement>({ threshold: 0.8 });
@@ -128,15 +152,30 @@ function VideoCard({
                 {/* Mobile Overlay */}
                 <div className="lg:hidden absolute bottom-0 left-0 w-full p-6 pb-28 md:pb-12 z-10 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white">
                     <div className="flex flex-col gap-2 mb-6 text-left">
-                        <span className="text-[9px] uppercase tracking-[0.2em] text-white/60 font-medium">
-                            {product.category_name || "New Arrival"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] uppercase tracking-[0.2em] text-white/60 font-medium">
+                                {product.category_name || "New Arrival"}
+                            </span>
+                            {ribbonLabel && (
+                                <span className="text-[8px] font-bold uppercase tracking-[0.12em] px-2 py-0.5"
+                                    style={{ background: "#E8485A", color: "#fff", borderRadius: 2 }}>
+                                    {ribbonLabel}
+                                </span>
+                            )}
+                        </div>
                         <h2 className="font-serif text-2xl tracking-widest uppercase leading-tight">
                             {product.name}
                         </h2>
-                        <p className="text-sm font-light tracking-widest opacity-90">
-                            GH₵{product.price_ghs.toFixed(2)}
-                        </p>
+                        <div className="flex items-baseline gap-2">
+                            {slashedPrice != null && (
+                                <span className="text-sm font-light tracking-widest line-through" style={{ color: "#E8485A", opacity: 0.9 }}>
+                                    GH₵{slashedPrice.toFixed(2)}
+                                </span>
+                            )}
+                            <p className="text-sm font-light tracking-widest opacity-90">
+                                GH₵{displayPrice.toFixed(2)}
+                            </p>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -167,9 +206,17 @@ function VideoCard({
             {/* Desktop Detail Column */}
             <div className="hidden lg:flex w-[40%] h-full bg-white flex-col justify-center p-16 xl:p-24 relative">
                 <div className="max-w-md text-left">
-                    <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-400 font-bold mb-4 block">
-                        {product.category_name || "MISS TOKYO EXCLUSIVE"}
-                    </span>
+                    <div className="flex items-center gap-3 mb-4">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-400 font-bold">
+                            {product.category_name || "MISS TOKYO EXCLUSIVE"}
+                        </span>
+                        {ribbonLabel && (
+                            <span className="text-[8px] font-bold uppercase tracking-[0.12em] px-2 py-0.5"
+                                style={{ background: "#E8485A", color: "#fff", borderRadius: 2 }}>
+                                {ribbonLabel}
+                            </span>
+                        )}
+                    </div>
                     <h2 className="font-serif text-5xl xl:text-6xl tracking-widest uppercase leading-[1.1] mb-8 text-neutral-900">
                         {product.name}
                     </h2>
@@ -181,9 +228,16 @@ function VideoCard({
                             "Indulge in the latest couture-inspired silhouette from Miss Tokyo. A perfect blend of contemporary elegance and timeless craftsmanship."}
                     </p>
 
-                    <p className="text-2xl font-serif tracking-widest text-neutral-900 mb-12">
-                        GH₵{product.price_ghs.toFixed(2)}
-                    </p>
+                    <div className="flex items-baseline gap-3 mb-12">
+                        {slashedPrice != null && (
+                            <span className="text-lg font-serif tracking-widest line-through" style={{ color: "#E8485A" }}>
+                                GH₵{slashedPrice.toFixed(2)}
+                            </span>
+                        )}
+                        <p className="text-2xl font-serif tracking-widest text-neutral-900">
+                            GH₵{displayPrice.toFixed(2)}
+                        </p>
+                    </div>
 
                     <div className="flex flex-col gap-4">
                         <button
@@ -331,6 +385,7 @@ export function GalleryClient({
                             priority={index < 2}
                             onOpenModal={setSelectedProduct}
                             onVisible={handleVisible}
+                            autoDiscountRules={autoDiscountRules}
                         />
                     </div>
                 ))}

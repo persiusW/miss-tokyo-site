@@ -237,7 +237,7 @@ function ShopProductCard({
                 <div className="flex items-center gap-[6px] flex-wrap text-[13px] font-medium">
                     {strikethroughPrice != null ? (
                         <>
-                            <span className="line-through text-[12px] font-normal" style={{ color: "#7A7167" }}>
+                            <span className="line-through text-[12px] font-normal" style={{ color: "#E8485A" }}>
                                 GH₵{strikethroughPrice.toFixed(2)}
                             </span>
                             <span style={{ color: isOnSale ? "#E8485A" : "#141210" }}>GH₵{displayPrice.toFixed(2)}</span>

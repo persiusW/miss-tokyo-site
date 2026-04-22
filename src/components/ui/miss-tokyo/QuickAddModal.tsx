@@ -222,7 +222,7 @@ export function QuickAddModal({
                         {strikethroughPrice != null ? (
                             <>
                                 <span style={{ color: "#E8485A" }}>GH₵{displayPrice.toFixed(2)}</span>
-                                <span className="text-sm font-normal line-through" style={{ color: "#7A7167" }}>
+                                <span className="text-sm font-normal line-through" style={{ color: "#E8485A" }}>
                                     GH₵{strikethroughPrice.toFixed(2)}
                                 </span>
                             </>

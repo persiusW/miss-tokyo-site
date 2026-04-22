@@ -410,7 +410,7 @@ export function ProductOptions(props: Props) {
                     GH₵{unitPrice.toFixed(2)}
                 </span>
                 {strikethroughPrice != null && strikethroughPrice > unitPrice && (
-                    <span style={{ fontSize: 18, color: "var(--muted, #7A7167)", textDecoration: "line-through", fontWeight: 300 }}>
+                    <span style={{ fontSize: 18, color: "#E8485A", textDecoration: "line-through", fontWeight: 300 }}>
                         GH₵{strikethroughPrice.toFixed(2)}
                     </span>
                 )}
