@@ -156,7 +156,7 @@ function ShopProductCard({
                     ) : ribbonLabel ? (
                         <span
                             className="absolute top-[10px] left-[10px] z-10 text-[9px] font-medium tracking-[0.1em] uppercase px-2 py-[3px]"
-                            style={{ borderRadius: 2, background: "#141210", color: "#fff" }}
+                            style={{ borderRadius: 2, background: "#E8485A", color: "#fff" }}
                         >
                             {ribbonLabel}
                         </span>
