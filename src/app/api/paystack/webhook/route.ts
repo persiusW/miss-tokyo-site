@@ -443,7 +443,7 @@ export async function POST(req: Request) {
             }
             // ─────────────────────────────────────────────────────────────────
 
-            console.log("Paystack Charge Success Event Received");
+            console.log("[inv-diag] charge.success — orderId:", orderId, "ref:", paystackRef, "isAlreadyProcessed:", isAlreadyProcessed);
             const customerEmail: string = data.customer?.email || "";
             const amountGHS = Number(data.amount) / 100;
             // paystackRef is already declared above
@@ -504,15 +504,26 @@ export async function POST(req: Request) {
                 ? parseItems(cartItems)
                 : orderItemsFromDB;
 
+            console.log("[inv-diag] isAlreadyProcessed:", isAlreadyProcessed, "parsedItems.length:", parsedItems.length, "orderId:", orderId);
+
             // Decrement inventory — hybrid model: variant-level or product-level
             if (!isAlreadyProcessed && parsedItems.length > 0) {
                 const productIds = [...new Set(parsedItems.map(i => i.productId).filter(Boolean))];
+
+                console.log("[inv-diag] productIds:", productIds);
+                console.log("[inv-diag] parsedItems (keys):", JSON.stringify(parsedItems.map((i: any) => ({
+                    productId: i.productId, size: i.size, color: i.color, stitching: i.stitching, qty: i.quantity,
+                }))));
 
                 // Fetch products with tracking flags
                 const { data: products } = await supabaseAdmin
                     .from("products")
                     .select("id, slug, inventory_count, track_inventory, track_variant_inventory")
                     .in("id", productIds);
+
+                console.log("[inv-diag] products from DB:", JSON.stringify((products ?? []).map((p: any) => ({
+                    id: p.id, track_inventory: p.track_inventory, track_variant_inventory: p.track_variant_inventory, inventory_count: p.inventory_count,
+                }))));
 
                 if (products) {
                     const productMap = new Map(
@@ -524,17 +535,19 @@ export async function POST(req: Request) {
                     );
 
                     // Only process items for products with inventory tracking enabled
-                    const trackedItems = parsedItems.filter(item =>
+                    const trackedItems = parsedItems.filter((item: any) =>
                         item.productId && productMap.get(item.productId)?.trackInventory
                     );
 
                     // Separate by deduction strategy
-                    const globalItems = trackedItems.filter(item => !productMap.get(item.productId)!.trackVariant);
-                    const variantItems = trackedItems.filter(item => productMap.get(item.productId)!.trackVariant);
+                    const globalItems = trackedItems.filter((item: any) => !productMap.get(item.productId)!.trackVariant);
+                    const variantItems = trackedItems.filter((item: any) => productMap.get(item.productId)!.trackVariant);
+
+                    console.log("[inv-diag] trackedItems:", trackedItems.length, "globalItems:", globalItems.length, "variantItems:", variantItems.length);
 
                     // Strategy A: deduct from products.inventory_count only
                     await Promise.allSettled(
-                        globalItems.map(item => {
+                        globalItems.map((item: any) => {
                             const { stock } = productMap.get(item.productId)!;
                             return supabaseAdmin
                                 .from("products")
@@ -546,11 +559,15 @@ export async function POST(req: Request) {
                     // Strategy B: deduct from product_variants AND products.inventory_count
                     // Batch-fetch all variants for relevant products in one query, then match in memory
                     if (variantItems.length > 0) {
-                        const variantProductIds = [...new Set(variantItems.map(i => i.productId))];
+                        const variantProductIds = [...new Set(variantItems.map((i: any) => i.productId))];
                         const { data: allVariants } = await supabaseAdmin
                             .from("product_variants")
                             .select("id, product_id, size, color, stitching, inventory_count")
                             .in("product_id", variantProductIds);
+
+                        console.log("[inv-diag] allVariants from DB:", JSON.stringify((allVariants ?? []).map((v: any) => ({
+                            id: v.id, product_id: v.product_id, size: v.size, color: v.color, stitching: v.stitching, inventory_count: v.inventory_count,
+                        }))));
 
                         const variantMap = ((allVariants ?? []) as Array<{ id: string; product_id: string; size: string | null; color: string | null; stitching: string | null; inventory_count: number | null }>).reduce((acc, v) => {
                             const key = `${v.product_id}|${v.size ?? "null"}|${v.color ?? "null"}|${v.stitching ?? "null"}`;
@@ -560,9 +577,10 @@ export async function POST(req: Request) {
 
                         // Deduct variant-level stock
                         await Promise.allSettled(
-                            variantItems.map(item => {
+                            variantItems.map((item: any) => {
                                 const key = `${item.productId}|${item.size ?? "null"}|${item.color ?? "null"}|${item.stitching ?? "null"}`;
                                 const variant = variantMap[key];
+                                console.log("[inv-diag] variant key lookup:", key, "→ found:", !!variant);
                                 if (variant && typeof variant.inventory_count === "number") {
                                     return supabaseAdmin
                                         .from("product_variants")
