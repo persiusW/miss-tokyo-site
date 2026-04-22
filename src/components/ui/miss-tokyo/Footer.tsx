@@ -81,13 +81,13 @@ export function Footer() {
 
     const socialLinks = [
         { key: "social_instagram", label: "Instagram" },
-        { key: "social_tiktok",    label: "TikTok" },
-        { key: "social_facebook",  label: "Facebook" },
-        { key: "social_twitter",   label: "Twitter" },
+        { key: "social_tiktok", label: "TikTok" },
+        { key: "social_facebook", label: "Facebook" },
+        { key: "social_twitter", label: "Twitter" },
         { key: "social_pinterest", label: "Pinterest" },
-        { key: "social_youtube",   label: "YouTube" },
-        { key: "social_snapchat",  label: "Snapchat" },
-        { key: "social_threads",   label: "Threads" },
+        { key: "social_youtube", label: "YouTube" },
+        { key: "social_snapchat", label: "Snapchat" },
+        { key: "social_threads", label: "Threads" },
     ] as const;
 
     return (
@@ -96,7 +96,7 @@ export function Footer() {
                 <div className="col-span-1 md:col-span-2 lg:col-span-2">
                     <h3 className="font-serif text-3xl tracking-[0.2em] uppercase mb-6">Miss Tokyo</h3>
                     <p className="max-w-sm text-neutral-400 leading-relaxed text-sm mb-10">
-                        Sleek, Monochromatic, Stark. <br />Handmade in Ghana.
+                        Cute. Cool. Feminine <br />By Miss Tokyo
                     </p>
 
                     {/* Newsletter */}

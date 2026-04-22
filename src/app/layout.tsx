@@ -56,7 +56,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: "MISS TOKYO | Minimalist Luxury",
-    description: "Handmade in Ghana. A minimalist collection of luxury fashion.",
+    description: "A minimalist collection of luxury fashion.",
   };
 }
 
