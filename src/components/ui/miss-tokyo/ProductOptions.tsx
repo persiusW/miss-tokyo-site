@@ -42,6 +42,8 @@ interface Props {
     trackInventory?: boolean;
     productVariants?: ProductVariant[];
     autoDiscountRule?: AutoDiscountRule | null;
+    preorderEnabled?: boolean;
+    preorderEstimatedDate?: string | null;
 }
 
 const COLOR_HEX: Record<string, string> = {
@@ -110,6 +112,8 @@ export function ProductOptions(props: Props) {
         trackInventory = true,
         productVariants,
         autoDiscountRule,
+        preorderEnabled = false,
+        preorderEstimatedDate = null,
     } = props;
 
     const router = useRouter();
@@ -323,12 +327,12 @@ export function ProductOptions(props: Props) {
         ? resolveWholesalePrice(qty, displayBasePrice, wholesaleTiers)
         : displayBasePrice;
 
-    const doAddToCart = (): boolean => {
+    const doAddToCart = (opts?: { isPreOrder?: boolean }): boolean => {
         if (sizes.length > 0 && !selectedSize) {
             toast.error("Please select a size");
             return false;
         }
-        if (isOutOfStock) {
+        if (isOutOfStock && !opts?.isPreOrder) {
             toast.error("This item is out of stock");
             return false;
         }
@@ -337,7 +341,7 @@ export function ProductOptions(props: Props) {
             productId,
             name,
             slug,
-            price: baseProductPrice, // store base price
+            price: baseProductPrice,
             size: selectedSize || "One size",
             color: selectedColor || undefined,
             quantity: qty,
@@ -345,6 +349,8 @@ export function ProductOptions(props: Props) {
             inventoryCount: effectiveInventory,
             isWholesale: isWholesalerState,
             wholesaleTiers,
+            isPreOrder: opts?.isPreOrder,
+            estimatedAvailability: opts?.isPreOrder ? (preorderEstimatedDate ?? undefined) : undefined,
         });
         return true;
     };
@@ -352,6 +358,16 @@ export function ProductOptions(props: Props) {
     const handleAddToBag = () => {
         if (addedToBag) return;
         if (doAddToCart()) {
+            setAddedToBag(true);
+            setCartOpen(true);
+            if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current);
+            addedToBagTimer.current = setTimeout(() => setAddedToBag(false), 2000);
+        }
+    };
+
+    const handlePreOrder = () => {
+        if (addedToBag) return;
+        if (doAddToCart({ isPreOrder: true })) {
             setAddedToBag(true);
             setCartOpen(true);
             if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current);
@@ -661,33 +677,54 @@ export function ProductOptions(props: Props) {
                 {effectiveInventory > 0 && effectiveInventory < 9999 && (
                     <span style={{ fontSize: 11, color: "var(--muted, #7A7167)" }}>{effectiveInventory} left in stock</span>
                 )}
-                {isOutOfStock && (
+                {isOutOfStock && !preorderEnabled && (
                     <span style={{ fontSize: 11, color: "#E8485A", fontWeight: 500 }}>Out of stock</span>
+                )}
+                {isOutOfStock && preorderEnabled && (
+                    <span style={{ fontSize: 11, color: "var(--gold, #C9A96E)", fontWeight: 500 }}>
+                        Pre-order available
+                        {preorderEstimatedDate && ` · Est. ${new Date(preorderEstimatedDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`}
+                    </span>
                 )}
             </div>
 
             {/* CTA stack */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
                 <button
-                    onClick={handleAddToBag}
-                    disabled={addedToBag || isOutOfStock}
+                    onClick={isOutOfStock && preorderEnabled ? handlePreOrder : handleAddToBag}
+                    disabled={addedToBag || (isOutOfStock && !preorderEnabled)}
                     style={{
                         width: "100%", padding: "15px 24px",
-                        background: addedToBag ? "#059669" : isOutOfStock ? "#D1D5DB" : "var(--ink, #141210)",
-                        color: "#fff",
+                        background: addedToBag
+                            ? "#059669"
+                            : (isOutOfStock && preorderEnabled)
+                                ? "var(--gold, #C9A96E)"
+                                : isOutOfStock
+                                    ? "#D1D5DB"
+                                    : "var(--ink, #141210)",
+                        color: (isOutOfStock && preorderEnabled) ? "var(--ink, #141210)" : "#fff",
                         border: "none", borderRadius: 2,
                         fontSize: 12, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase",
-                        cursor: addedToBag || isOutOfStock ? "default" : "pointer",
+                        cursor: addedToBag || (isOutOfStock && !preorderEnabled) ? "default" : "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                         transition: "background 0.25s",
                     }}
                 >
                     {addedToBag ? (
                         <>
-                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
                             Added to Bag ✓
+                        </>
+                    ) : isOutOfStock && preorderEnabled ? (
+                        <>
+                            Pre-Order
+                            {preorderEstimatedDate && (
+                                <span style={{ fontSize: 10, fontWeight: 400, marginLeft: 6, opacity: 0.8 }}>
+                                    Est. {new Date(preorderEstimatedDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                                </span>
+                            )}
                         </>
                     ) : isOutOfStock ? (
                         "Out of Stock"
