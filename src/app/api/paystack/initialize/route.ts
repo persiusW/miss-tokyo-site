@@ -54,7 +54,7 @@ export async function POST(request: Request) {
             const pIds = cartArr.length > 0 ? cartArr.map(i => i.productId) : [productId];
             const { data: dbProducts } = await supabaseAdmin
                 .from("products")
-                .select("id, price_ghs, is_sale, discount_value, inventory_count")
+                .select("id, price_ghs, is_sale, discount_value, inventory_count, track_variant_inventory")
                 .in("id", pIds);
 
             const dbPriceMap = (dbProducts || []).reduce((acc: any, p: any) => {
@@ -63,14 +63,27 @@ export async function POST(request: Request) {
                 return acc;
             }, {});
 
-            // Inventory guard — reject order if any item exceeds available stock
+            // Aggregate total ordered quantity per product across all cart items.
+            // Buying 1×S + 1×M + 1×L of the same product = 3 units, not 1.
+            const qtyByProductId: Record<string, number> = {};
+            for (const item of cartArr) {
+                if (item.productId) {
+                    qtyByProductId[item.productId] = (qtyByProductId[item.productId] ?? 0) + (item.quantity ?? 1);
+                }
+            }
+
+            // Hard stock guard: reject if aggregate qty for any product exceeds inventory
             const dbStockMap = (dbProducts || []).reduce((acc: any, p: any) => {
                 acc[p.id] = p.inventory_count ?? 0;
                 return acc;
             }, {});
+            const checkedProducts = new Set<string>();
             for (const item of cartArr) {
+                if (checkedProducts.has(item.productId)) continue;
+                checkedProducts.add(item.productId);
                 const stock = dbStockMap[item.productId];
-                if (stock !== undefined && stock !== 9999 && item.quantity > stock) {
+                const totalQty = qtyByProductId[item.productId] ?? (item.quantity ?? 1);
+                if (stock !== undefined && stock !== 9999 && totalQty > stock) {
                     return NextResponse.json(
                         { error: `"${item.name}" only has ${stock} unit${stock === 1 ? "" : "s"} in stock.` },
                         { status: 409 }
@@ -78,7 +91,44 @@ export async function POST(request: Request) {
                 }
             }
 
-            // OOS enforcement — filter items where tracked inventory has zero stock
+            // Variant-level guard: for track_variant_inventory products, also check each
+            // individual variant's stock so a sold-out size can't slip through.
+            const variantTrackedProductIds = new Set<string>(
+                (dbProducts ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
+            );
+            if (variantTrackedProductIds.size > 0) {
+                const variantCartItems = cartArr.filter(i => variantTrackedProductIds.has(i.productId));
+                if (variantCartItems.length > 0) {
+                    const { data: dbVariants } = await supabaseAdmin
+                        .from("product_variants")
+                        .select("product_id, size, color, stitching, inventory_count")
+                        .in("product_id", [...variantTrackedProductIds]);
+
+                    const normAttrInit = (s: string | null | undefined): string => {
+                        if (s == null) return "null";
+                        return s.replace(/\s*[\u2014\u2013-]\s*/g, "-").trim().toLowerCase();
+                    };
+
+                    const variantStockMap: Record<string, number> = {};
+                    for (const v of (dbVariants ?? [])) {
+                        const key = `${v.product_id}|${normAttrInit(v.size)}|${normAttrInit(v.color)}|${normAttrInit(v.stitching)}`;
+                        variantStockMap[key] = v.inventory_count ?? 0;
+                    }
+
+                    for (const item of variantCartItems) {
+                        const key = `${item.productId}|${normAttrInit(item.size)}|${normAttrInit(item.color)}|${normAttrInit(item.stitching)}`;
+                        const variantStock = variantStockMap[key];
+                        if (variantStock !== undefined && variantStock !== 9999 && (item.quantity ?? 1) > variantStock) {
+                            return NextResponse.json(
+                                { error: `"${item.name}" in this size/colour only has ${variantStock} unit${variantStock === 1 ? "" : "s"} in stock.` },
+                                { status: 409 }
+                            );
+                        }
+                    }
+                }
+            }
+
+            // OOS enforcement — soft check for tracked-inventory products
             const productIds = cartArr.map((i: any) => i.productId).filter(Boolean);
             const { data: stockProducts } = await supabaseAdmin
                 .from("products")
@@ -87,15 +137,19 @@ export async function POST(request: Request) {
 
             const stockMap = Object.fromEntries((stockProducts ?? []).map((p: any) => [p.id, p]));
 
+            const seenOosProducts = new Set<string>();
             for (const item of cartArr) {
                 const p = stockMap[item.productId];
-                if (p && p.track_inventory && (p.inventory_count ?? 0) < (item.quantity ?? 1)) {
+                const totalQty = qtyByProductId[item.productId] ?? (item.quantity ?? 1);
+                if (p && p.track_inventory && (p.inventory_count ?? 0) < totalQty && !seenOosProducts.has(item.productId)) {
+                    seenOosProducts.add(item.productId);
                     oosItems.push(item.name ?? item.productId);
                 }
             }
 
-            // If all items are OOS, abort with 409
-            if (oosItems.length > 0 && oosItems.length === cartArr.length) {
+            // If all products in cart are OOS, abort with 409
+            const uniqueProductCount = new Set(cartArr.map((i: any) => i.productId).filter(Boolean)).size;
+            if (oosItems.length > 0 && oosItems.length >= uniqueProductCount) {
                 return NextResponse.json(
                     { error: "All items in your cart are out of stock.", oosItems },
                     { status: 409 }

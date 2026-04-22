@@ -65,12 +65,26 @@ export async function POST(req: NextRequest) {
         };
     });
 
-    const amountPesewas = Math.round(totalGHS * 100);
+    // Fetch platform fee settings — same as regular checkout
+    const { data: storeFeeSettings } = await supabaseAdmin
+        .from('store_settings')
+        .select('platform_fee_percentage, platform_fee_label')
+        .eq('id', 'default')
+        .maybeSingle();
 
-    // Update total_amount with server-verified value
+    const feePct = Number(storeFeeSettings?.platform_fee_percentage) || 0;
+    const platformFeeAmount = feePct > 0
+        ? parseFloat((totalGHS * feePct / 100).toFixed(2))
+        : 0;
+    const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
+    const amountWithFee = parseFloat((totalGHS + platformFeeAmount).toFixed(2));
+
+    const amountPesewas = Math.round(amountWithFee * 100);
+
+    // Update total_amount with server-verified value (fee-inclusive)
     await supabaseAdmin
         .from('pos_sessions')
-        .update({ total_amount: totalGHS })
+        .update({ total_amount: amountWithFee })
         .eq('id', sessionId);
 
     // Atomic inventory reservation via DB function
@@ -91,15 +105,21 @@ export async function POST(req: NextRequest) {
     if (!secretKey) return NextResponse.json({ error: 'Paystack not configured' }, { status: 500 });
 
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://misstokyo.shop';
-    // Use transaction/initialize — takes email directly, no customer pre-creation needed
+
+    // Apply split group when configured and amount is above Paystack's minimum (GHS 5)
+    const paystackSplitCode = process.env.PAYSTACK_SPLIT_CODE;
+    const splitPayload = (paystackSplitCode && amountWithFee >= 5) ? { split_code: paystackSplitCode } : {};
+
     const paystackBody = {
         email: session.customer_email,
         amount: amountPesewas,
         currency: 'GHS',
         channels: ['mobile_money', 'card', 'bank', 'bank_transfer', 'ussd'],
+        ...splitPayload,
         metadata: {
             pos_session_id: sessionId,
             source: 'pos',
+            ...(platformFeeAmount > 0 ? { platform_fee_amount: platformFeeAmount, platform_fee_label: platformFeeLabel } : {}),
         },
     };
 
@@ -142,8 +162,8 @@ export async function POST(req: NextRequest) {
                 <p>Hi ${firstName},</p>
                 <p>Your Miss Tokyo order is ready. Review your items and complete payment below.</p>
                 <p><strong>Items:</strong> ${itemList}</p>
-                <p><strong>Total:</strong> GH&#8373;${totalGHS.toFixed(2)}</p>
-                <p><a href="${previewUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;">Review &amp; Pay &mdash; GH&#8373;${totalGHS.toFixed(2)}</a></p>
+                <p><strong>Total:</strong> GH&#8373;${amountWithFee.toFixed(2)}</p>
+                <p><a href="${previewUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;">Review &amp; Pay &mdash; GH&#8373;${amountWithFee.toFixed(2)}</a></p>
                 <p style="color:#999;font-size:12px;">This link expires in 30 minutes.</p>
             `,
         }).catch((e: unknown) => console.error('[pos/send-link] email error:', e)),
@@ -152,11 +172,11 @@ export async function POST(req: NextRequest) {
         session.customer_phone
             ? sendSMS({
                 to: session.customer_phone,
-                message: `Hi ${firstName}, your Miss Tokyo order (GH${String.fromCharCode(8373)}${totalGHS.toFixed(2)}) is ready. Review and pay here: ${previewUrl} (expires in 30 mins)`,
+                message: `Hi ${firstName}, your Miss Tokyo order (GH${String.fromCharCode(8373)}${amountWithFee.toFixed(2)}) is ready. Review and pay here: ${previewUrl} (expires in 30 mins)`,
             }).catch((e: unknown) => console.error('[pos/send-link] sms error:', e))
             : Promise.resolve(),
     ]);
 
     // Return the preview URL — staff copies/shares this, not the raw Paystack URL
-    return NextResponse.json({ paymentUrl: previewUrl, sessionId, total: totalGHS });
+    return NextResponse.json({ paymentUrl: previewUrl, sessionId, total: amountWithFee });
 }
