@@ -413,7 +413,7 @@ export async function POST(req: Request) {
                     .eq("id", orderId)
                     .single();
 
-                if (existingOrder && (existingOrder.status === "paid" || existingOrder.status === "confirmed" || existingOrder.paystack_reference === paystackRef)) {
+                if (existingOrder && (existingOrder.status === "paid" || existingOrder.status === "confirmed")) {
                     console.log(`[webhook] Order ${orderId} already processed in DB. Skipping inventory deductions but will trigger email.`);
                     isAlreadyProcessed = true;
                 }
