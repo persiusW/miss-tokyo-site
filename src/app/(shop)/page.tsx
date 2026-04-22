@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { TrustBar } from "@/components/public/TrustBar";
 import { HeroSlider } from "@/components/public/HeroSlider";
@@ -14,16 +13,6 @@ import type { SiteSettings, HeroSlide, FeaturedCategory, HomepageReview, TrustBa
 export const revalidate = 300;
 
 export default async function HomePage() {
-  // Check if admin has redirected the landing page away from home
-  const { data: storeRow } = await supabaseAdmin
-    .from("store_settings")
-    .select("homepage_route")
-    .eq("id", "default")
-    .maybeSingle();
-  const homepageRoute = (storeRow as any)?.homepage_route ?? "home";
-  if (homepageRoute === "shop") redirect("/shop");
-  if (homepageRoute === "gallery") redirect("/gallery");
-
   const [
     { data: settingsData },
     { data: heroSlidesData },

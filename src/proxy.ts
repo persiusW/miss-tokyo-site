@@ -100,6 +100,26 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         return applySecurityHeaders(NextResponse.redirect(homeUrl));
     }
 
+    // Landing-page redirect: anonymous visitors hitting "/" are sent to the
+    // admin-configured route (shop or gallery). Authenticated users always
+    // see the real home page so admins can still access it.
+    if (pathname === "/" && !user) {
+        try {
+            const apiUrl = new URL("/api/landing-route", request.url);
+            const res = await fetch(apiUrl.toString(), { cache: "no-store" });
+            if (res.ok) {
+                const { route } = await res.json();
+                if (route === "shop" || route === "gallery") {
+                    const dest = request.nextUrl.clone();
+                    dest.pathname = `/${route}`;
+                    return applySecurityHeaders(NextResponse.redirect(dest));
+                }
+            }
+        } catch {
+            // Fetch failed — serve the real home page
+        }
+    }
+
     return applySecurityHeaders(response);
 }
 
