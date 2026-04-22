@@ -71,7 +71,9 @@ function VideoCard({
         : hasSaleFromDiscount ? product.price_ghs
         : adEffective != null ? product.price_ghs
         : null;
-    const ribbonLabel = isProductOnSale ? "Sale" : (applicableRule?.title ?? null);
+    const isNew = product.badge === "new" || (Date.now() - new Date(product.created_at).getTime() < 14 * 86400000);
+    const ribbonLabel = isProductOnSale ? "Sale" : (applicableRule?.title ?? (isNew ? "New" : null));
+    const ribbonBg = (isProductOnSale || applicableRule) ? "#E8485A" : "#141210";
 
     // Use the shared hook for viewport detection — threshold 0.8 matches the old inline observer
     const [containerRef, isVisible] = useIntersectionObserver<HTMLDivElement>({ threshold: 0.8 });
@@ -158,7 +160,7 @@ function VideoCard({
                             </span>
                             {ribbonLabel && (
                                 <span className="text-[8px] font-bold uppercase tracking-[0.12em] px-2 py-0.5"
-                                    style={{ background: "#E8485A", color: "#fff", borderRadius: 2 }}>
+                                    style={{ background: ribbonBg, color: "#fff", borderRadius: 2 }}>
                                     {ribbonLabel}
                                 </span>
                             )}
