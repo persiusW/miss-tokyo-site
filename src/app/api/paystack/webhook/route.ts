@@ -265,7 +265,7 @@ export async function POST(req: Request) {
 
                 await Promise.allSettled(items.map(async (item: any) => {
                     const product = productMap.get(item.productId);
-                    if (!product || !product.track_inventory) return;
+                    if (!product || product.track_inventory === false) return;
                     const qty = item.quantity ?? 1;
                     if (product.track_variant_inventory && item.variantId) {
                         // Deduct variant stock
@@ -361,7 +361,7 @@ export async function POST(req: Request) {
 
                     await Promise.allSettled(items.map(async (item: any) => {
                         const product = productMap.get(item.productId);
-                        if (!product || !product.track_inventory) return;
+                        if (!product || product.track_inventory === false) return;
                         const qty = item.quantity ?? 1;
                         if (product.track_variant_inventory && item.variantId) {
                             // Deduct variant stock
