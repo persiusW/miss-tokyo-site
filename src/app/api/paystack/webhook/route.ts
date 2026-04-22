@@ -518,8 +518,8 @@ export async function POST(req: Request) {
                     const productMap = new Map(
                         products.map(p => [p.id, {
                             stock: p.inventory_count as number,
-                            trackInventory: p.track_inventory as boolean,
-                            trackVariant: p.track_variant_inventory as boolean,
+                            trackInventory: p.track_inventory !== false, // null → tracked (default)
+                            trackVariant: p.track_variant_inventory === true,
                         }])
                     );
 
