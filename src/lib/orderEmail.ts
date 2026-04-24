@@ -35,6 +35,37 @@ export function buildLineItemsHtml(items: any[]): string {
     </table>`;
 }
 
+export function buildPreorderLineItemsHtml(items: any[]): string {
+    if (!items.length) return "";
+    const rows = items.map(item => {
+        const unitPrice = Number(item.price || 0);
+        const qty = Number(item.quantity || 1);
+        const lineTotal = unitPrice * qty;
+        const variant = [item.size, item.color, item.stitching]
+            .filter(Boolean)
+            .map((v: string) => escHtml(v))
+            .join(" · ");
+        const estDate = item.estimatedAvailability
+            ? new Date(item.estimatedAvailability).toLocaleDateString("en-GB", { month: "long", year: "numeric" })
+            : "date TBD";
+        return `
+      <tr style="border-bottom: 1px solid #fef3c7;">
+        <td style="padding: 10px 0; font-size: 13px; color: #171717;">
+          ${escHtml(item.name || "Item")}
+          ${variant ? `<div style="font-size: 11px; color: #737373; margin-top: 2px;">${variant} × ${qty}</div>` : `<div style="font-size: 11px; color: #737373; margin-top: 2px;">× ${qty}</div>`}
+          <div style="font-size: 11px; color: #d97706; margin-top: 2px;">Est. availability: ${estDate}</div>
+        </td>
+        <td style="padding: 10px 0; font-size: 13px; text-align: right; color: #171717;">GH&#8373; ${lineTotal.toFixed(2)}</td>
+      </tr>`;
+    }).join("");
+
+    return `
+    <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #d97706; margin: 20px 0 6px; border-top: 1px solid #fef3c7; padding-top: 14px;">Pre-Order Items &mdash; Ships when available</p>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+      ${rows}
+    </table>`;
+}
+
 export async function sendOrderConfirmation(opts: {
     customerEmail: string;
     orderRef: string;
@@ -65,6 +96,8 @@ export async function sendOrderConfirmation(opts: {
 
     const hasDiscount = discountAmount && discountAmount > 0;
     const hasFee = feeAmount && feeAmount > 0;
+    const regularItems = items.filter(i => !i.isPreOrder);
+    const preorderItems = items.filter(i => i.isPreOrder);
     const subtotal = hasFee ? amount - feeAmount! : amount;
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
 
@@ -149,7 +182,7 @@ export async function sendOrderConfirmation(opts: {
       </tr>
     </table>
 
-    ${buildLineItemsHtml(items)}
+    ${buildLineItemsHtml(regularItems)}${buildPreorderLineItemsHtml(preorderItems)}
 
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 32px;">
       ${discountRow}
