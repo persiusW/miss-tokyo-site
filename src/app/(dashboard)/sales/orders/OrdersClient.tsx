@@ -20,6 +20,7 @@ type Order = {
     shipping_address: Record<string, string> | null;
     delivery_method: string | null;
     created_at: string;
+    has_preorder?: boolean;
 };
 
 type Rider = {
@@ -544,6 +545,11 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                                 </td>
                                 <td className="px-4 py-4 text-neutral-700">
                                     {order.customer_name || order.customer_email || "—"}
+                                    {order.has_preorder && (
+                                        <span className="inline-block text-[9px] font-semibold uppercase tracking-widest bg-amber-100 text-amber-700 px-2 py-0.5 rounded-sm ml-1">
+                                            Pre-Order
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="px-4 py-4">
                                     <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded-sm ${
