@@ -65,9 +65,10 @@ export async function POST(request: Request) {
 
             // Aggregate total ordered quantity per product across all cart items.
             // Buying 1×S + 1×M + 1×L of the same product = 3 units, not 1.
+            // Pre-order items don't consume real stock, so exclude them from the count.
             const qtyByProductId: Record<string, number> = {};
             for (const item of cartArr) {
-                if (item.productId) {
+                if (item.productId && !item.isPreOrder) {
                     qtyByProductId[item.productId] = (qtyByProductId[item.productId] ?? 0) + (item.quantity ?? 1);
                 }
             }
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
             }, {});
             const checkedProducts = new Set<string>();
             for (const item of cartArr) {
+                if (item.isPreOrder) continue; // pre-order items bypass real-stock check
                 if (checkedProducts.has(item.productId)) continue;
                 checkedProducts.add(item.productId);
                 const stock = dbStockMap[item.productId];
@@ -97,7 +99,7 @@ export async function POST(request: Request) {
                 (dbProducts ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
             );
             if (variantTrackedProductIds.size > 0) {
-                const variantCartItems = cartArr.filter(i => variantTrackedProductIds.has(i.productId));
+                const variantCartItems = cartArr.filter(i => variantTrackedProductIds.has(i.productId) && !i.isPreOrder);
                 if (variantCartItems.length > 0) {
                     const { data: dbVariants } = await supabaseAdmin
                         .from("product_variants")
@@ -139,6 +141,7 @@ export async function POST(request: Request) {
 
             const seenOosProducts = new Set<string>();
             for (const item of cartArr) {
+                if (item.isPreOrder) continue; // pre-order items are intentionally zero-stock
                 const p = stockMap[item.productId];
                 const totalQty = qtyByProductId[item.productId] ?? (item.quantity ?? 1);
                 if (p && p.track_inventory && (p.inventory_count ?? 0) < totalQty && !seenOosProducts.has(item.productId)) {
@@ -263,6 +266,8 @@ export async function POST(request: Request) {
             });
         }
 
+        const hasPreorder = cartArr.some((item: any) => item.isPreOrder === true);
+
         // Create a pending order BEFORE redirecting to Paystack.
         // This guarantees orders are always recorded, regardless of webhook/verify reliability.
         const { data: pendingOrder, error: orderError } = await supabaseAdmin
@@ -279,6 +284,7 @@ export async function POST(request: Request) {
                 delivery_method: clientMetadata?.deliveryMethod || "delivery",
                 total_amount: amountWithFee,
                 status: "pending",
+                has_preorder: hasPreorder,
                 items: cartArr,
                 discount_code: clientMetadata?.discount_code || null,
                 discount_amount: Number(clientMetadata?.discount_amount) || 0,
