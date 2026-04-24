@@ -21,6 +21,8 @@ type Product = {
     image_urls: string[] | null;
     sku: string | null;
     product_variants: { sku: string | null; inventory_count: number | null }[] | null;
+    preorder_enabled: boolean;
+    preorder_estimated_date: string | null;
 };
 
 type WholesaleCategory = {
@@ -46,7 +48,7 @@ export default function CatalogProductsPage() {
     const fetchProducts = useCallback(async () => {
         const { data } = await supabase
             .from("products")
-            .select("id, name, slug, sku, category_type, category_ids, price_ghs, inventory_count, track_inventory, track_variant_inventory, is_active, image_urls, product_variants(sku, inventory_count)")
+            .select("id, name, slug, sku, category_type, category_ids, price_ghs, inventory_count, track_inventory, track_variant_inventory, is_active, image_urls, preorder_enabled, preorder_estimated_date, product_variants(sku, inventory_count)")
             .order("created_at", { ascending: false });
         setProducts(data || []);
         setLoading(false);
@@ -164,6 +166,22 @@ export default function CatalogProductsPage() {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(pid => pid !== id) : [...prev, id]);
     }, []);
 
+    const togglePreorder = async (productId: string, enabled: boolean, estimatedDate?: string | null) => {
+        const { error } = await supabase
+            .from("products")
+            .update({
+                preorder_enabled: enabled,
+                preorder_estimated_date: enabled ? (estimatedDate ?? null) : null,
+            })
+            .eq("id", productId);
+        if (error) { toast.error("Failed to update pre-order settings"); return; }
+        setProducts(prev => prev.map(p =>
+            p.id === productId
+                ? { ...p, preorder_enabled: enabled, preorder_estimated_date: enabled ? (estimatedDate ?? null) : null }
+                : p
+        ));
+    };
+
     const handleDeleteClick = useCallback((id: string) => setConfirmDeleteId(id), []);
     const handleCancelDelete = useCallback(() => setConfirmDeleteId(null), []);
     const handleConfirmDeleteRow = useCallback((id: string) => handleDelete(id), [products, selectedIds]); // handle delete has access to these anyway
@@ -252,6 +270,7 @@ export default function CatalogProductsPage() {
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Inventory</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Price</th>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Pre-Order</th>
                             <th className="px-6 py-4"></th>
                         </tr>
                     </thead>
@@ -275,6 +294,7 @@ export default function CatalogProductsPage() {
                                     isConfirming={confirmDeleteId === product.id}
                                     onToggleSelect={toggleSelect}
                                     onToggleActive={handleToggleActiveRow}
+                                    onTogglePreorder={togglePreorder}
                                     onDeleteClick={handleDeleteClick}
                                     onConfirmDelete={handleConfirmDeleteRow}
                                     onCancelDelete={handleCancelDelete}
@@ -353,6 +373,7 @@ const ProductRow = React.memo(({
     isConfirming,
     onToggleSelect,
     onToggleActive,
+    onTogglePreorder,
     onDeleteClick,
     onConfirmDelete,
     onCancelDelete,
@@ -363,6 +384,7 @@ const ProductRow = React.memo(({
     isConfirming: boolean;
     onToggleSelect: (id: string) => void;
     onToggleActive: (id: string, current: boolean) => void;
+    onTogglePreorder: (id: string, enabled: boolean, estimatedDate?: string | null) => void;
     onDeleteClick: (id: string) => void;
     onConfirmDelete: (id: string) => void;
     onCancelDelete: () => void;
@@ -432,6 +454,28 @@ const ProductRow = React.memo(({
             </td>
             <td className="px-6 py-4 text-right font-medium">
                 GH₵ {product.price_ghs}
+            </td>
+            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                <div className="flex flex-col gap-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={product.preorder_enabled}
+                            onChange={e => onTogglePreorder(product.id, e.target.checked, product.preorder_estimated_date)}
+                            className="w-4 h-4 accent-amber-500"
+                        />
+                        <span className="text-[11px] text-neutral-600">Enable</span>
+                    </label>
+                    {product.preorder_enabled && (
+                        <input
+                            type="date"
+                            value={product.preorder_estimated_date ?? ""}
+                            onChange={e => onTogglePreorder(product.id, true, e.target.value || null)}
+                            className="text-[11px] border border-amber-300 rounded px-1.5 py-0.5 text-neutral-700 bg-amber-50"
+                            placeholder="Est. date"
+                        />
+                    )}
+                </div>
             </td>
             <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                 {isConfirming ? (
