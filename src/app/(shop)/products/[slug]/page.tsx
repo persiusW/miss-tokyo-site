@@ -160,7 +160,7 @@ export default async function ProductPage({
             .eq("product_id", product.id),
         supabaseAdmin
             .from("products")
-            .select("track_variant_inventory")
+            .select("track_variant_inventory, preorder_enabled, preorder_estimated_date")
             .eq("id", product.id)
             .maybeSingle(),
         getActiveAutoDiscounts().catch(() => []),
@@ -355,6 +355,8 @@ export default async function ProductPage({
                             trackInventory={product.track_inventory}
                             productVariants={productVariants}
                             autoDiscountRule={applicableAutoRule as any}
+                            preorderEnabled={(variantMetaRes.data as any)?.preorder_enabled ?? false}
+                            preorderEstimatedDate={(variantMetaRes.data as any)?.preorder_estimated_date ?? null}
                         />
 
                         {/* Accordions */}
