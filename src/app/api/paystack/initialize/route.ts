@@ -19,7 +19,7 @@ export async function POST(request: Request) {
         const cartArr: any[] = Array.isArray(cartItems) ? cartItems : [];
 
         // Hoisted — populated inside the cart block, returned in the success response
-        let oosItems: string[] = [];
+        const oosItems: string[] = [];
 
         // Calculate amount exclusively server-side — never trust client-supplied amounts
         let amountInGHS = 0;
@@ -193,7 +193,7 @@ export async function POST(request: Request) {
             if (autoRules && autoRules.length > 0) {
                 // Build productCategoryMap for category-scoped rules
                 const hasCategoryRules = autoRules.some((r: any) => r.applies_to === "SPECIFIC_CATEGORIES");
-                let productCategoryMap: Record<string, string[]> = {};
+                const productCategoryMap: Record<string, string[]> = {};
 
                 if (hasCategoryRules) {
                     const cartProductIds = cartArr.map((i: any) => i.productId).filter(Boolean);
