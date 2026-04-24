@@ -516,25 +516,60 @@ export default function CheckoutPage() {
             <div className="bg-neutral-50 p-8 md:p-12 border border-neutral-100 h-fit space-y-8">
                 <h2 className="font-serif text-xl tracking-widest uppercase">Order Summary</h2>
 
-                {/* Items */}
-                <div className="space-y-6">
-                    {items.map(item => (
-                        <div key={item.id} className="flex gap-4 items-center">
-                            <div className="w-16 h-16 bg-white overflow-hidden flex-shrink-0 border border-neutral-200 relative">
-                                {item.imageUrl ? (
-                                    <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="64px" />
-                                ) : (
-                                    <div className="w-full h-full bg-neutral-100" />
-                                )}
+                {/* Regular Items */}
+                {items.filter(i => !i.isPreOrder).length > 0 && (
+                    <div className="space-y-6">
+                        {items.filter(i => !i.isPreOrder).map(item => (
+                            <div key={item.id} className="flex gap-4 items-center">
+                                <div className="w-16 h-16 bg-white overflow-hidden flex-shrink-0 border border-neutral-200 relative">
+                                    {item.imageUrl ? (
+                                        <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="64px" />
+                                    ) : (
+                                        <div className="w-full h-full bg-neutral-100" />
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>
+                                    <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} · Qty: {item.quantity}</p>
+                                </div>
+                                <p className="font-medium text-sm">GHS {(getEffectivePrice(item) * item.quantity).toFixed(2)}</p>
                             </div>
-                            <div className="flex-1">
-                                <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>
-                                <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} · Qty: {item.quantity}</p>
-                            </div>
-                            <p className="font-medium text-sm">GHS {(getEffectivePrice(item) * item.quantity).toFixed(2)}</p>
+                        ))}
+                    </div>
+                )}
+
+                {/* Pre-Order Items */}
+                {items.some(i => i.isPreOrder) && (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 border-t border-amber-200 pt-4">
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-600">
+                                Pre-Order Items
+                            </span>
+                            <span className="text-[10px] text-amber-500">· Ships when available</span>
                         </div>
-                    ))}
-                </div>
+                        {items.filter(i => i.isPreOrder).map(item => (
+                            <div key={item.id} className="flex gap-4 items-center">
+                                <div className="w-16 h-16 bg-white overflow-hidden flex-shrink-0 border border-amber-200 relative">
+                                    {item.imageUrl ? (
+                                        <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="64px" />
+                                    ) : (
+                                        <div className="w-full h-full bg-amber-50" />
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>
+                                    <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} · Qty: {item.quantity}</p>
+                                    {item.estimatedAvailability && (
+                                        <p className="text-[10px] text-amber-600 mt-0.5">
+                                            Est. {new Date(item.estimatedAvailability).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+                                        </p>
+                                    )}
+                                </div>
+                                <p className="font-medium text-sm">GHS {(getEffectivePrice(item) * item.quantity).toFixed(2)}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 {/* Automatic discount badges */}
                 {autoDiscountResult && autoDiscountResult.appliedRules.length > 0 && (
