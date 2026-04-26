@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
     let eventType = type;
     if (type === "ready_for_pickup") eventType = "order_fulfilled"; // Uses fulfillment template for pickup ready
     if (type === "shipped") eventType = "order_shipped";
+    if (type === "packed") eventType = "order_packed";
 
     const [{ data: emailTpl }, { data: smsTpl }] = await Promise.all([
       supabaseAdmin.from("communication_templates").select("subject, greeting, body_text").eq("channel", "email").eq("event_type", eventType).single(),
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     // ── Email ─────────────────────────────────────────────────────────────
     if (order.customer_email) {
-      const subject = inject(emailTpl?.subject || (type === "ready_for_pickup" ? `Your order #${orderRef} is ready for pickup!` : type === "fulfilled" ? `Your package has arrived! 🎁 — #${orderRef}` : type === "cancelled" ? `Order Cancelled — #${orderRef}` : `Order Update — #${orderRef}`));
+      const subject = inject(emailTpl?.subject || (type === "packed" ? `Your order #${orderRef} is being prepared` : type === "ready_for_pickup" ? `Your order #${orderRef} is ready for pickup!` : type === "fulfilled" ? `Your package has arrived! 🎁 — #${orderRef}` : type === "cancelled" ? `Order Cancelled — #${orderRef}` : `Order Update — #${orderRef}`));
       const greeting = inject(emailTpl?.greeting || "Hello " + firstName + ",");
       const body = inject(emailTpl?.body_text || "");
 
@@ -84,14 +85,14 @@ export async function POST(req: NextRequest) {
 <body style="font-family: Georgia, serif; background: #fafaf9; margin: 0; padding: 40px 20px;">
   <div style="max-width: 560px; margin: 0 auto; background: white; border: 1px solid #e5e5e5; padding: 48px;">
     <h1 style="font-size: 24px; letter-spacing: 0.15em; text-transform: uppercase; margin: 0 0 8px;">${bizName}</h1>
-    <p style="color: #737373; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; margin: 0 0 40px;">${type === "fulfilled" ? "Order Delivered" : "Order Update"}</p>
+    <p style="color: #737373; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; margin: 0 0 40px;">${type === "fulfilled" ? "Order Delivered" : type === "packed" ? "Order Being Prepared" : "Order Update"}</p>
 
     <h2 style="font-size: 16px; font-weight: normal; color: #171717; margin: 0 0 24px; letter-spacing: 0.05em;">
       ${greeting}
     </h2>
 
     <p style="font-size: 14px; color: #525252; line-height: 1.8; margin: 0 0 32px; white-space: pre-wrap;">
-      ${body || (type === "ready_for_pickup" ? "Your order is ready to collect. Please visit our atelier." : type === "shipped" ? "Your order is on its way." : type === "fulfilled" ? "Your package has arrived 🎁 Thanks for your purchase! Tag us or share your look—we’d love to see!”" : type === "cancelled" ? `We are sorry to inform you that your order #${orderRef} has been cancelled. Please contact us if you have any questions.` : "Your order status has been updated.")}
+      ${body || fallbackEmailBody(type, orderRef)}
     </p>
 
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 32px;">
@@ -144,7 +145,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
+function fallbackEmailBody(type: string, orderRef: string): string {
+  if (type === "packed") return "Great news — your order is now being packed and prepared for dispatch. We will notify you once it is on its way.";
+  if (type === "ready_for_pickup") return "Your order is ready to collect. Please visit our atelier.";
+  if (type === "shipped") return "Your order is on its way.";
+  if (type === "fulfilled") return "Your package has arrived. Thanks for your purchase! Tag us or share your look — we would love to see!";
+  if (type === "cancelled") return `We are sorry to inform you that your order #${orderRef} has been cancelled. Please contact us if you have any questions.`;
+  return "Your order status has been updated.";
+}
+
 function buildFallbackSms(type: string, orderRef: string, firstName: string, bizName: string): string {
+  if (type === "packed") {
+    return `${bizName}: Hi ${firstName}, your order #${orderRef} is being packed and will be on its way soon. Thank you!`;
+  }
   if (type === "ready_for_pickup") {
     return `${bizName}: Hi ${firstName}, your order #${orderRef} is ready for pickup! Please visit our atelier to collect it. Thank you!`;
   }

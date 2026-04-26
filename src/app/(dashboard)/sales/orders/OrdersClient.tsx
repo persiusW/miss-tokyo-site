@@ -281,14 +281,20 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
             setSelected(new Set());
 
             // Trigger Email/SMS
-            if (status === "fulfilled" || status === "cancelled") {
-                ids.forEach(orderId => {
-                    fetch("/api/email/fulfillment", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ orderId, type: status }),
-                    }).catch(err => console.error("Auto-email failed for", orderId, err));
-                });
+            if (status === "fulfilled" || status === "cancelled" || status === "packed") {
+                await Promise.all(ids.map(async orderId => {
+                    try {
+                        const res = await fetch("/api/email/fulfillment", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ orderId, type: status }),
+                        });
+                        if (!res.ok) throw new Error(await res.text());
+                    } catch (err) {
+                        console.error("Auto-email failed for", orderId, err);
+                        toast.error(`Notification failed for order ${orderId.substring(0, 8).toUpperCase()}`);
+                    }
+                }));
             }
         }
         setBulkLoading(false);
@@ -351,6 +357,26 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
             setDispatchOrders([]);
         } catch (err: any) {
             toast.error(err.message || "Dispatch failed.");
+        }
+    };
+
+    const markFulfilledForOrder = async (order: Order) => {
+        setOpenDropdown(null);
+        setDropdownPos(null);
+        const { error } = await supabase.from("orders").update({ status: "fulfilled" }).eq("id", order.id);
+        if (error) { toast.error("Failed to mark fulfilled."); return; }
+        toast.success("Order marked fulfilled.");
+        setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "fulfilled" } : o));
+        try {
+            const res = await fetch("/api/email/fulfillment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: order.id, type: "fulfilled" }),
+            });
+            if (!res.ok) throw new Error(await res.text());
+        } catch (err) {
+            console.error("Fulfillment notification failed", err);
+            toast.error("Order updated but notification failed.");
         }
     };
 
@@ -624,7 +650,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                                                 )
                                             )}
 
-                                            <button onClick={() => { bulkUpdate("fulfilled"); setOpenDropdown(null); }}
+                                            <button onClick={() => markFulfilledForOrder(order)}
                                                 className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-emerald-600 hover:bg-neutral-50 text-left">
                                                 Mark Fulfilled
                                             </button>

@@ -16,7 +16,7 @@ function NavLink({ href, label, badge }: NavItem) {
     return (
         <Link
             href={href}
-            className={`flex items-center justify-between px-3 py-[7px] text-sm transition-all duration-150 ${
+            className={`flex items-center justify-between px-3 py-[5px] text-sm transition-all duration-150 ${
                 isActive
                     ? "bg-neutral-100 text-black font-semibold border-l-2 border-black"
                     : "text-neutral-500 hover:bg-neutral-50 hover:text-black border-l-2 border-transparent"
@@ -68,6 +68,7 @@ export function AdminSidebar({ isFullAccess, showCustomRequests, businessName }:
         { label: "Point of Sale", href: "/pos" },
         { label: "POS History", href: "/pos/history" },
         { label: "Orders", href: "/sales/orders" },
+        { label: "Pre-Orders", href: "/sales/pre-orders" },
         { label: "Abandoned Carts", href: "/customers/abandoned" },
         { label: "Discounts", href: "/catalog/discounts" },
         { label: "Auto Discounts", href: "/catalog/auto-discounts" },
@@ -103,7 +104,7 @@ export function AdminSidebar({ isFullAccess, showCustomRequests, businessName }:
         : [];
 
     const navContent = (
-        <nav className="flex-1 py-5 px-2 space-y-5 overflow-y-auto">
+        <nav className="flex-1 py-3 px-2 space-y-3 overflow-y-auto">
             <NavSection
                 title="Overview"
                 items={[
