@@ -367,6 +367,24 @@ export default function CatalogProductsPage() {
     );
 }
 
+function weeksFromDate(dateStr: string | null): string {
+    if (!dateStr) return "";
+    const diff = new Date(dateStr).getTime() - Date.now();
+    const weeks = Math.max(1, Math.round(diff / (7 * 24 * 60 * 60 * 1000)));
+    return String(weeks);
+}
+
+function weeksToDate(weeks: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() + weeks * 7);
+    return d.toISOString().slice(0, 10);
+}
+
+function fmtEstDate(dateStr: string | null): string {
+    if (!dateStr) return "";
+    return new Date(dateStr).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
+
 const ProductRow = React.memo(({
     product,
     isSelected,
@@ -390,6 +408,8 @@ const ProductRow = React.memo(({
     onCancelDelete: () => void;
     router: any;
 }) => {
+    const [weeksInput, setWeeksInput] = React.useState<string>(() => weeksFromDate(product.preorder_estimated_date));
+
     const variantTotal = product.track_variant_inventory
         ? (product.product_variants || []).reduce((sum, v) => sum + (v.inventory_count ?? 0), 0)
         : null;
@@ -461,19 +481,36 @@ const ProductRow = React.memo(({
                         <input
                             type="checkbox"
                             checked={product.preorder_enabled}
-                            onChange={e => onTogglePreorder(product.id, e.target.checked, product.preorder_estimated_date)}
+                            onChange={e => {
+                                if (!e.target.checked) { onTogglePreorder(product.id, false, null); setWeeksInput(""); }
+                                else { onTogglePreorder(product.id, true, weeksInput ? weeksToDate(Number(weeksInput)) : null); }
+                            }}
                             className="w-4 h-4 accent-amber-500"
                         />
                         <span className="text-[11px] text-neutral-600">Enable</span>
                     </label>
                     {product.preorder_enabled && (
-                        <input
-                            type="date"
-                            value={product.preorder_estimated_date ?? ""}
-                            onChange={e => onTogglePreorder(product.id, true, e.target.value || null)}
-                            className="text-[11px] border border-amber-300 rounded px-1.5 py-0.5 text-neutral-700 bg-amber-50"
-                            placeholder="Est. date"
-                        />
+                        <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="52"
+                                    value={weeksInput}
+                                    onChange={e => setWeeksInput(e.target.value)}
+                                    onBlur={() => {
+                                        const w = Number(weeksInput);
+                                        if (w >= 1) onTogglePreorder(product.id, true, weeksToDate(w));
+                                    }}
+                                    className="w-14 text-[11px] border border-amber-300 rounded px-1.5 py-0.5 text-neutral-700 bg-amber-50 outline-none focus:border-amber-500"
+                                    placeholder="wks"
+                                />
+                                <span className="text-[10px] text-neutral-400">wks</span>
+                            </div>
+                            {product.preorder_estimated_date && (
+                                <span className="text-[10px] text-amber-600">Est. {fmtEstDate(product.preorder_estimated_date)}</span>
+                            )}
+                        </div>
                     )}
                 </div>
             </td>

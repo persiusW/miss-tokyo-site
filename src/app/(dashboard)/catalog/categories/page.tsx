@@ -20,6 +20,8 @@ type Category = {
     wholesale_tier_1_price: number | null;
     wholesale_tier_2_price: number | null;
     wholesale_tier_3_price: number | null;
+    preorder_enabled: boolean;
+    preorder_estimated_weeks: number | null;
     created_at: string;
 };
 
@@ -83,6 +85,10 @@ export default function CategoriesPage() {
     const [editForm, setEditForm] = useState({ name: "", slug: "", description: "", image_url: "" });
     const [editIsWholesale, setEditIsWholesale] = useState(false);
     const [editWholesalePrices, setEditWholesalePrices] = useState({ t1: "", t2: "", t3: "" });
+    const [newPreorderEnabled, setNewPreorderEnabled] = useState(false);
+    const [newPreorderWeeks, setNewPreorderWeeks] = useState("");
+    const [editPreorderEnabled, setEditPreorderEnabled] = useState(false);
+    const [editPreorderWeeks, setEditPreorderWeeks] = useState("");
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [search, setSearch] = useState("");
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -120,6 +126,7 @@ export default function CategoriesPage() {
         if (!form.name) return;
         setSaving(true);
 
+        const preorderWeeksNum = newPreorderEnabled && newPreorderWeeks ? Number(newPreorderWeeks) : 0;
         const res = await createCategory({
             name: form.name,
             slug: form.slug || slugify(form.name),
@@ -130,6 +137,8 @@ export default function CategoriesPage() {
             wholesale_tier_1_price: newIsWholesale && newWholesalePrices.t1 ? Number(newWholesalePrices.t1) : null,
             wholesale_tier_2_price: newIsWholesale && newWholesalePrices.t2 ? Number(newWholesalePrices.t2) : null,
             wholesale_tier_3_price: newIsWholesale && newWholesalePrices.t3 ? Number(newWholesalePrices.t3) : null,
+            preorder_enabled: newPreorderEnabled,
+            preorder_estimated_weeks: preorderWeeksNum,
         });
 
         if (!res.success) {
@@ -140,6 +149,8 @@ export default function CategoriesPage() {
             setNewImageUrl(null);
             setNewIsWholesale(false);
             setNewWholesalePrices({ t1: "", t2: "", t3: "" });
+            setNewPreorderEnabled(false);
+            setNewPreorderWeeks("");
             setIsAdding(false);
             await fetchCategories();
         }
@@ -181,6 +192,8 @@ export default function CategoriesPage() {
             t2: cat.wholesale_tier_2_price != null ? String(cat.wholesale_tier_2_price) : "",
             t3: cat.wholesale_tier_3_price != null ? String(cat.wholesale_tier_3_price) : "",
         });
+        setEditPreorderEnabled(cat.preorder_enabled ?? false);
+        setEditPreorderWeeks(cat.preorder_estimated_weeks ? String(cat.preorder_estimated_weeks) : "");
     };
 
     const cancelEdit = () => { setEditingId(null); };
@@ -235,6 +248,8 @@ export default function CategoriesPage() {
 
     const handleSaveEdit = async (id: string) => {
         setSaving(true);
+        const cat = categories.find(c => c.id === id);
+        const weeksNum = editPreorderEnabled && editPreorderWeeks ? Number(editPreorderWeeks) : 0;
         const res = await updateCategory(id, {
             name: editForm.name,
             slug: editForm.slug,
@@ -244,10 +259,36 @@ export default function CategoriesPage() {
             wholesale_tier_1_price: editIsWholesale && editWholesalePrices.t1 ? Number(editWholesalePrices.t1) : null,
             wholesale_tier_2_price: editIsWholesale && editWholesalePrices.t2 ? Number(editWholesalePrices.t2) : null,
             wholesale_tier_3_price: editIsWholesale && editWholesalePrices.t3 ? Number(editWholesalePrices.t3) : null,
+            preorder_enabled: editPreorderEnabled,
+            preorder_estimated_weeks: weeksNum,
         });
 
-        if (!res.success) { toast.error(res.error || "Failed to update category."); }
-        else { toast.success("Category updated."); setEditingId(null); await fetchCategories(); }
+        if (!res.success) { toast.error(res.error || "Failed to update category."); setSaving(false); return; }
+
+        // Bulk-update products belonging to this category
+        if (cat) {
+            const { data: matched } = await supabase
+                .from("products")
+                .select("id")
+                .or(`category_type.eq.${cat.slug},category_ids.cs.{${id}}`);
+            const ids = (matched ?? []).map((p: { id: string }) => p.id);
+            if (ids.length > 0) {
+                const estDate = editPreorderEnabled && weeksNum > 0
+                    ? (() => { const d = new Date(); d.setDate(d.getDate() + weeksNum * 7); return d.toISOString().slice(0, 10); })()
+                    : null;
+                await supabase.from("products").update({
+                    preorder_enabled: editPreorderEnabled,
+                    preorder_estimated_date: estDate,
+                }).in("id", ids);
+                if (ids.length > 0) toast.success(`Category updated. Pre-order applied to ${ids.length} product${ids.length !== 1 ? "s" : ""}.`);
+            } else {
+                toast.success("Category updated.");
+            }
+        } else {
+            toast.success("Category updated.");
+        }
+        setEditingId(null);
+        await fetchCategories();
         setSaving(false);
     };
 
@@ -339,6 +380,34 @@ export default function CategoriesPage() {
                                 </label>
                                 {newIsWholesale && (
                                     <WholesalePricingFields prices={newWholesalePrices} onChange={setNewWholesalePrices} tierConfig={tierConfig} />
+                                )}
+                            </div>
+                            {/* Pre-Order toggle */}
+                            <div>
+                                <label className="flex items-center justify-between cursor-pointer group">
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Pre-Order Category</p>
+                                        <p className="text-[10px] text-neutral-400 mt-0.5">Mark all products in this category as pre-order</p>
+                                    </div>
+                                    <div
+                                        onClick={() => setNewPreorderEnabled(v => !v)}
+                                        className={`w-11 h-6 rounded-full transition-colors cursor-pointer flex-shrink-0 relative ${newPreorderEnabled ? "bg-amber-500" : "bg-neutral-200"}`}
+                                    >
+                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${newPreorderEnabled ? "translate-x-5" : ""}`} />
+                                    </div>
+                                </label>
+                                {newPreorderEnabled && (
+                                    <div className="mt-3 flex items-center gap-3 p-3 bg-amber-50 border border-amber-200">
+                                        <label className="text-[10px] uppercase tracking-widest font-semibold text-amber-700 whitespace-nowrap">Est. Weeks</label>
+                                        <input
+                                            type="number" min="1" max="52"
+                                            value={newPreorderWeeks}
+                                            onChange={e => setNewPreorderWeeks(e.target.value)}
+                                            className="w-20 border-b border-amber-400 bg-transparent py-1 outline-none focus:border-amber-600 text-sm text-neutral-700"
+                                            placeholder="e.g. 6"
+                                        />
+                                        <span className="text-[10px] text-amber-600">weeks from today</span>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -460,7 +529,7 @@ export default function CategoriesPage() {
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Description</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Featured</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Wholesale</th>
+                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Wholesale / Pre-Order</th>
                             <th className="px-6 py-4"></th>
                         </tr>
                     </thead>
@@ -489,8 +558,9 @@ export default function CategoriesPage() {
                                     </td>
                                     <td className="px-6 py-4"><span className="text-xs text-neutral-400 italic">editing</span></td>
                                     <td className="px-6 py-4">—</td>
-                                    <td className="px-6 py-4 min-w-[200px]">
-                                        <div className="space-y-2">
+                                    <td className="px-6 py-4 min-w-[260px]">
+                                        <div className="space-y-3">
+                                            {/* Wholesale */}
                                             <label className="flex items-center gap-2 cursor-pointer">
                                                 <div onClick={() => setEditIsWholesale(v => !v)}
                                                     className={`w-9 h-5 rounded-full transition-colors cursor-pointer relative flex-shrink-0 ${editIsWholesale ? "bg-black" : "bg-neutral-200"}`}>
@@ -516,6 +586,26 @@ export default function CategoriesPage() {
                                                                 placeholder="0.00" />
                                                         </div>
                                                     ))}
+                                                </div>
+                                            )}
+                                            {/* Pre-Order */}
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <div onClick={() => setEditPreorderEnabled(v => !v)}
+                                                    className={`w-9 h-5 rounded-full transition-colors cursor-pointer relative flex-shrink-0 ${editPreorderEnabled ? "bg-amber-500" : "bg-neutral-200"}`}>
+                                                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editPreorderEnabled ? "translate-x-4" : ""}`} />
+                                                </div>
+                                                <span className="text-[10px] uppercase tracking-widest text-amber-600 font-semibold">
+                                                    {editPreorderEnabled ? "Pre-Order On" : "Pre-Order Off"}
+                                                </span>
+                                            </label>
+                                            {editPreorderEnabled && (
+                                                <div className="flex items-center gap-2">
+                                                    <input type="number" min="1" max="52"
+                                                        value={editPreorderWeeks}
+                                                        onChange={e => setEditPreorderWeeks(e.target.value)}
+                                                        className="w-16 border-b border-amber-400 bg-transparent py-0.5 outline-none focus:border-amber-600 text-xs text-neutral-700"
+                                                        placeholder="wks" />
+                                                    <span className="text-[9px] text-amber-600">weeks from today</span>
                                                 </div>
                                             )}
                                         </div>
@@ -567,15 +657,22 @@ export default function CategoriesPage() {
                                         </button>
                                     </td>
                                     <td className="px-6 py-4">
-                                        {cat.is_wholesale ? (
-                                            <div className="text-[10px] text-neutral-500 space-y-0.5">
-                                                {cat.wholesale_tier_1_price != null && <div>T1: GH₵{cat.wholesale_tier_1_price}</div>}
-                                                {cat.wholesale_tier_2_price != null && <div>T2: GH₵{cat.wholesale_tier_2_price}</div>}
-                                                {cat.wholesale_tier_3_price != null && <div>T3: GH₵{cat.wholesale_tier_3_price}</div>}
-                                            </div>
-                                        ) : (
-                                            <span className="text-[10px] text-neutral-300">—</span>
-                                        )}
+                                        <div className="space-y-1">
+                                            {cat.is_wholesale ? (
+                                                <div className="text-[10px] text-neutral-500 space-y-0.5">
+                                                    {cat.wholesale_tier_1_price != null && <div>T1: GH₵{cat.wholesale_tier_1_price}</div>}
+                                                    {cat.wholesale_tier_2_price != null && <div>T2: GH₵{cat.wholesale_tier_2_price}</div>}
+                                                    {cat.wholesale_tier_3_price != null && <div>T3: GH₵{cat.wholesale_tier_3_price}</div>}
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] text-neutral-300">—</span>
+                                            )}
+                                            {cat.preorder_enabled && (
+                                                <span className="inline-block text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full">
+                                                    Pre-Order{cat.preorder_estimated_weeks ? ` · ${cat.preorder_estimated_weeks}wks` : ""}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         {confirmDeleteId === cat.id ? (
