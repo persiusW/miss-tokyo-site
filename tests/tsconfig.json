@@ -6,6 +6,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "jsx": "react-jsx",
+    "types": ["@playwright/test", "node"],
     "paths": {
       "@/*": ["../src/*"]
     }

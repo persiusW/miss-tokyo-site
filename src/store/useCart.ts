@@ -53,7 +53,7 @@ export const useCart = create<CartState>()(
             items: [],
             isOpen: false,
             setIsOpen: (isOpen) => set({ isOpen }),
-            addItem: (item, openDrawer = true) => {
+            addItem: (item, openDrawer = false) => {
                 // Pre-order items bypass the OOS block — they're intentionally zero-stock
                 if (!item.isPreOrder && item.inventoryCount !== undefined && item.inventoryCount <= 0) {
                     toast.error(`${item.name} is out of stock`);
