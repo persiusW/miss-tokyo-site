@@ -125,7 +125,10 @@ BEGIN
     -- Clear any existing reservations for this order (idempotent re-init)
     DELETE FROM public.online_reservations WHERE order_id = p_order_id;
 
-    FOR item IN SELECT * FROM jsonb_array_elements(p_items)
+    -- Sort by product_id before acquiring locks. Without consistent ordering, two
+    -- concurrent sessions locking [Shirt, Pants] and [Pants, Shirt] will deadlock.
+    -- Sorting guarantees every session acquires locks in the same global order.
+    FOR item IN SELECT value FROM jsonb_array_elements(p_items) ORDER BY (value->>'product_id')
     LOOP
         p_id := (item->>'product_id')::UUID;
         v_id := CASE
@@ -428,18 +431,33 @@ export async function reserveStock(orderId: string, items: ReserveItem[]): Promi
  * Converts a reservation into a confirmed sale.
  * Reads reservation quantities, decrements inventory_count, then deletes the reservation.
  * Called exclusively from the webhook on charge.success.
+ *
+ * Late webhook handling: the cron job marks orders expired but intentionally does NOT
+ * delete the reservation row. This means a Paystack webhook that fires after the 30-minute
+ * TTL will still find the reservation and correctly decrement stock. The reservation row
+ * is only deleted here, after a confirmed sale, or never (the DB row stays as an audit trail
+ * after an expired order if no payment ever arrives).
  */
 export async function confirmSale(orderId: string): Promise<void> {
     const { data: reservations, error: fetchError } = await supabaseAdmin
         .from("online_reservations")
-        .select("product_id, variant_id, quantity")
+        .select("product_id, variant_id, quantity, expires_at")
         .eq("order_id", orderId);
 
     if (fetchError) throw new Error(fetchError.message);
     if (!reservations?.length) {
-        // No reservation found — this order was likely created before the reservation
-        // system was deployed. Fall through gracefully (webhook will handle legacy path).
+        // No reservation found — order predates the reservation system.
+        // The webhook's legacy fallback block (using parsedItems) will handle this order.
         return;
+    }
+
+    // Process even if the reservation has expired (late Paystack webhook).
+    // The customer paid — always honor the sale. The cron only marks the order expired
+    // but leaves the row intact for exactly this recovery path.
+    const now = new Date();
+    const isLate = reservations.some(r => new Date(r.expires_at) < now);
+    if (isLate) {
+        console.warn(`[confirmSale] Late webhook for order ${orderId}: reservation expired but payment confirmed — processing sale`);
     }
 
     // Decrement variant-level stock
@@ -833,10 +851,10 @@ Co-Authored-By: claude-flow <ruv@ruv.net>"
 **Files:**
 - Modify: `src/app/api/paystack/webhook/route.ts`
 
-Two changes:
+Three changes:
 1. Change the `isAlreadyProcessed` check to use `payment_status = 'pending'` atomically (not `order.status`)
 2. Replace the raw stock decrement block (lines 508–609) with `confirmSale(orderId)`
-3. Import `normAttr` from shared util and `confirmSale` from inventory
+3. Import `normAttr` from shared util and `confirmSale` from inventory; replace slug-loop cache bust with `revalidateTag("products")`
 
 - [ ] **Step 1: Read lines 1-30 of the webhook to confirm current imports**
 
@@ -928,18 +946,10 @@ Replace the ENTIRE block (the `if (!isAlreadyProcessed && parsedItems.length > 0
                     }
                 }
 
-                // Revalidate product pages so updated stock is reflected immediately
-                if (parsedItems.length > 0) {
-                    const productIds = [...new Set(parsedItems.map((i: any) => i.productId).filter(Boolean))];
-                    const { data: slugProducts } = await supabaseAdmin
-                        .from("products")
-                        .select("slug")
-                        .in("id", productIds);
-                    for (const p of slugProducts ?? []) {
-                        if (p.slug) revalidatePath(`/products/${p.slug}`, "page");
-                    }
-                }
-                revalidatePath("/shop", "page");
+                // Invalidate the 'products' tag so every shop grid and PDP
+                // immediately serves fresh stock counts. One call replaces the
+                // previous per-slug DB query + loop pattern.
+                revalidateTag("products");
             }
 
             // Legacy single-product flow
@@ -1112,7 +1122,7 @@ Co-Authored-By: claude-flow <ruv@ruv.net>"
 
 Read `src/lib/products.ts` lines 66–149 (the `getCachedProducts` block).
 
-- [ ] **Step 2: Remove the 60-second TTL**
+- [ ] **Step 2: Add a cache tag and remove the 60-second TTL**
 
 Find:
 ```typescript
@@ -1123,10 +1133,10 @@ Find:
 Replace with:
 ```typescript
     ["products-list"],
-    { revalidate: false }
+    { revalidate: false, tags: ["products"] }
 ```
 
-`revalidate: false` means the cache entry is only invalidated by explicit `revalidatePath` calls (which the webhook already does). The shop grid will serve fresh data after every confirmed payment.
+`revalidate: false` + `tags: ["products"]` means this cache entry is only invalidated when `revalidateTag("products")` is called. The webhook (Task 6) calls exactly that after every confirmed payment, so the shop grid stays live without a timer. Any other future data fetch for products should also add `next: { tags: ["products"] }` so a single `revalidateTag` clears all product caches in one shot.
 
 - [ ] **Step 3: Build**
 
@@ -1566,7 +1576,9 @@ Co-Authored-By: claude-flow <ruv@ruv.net>"
 **Files:**
 - Create: `src/app/api/cron/expire-reservations/route.ts`
 
-This endpoint is called by Vercel Cron every 5 minutes to release timed-out reservations.
+This endpoint marks timed-out pending orders as expired. It does **not** delete the reservation rows — see the late-webhook note in `confirmSale`.
+
+> **Vercel tier note:** The `*/5 * * * *` schedule (every 5 minutes) requires **Vercel Pro** or higher. On the Hobby (free) tier, Vercel restricts cron jobs to running at most once per day. If you are on Hobby, either upgrade to Pro, or drive this endpoint with a free external scheduler such as [cron-job.org](https://cron-job.org) or a GitHub Actions scheduled workflow that POSTs to `https://your-domain.com/api/cron/expire-reservations` with the `Authorization: Bearer <CRON_SECRET>` header.
 
 - [ ] **Step 1: Create the route**
 
@@ -1574,7 +1586,6 @@ This endpoint is called by Vercel Cron every 5 minutes to release timed-out rese
 // src/app/api/cron/expire-reservations/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { releaseReservation } from "@/lib/inventory";
 
 export async function POST(req: Request) {
     // Verify cron secret to prevent unauthorized calls
@@ -1583,7 +1594,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: expired, error } = await supabaseAdmin
+    // Find pending orders whose reservations have expired.
+    // IMPORTANT: We do NOT delete the reservation row here.
+    // fn_combined_available_stock already ignores rows where expires_at < NOW(),
+    // so the stock is freed automatically at the moment of expiry — no row deletion needed.
+    // Keeping the row intact allows a late Paystack webhook to still call confirmSale()
+    // and correctly decrement stock, preventing the "webhook decrement after cron delete"
+    // loophole that would drive inventory negative.
+    const { data: expiredReservations, error } = await supabaseAdmin
         .from("online_reservations")
         .select("order_id")
         .lt("expires_at", new Date().toISOString());
@@ -1593,21 +1611,21 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const orderIds = [...new Set((expired ?? []).map(r => r.order_id))];
+    const orderIds = [...new Set((expiredReservations ?? []).map(r => r.order_id))];
 
-    let released = 0;
+    let expired = 0;
     for (const orderId of orderIds) {
-        await releaseReservation(orderId);
-        // Only expire orders that are still pending — don't touch paid/cancelled orders
-        await supabaseAdmin
+        // Only mark orders that are still pending — never touch paid/cancelled/confirmed orders
+        const { count } = await supabaseAdmin
             .from("orders")
             .update({ status: "expired" })
             .eq("id", orderId)
-            .eq("status", "pending");
-        released++;
+            .eq("status", "pending")
+            .select("id", { count: "exact", head: true });
+        if (count) expired++;
     }
 
-    return NextResponse.json({ released });
+    return NextResponse.json({ expired });
 }
 ```
 
