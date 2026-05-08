@@ -14,6 +14,7 @@ export type CartItem = {
     stitching?: string;
     quantity: number;
     imageUrl: string;
+    cartAddedAt?: number; // Unix ms — set at addItem time, used for staleness detection
     inventoryCount?: number; // max purchasable quantity (undefined = unlimited)
     // Wholesale fields — only present for wholesale users
     isWholesale?: boolean;
@@ -72,7 +73,7 @@ export const useCart = create<CartState>()(
                         };
                     }
                     const max = item.inventoryCount ?? Infinity;
-                    const clampedItem = { ...item, quantity: Math.min(item.quantity, max) };
+                    const clampedItem = { ...item, quantity: Math.min(item.quantity, max), cartAddedAt: item.cartAddedAt ?? Date.now() };
                     return { items: [...state.items, clampedItem], isOpen: openDrawer ? true : state.isOpen };
                 });
             },
