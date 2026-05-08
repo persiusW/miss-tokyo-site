@@ -2,6 +2,7 @@ export const maxDuration = 30; // 30 seconds — headroom for Paystack API hands
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { reserveStock, type ReserveItem } from "@/lib/inventory";
 
 export async function POST(request: Request) {
     try {
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
 
         // Hoisted — populated inside the cart block, returned in the success response
         const oosItems: string[] = [];
+
+        // Hoisted — populated inside the cart block, used for hasPreorder check below
+        let dbProductMap: Record<string, any> = {};
 
         // Calculate amount exclusively server-side — never trust client-supplied amounts
         let amountInGHS = 0;
@@ -54,8 +58,22 @@ export async function POST(request: Request) {
             const pIds = cartArr.length > 0 ? cartArr.map(i => i.productId) : [productId];
             const { data: dbProducts } = await supabaseAdmin
                 .from("products")
-                .select("id, price_ghs, is_sale, discount_value, inventory_count, track_variant_inventory")
+                .select("id, price_ghs, is_sale, discount_value, inventory_count, track_variant_inventory, is_active, preorder_enabled")
                 .in("id", pIds);
+
+            // Build a product map for server-side is_active and preorder checks
+            dbProductMap = Object.fromEntries((dbProducts ?? []).map((p: any) => [p.id, p]));
+
+            // Reject inactive products — client isPreOrder is untrusted
+            for (const item of cartArr) {
+                const p = dbProductMap[item.productId];
+                if (!p?.is_active) {
+                    return NextResponse.json(
+                        { error: `"${item.name}" is no longer available.` },
+                        { status: 409 }
+                    );
+                }
+            }
 
             const dbPriceMap = (dbProducts || []).reduce((acc: any, p: any) => {
                 const base = p.is_sale && p.discount_value > 0 ? p.price_ghs * (1 - p.discount_value / 100) : p.price_ghs;
@@ -68,7 +86,7 @@ export async function POST(request: Request) {
             // Pre-order items don't consume real stock, so exclude them from the count.
             const qtyByProductId: Record<string, number> = {};
             for (const item of cartArr) {
-                if (item.productId && !item.isPreOrder) {
+                if (item.productId && !dbProductMap[item.productId]?.preorder_enabled) {
                     qtyByProductId[item.productId] = (qtyByProductId[item.productId] ?? 0) + (item.quantity ?? 1);
                 }
             }
@@ -80,7 +98,7 @@ export async function POST(request: Request) {
             }, {});
             const checkedProducts = new Set<string>();
             for (const item of cartArr) {
-                if (item.isPreOrder) continue; // pre-order items bypass real-stock check
+                if (dbProductMap[item.productId]?.preorder_enabled) continue;
                 if (checkedProducts.has(item.productId)) continue;
                 checkedProducts.add(item.productId);
                 const stock = dbStockMap[item.productId];
@@ -99,7 +117,7 @@ export async function POST(request: Request) {
                 (dbProducts ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
             );
             if (variantTrackedProductIds.size > 0) {
-                const variantCartItems = cartArr.filter(i => variantTrackedProductIds.has(i.productId) && !i.isPreOrder);
+                const variantCartItems = cartArr.filter(i => variantTrackedProductIds.has(i.productId) && !dbProductMap[i.productId]?.preorder_enabled);
                 if (variantCartItems.length > 0) {
                     const { data: dbVariants } = await supabaseAdmin
                         .from("product_variants")
@@ -141,7 +159,7 @@ export async function POST(request: Request) {
 
             const seenOosProducts = new Set<string>();
             for (const item of cartArr) {
-                if (item.isPreOrder) continue; // pre-order items are intentionally zero-stock
+                if (dbProductMap[item.productId]?.preorder_enabled) continue;
                 const p = stockMap[item.productId];
                 const totalQty = qtyByProductId[item.productId] ?? (item.quantity ?? 1);
                 if (p && p.track_inventory && (p.inventory_count ?? 0) < totalQty && !seenOosProducts.has(item.productId)) {
@@ -266,7 +284,7 @@ export async function POST(request: Request) {
             });
         }
 
-        const hasPreorder = cartArr.some((item: any) => item.isPreOrder === true);
+        const hasPreorder = cartArr.some((item: any) => dbProductMap[item.productId]?.preorder_enabled === true);
 
         // Create a pending order BEFORE redirecting to Paystack.
         // This guarantees orders are always recorded, regardless of webhook/verify reliability.
@@ -324,6 +342,28 @@ export async function POST(request: Request) {
         //     bearer: "subaccount",
         //     transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
         // } : {};
+
+        // Atomically reserve stock before redirecting to Paystack.
+        // Throws if any item is unavailable; cancels the pending order if so.
+        if (cartArr.length > 0) {
+            const reserveItems: ReserveItem[] = cartArr.map((item: any) => ({
+                productId: item.productId,
+                variantId: item.variantId ?? null,
+                size: item.size,
+                color: item.color,
+                stitching: item.stitching,
+                quantity: item.quantity ?? 1,
+            }));
+            try {
+                await reserveStock(orderId, reserveItems);
+            } catch (err: any) {
+                await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+                return NextResponse.json(
+                    { error: err.message ?? "One or more items are no longer available." },
+                    { status: 409 }
+                );
+            }
+        }
 
         const response = await fetch("https://api.paystack.co/transaction/initialize", {
             method: "POST",
