@@ -145,7 +145,7 @@ const getCachedProducts = unstable_cache(
         return { products, total: count ?? 0, minPrice, maxPrice };
     },
     ["products-list"],
-    { revalidate: 60 }
+    { revalidate: false, tags: ["products"] }
 );
 
 export async function getProducts(params: GetProductsParams, role?: string) {

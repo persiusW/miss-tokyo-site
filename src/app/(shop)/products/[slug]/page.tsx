@@ -57,8 +57,6 @@ const getPdpSettings = unstable_cache(
     { revalidate: 300 }
 );
 
-export const revalidate = 60;
-
 // Pre-build every published product page at deploy time.
 // ISR (revalidate = 60) handles background refresh; this ensures zero cold-start
 // DB queries for any product URL under load.
