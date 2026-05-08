@@ -2,7 +2,9 @@ export const maxDuration = 60; // 1 minute — safe window for Paystack webhook 
 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { revalidatePath } from "next/cache";
+import { revalidateTag } from "next/cache";
+import { normAttr } from "@/lib/utils/normAttr";
+import { confirmSale } from "@/lib/inventory";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
@@ -409,12 +411,15 @@ export async function POST(req: Request) {
             if (orderId) {
                 const { data: existingOrder } = await supabaseAdmin
                     .from("orders")
-                    .select("status, paystack_reference, customer_metadata, items")
+                    .select("status, payment_status, paystack_reference, customer_metadata, items")
                     .eq("id", orderId)
                     .single();
 
-                if (existingOrder && (existingOrder.status === "paid" || existingOrder.status === "confirmed")) {
-                    console.log(`[webhook] Order ${orderId} already processed in DB. Skipping inventory deductions but will trigger email.`);
+                // Use payment_status for idempotency — NOT order.status.
+                // The verify page previously set order.status before the webhook fired,
+                // causing isAlreadyProcessed=true and stock was never decremented.
+                if (existingOrder && existingOrder.payment_status !== "pending") {
+                    console.log(`[webhook] Order ${orderId} already processed (payment_status=${existingOrder.payment_status}). Skipping inventory deductions.`);
                     isAlreadyProcessed = true;
                 }
 
@@ -504,128 +509,31 @@ export async function POST(req: Request) {
                 ? parseItems(cartItems)
                 : orderItemsFromDB;
 
-            // Decrement inventory — hybrid model: variant-level or product-level
-            if (!isAlreadyProcessed && parsedItems.length > 0) {
-                const productIds = [...new Set(parsedItems.map(i => i.productId).filter(Boolean))];
-
-                // Fetch products with tracking flags
-                const { data: products } = await supabaseAdmin
-                    .from("products")
-                    .select("id, slug, inventory_count, track_inventory, track_variant_inventory")
-                    .in("id", productIds);
-
-                if (products) {
-                    const productMap = new Map(
-                        products.map(p => [p.id, {
-                            stock: p.inventory_count as number,
-                            trackInventory: p.track_inventory !== false, // null → tracked (default)
-                            trackVariant: p.track_variant_inventory === true,
-                        }])
-                    );
-
-                    // Only process items for products with inventory tracking enabled
-                    const trackedItems = parsedItems.filter(item =>
-                        item.productId && productMap.get(item.productId)?.trackInventory
-                    );
-
-                    // Separate by deduction strategy
-                    const globalItems = trackedItems.filter(item => !productMap.get(item.productId)!.trackVariant);
-                    const variantItems = trackedItems.filter(item => productMap.get(item.productId)!.trackVariant);
-
-                    // Strategy A: deduct from products.inventory_count only
-                    await Promise.allSettled(
-                        globalItems.map(item => {
-                            const { stock } = productMap.get(item.productId)!;
-                            return supabaseAdmin
-                                .from("products")
-                                .update({ inventory_count: Math.max(0, stock - item.quantity) })
-                                .eq("id", item.productId);
-                        })
-                    );
-
-                    // Strategy B: deduct from product_variants AND products.inventory_count
-                    // Batch-fetch all variants for relevant products in one query, then match in memory
-                    if (variantItems.length > 0) {
-                        const variantProductIds = [...new Set(variantItems.map(i => i.productId))];
-                        const { data: allVariants } = await supabaseAdmin
-                            .from("product_variants")
-                            .select("id, product_id, size, color, stitching, inventory_count")
-                            .in("product_id", variantProductIds);
-
-                        // Normalize variant attribute strings for key matching.
-                        // DB stores sizes like "L — 12" (em dash + spaces); cart encodes "L-12" (hyphen).
-                        // Normalize both to lowercase hyphen-separated so keys always match.
-                        function normAttr(s: string | null | undefined): string {
-                            if (s == null) return "null";
-                            return s.replace(/\s*[\u2014\u2013-]\s*/g, "-").trim().toLowerCase();
-                        }
-
-                        const variantMap = ((allVariants ?? []) as Array<{ id: string; product_id: string; size: string | null; color: string | null; stitching: string | null; inventory_count: number | null }>).reduce((acc, v) => {
-                            const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
-                            acc[key] = v;
-                            return acc;
-                        }, {} as Record<string, { id: string; inventory_count: number | null }>);
-
-                        // Deduct variant-level stock
-                        await Promise.allSettled(
-                            variantItems.map(item => {
-                                const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
-                                const variant = variantMap[key];
-                                if (variant && typeof variant.inventory_count === "number") {
-                                    return supabaseAdmin
-                                        .from("product_variants")
-                                        .update({ inventory_count: Math.max(0, variant.inventory_count - item.quantity) })
-                                        .eq("id", variant.id);
-                                }
-                                return Promise.resolve();
-                            })
-                        );
-
-                        // Also deduct product-level stock (aggregate qty per product)
-                        const qtyByProduct = variantItems.reduce((acc, item) => {
-                            acc[item.productId] = (acc[item.productId] ?? 0) + item.quantity;
-                            return acc;
-                        }, {} as Record<string, number>);
-                        const qtyEntries = Object.entries(qtyByProduct) as [string, number][];
-                        await Promise.allSettled(
-                            qtyEntries.map(([productId, totalQty]) => {
-                                const { stock } = productMap.get(productId)!;
-                                return supabaseAdmin
-                                    .from("products")
-                                    .update({ inventory_count: Math.max(0, stock - totalQty) })
-                                    .eq("id", productId);
-                            })
-                        );
-                    }
-
-                    // Revalidate product pages so updated stock is reflected immediately
-                    const slugs = products
-                        .map(p => (p as any).slug as string | null)
-                        .filter((s): s is string => !!s);
-                    for (const slug of slugs) {
-                        revalidatePath(`/products/${slug}`, "page");
-                    }
-                    revalidatePath("/shop", "page");
-                }
-            }
-
-            // Legacy single-product flow
-            if (!isAlreadyProcessed && !parsedItems.length && productId) {
-                const { data: product } = await supabaseAdmin
-                    .from("products")
-                    .select("inventory_count, slug")
-                    .eq("id", productId)
-                    .single();
-                if (product && product.inventory_count > 0) {
-                    await supabaseAdmin
+            // Confirm sale: convert reservation → permanent inventory deduction.
+            // confirmSale() reads online_reservations, decrements inventory_count,
+            // then deletes the reservation. Falls through gracefully for orders
+            // created before the reservation system was deployed.
+            if (!isAlreadyProcessed) {
+                if (orderId) {
+                    await confirmSale(orderId);
+                } else if (productId) {
+                    // Legacy single-product path (no orderId in metadata)
+                    const { data: product } = await supabaseAdmin
                         .from("products")
-                        .update({ inventory_count: product.inventory_count - 1 })
-                        .eq("id", productId);
-                    if ((product as any).slug) {
-                        revalidatePath(`/products/${(product as any).slug}`, "page");
+                        .select("inventory_count, track_inventory")
+                        .eq("id", productId)
+                        .single();
+                    if (product?.track_inventory !== false) {
+                        await supabaseAdmin
+                            .from("products")
+                            .update({ inventory_count: Math.max(0, (product?.inventory_count ?? 0) - 1) })
+                            .eq("id", productId);
                     }
-                    revalidatePath("/shop", "page");
                 }
+
+                // Flush the 'products' cache tag so shop grids and PDPs
+                // serve fresh stock counts immediately after payment.
+                revalidateTag("products", "max");
             }
 
             // Auto-create/link customer account
