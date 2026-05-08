@@ -52,6 +52,8 @@ export default function CheckoutPage() {
     const totalAmount = useCart(s => s.totalAmount);
     const [mounted, setMounted] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [stockChecking, setStockChecking] = useState(false);
+    const [stockError, setStockError] = useState<string | null>(null);
 
     // Store Settings
     const [enablePickup, setEnablePickup] = useState(false);
@@ -144,6 +146,44 @@ export default function CheckoutPage() {
                 snapchat:           meta.snapchat         || prev.snapchat,
             }));
         });
+    }, []);
+
+    useEffect(() => {
+        if (!items.length) return;
+
+        setStockChecking(true);
+        setStockError(null);
+
+        const checkItems = items.map(i => ({
+            productId: i.productId,
+            variantId: null,
+            size: i.size,
+            color: i.color,
+            stitching: (i as { stitching?: string }).stitching ?? null,
+            quantity: i.quantity,
+        }));
+
+        fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.results) return;
+                const issues: string[] = [];
+                for (const result of data.results) {
+                    const cartItem = items.find(i => i.productId === result.productId);
+                    if (!cartItem) continue;
+                    if (!result.isActive) {
+                        issues.push(`"${cartItem.name}" is no longer available.`);
+                    } else if (!result.preorderEnabled && result.available < cartItem.quantity) {
+                        issues.push(`"${cartItem.name}" only has ${result.available} unit${result.available === 1 ? "" : "s"} left.`);
+                    }
+                }
+                if (issues.length > 0) setStockError(issues.join(" "));
+            })
+            .catch(() => {
+                // Don't block checkout on network failure — server will catch it at payment
+            })
+            .finally(() => setStockChecking(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const lastFetchedKey = useRef<string>("");
@@ -502,12 +542,19 @@ export default function CheckoutPage() {
                         </div>
                     </div>
 
+                    {stockError && (
+                        <p className="text-xs text-red-600 text-center font-medium py-2">{stockError}</p>
+                    )}
+                    {stockChecking && (
+                        <p className="text-[10px] text-neutral-400 uppercase tracking-widest text-center">Checking stock availability...</p>
+                    )}
+
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || stockChecking || !!stockError}
                         className="w-full py-5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors mt-8 disabled:opacity-50 mt-12 block text-center"
                     >
-                        {loading ? "Processing..." : `Pay GHS ${finalTotal.toFixed(2)}`}
+                        {loading ? "Processing..." : stockChecking ? "Checking availability..." : `Pay GHS ${finalTotal.toFixed(2)}`}
                     </button>
                 </form>
             </div>

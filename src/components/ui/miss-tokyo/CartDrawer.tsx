@@ -19,6 +19,12 @@ export function CartDrawer() {
     const [autoDiscountResult, setAutoDiscountResult] = useState<AutoDiscountResult | null>(null);
     // Track the items fingerprint we last fetched for — avoids re-fetching on cart re-open
     const lastFetchedKey = useRef<string>("");
+
+    // Inventory staleness check constants and state
+    const STALE_ITEM_MS = 15 * 60 * 1000;      // 15 minutes
+    const RECHECK_INTERVAL_MS = 5 * 60 * 1000;  // 5 minutes
+    const lastCheckedRef = useRef<number>(0);
+    const [staleItemIds, setStaleItemIds] = useState<Set<string>>(new Set());
     const router = useRouter();
 
     useEffect(() => { setMounted(true); }, []);
@@ -44,6 +50,45 @@ export function CartDrawer() {
     useEffect(() => {
         if (isOpen) fetchAutoDiscounts();
     }, [isOpen, fetchAutoDiscounts]);
+
+    // Live stock re-check when drawer opens — fires if any item is 15+ min old or cache expired
+    useEffect(() => {
+        if (!isOpen || items.length === 0) return;
+
+        const now = Date.now();
+        const hasStaleItem = items.some(i => now - (i.cartAddedAt ?? 0) > STALE_ITEM_MS);
+        const cacheExpired = now - lastCheckedRef.current > RECHECK_INTERVAL_MS;
+
+        if (!hasStaleItem && !cacheExpired) return;
+
+        const checkItems = items.map(i => ({
+            productId: i.productId,
+            variantId: null,
+            size: i.size,
+            color: i.color,
+            stitching: i.stitching,
+            quantity: i.quantity,
+        }));
+
+        fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.results) return;
+                lastCheckedRef.current = Date.now();
+                const stale = new Set<string>();
+                for (const result of data.results) {
+                    const cartItem = items.find(i => i.productId === result.productId);
+                    if (!cartItem) continue;
+                    if (!result.isActive || (!result.preorderEnabled && result.available < cartItem.quantity)) {
+                        stale.add(cartItem.id);
+                    }
+                }
+                setStaleItemIds(stale);
+            })
+            .catch(() => {
+                // Best-effort: don't block drawer open on network failure
+            });
+    }, [isOpen, items]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!mounted || !isOpen) return null;
 
@@ -102,6 +147,11 @@ export function CartDrawer() {
                                                 <Trash2 size={14} />
                                             </button>
                                         </div>
+                                        {staleItemIds.has(item.id) && (
+                                            <p className="text-xs text-amber-600 font-medium mt-0.5">
+                                                May no longer be available — will be verified at checkout
+                                            </p>
+                                        )}
                                         <p className="text-[10px] text-neutral-500 uppercase tracking-widest mb-1">Size: {item.size}{item.color ? ` · ${item.color}` : ""}</p>
                                         {isWholesaleDiscounted && (
                                             <p className="text-[9px] text-emerald-600 uppercase tracking-widest mb-2 font-semibold">
