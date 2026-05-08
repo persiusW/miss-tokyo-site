@@ -63,10 +63,12 @@ export async function GET(req: Request) {
 
         // If order was pre-created at checkout initialization, update it directly
         if (metaOrderId) {
+            // Update metadata only — status and payment_status are set exclusively by the webhook.
+            // Setting status here triggers isAlreadyProcessed in the webhook, causing stock
+            // to never be decremented (the verify→webhook race condition).
             await supabase
                 .from("orders")
                 .update({
-                    status: orderStatus,
                     paystack_reference: reference,
                     customer_name: fullName || null,
                     customer_phone: phone || null,
@@ -88,10 +90,7 @@ export async function GET(req: Request) {
             .maybeSingle();
 
         if (existingOrder) {
-            // Update status if payment is now confirmed
-            if (paystackTxStatus === "success" && existingOrder.status !== "paid") {
-                await supabase.from("orders").update({ status: "paid" }).eq("id", existingOrder.id);
-            }
+            // Do not update status here — webhook is the sole owner of order status.
             const order = await fetchOrderForReceipt(existingOrder.id);
             return NextResponse.json({ status: orderStatus, orderId: existingOrder.id, order }, { headers: NO_STORE });
         }
