@@ -21,6 +21,8 @@ interface Product {
     image_urls: string[] | null;
     is_sale: boolean;
     discount_value: number;
+    inventory_count: number | null;
+    track_inventory: boolean | null;
 }
 
 interface NewArrivalsCarouselProps {
@@ -46,6 +48,7 @@ export function NewArrivalsCarousel({ products }: NewArrivalsCarouselProps) {
                 {visible.map((p) => {
                     const isOnSale = p.is_sale && p.discount_value > 0;
                     const salePrice = isOnSale ? p.price_ghs * (1 - p.discount_value / 100) : null;
+                    const isOos = p.track_inventory && (p.inventory_count ?? 0) <= 0;
 
                     return (
                         <Link key={p.slug} href={`/products/${p.slug}`} className="group block">
@@ -74,9 +77,15 @@ export function NewArrivalsCarousel({ products }: NewArrivalsCarouselProps) {
                                         />
                                     );
                                 })()}
-                                <span className="absolute top-2.5 left-2.5 bg-black text-white text-[9px] tracking-[0.15em] uppercase px-2 py-1 font-bold leading-none">
-                                    NEW
-                                </span>
+                                {isOos ? (
+                                    <span className="absolute top-2.5 left-2.5 bg-neutral-500 text-white text-[9px] tracking-[0.15em] uppercase px-2 py-1 font-bold leading-none">
+                                        SOLD OUT
+                                    </span>
+                                ) : (
+                                    <span className="absolute top-2.5 left-2.5 bg-black text-white text-[9px] tracking-[0.15em] uppercase px-2 py-1 font-bold leading-none">
+                                        NEW
+                                    </span>
+                                )}
                             </div>
                             <p className="text-xs uppercase tracking-wide font-bold text-black mt-3 line-clamp-1">
                                 {p.name}

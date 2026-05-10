@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
         details: { name: name, slug: data.slug }
     });
 
+    revalidatePath("/", "page");
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");
     revalidateTag("products", "max");
@@ -326,6 +327,7 @@ export async function PATCH(req: NextRequest) {
         newData: updateFields
     });
 
+    revalidatePath("/", "page");
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");
     revalidateTag("products", "max");

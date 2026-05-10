@@ -10,13 +10,15 @@ interface Product {
     image_urls: string[] | null;
     is_sale: boolean;
     discount_value: number;
+    inventory_count: number | null;
+    track_inventory: boolean | null;
 }
 
 export async function NewArrivalsSection() {
     const db = createClient();
     const { data } = await db
         .from("products")
-        .select("slug, name, price_ghs, image_urls, is_sale, discount_value")
+        .select("slug, name, price_ghs, image_urls, is_sale, discount_value, inventory_count, track_inventory")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
         .limit(16);
