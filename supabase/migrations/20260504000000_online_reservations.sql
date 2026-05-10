@@ -13,7 +13,7 @@ CREATE TABLE public.online_reservations (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX ON public.online_reservations (product_id, order_id);
+CREATE UNIQUE INDEX ON public.online_reservations (product_id, variant_id, order_id) NULLS NOT DISTINCT;
 CREATE INDEX ON public.online_reservations (expires_at);
 CREATE INDEX ON public.online_reservations (order_id);
 
