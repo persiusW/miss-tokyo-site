@@ -3,6 +3,7 @@ export const maxDuration = 30; // 30 seconds — headroom for Paystack API hands
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { reserveStock, type ReserveItem } from "@/lib/inventory";
+import { normAttr } from "@/lib/utils/normAttr";
 
 export async function POST(request: Request) {
     try {
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
             const pIds = cartArr.length > 0 ? cartArr.map(i => i.productId) : [productId];
             const { data: dbProducts } = await supabaseAdmin
                 .from("products")
-                .select("id, price_ghs, is_sale, discount_value, inventory_count, track_variant_inventory, is_active, preorder_enabled")
+                .select("id, name, price_ghs, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, is_active, preorder_enabled")
                 .in("id", pIds);
 
             // Build a product map for server-side is_active and preorder checks
@@ -124,19 +125,14 @@ export async function POST(request: Request) {
                         .select("product_id, size, color, stitching, inventory_count")
                         .in("product_id", [...variantTrackedProductIds]);
 
-                    const normAttrInit = (s: string | null | undefined): string => {
-                        if (s == null) return "null";
-                        return s.replace(/\s*[\u2014\u2013-]\s*/g, "-").trim().toLowerCase();
-                    };
-
                     const variantStockMap: Record<string, number> = {};
                     for (const v of (dbVariants ?? [])) {
-                        const key = `${v.product_id}|${normAttrInit(v.size)}|${normAttrInit(v.color)}|${normAttrInit(v.stitching)}`;
+                        const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
                         variantStockMap[key] = v.inventory_count ?? 0;
                     }
 
                     for (const item of variantCartItems) {
-                        const key = `${item.productId}|${normAttrInit(item.size)}|${normAttrInit(item.color)}|${normAttrInit(item.stitching)}`;
+                        const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
                         const variantStock = variantStockMap[key];
                         if (variantStock !== undefined && variantStock !== 9999 && (item.quantity ?? 1) > variantStock) {
                             return NextResponse.json(
@@ -148,23 +144,15 @@ export async function POST(request: Request) {
                 }
             }
 
-            // OOS enforcement — soft check for tracked-inventory products
-            const productIds = cartArr.map((i: any) => i.productId).filter(Boolean);
-            const { data: stockProducts } = await supabaseAdmin
-                .from("products")
-                .select("id, inventory_count, track_inventory, name")
-                .in("id", productIds);
-
-            const stockMap = Object.fromEntries((stockProducts ?? []).map((p: any) => [p.id, p]));
-
+            // OOS enforcement — uses dbProductMap (already fetched above, now includes track_inventory + name)
             const seenOosProducts = new Set<string>();
             for (const item of cartArr) {
                 if (dbProductMap[item.productId]?.preorder_enabled) continue;
-                const p = stockMap[item.productId];
+                const p = dbProductMap[item.productId];
                 const totalQty = qtyByProductId[item.productId] ?? (item.quantity ?? 1);
                 if (p && p.track_inventory && (p.inventory_count ?? 0) < totalQty && !seenOosProducts.has(item.productId)) {
                     seenOosProducts.add(item.productId);
-                    oosItems.push(item.name ?? item.productId);
+                    oosItems.push(p.name ?? item.name ?? item.productId);
                 }
             }
 
