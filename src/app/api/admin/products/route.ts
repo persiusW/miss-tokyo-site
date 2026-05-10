@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { logActivity } from "@/lib/utils/logActivity";
 
 export async function POST(req: NextRequest) {
@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
 
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");
+    revalidateTag("products", "max");
 
     return NextResponse.json({ success: true, product: data });
 }
@@ -127,6 +128,7 @@ export async function PATCH(req: NextRequest) {
         }
         revalidatePath("/shop", "page");
         revalidatePath("/catalog/products", "page");
+        revalidateTag("products", "max");
         return NextResponse.json({ success: true });
     }
 
@@ -326,6 +328,7 @@ export async function PATCH(req: NextRequest) {
 
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");
+    revalidateTag("products", "max");
 
     return NextResponse.json({ success: true });
 }
