@@ -202,110 +202,40 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
     }
 
-    // Merge strategy: preserve DB-current inventory_count so admin saves
-    // don't overwrite stock deductions that happened while the form was open.
     if (variants && variants.length > 0) {
-        function normVariant(s: string | null | undefined): string {
-            if (s == null) return "null";
-            return s.replace(/\s*[—–-]\s*/g, "-").trim().toLowerCase();
-        }
-
-        // Fetch current DB variants to get live inventory_count values
-        const { data: existingVariants } = await supabaseAdmin
+        // Delete ALL existing variants then insert fresh — avoids duplicate rows
+        // that accumulate when upsert lacks a DB-level unique constraint.
+        const { error: delErr } = await supabaseAdmin
             .from("product_variants")
-            .select("id, size, color, stitching, inventory_count")
+            .delete()
             .eq("product_id", id);
 
-        const existingMap = new Map(
-            (existingVariants ?? []).map(v => [
-                `${normVariant(v.size)}|${normVariant(v.color)}|${normVariant(v.stitching)}`,
-                v
-            ])
-        );
-
-        // Delete variants that are no longer in the incoming list
-        const incomingKeys = new Set(
-            variants.map((v: any) =>
-                `${normVariant(v.size)}|${normVariant(v.color)}|${normVariant(v.stitching)}`
-            )
-        );
-        const toDelete = (existingVariants ?? []).filter(v => {
-            const key = `${normVariant(v.size)}|${normVariant(v.color)}|${normVariant(v.stitching)}`;
-            return !incomingKeys.has(key);
-        });
-        if (toDelete.length > 0) {
-            await supabaseAdmin
-                .from("product_variants")
-                .delete()
-                .in("id", toDelete.map((v: any) => v.id));
+        if (delErr) {
+            console.error("[admin/products PATCH] variant delete failed:", delErr.message);
+            return NextResponse.json({ error: `Variant delete failed: ${delErr.message}` }, { status: 500 });
         }
 
-        // Upsert variants — use form value (edit form pre-fills from DB so this preserves
-        // stock unless the admin explicitly changed the count).
-        const toUpsert = variants.map((v: any) => {
-            const key = `${normVariant(v.size)}|${normVariant(v.color)}|${normVariant(v.stitching)}`;
-            const existing = existingMap.get(key);
-            return {
-                ...v,
-                product_id: id,
-                inventory_count: v.inventory_count ?? (existing?.inventory_count ?? 0),
-            };
-        });
+        const toInsert = variants.map((v: any) => ({
+            product_id: id,
+            size: v.size || null,
+            color: v.color || null,
+            stitching: v.stitching || null,
+            sku: v.sku || null,
+            inventory_count: v.inventory_count ?? 0,
+        }));
 
-        const { error: upsertErr } = await supabaseAdmin
+        const { error: insertErr } = await supabaseAdmin
             .from("product_variants")
-            .upsert(toUpsert, { onConflict: "product_id,size,color,stitching" });
+            .insert(toInsert);
 
-        if (upsertErr) {
-            console.error("[admin/products PATCH] variant upsert failed, falling back to manual merge:", upsertErr.message);
-            // Fallback: manual merge without upsert (handles missing unique constraint)
-            for (const v of toUpsert) {
-                const key = `${normVariant(v.size)}|${normVariant(v.color)}|${normVariant(v.stitching)}`;
-                const existing = existingMap.get(key);
-                if (existing) {
-                    // UPDATE existing variant
-                    const { error: updateErr } = await supabaseAdmin
-                        .from("product_variants")
-                        .update({
-                            size: v.size,
-                            color: v.color,
-                            stitching: v.stitching,
-                            price_ghs: v.price_ghs,
-                            sku: v.sku,
-                            inventory_count: v.inventory_count ?? existing.inventory_count,
-                        })
-                        .eq("id", existing.id);
-                    if (updateErr) {
-                        console.error("[admin/products PATCH] variant update failed:", updateErr.message);
-                        return NextResponse.json({ error: `Variant update failed: ${updateErr.message}` }, { status: 500 });
-                    }
-                } else {
-                    // INSERT new variant
-                    const { error: insertErr } = await supabaseAdmin
-                        .from("product_variants")
-                        .insert(v);
-                    if (insertErr) {
-                        console.error("[admin/products PATCH] variant insert failed:", insertErr.message);
-                        return NextResponse.json({ error: `Variant insert failed: ${insertErr.message}` }, { status: 500 });
-                    }
-                }
-            }
+        if (insertErr) {
+            console.error("[admin/products PATCH] variant insert failed:", insertErr.message);
+            return NextResponse.json({ error: `Variant insert failed: ${insertErr.message}` }, { status: 500 });
         }
 
-        // Sync product-level inventory_count to real variant sum so shop grid,
-        // sold-out ribbons, and JSON-LD reflect actual stock rather than the 9999 sentinel.
-        // Only applies when tracking is active — avoids overwriting the 9999 sentinel
-        // for untracked products that happen to have variant rows.
+        // Sync product-level inventory_count to variant sum
         if (track_inventory && track_variant_inventory) {
-            // Re-fetch the updated variants to get accurate DB-current totals
-            const { data: updatedVariants } = await supabaseAdmin
-                .from("product_variants")
-                .select("inventory_count")
-                .eq("product_id", id);
-            const variantSum = (updatedVariants ?? []).reduce(
-                (sum: number, v: { inventory_count?: number }) => sum + (v.inventory_count ?? 0),
-                0
-            );
+            const variantSum = toInsert.reduce((sum: number, v: { inventory_count: number }) => sum + (v.inventory_count ?? 0), 0);
             const { error: syncErr } = await supabaseAdmin
                 .from("products")
                 .update({ inventory_count: variantSum })
@@ -314,6 +244,9 @@ export async function PATCH(req: NextRequest) {
                 console.error("[admin/products PATCH] inventory_count sync failed:", syncErr.message);
             }
         }
+    } else if (variants !== undefined) {
+        // variants sent as empty array — clear all variant rows
+        await supabaseAdmin.from("product_variants").delete().eq("product_id", id);
     }
 
     // LOG ACTIVITY
