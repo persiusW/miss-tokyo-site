@@ -237,16 +237,15 @@ export async function PATCH(req: NextRequest) {
                 .in("id", toDelete.map((v: any) => v.id));
         }
 
-        // Upsert variants, preserving live inventory_count for existing ones
+        // Upsert variants — use form value (edit form pre-fills from DB so this preserves
+        // stock unless the admin explicitly changed the count).
         const toUpsert = variants.map((v: any) => {
             const key = `${normVariant(v.size)}|${normVariant(v.color)}|${normVariant(v.stitching)}`;
             const existing = existingMap.get(key);
             return {
                 ...v,
                 product_id: id,
-                inventory_count: existing !== undefined
-                    ? existing.inventory_count  // preserve DB-current stock
-                    : (v.inventory_count ?? 0), // new variant: use form value
+                inventory_count: v.inventory_count ?? (existing?.inventory_count ?? 0),
             };
         });
 
@@ -261,7 +260,7 @@ export async function PATCH(req: NextRequest) {
                 const key = `${normVariant(v.size)}|${normVariant(v.color)}|${normVariant(v.stitching)}`;
                 const existing = existingMap.get(key);
                 if (existing) {
-                    // UPDATE existing variant — preserve inventory_count, update other fields
+                    // UPDATE existing variant
                     const { error: updateErr } = await supabaseAdmin
                         .from("product_variants")
                         .update({
@@ -270,7 +269,7 @@ export async function PATCH(req: NextRequest) {
                             stitching: v.stitching,
                             price_ghs: v.price_ghs,
                             sku: v.sku,
-                            // inventory_count intentionally not updated — preserve DB-current stock
+                            inventory_count: v.inventory_count ?? existing.inventory_count,
                         })
                         .eq("id", existing.id);
                     if (updateErr) {

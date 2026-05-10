@@ -63,7 +63,7 @@ export const useCart = create<CartState>()(
                 set((state) => {
                     const existingItem = state.items.find(i => i.id === item.id);
                     if (existingItem) {
-                        const max = existingItem.inventoryCount ?? Infinity;
+                        const max = existingItem.isPreOrder ? Infinity : (existingItem.inventoryCount ?? Infinity);
                         const newQty = Math.min(existingItem.quantity + item.quantity, max);
                         return {
                             items: state.items.map(i =>
@@ -72,7 +72,7 @@ export const useCart = create<CartState>()(
                             isOpen: openDrawer ? true : state.isOpen,
                         };
                     }
-                    const max = item.inventoryCount ?? Infinity;
+                    const max = item.isPreOrder ? Infinity : (item.inventoryCount ?? Infinity);
                     const clampedItem = { ...item, quantity: Math.min(item.quantity, max), cartAddedAt: item.cartAddedAt ?? Date.now() };
                     return { items: [...state.items, clampedItem], isOpen: openDrawer ? true : state.isOpen };
                 });
@@ -83,7 +83,7 @@ export const useCart = create<CartState>()(
             updateQuantity: (id, quantity) => set((state) => ({
                 items: state.items.map(i => {
                     if (i.id !== id) return i;
-                    const max = i.inventoryCount ?? Infinity;
+                    const max = i.isPreOrder ? Infinity : (i.inventoryCount ?? Infinity);
                     return { ...i, quantity: Math.min(Math.max(1, quantity), max) };
                 }),
             })),
