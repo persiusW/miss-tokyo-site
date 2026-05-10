@@ -16,6 +16,7 @@ type Order = {
     customer_phone: string | null;
     total_amount: number | null;
     status: string;
+    payment_status?: string | null;
     paystack_reference: string | null;
     shipping_address: Record<string, string> | null;
     delivery_method: string | null;
@@ -49,8 +50,14 @@ const STATUS_STYLES: Record<string, string> = {
     fulfilled:         "bg-emerald-50 text-emerald-700",
     delivered:         "bg-emerald-100 text-emerald-800",
     cancelled:         "bg-red-50 text-red-600",
+    failed:            "bg-red-50 text-red-600",
     refunded:          "bg-neutral-100 text-neutral-600",
     ready_for_pickup:  "bg-neutral-900 text-white",
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, { label: string; className: string }> = {
+    abandoned: { label: "Abandoned",    className: "text-neutral-400" },
+    failed:    { label: "Payment Failed", className: "text-red-400" },
 };
 
 type Tab = "all" | "packed" | "pickups" | "shipped" | "fulfilled" | "cancelled" | "refunded" | "all-orders";
@@ -593,6 +600,11 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                                     <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
                                         {order.status === "ready_for_pickup" ? "Ready for Pickup" : order.status}
                                     </span>
+                                    {order.payment_status && PAYMENT_STATUS_LABELS[order.payment_status] && (
+                                        <span className={`block text-[9px] uppercase tracking-widest mt-0.5 ${PAYMENT_STATUS_LABELS[order.payment_status].className}`}>
+                                            {PAYMENT_STATUS_LABELS[order.payment_status].label}
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="px-4 py-4">
                                     <span className="font-mono text-xs text-neutral-500">

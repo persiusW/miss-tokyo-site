@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/expire-reservations",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-payment-status",
+      "schedule": "0 * * * *"
     }
   ]
 }
