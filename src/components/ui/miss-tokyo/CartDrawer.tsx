@@ -79,7 +79,7 @@ export function CartDrawer() {
                 for (const result of data.results) {
                     const cartItem = items.find(i => i.productId === result.productId);
                     if (!cartItem) continue;
-                    if (!result.isActive || (!result.preorderEnabled && result.available < cartItem.quantity)) {
+                    if (!result.isActive || (!result.preorderEnabled && !cartItem.isPreOrder && result.available < cartItem.quantity)) {
                         stale.add(cartItem.id);
                     }
                 }
