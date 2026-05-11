@@ -82,6 +82,15 @@ export default async function ShopCatalog({
     const shopImageStretch = storeSettingsData?.shop_image_stretch ?? false;
 
     const rules = autoRules ?? [];
+
+    // Derive which categories have live products — check both category_ids (UUID array) and category_type (text)
+    // This avoids relying on the pre-computed product_count column which can be stale/inaccurate
+    const activeCategoryIds = new Set((products || []).flatMap((p: any) => p.category_ids || []));
+    const activeCategoryNames = new Set((products || []).map((p: any) => (p.category_type || "").toLowerCase().trim()).filter(Boolean));
+    const visibleCategories = (categories || []).filter((c: any) =>
+        activeCategoryIds.has(c.id) || activeCategoryNames.has((c.name || "").toLowerCase().trim())
+    );
+
     const formattedProducts = (products || []).map((p: any) => {
         const isOnSale = p.is_sale === true;
         const salePrice = isOnSale && p.discount_value > 0
@@ -127,7 +136,7 @@ export default async function ShopCatalog({
             <Suspense fallback={null}>
                 <ShopClient
                     products={formattedProducts}
-                    categories={(categories || []).map((c: any) => ({
+                    categories={visibleCategories.map((c: any) => ({
                         id: c.id,
                         name: c.name,
                         slug: c.slug,
