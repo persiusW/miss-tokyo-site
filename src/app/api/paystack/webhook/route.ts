@@ -635,12 +635,12 @@ export async function POST(req: Request) {
                                 const { data: currentOrderData } = await supabaseAdmin.from("orders").select("customer_metadata").eq("id", orderId).single();
                 const currentMeta = (currentOrderData?.customer_metadata as object) || {};
 
-                // Only set payment_status — never overwrite fulfillment_status or status
-                // Idempotency guard: only update payment_status if still pending
+                // Idempotency guard: only update if payment still pending
                 const { error } = await supabaseAdmin
                     .from("orders")
                     .update({
                         payment_status: "paid",
+                        status: "paid",
                         paystack_reference: paystackRef,
                         customer_name: fullName || null,
                         customer_phone: phone || null,

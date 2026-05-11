@@ -69,7 +69,7 @@ export async function GET(req: Request) {
             // Fetch current order state for idempotency check and fallback item list
             const { data: currentOrder } = await supabase
                 .from("orders")
-                .select("payment_status, items")
+                .select("payment_status, status, items")
                 .eq("id", metaOrderId)
                 .single();
 
@@ -162,6 +162,17 @@ export async function GET(req: Request) {
                     .eq("payment_status", "pending");
 
                 revalidateTag("products", "max");
+            }
+
+            // Race-condition safety: webhook may have set payment_status="paid" before verify ran,
+            // causing the block above to be skipped. Ensure status is always "paid" when Paystack
+            // confirms success — only if still "pending" (won't touch packed/shipped/etc).
+            if (paystackTxStatus === "success" && currentOrder?.status === "pending") {
+                await supabase
+                    .from("orders")
+                    .update({ status: "paid" })
+                    .eq("id", metaOrderId)
+                    .eq("status", "pending");
             }
 
             const order = await fetchOrderForReceipt(metaOrderId);
