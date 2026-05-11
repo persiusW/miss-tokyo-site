@@ -170,17 +170,18 @@ export default function CheckoutPage() {
                 if (!data.results) return;
                 const issues: string[] = [];
                 const issueIds = new Set<string>();
-                for (const result of data.results) {
-                    const cartItem = items.find(i => i.productId === result.productId);
-                    if (!cartItem) continue;
+                // results are returned in the same order as checkItems / items
+                data.results.forEach((result: any, idx: number) => {
+                    const cartItem = items[idx];
+                    if (!cartItem) return;
                     if (!result.isActive) {
                         issues.push(`"${cartItem.name}" is no longer available.`);
-                        issueIds.add(cartItem.productId);
+                        issueIds.add(cartItem.id); // cart item id, not productId
                     } else if (!cartItem.isPreOrder && result.available < cartItem.quantity) {
-                        issues.push(`"${cartItem.name}" only has ${result.available} unit${result.available === 1 ? "" : "s"} left.`);
-                        issueIds.add(cartItem.productId);
+                        issues.push(`"${cartItem.name}" (${cartItem.size}) only has ${result.available} unit${result.available === 1 ? "" : "s"} left.`);
+                        issueIds.add(cartItem.id);
                     }
-                }
+                });
                 if (issues.length > 0) { setStockError(issues.join(" ")); setStockIssueIds(issueIds); }
                 else { setStockError(null); setStockIssueIds(new Set()); }
             })
@@ -329,20 +330,21 @@ export default function CheckoutPage() {
             if (stockData.results) {
                 const issues: string[] = [];
                 const issueIds = new Set<string>();
-                for (const result of stockData.results) {
-                    const cartItem = items.find(i => i.productId === result.productId);
-                    if (!cartItem) continue;
+                // results are in the same order as checkItems / items
+                stockData.results.forEach((result: any, idx: number) => {
+                    const cartItem = items[idx];
+                    if (!cartItem) return;
                     if (!result.isActive) {
                         issues.push(`"${cartItem.name}" is no longer available.`);
-                        issueIds.add(cartItem.productId);
+                        issueIds.add(cartItem.id);
                     } else if (!cartItem.isPreOrder && result.available < cartItem.quantity) {
                         issues.push(result.available === 0
-                            ? `"${cartItem.name}" just sold out. Please remove it from your cart.`
-                            : `"${cartItem.name}" only has ${result.available} left. Please update your cart.`
+                            ? `"${cartItem.name}" (${cartItem.size}) just sold out. Please remove it from your cart.`
+                            : `"${cartItem.name}" (${cartItem.size}) only has ${result.available} left. Please update your cart.`
                         );
-                        issueIds.add(cartItem.productId);
+                        issueIds.add(cartItem.id);
                     }
-                }
+                });
                 if (issues.length > 0) {
                     setStockError(issues.join(" "));
                     setStockIssueIds(issueIds);
@@ -617,7 +619,7 @@ export default function CheckoutPage() {
                 {items.filter(i => !i.isPreOrder).length > 0 && (
                     <div className="space-y-6">
                         {items.filter(i => !i.isPreOrder).map(item => {
-                            const hasIssue = stockIssueIds.has(item.productId);
+                            const hasIssue = stockIssueIds.has(item.id);
                             return (
                                 <div key={item.id} className={`flex gap-4 items-center rounded-sm transition-colors ${hasIssue ? "bg-red-50 border border-red-200 p-2 -mx-2" : ""}`}>
                                     <div className={`w-16 h-16 bg-white overflow-hidden flex-shrink-0 border relative ${hasIssue ? "border-red-300" : "border-neutral-200"}`}>
