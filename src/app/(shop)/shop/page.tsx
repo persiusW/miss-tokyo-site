@@ -14,7 +14,7 @@ const getAutoDiscountRules = unstable_cache(
         return data ?? [];
     },
     ["active-auto-discounts"],
-    { revalidate: 300 }
+    { revalidate: 300, tags: ["auto-discounts"] }
 );
 
 // Cache admin-controlled settings for 5 minutes — they change rarely and this

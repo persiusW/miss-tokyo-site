@@ -26,7 +26,7 @@ const getActiveAutoDiscounts = unstable_cache(
         return data ?? [];
     },
     ["active-auto-discounts-pdp"],
-    { revalidate: 300 }
+    { revalidate: 300, tags: ["auto-discounts"] }
 );
 
 // ── ISR-SAFE caches ────────────────────────────────────────────────────────────

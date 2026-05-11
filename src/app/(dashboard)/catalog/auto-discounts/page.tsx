@@ -208,6 +208,7 @@ export default function AutoDiscountsPage() {
             toast.success(editingId ? "Updated." : "Created.");
             closeForm();
             fetchAll();
+            fetch("/api/admin/revalidate-discounts", { method: "POST" });
         }
     };
 
@@ -222,6 +223,7 @@ export default function AutoDiscountsPage() {
             toast.error("Failed to update.");
         } else {
             setRules(prev => prev.map(r => r.id === rule.id ? { ...r, is_active: !r.is_active } : r));
+            fetch("/api/admin/revalidate-discounts", { method: "POST" });
         }
     };
 
@@ -235,6 +237,7 @@ export default function AutoDiscountsPage() {
         } else {
             toast.success("Deleted.");
             setRules(prev => prev.filter(r => r.id !== id));
+            fetch("/api/admin/revalidate-discounts", { method: "POST" });
         }
     };
 
