@@ -334,14 +334,46 @@ export async function POST(request: Request) {
         // Atomically reserve stock before redirecting to Paystack.
         // Throws if any item is unavailable; cancels the pending order if so.
         if (cartArr.length > 0) {
-            const reserveItems: ReserveItem[] = cartArr.map((item: any) => ({
-                productId: item.productId,
-                variantId: item.variantId ?? null,
-                size: item.size,
-                color: item.color,
-                stitching: item.stitching,
-                quantity: item.quantity ?? 1,
-            }));
+            // Resolve current variant IDs from (product_id, size, color, stitching) so stale
+            // cart UUIDs (from a product re-save) don't break the reservation.
+            const variantIdLookup: Record<string, string> = {};
+            const variantTrackedIds = new Set<string>(
+                (Object.values(dbProductMap) as any[]).filter(p => p.track_variant_inventory).map(p => p.id as string)
+            );
+            if (variantTrackedIds.size > 0) {
+                const { data: currentVariants } = await supabaseAdmin
+                    .from("product_variants")
+                    .select("id, product_id, size, color, stitching")
+                    .in("product_id", [...variantTrackedIds]);
+                for (const v of currentVariants ?? []) {
+                    const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+                    variantIdLookup[key] = v.id;
+                }
+            }
+
+            // Aggregate by (productId, resolvedVariantId) — prevents duplicate-key errors when
+            // multiple cart items share the same product+variant (e.g. variant_id=null for both sizes).
+            const reserveMap = new Map<string, ReserveItem>();
+            for (const item of cartArr) {
+                let resolvedVariantId: string | null = item.variantId ?? null;
+                if (variantTrackedIds.has(item.productId)) {
+                    const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+                    resolvedVariantId = variantIdLookup[lookupKey] ?? null;
+                }
+                const mapKey = `${item.productId}|${resolvedVariantId ?? "null"}`;
+                const existing = reserveMap.get(mapKey);
+                if (existing) {
+                    existing.quantity += item.quantity ?? 1;
+                } else {
+                    reserveMap.set(mapKey, {
+                        productId: item.productId,
+                        variantId: resolvedVariantId,
+                        quantity: item.quantity ?? 1,
+                    });
+                }
+            }
+            const reserveItems: ReserveItem[] = [...reserveMap.values()];
+
             try {
                 await reserveStock(orderId, reserveItems);
             } catch (err: any) {
