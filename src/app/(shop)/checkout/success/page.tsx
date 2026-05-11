@@ -14,6 +14,8 @@ interface OrderItem {
     size?: string;
     color?: string;
     imageUrl?: string;
+    isPreOrder?: boolean;
+    estimatedAvailability?: string; // ISO date
 }
 
 interface Order {
@@ -129,6 +131,8 @@ function Receipt({ order, orderRef }: { order: Order; orderRef: string }) {
     }, []);
 
     const items: OrderItem[] = Array.isArray(order.items) ? order.items : [];
+    const regularItems = items.filter(i => !i.isPreOrder);
+    const preorderItems = items.filter(i => i.isPreOrder);
     const hasDiscount = order.discount_amount > 0;
     const subtotalBeforeDiscount = hasDiscount ? order.total_amount + order.discount_amount : null;
     const deliveryLabel = order.delivery_method?.toLowerCase().includes("pickup") ? "Store Pickup" : "Standard Delivery";
@@ -180,22 +184,18 @@ function Receipt({ order, orderRef }: { order: Order; orderRef: string }) {
 
                 {/* Receipt card */}
                 <div style={{ background: "#fff", border: "1px solid #e5e5e5", borderRadius: 4, overflow: "hidden", marginBottom: 16 }}>
-                    {/* Items */}
-                    {items.length > 0 && (
+                    {/* Regular items */}
+                    {regularItems.length > 0 && (
                         <div style={{ padding: "24px 24px 0" }}>
                             <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "#a3a3a3", marginBottom: 16 }}>
                                 Items Ordered
                             </p>
                             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                                {items.map((item, i) => (
+                                {regularItems.map((item, i) => (
                                     <div key={i} style={{ display: "flex", gap: 14, paddingBottom: 16, borderBottom: "1px solid #f5f5f5" }}>
                                         {item.imageUrl && (
-                                            <div style={{
-                                                width: 60, height: 80, flexShrink: 0,
-                                                background: "#f5f5f5", overflow: "hidden", borderRadius: 2,
-                                                position: "relative",
-                                            }}>
-                                                {item.imageUrl && <Image src={item.imageUrl} alt={item.name} fill sizes="60px" style={{ objectFit: "cover" }} />}
+                                            <div style={{ width: 60, height: 80, flexShrink: 0, background: "#f5f5f5", overflow: "hidden", borderRadius: 2, position: "relative" }}>
+                                                <Image src={item.imageUrl} alt={item.name} fill sizes="60px" style={{ objectFit: "cover" }} />
                                             </div>
                                         )}
                                         <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -213,6 +213,58 @@ function Receipt({ order, orderRef }: { order: Order; orderRef: string }) {
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Pre-order items */}
+                    {preorderItems.length > 0 && (
+                        <div style={{ padding: regularItems.length > 0 ? "20px 24px 0" : "24px 24px 0", borderTop: regularItems.length > 0 ? "1px solid #f5f5f5" : "none" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                                <p style={{ fontSize: 10, letterSpacing: "0.18em", textTransform: "uppercase", color: "#92400e" }}>
+                                    Pre-Order Items
+                                </p>
+                                <span style={{
+                                    fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase",
+                                    padding: "2px 7px", background: "#fef3c7", color: "#92400e",
+                                    borderRadius: 2, border: "1px solid #fde68a",
+                                }}>
+                                    Reserved
+                                </span>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                                {preorderItems.map((item, i) => {
+                                    const estDate = item.estimatedAvailability
+                                        ? new Date(item.estimatedAvailability).toLocaleDateString("en-GB", { month: "long", year: "numeric" })
+                                        : null;
+                                    return (
+                                        <div key={i} style={{ display: "flex", gap: 14, paddingBottom: 16, borderBottom: "1px solid #fef3c7" }}>
+                                            {item.imageUrl && (
+                                                <div style={{ width: 60, height: 80, flexShrink: 0, background: "#fef3c7", overflow: "hidden", borderRadius: 2, position: "relative" }}>
+                                                    <Image src={item.imageUrl} alt={item.name} fill sizes="60px" style={{ objectFit: "cover" }} />
+                                                </div>
+                                            )}
+                                            <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                                <div>
+                                                    <p style={{ fontSize: 13, fontWeight: 500, color: "#141210", marginBottom: 4 }}>{item.name}</p>
+                                                    {(item.size || item.color) && (
+                                                        <p style={{ fontSize: 11, color: "#737373", letterSpacing: "0.05em" }}>
+                                                            {[item.size, item.color].filter(Boolean).join(" · ")} × {item.quantity}
+                                                        </p>
+                                                    )}
+                                                    {estDate && (
+                                                        <p style={{ fontSize: 11, color: "#b45309", marginTop: 4, fontWeight: 500 }}>
+                                                            Est. availability: {estDate}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <p style={{ fontSize: 13, fontWeight: 500, color: "#141210", flexShrink: 0 }}>
+                                                    GH₵{(item.price * item.quantity).toFixed(2)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
