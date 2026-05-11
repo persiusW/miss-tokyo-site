@@ -203,6 +203,19 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (variants && variants.length > 0) {
+        // Before deleting variants, remove any online_reservations that reference them.
+        // The FK (online_reservations_variant_id_fkey) would block the delete otherwise.
+        // For active reservations this is safe: confirmSale falls back to a normAttr-keyed
+        // variant lookup, which resolves the newly inserted variants by size/colour/stitching.
+        const { data: existingVariants } = await supabaseAdmin
+            .from("product_variants")
+            .select("id")
+            .eq("product_id", id);
+        const existingVarIds = (existingVariants ?? []).map((v: any) => v.id as string);
+        if (existingVarIds.length > 0) {
+            await supabaseAdmin.from("online_reservations").delete().in("variant_id", existingVarIds);
+        }
+
         // Delete ALL existing variants then insert fresh — avoids duplicate rows
         // that accumulate when upsert lacks a DB-level unique constraint.
         const { error: delErr } = await supabaseAdmin
@@ -246,6 +259,13 @@ export async function PATCH(req: NextRequest) {
         }
     } else if (variants !== undefined) {
         // variants sent as empty array — clear all variant rows
+        // Clear FK-referencing reservations first to avoid constraint violation.
+        const { data: existingVariants } = await supabaseAdmin
+            .from("product_variants").select("id").eq("product_id", id);
+        const existingVarIds = (existingVariants ?? []).map((v: any) => v.id as string);
+        if (existingVarIds.length > 0) {
+            await supabaseAdmin.from("online_reservations").delete().in("variant_id", existingVarIds);
+        }
         await supabaseAdmin.from("product_variants").delete().eq("product_id", id);
     }
 
