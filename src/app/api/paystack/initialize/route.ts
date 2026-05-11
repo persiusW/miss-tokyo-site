@@ -277,7 +277,8 @@ export async function POST(request: Request) {
             });
         }
 
-        const hasPreorder = cartArr.some((item: any) => dbProductMap[item.productId]?.preorder_enabled === true);
+        // Use the cart-item flag — this covers both product-level and category-inherited preorder
+        const hasPreorder = cartArr.some((item: any) => item.isPreOrder === true);
 
         // Create a pending order BEFORE redirecting to Paystack.
         // This guarantees orders are always recorded, regardless of webhook/verify reliability.
@@ -360,6 +361,13 @@ export async function POST(request: Request) {
             // multiple cart items share the same product+variant (e.g. variant_id=null for both sizes).
             const reserveMap = new Map<string, ReserveItem>();
             for (const item of cartArr) {
+                // Pre-order items have no stock to lock — skip the reservation entirely.
+                // This covers both product-level preorder_enabled AND category-inherited
+                // preorder (where the product column is false but isPreOrder was set at
+                // add-to-cart time). The DB function only checks the column, so passing
+                // category-inherited items would cause a false "insufficient stock" throw.
+                if (item.isPreOrder) continue;
+
                 let resolvedVariantId: string | null = item.variantId ?? null;
                 if (variantTrackedIds.has(item.productId)) {
                     const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
