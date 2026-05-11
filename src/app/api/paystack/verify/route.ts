@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
+import { confirmSale } from "@/lib/inventory";
+import { normAttr } from "@/lib/utils/normAttr";
 
 const NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const ORDER_FIELDS = "id, customer_name, customer_email, customer_phone, shipping_address, delivery_method, total_amount, items, discount_code, discount_amount, status, paystack_reference";
@@ -63,9 +66,14 @@ export async function GET(req: Request) {
 
         // If order was pre-created at checkout initialization, update it directly
         if (metaOrderId) {
-            // Update metadata only — status and payment_status are set exclusively by the webhook.
-            // Setting status here triggers isAlreadyProcessed in the webhook, causing stock
-            // to never be decremented (the verify→webhook race condition).
+            // Fetch current order state for idempotency check and fallback item list
+            const { data: currentOrder } = await supabase
+                .from("orders")
+                .select("payment_status, items")
+                .eq("id", metaOrderId)
+                .single();
+
+            // Always update metadata fields
             await supabase
                 .from("orders")
                 .update({
@@ -76,6 +84,86 @@ export async function GET(req: Request) {
                     delivery_method: deliveryMethod || null,
                 })
                 .eq("id", metaOrderId);
+
+            // Decrement stock and mark paid on success — scoped to "pending" for idempotency.
+            // Verify is the primary stock-decrement path for local dev and webhook-miss scenarios.
+            // Setting status="paid" here prevents double-decrement by the production webhook,
+            // which checks status === "paid" for its own idempotency guard.
+            if (paystackTxStatus === "success" && currentOrder?.payment_status === "pending") {
+                let stockDecremented = false;
+                try {
+                    stockDecremented = await confirmSale(metaOrderId);
+                } catch (e) {
+                    console.error("[verify] confirmSale error:", e);
+                }
+
+                if (!stockDecremented) {
+                    const orderItems: any[] = Array.isArray(currentOrder?.items) ? (currentOrder.items as any[]) : [];
+                    if (orderItems.length > 0) {
+                        const pIds = [...new Set(orderItems.map((i: any) => i.productId).filter(Boolean))];
+                        const { data: fbProducts } = await supabase
+                            .from("products")
+                            .select("id, inventory_count, track_inventory, track_variant_inventory")
+                            .in("id", pIds);
+                        const fbProductMap = new Map((fbProducts ?? []).map((p: any) => [p.id, p]));
+
+                        const variantTrackedPIds = new Set<string>(
+                            (fbProducts ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
+                        );
+                        const variantIdLookup: Record<string, string> = {};
+                        if (variantTrackedPIds.size > 0) {
+                            const { data: fbVariants } = await supabase
+                                .from("product_variants")
+                                .select("id, product_id, size, color, stitching, inventory_count")
+                                .in("product_id", [...variantTrackedPIds]);
+                            for (const v of fbVariants ?? []) {
+                                const k = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+                                variantIdLookup[k] = v.id;
+                            }
+                        }
+
+                        await Promise.allSettled(orderItems.map(async (item: any) => {
+                            const product = fbProductMap.get(item.productId);
+                            if (!product || product.track_inventory === false) return;
+                            const qty = item.quantity ?? 1;
+                            if (product.track_variant_inventory) {
+                                const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+                                const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
+                                if (resolvedVariantId) {
+                                    const { data: variant } = await supabase
+                                        .from("product_variants")
+                                        .select("inventory_count")
+                                        .eq("id", resolvedVariantId)
+                                        .single();
+                                    if (variant) {
+                                        await supabase.from("product_variants")
+                                            .update({ inventory_count: Math.max(0, (variant.inventory_count ?? 0) - qty) })
+                                            .eq("id", resolvedVariantId);
+                                    }
+                                }
+                                await supabase.from("products")
+                                    .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
+                                    .eq("id", item.productId);
+                            } else {
+                                await supabase.from("products")
+                                    .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
+                                    .eq("id", item.productId);
+                            }
+                        }));
+                        console.log(`[verify] fallback stock decrement applied for order ${metaOrderId}`);
+                    }
+                }
+
+                // Mark as paid — guarded by payment_status="pending" for idempotency
+                await supabase
+                    .from("orders")
+                    .update({ payment_status: "paid", status: "paid" })
+                    .eq("id", metaOrderId)
+                    .eq("payment_status", "pending");
+
+                revalidateTag("products", "max");
+            }
+
             const order = await fetchOrderForReceipt(metaOrderId);
             return NextResponse.json({ status: orderStatus, orderId: metaOrderId, order }, {
                 headers: { "Cache-Control": "private, no-store" },
