@@ -60,7 +60,7 @@ export default async function ShopCatalog({
     const now = new Date().toISOString();
     const [{ data: products }, { data: categories }, { data: storeSettingsData }, { data: autoRules }] = await Promise.all([
         productsQuery,
-        supabase.from("categories").select("id, name, slug, image_url").eq("is_active", true).order("name"),
+        supabase.from("categories").select("id, name, slug, image_url, preorder_enabled, preorder_estimated_weeks").eq("is_active", true).order("name"),
         supabase.from("store_settings").select("shop_grid_cols, shop_product_limit, shop_mobile_cols, shop_show_title, shop_image_stretch").eq("id", "default").single(),
         supabase.from("automatic_discounts")
             .select("id, title, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope")
@@ -83,6 +83,14 @@ export default async function ShopCatalog({
 
     const rules = autoRules ?? [];
 
+    // Build preorder lookup maps from categories
+    const preorderCatById = new Map(
+        (categories || []).filter((c: any) => c.preorder_enabled).map((c: any) => [c.id, c])
+    );
+    const preorderCatByName = new Map(
+        (categories || []).filter((c: any) => c.preorder_enabled).map((c: any) => [(c.name || "").toLowerCase(), c])
+    );
+
     // Derive which categories have live products — check both category_ids (UUID array) and category_type (text)
     // This avoids relying on the pre-computed product_count column which can be stale/inaccurate
     const activeCategoryIds = new Set((products || []).flatMap((p: any) => p.category_ids || []));
@@ -97,6 +105,16 @@ export default async function ShopCatalog({
             ? `GH₵ ${(p.price_ghs * (1 - p.discount_value / 100)).toFixed(2)}`
             : null;
         const autoRule = getApplicableRule(p.id, p.category_ids || null, rules);
+
+        // Inherit preorder from category if product doesn't have it set
+        let effectivePreorder = p.preorder_enabled ?? false;
+        if (!effectivePreorder) {
+            const inheritedCat =
+                (p.category_ids as string[] | null)?.map((id: string) => preorderCatById.get(id)).find(Boolean)
+                ?? (p.category_type ? preorderCatByName.get((p.category_type as string).toLowerCase()) : undefined);
+            if (inheritedCat) effectivePreorder = true;
+        }
+
         return {
             slug: p.slug || p.id,
             name: p.name,
@@ -115,7 +133,7 @@ export default async function ShopCatalog({
                         ? (p.product_variants || []).reduce((sum: number, v: any) => sum + (v.inventory_count ?? 0), 0)
                         : (p.inventory_count === 9999 ? 9999 : (p.inventory_count ?? 0)))
                     : 9999;
-                if (stock <= 0) return p.preorder_enabled ? "Pre-order" : "Sold Out";
+                if (stock <= 0) return effectivePreorder ? "Pre-order" : "Sold Out";
                 if (stock > 0 && stock <= 3) return `Only ${stock} Left`;
                 return isOnSale ? null : (autoRule?.title ?? p.ribbon ?? null);
             })(),

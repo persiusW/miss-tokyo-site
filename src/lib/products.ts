@@ -26,6 +26,7 @@ export interface ShopProduct {
     track_inventory: boolean;
     track_variant_inventory: boolean;
     preorder_enabled: boolean;
+    preorder_estimated_date: string | null;
     category_ids: string[] | null;
     created_at: string;
 }
@@ -57,8 +58,8 @@ const PAGE_SIZE = 24;
 const getCachedCategories = unstable_cache(
     async () => {
         const db = createClient();
-        const { data } = await db.from("categories").select("name, slug");
-        return (data ?? []) as Array<{ name: string; slug: string }>;
+        const { data } = await db.from("categories").select("id, name, slug, preorder_enabled, preorder_estimated_weeks");
+        return (data ?? []) as Array<{ id: string; name: string; slug: string; preorder_enabled: boolean; preorder_estimated_weeks: number }>;
     },
     ["categories-name-map"],
     { revalidate: 300 }
@@ -88,6 +89,12 @@ const getCachedProducts = unstable_cache(
         const catMap = new Map<string, { name: string; slug: string }>(
             allCats.map((c: any) => [c.name.toLowerCase(), c])
         );
+        const preorderCatById = new Map(
+            allCats.filter((c: any) => c.preorder_enabled).map((c: any) => [c.id, c])
+        );
+        const preorderCatByName = new Map(
+            allCats.filter((c: any) => c.preorder_enabled).map((c: any) => [c.name.toLowerCase(), c])
+        );
 
         let query = db
             .from("products")
@@ -95,7 +102,7 @@ const getCachedProducts = unstable_cache(
                 `id, name, slug, description, price_ghs, compare_at_price_ghs,
                  image_urls, is_featured, is_active, category_id, category_type, category_ids,
                  available_colors, available_sizes, color_variants, size_variants,
-                 bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, preorder_enabled, sku, created_at`,
+                 bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, preorder_enabled, preorder_estimated_date, sku, created_at`,
                 { count: "exact" }
             );
 
@@ -134,13 +141,34 @@ const getCachedProducts = unstable_cache(
 
         const products: ShopProduct[] = (data || []).map((p: any) => {
             const matchedCat = p.category_type ? catMap.get(p.category_type.toLowerCase()) : null;
+
+            // Category-level preorder inheritance: if the product hasn't explicitly enabled
+            // preorder, check if any of its assigned categories has preorder enabled
+            let effectivePreorder = p.preorder_enabled ?? false;
+            let effectivePreorderDate: string | null = p.preorder_estimated_date ?? null;
+            if (!effectivePreorder) {
+                const inheritedCat =
+                    (p.category_ids as string[] | null)?.map((id: string) => preorderCatById.get(id)).find(Boolean)
+                    ?? (p.category_id ? preorderCatById.get(p.category_id) : undefined)
+                    ?? (p.category_type ? preorderCatByName.get(p.category_type.toLowerCase()) : undefined);
+                if (inheritedCat) {
+                    effectivePreorder = true;
+                    if (!effectivePreorderDate && inheritedCat.preorder_estimated_weeks > 0) {
+                        effectivePreorderDate = new Date(
+                            Date.now() + inheritedCat.preorder_estimated_weeks * 7 * 24 * 60 * 60 * 1000
+                        ).toISOString().split("T")[0];
+                    }
+                }
+            }
+
             return {
                 ...p,
                 category_name: matchedCat?.name ?? p.category_type ?? null,
                 category_slug: matchedCat?.slug ?? null,
                 track_inventory: p.track_inventory ?? true,
                 track_variant_inventory: p.track_variant_inventory ?? false,
-                preorder_enabled: p.preorder_enabled ?? false,
+                preorder_enabled: effectivePreorder,
+                preorder_estimated_date: effectivePreorderDate,
             };
         });
 
@@ -181,6 +209,30 @@ const getCachedCategoriesByRole = unstable_cache(
 export async function getCategories(role?: string): Promise<ShopCategory[]> {
     const isAuthorized = !!role && ["admin", "owner", "wholesale", "wholesaler"].includes(role.toLowerCase());
     return getCachedCategoriesByRole(isAuthorized);
+}
+
+// Lightweight cached fetch of category assignments for all active products.
+// Used to filter the storefront category list to only those with live products.
+const getCachedProductCategoryAssignments = unstable_cache(
+    async () => {
+        const db = createClient();
+        const { data } = await db
+            .from("products")
+            .select("category_id, category_type, category_ids")
+            .eq("is_active", true);
+        return (data ?? []) as Array<{ category_id: string | null; category_type: string | null; category_ids: string[] | null }>;
+    },
+    ["product-category-assignments"],
+    { revalidate: 300, tags: ["products"] }
+);
+
+export async function getPopulatedCategoryFilter(allCategories: ShopCategory[]): Promise<ShopCategory[]> {
+    const assignments = await getCachedProductCategoryAssignments();
+    const activeCatIds = new Set(assignments.flatMap(p => p.category_ids ?? (p.category_id ? [p.category_id] : [])));
+    const activeCatNames = new Set(assignments.map(p => (p.category_type ?? "").toLowerCase().trim()).filter(Boolean));
+    return allCategories.filter(c =>
+        activeCatIds.has(c.id) || activeCatNames.has(c.name.toLowerCase().trim())
+    );
 }
 
 // ─── PDP interfaces ────────────────────────────────────────────────────────

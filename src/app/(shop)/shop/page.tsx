@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { Suspense } from "react";
 import { unstable_cache } from "next/cache";
-import { getProducts, getCategories, deriveColors, deriveSizes } from "@/lib/products";
+import { getProducts, getCategories, getPopulatedCategoryFilter, deriveColors, deriveSizes } from "@/lib/products";
 import { ShopPageClient } from "@/components/ui/miss-tokyo/ShopPageClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -103,7 +103,7 @@ export default async function ShopPage({
         getAutoDiscountRules().catch(() => []),
     ]);
 
-    const [{ products, total, minPrice, maxPrice }, categories] = await Promise.all([
+    const [{ products, total, minPrice, maxPrice }, allCategories] = await Promise.all([
         getProducts({
             category: params.category,
             sort:     params.sort,
@@ -117,6 +117,8 @@ export default async function ShopPage({
         }, role),
         getCategories(role),
     ]);
+
+    const categories = await getPopulatedCategoryFilter(allCategories);
 
     // Resolve category slug → name once (reused for both filter queries)
     let categoryName: string | null = null;

@@ -149,7 +149,12 @@ export default async function ProductPage({
         wholesaleTiersData: null,
     }));
 
-    const [related, { reviews, distribution }, variantRes, variantMetaRes, autoDiscountRules] = await Promise.all([
+    const catConditionsForPreorder: string[] = [];
+    if (product.category_ids?.length) catConditionsForPreorder.push(`id.in.(${product.category_ids.join(",")})`);
+    if (product.category_id) catConditionsForPreorder.push(`id.eq.${product.category_id}`);
+    if (product.category_type) catConditionsForPreorder.push(`name.ilike."${product.category_type}"`);
+
+    const [related, { reviews, distribution }, variantRes, variantMetaRes, autoDiscountRules, preorderCatRes] = await Promise.all([
         getRelatedProducts(product.category_type ?? "", slug),
         getProductReviews(product.id),
         supabaseAdmin
@@ -162,10 +167,30 @@ export default async function ProductPage({
             .eq("id", product.id)
             .maybeSingle(),
         getActiveAutoDiscounts().catch(() => []),
+        catConditionsForPreorder.length
+            ? supabaseAdmin
+                .from("categories")
+                .select("preorder_enabled, preorder_estimated_weeks")
+                .or(catConditionsForPreorder.join(","))
+                .eq("preorder_enabled", true)
+                .limit(1)
+                .maybeSingle()
+            : Promise.resolve({ data: null }),
     ]);
 
     const productVariants = variantRes.data ?? [];
     const trackVariantInventory = (variantMetaRes.data as any)?.track_variant_inventory ?? false;
+
+    // Resolve effective preorder: product-level takes priority, falls back to category
+    const productPreorderEnabled = (variantMetaRes.data as any)?.preorder_enabled ?? false;
+    const productPreorderDate = (variantMetaRes.data as any)?.preorder_estimated_date ?? null;
+    const catPreorderData = preorderCatRes.data as { preorder_enabled: boolean; preorder_estimated_weeks: number } | null;
+    const effectivePreorderEnabled = productPreorderEnabled || (catPreorderData?.preorder_enabled ?? false);
+    const effectivePreorderDate = productPreorderEnabled
+        ? productPreorderDate
+        : (catPreorderData?.preorder_estimated_weeks ?? 0) > 0
+            ? new Date(Date.now() + catPreorderData!.preorder_estimated_weeks * 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+            : null;
 
     const baseTiers = wholesaleTiersData || {
         tier1_min: 3, tier1_max: 5, tier1_discount: 10,
@@ -353,8 +378,8 @@ export default async function ProductPage({
                             trackInventory={product.track_inventory}
                             productVariants={productVariants}
                             autoDiscountRule={applicableAutoRule as any}
-                            preorderEnabled={(variantMetaRes.data as any)?.preorder_enabled ?? false}
-                            preorderEstimatedDate={(variantMetaRes.data as any)?.preorder_estimated_date ?? null}
+                            preorderEnabled={effectivePreorderEnabled}
+                            preorderEstimatedDate={effectivePreorderDate}
                         />
 
                         {/* Accordions */}
