@@ -173,7 +173,7 @@ export default function CheckoutPage() {
                     if (!cartItem) continue;
                     if (!result.isActive) {
                         issues.push(`"${cartItem.name}" is no longer available.`);
-                    } else if (!result.preorderEnabled && result.available < cartItem.quantity) {
+                    } else if (!(result.preorderEnabled && result.available === 0) && result.available < cartItem.quantity) {
                         issues.push(`"${cartItem.name}" only has ${result.available} unit${result.available === 1 ? "" : "s"} left.`);
                     }
                 }
@@ -329,7 +329,7 @@ export default function CheckoutPage() {
                     if (!cartItem) continue;
                     if (!result.isActive) {
                         issues.push(`"${cartItem.name}" is no longer available.`);
-                    } else if (!result.preorderEnabled && result.available < cartItem.quantity) {
+                    } else if (!(result.preorderEnabled && result.available === 0) && result.available < cartItem.quantity) {
                         issues.push(result.available === 0
                             ? `"${cartItem.name}" just sold out. Please remove it from your cart.`
                             : `"${cartItem.name}" only has ${result.available} left. Please update your cart.`
