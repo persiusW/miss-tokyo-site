@@ -178,13 +178,13 @@ export default function CheckoutPage() {
                     }
                 }
                 if (issues.length > 0) setStockError(issues.join(" "));
+                else setStockError(null);
             })
             .catch(() => {
-                // Don't block checkout on network failure — server will catch it at payment
+                // Don't block checkout on network failure — server catches it at reserve time
             })
             .finally(() => setStockChecking(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [items]);
 
     const lastFetchedKey = useRef<string>("");
 
@@ -306,6 +306,48 @@ export default function CheckoutPage() {
             setErrors(validationErrors);
             return;
         }
+
+        // Fresh real-time stock check right before payment — catches inventory
+        // changes that happened after the page initially loaded.
+        setStockChecking(true);
+        setStockError(null);
+        try {
+            const checkItems = items.map(i => ({
+                productId: i.productId,
+                variantId: null,
+                size: i.size,
+                color: i.color,
+                stitching: (i as { stitching?: string }).stitching ?? null,
+                quantity: i.quantity,
+            }));
+            const stockRes = await fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`);
+            const stockData = await stockRes.json();
+            if (stockData.results) {
+                const issues: string[] = [];
+                for (const result of stockData.results) {
+                    const cartItem = items.find(i => i.productId === result.productId);
+                    if (!cartItem) continue;
+                    if (!result.isActive) {
+                        issues.push(`"${cartItem.name}" is no longer available.`);
+                    } else if (!result.preorderEnabled && result.available < cartItem.quantity) {
+                        issues.push(result.available === 0
+                            ? `"${cartItem.name}" just sold out. Please remove it from your cart.`
+                            : `"${cartItem.name}" only has ${result.available} left. Please update your cart.`
+                        );
+                    }
+                }
+                if (issues.length > 0) {
+                    setStockError(issues.join(" "));
+                    setStockChecking(false);
+                    return;
+                }
+            }
+        } catch {
+            // Network failure — let the server catch it at reserve time
+        } finally {
+            setStockChecking(false);
+        }
+
         setLoading(true);
         try {
             const payload = {
