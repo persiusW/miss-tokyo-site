@@ -425,7 +425,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     return (
         <div className="space-y-0">
             {/* Search + Tabs row — sticky so it stays visible while scrolling orders */}
-            <div className="sticky top-0 z-10 bg-neutral-50 flex flex-col sm:flex-row sm:items-end gap-4 border-b border-neutral-200 pb-0">
+            <div className="sticky top-0 z-10 bg-neutral-50 flex flex-col sm:flex-row sm:items-end gap-4 border-t border-b border-neutral-200 pb-0">
                 <div className="flex gap-0 overflow-x-auto">
                     {TABS.map(tab => (
                         <button

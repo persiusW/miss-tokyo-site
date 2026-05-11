@@ -23,7 +23,7 @@ export default async function OrdersPage() {
     const allOrders = orders ?? [];
 
     return (
-        <div className="space-y-12">
+        <div className="space-y-6">
             <header>
                 <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Orders</h1>
                 <p className="text-neutral-500">All customer orders and their fulfilment status.</p>
