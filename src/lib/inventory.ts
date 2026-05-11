@@ -176,7 +176,9 @@ export async function reserveStock(orderId: string, items: ReserveItem[]): Promi
  * Late webhook handling: the cron marks orders expired but intentionally does NOT delete
  * the reservation row. A late Paystack webhook still finds the row and decrements correctly.
  */
-export async function confirmSale(orderId: string): Promise<void> {
+// Returns true if reservations were found and stock was decremented.
+// Returns false if no reservation row existed (caller should apply fallback).
+export async function confirmSale(orderId: string): Promise<boolean> {
     const { data: reservations, error: fetchError } = await supabaseAdmin
         .from("online_reservations")
         .select("product_id, variant_id, quantity, expires_at")
@@ -184,9 +186,7 @@ export async function confirmSale(orderId: string): Promise<void> {
 
     if (fetchError) throw new Error(fetchError.message);
     if (!reservations?.length) {
-        // No reservation found — order predates the reservation system.
-        // The webhook's legacy fallback block (using parsedItems) will handle this.
-        return;
+        return false;
     }
 
     const now = new Date();
@@ -244,6 +244,8 @@ export async function confirmSale(orderId: string): Promise<void> {
         .from("online_reservations")
         .delete()
         .eq("order_id", orderId);
+
+    return true;
 }
 
 /**

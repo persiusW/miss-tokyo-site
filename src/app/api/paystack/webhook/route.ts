@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { revalidateTag } from "next/cache";
 import { confirmSale } from "@/lib/inventory";
+import { normAttr } from "@/lib/utils/normAttr";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
@@ -513,8 +514,69 @@ export async function POST(req: Request) {
             // then deletes the reservation. Falls through gracefully for orders
             // created before the reservation system was deployed.
             if (!isAlreadyProcessed) {
+                let stockDecremented = false;
+
                 if (orderId) {
-                    await confirmSale(orderId);
+                    stockDecremented = await confirmSale(orderId);
+
+                    // Fallback: no reservation row (order predates reservation system or
+                    // reservation was never created). Decrement directly from stored items.
+                    if (!stockDecremented && orderItemsFromDB.length > 0) {
+                        const pIds = [...new Set(orderItemsFromDB.map((i: any) => i.productId).filter(Boolean))];
+                        const { data: fbProducts } = await supabaseAdmin
+                            .from("products")
+                            .select("id, inventory_count, track_inventory, track_variant_inventory")
+                            .in("id", pIds);
+                        const fbProductMap = new Map((fbProducts ?? []).map((p: any) => [p.id, p]));
+
+                        // Resolve current variant IDs by (size, color, stitching) for tracked products
+                        const variantTrackedPIds = new Set<string>(
+                            (fbProducts ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
+                        );
+                        const variantIdLookup: Record<string, string> = {};
+                        if (variantTrackedPIds.size > 0) {
+                            const { data: fbVariants } = await supabaseAdmin
+                                .from("product_variants")
+                                .select("id, product_id, size, color, stitching, inventory_count")
+                                .in("product_id", [...variantTrackedPIds]);
+                            for (const v of fbVariants ?? []) {
+                                const k = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+                                variantIdLookup[k] = v.id;
+                            }
+                        }
+
+                        await Promise.allSettled(orderItemsFromDB.map(async (item: any) => {
+                            const product = fbProductMap.get(item.productId);
+                            if (!product || product.track_inventory === false) return;
+                            const qty = item.quantity ?? 1;
+
+                            if (product.track_variant_inventory) {
+                                const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+                                const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
+                                if (resolvedVariantId) {
+                                    const { data: variant } = await supabaseAdmin
+                                        .from("product_variants")
+                                        .select("inventory_count")
+                                        .eq("id", resolvedVariantId)
+                                        .single();
+                                    if (variant) {
+                                        await supabaseAdmin.from("product_variants")
+                                            .update({ inventory_count: Math.max(0, (variant.inventory_count ?? 0) - qty) })
+                                            .eq("id", resolvedVariantId);
+                                    }
+                                }
+                                // Decrement product-level too
+                                await supabaseAdmin.from("products")
+                                    .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
+                                    .eq("id", item.productId);
+                            } else {
+                                await supabaseAdmin.from("products")
+                                    .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
+                                    .eq("id", item.productId);
+                            }
+                        }));
+                        console.log(`[webhook] fallback stock decrement applied for order ${orderId} (no reservation row)`);
+                    }
                 } else if (productId) {
                     // Legacy single-product path (no orderId in metadata)
                     const { data: product } = await supabaseAdmin
@@ -530,8 +592,6 @@ export async function POST(req: Request) {
                     }
                 }
 
-                // Flush the 'products' cache tag so shop grids and PDPs
-                // serve fresh stock counts immediately after payment.
                 revalidateTag("products", "max");
             }
 
