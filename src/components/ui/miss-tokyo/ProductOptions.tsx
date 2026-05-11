@@ -220,7 +220,9 @@ export function ProductOptions(props: Props) {
     }, [trackVariantInventory, productVariants, selectedColor]);
 
     // On mount: once variant stock data is ready, advance size to first in-stock option.
+    // Skip when pre-order is enabled — all sizes are orderable, no need to force-advance.
     useEffect(() => {
+        if (preorderEnabled) return;
         if (!sizesWithStock) return;
         if (selectedSize && sizesWithStock.has(selectedSize)) return;
         const first = sizes.find(s => sizesWithStock.has(s.label));
@@ -231,6 +233,7 @@ export function ProductOptions(props: Props) {
     // When color changes, if the selected size has no stock for that color, advance to
     // the first size that does — so the user is never stuck on an OOS combo.
     useEffect(() => {
+        if (preorderEnabled) return;
         if (!sizesInStockForSelectedColor) return;
         if (selectedSize && sizesInStockForSelectedColor.has(selectedSize)) return;
         const first = sizes.find(s => sizesInStockForSelectedColor!.has(s.label));
@@ -240,6 +243,7 @@ export function ProductOptions(props: Props) {
 
     // When colorsWithStock resolves and current color has no stock anywhere, advance color.
     useEffect(() => {
+        if (preorderEnabled) return;
         if (!colorsWithStock) return;
         if (selectedColor && colorsWithStock.has(selectedColor)) return;
         const first = colors.find(c => colorsWithStock.has(c.name));
@@ -519,24 +523,26 @@ export function ProductOptions(props: Props) {
                             const inStock = colorsWithStock !== null
                                 ? colorsWithStock.has(c.name)
                                 : c.in_stock;
+                            // When pre-order is enabled, all variants are orderable.
+                            const canSelect = preorderEnabled || inStock;
                             const isSelected = selectedColor === c.name;
                             return (
                                 <button
                                     key={c.name}
-                                    title={inStock ? c.name : `${c.name} — out of stock`}
-                                    onClick={() => { if (inStock) setSelectedColor(c.name); }}
-                                    disabled={!inStock}
+                                    title={inStock ? c.name : preorderEnabled ? `${c.name} — pre-order` : `${c.name} — out of stock`}
+                                    onClick={() => { if (canSelect) setSelectedColor(c.name); }}
+                                    disabled={!canSelect}
                                     style={{
                                         position: "relative",
                                         width: 32, height: 32, borderRadius: "50%",
                                         background: c.hex,
                                         border: "2px solid transparent",
-                                        cursor: inStock ? "pointer" : "not-allowed",
+                                        cursor: canSelect ? "pointer" : "not-allowed",
                                         transition: "box-shadow 0.15s, opacity 0.15s",
                                         boxShadow: isSelected
                                             ? "0 0 0 2px #fff, 0 0 0 3.5px var(--ink, #141210)"
                                             : "none",
-                                        opacity: inStock ? 1 : 0.3,
+                                        opacity: inStock ? 1 : preorderEnabled ? 0.6 : 0.3,
                                         outline: "none",
                                         overflow: "hidden",
                                     }}
@@ -588,13 +594,15 @@ export function ProductOptions(props: Props) {
                                 : sizesWithStock !== null
                                     ? sizesWithStock.has(s.label)
                                     : s.in_stock;
+                            // When pre-order is enabled, all sizes are orderable.
+                            const canSelect = preorderEnabled || inStock;
                             const isActive = selectedSize === s.label;
                             return (
                                 <button
                                     key={s.label}
-                                    onClick={() => { if (inStock) setSelectedSize(s.label); }}
-                                    disabled={!inStock}
-                                    title={inStock ? s.label : `${s.label} — out of stock`}
+                                    onClick={() => { if (canSelect) setSelectedSize(s.label); }}
+                                    disabled={!canSelect}
+                                    title={inStock ? s.label : preorderEnabled ? `${s.label} — pre-order` : `${s.label} — out of stock`}
                                     style={{
                                         position: "relative",
                                         padding: "9px 16px",
@@ -607,7 +615,7 @@ export function ProductOptions(props: Props) {
                                         borderRadius: 2, fontSize: 12, fontWeight: 400,
                                         color: isActive ? "#fff" : inStock ? "var(--muted, #7A7167)" : "rgba(20,18,16,0.3)",
                                         background: isActive ? "var(--ink, #141210)" : "transparent",
-                                        cursor: inStock ? "pointer" : "not-allowed",
+                                        cursor: canSelect ? "pointer" : "not-allowed",
                                         transition: "all 0.15s",
                                         overflow: "hidden",
                                     }}
