@@ -7,11 +7,11 @@ import imageCompression from "browser-image-compression";
  */
 export async function compressToWebP(file: File): Promise<File> {
     const options = {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1920,
+        maxSizeMB: 2,
+        maxWidthOrHeight: 2400,
         useWebWorker: true,
         fileType: "image/webp" as const,
-        initialQuality: 0.85,
+        initialQuality: 0.93,
     };
 
     const compressed = await imageCompression(file, options);

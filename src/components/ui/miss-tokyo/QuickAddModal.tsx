@@ -91,14 +91,16 @@ export function QuickAddModal({
     }, [onClose]);
 
     // Colors that have ANY in-stock variant across all sizes.
+    // When preorder is enabled, all colors are selectable regardless of stock.
     const colorsWithAnyStock = useMemo<Set<string> | null>(() => {
+        if (product.preorder_enabled) return null; // all colors selectable for preorder
         if (!product.track_variant_inventory || variants.length === 0) return null;
         const result = new Set<string>();
         for (const v of variants) {
             if ((v.inventory_count ?? 0) > 0 && v.color != null) result.add(v.color);
         }
         return result;
-    }, [product.track_variant_inventory, variants]);
+    }, [product.track_variant_inventory, variants, product.preorder_enabled]);
 
     // Sizes that have a variant row for the selected color (in-stock OR out-of-stock).
     const sizesForSelectedColor = useMemo<string[]>(() => {
@@ -111,14 +113,16 @@ export function QuickAddModal({
     }, [product.track_variant_inventory, variants, selectedColor, sizes]);
 
     // Sizes with stock > 0 for the selected color.
+    // When preorder is enabled, all sizes are selectable regardless of stock.
     const sizesInStockForColor = useMemo<Set<string>>(() => {
+        if (product.preorder_enabled) return new Set(sizesForSelectedColor); // all sizes selectable
         if (!product.track_variant_inventory || variants.length === 0 || !selectedColor) return new Set(sizes);
         const result = new Set<string>();
         for (const v of variants) {
             if ((v.color ?? "") === selectedColor && (v.inventory_count ?? 0) > 0 && v.size != null) result.add(v.size);
         }
         return result;
-    }, [product.track_variant_inventory, variants, selectedColor, sizes]);
+    }, [product.track_variant_inventory, variants, selectedColor, sizes, product.preorder_enabled, sizesForSelectedColor]);
 
     // Once variants load, advance selectedColor to first color with any stock.
     useEffect(() => {
@@ -156,9 +160,10 @@ export function QuickAddModal({
     }, [product.track_inventory, product.track_variant_inventory, variants, selectedSize, selectedColor, product.inventory_count]);
 
     const isOutOfStock = effectiveInventory === 0;
+    const isPreorderMode = isOutOfStock && product.preorder_enabled;
 
     const handleAdd = () => {
-        if (isOutOfStock) return;
+        if (isOutOfStock && !product.preorder_enabled) return;
         if (sizesForSelectedColor.length > 0 && !selectedSize) return;
         setAdding(true);
         addItem({
@@ -172,7 +177,9 @@ export function QuickAddModal({
             quantity: 1,
             imageUrl: product.image_urls?.[0] || "",
             inventoryCount: effectiveInventory,
-        }, false);
+            isPreOrder: isPreorderMode,
+            estimatedAvailability: isPreorderMode ? undefined : undefined,
+        }, isPreorderMode);
         setAdding(false);
         setAdded(true);
         setTimeout(onClose, 1400);
@@ -310,17 +317,25 @@ export function QuickAddModal({
 
                     <button
                         onClick={handleAdd}
-                        disabled={adding || isOutOfStock || (sizes.length > 0 && !selectedSize)}
+                        disabled={adding || (isOutOfStock && !product.preorder_enabled) || (sizesForSelectedColor.length > 0 && !selectedSize)}
                         className="w-full py-[13px] flex items-center justify-center gap-2 text-[12px] font-medium tracking-[0.1em] uppercase mb-[10px] transition-colors"
                         style={{
                             borderRadius: 2, border: "none",
-                            background: added ? "#16a34a" : (isOutOfStock || (sizes.length > 0 && !selectedSize)) ? "#D1D5DB" : "#141210",
-                            color: isOutOfStock ? "#9CA3AF" : "#fff",
-                            cursor: (isOutOfStock || (sizes.length > 0 && !selectedSize)) ? "not-allowed" : "pointer",
+                            background: added ? "#16a34a"
+                                : (sizesForSelectedColor.length > 0 && !selectedSize) ? "#D1D5DB"
+                                : (isOutOfStock && !product.preorder_enabled) ? "#D1D5DB"
+                                : isPreorderMode ? "#C9963A"
+                                : "#141210",
+                            color: (isOutOfStock && !product.preorder_enabled) ? "#9CA3AF" : "#fff",
+                            cursor: ((isOutOfStock && !product.preorder_enabled) || (sizesForSelectedColor.length > 0 && !selectedSize)) ? "not-allowed" : "pointer",
                         }}
                     >
                         <ShoppingBag size={14} strokeWidth={1.5} />
-                        {added ? "Added to Cart ✓" : adding ? "Adding…" : isOutOfStock ? "Out of Stock" : "Add to Cart"}
+                        {added ? "Added to Cart ✓"
+                            : adding ? "Adding…"
+                            : (isOutOfStock && !product.preorder_enabled) ? "Out of Stock"
+                            : isPreorderMode ? "Pre-Order"
+                            : "Add to Cart"}
                     </button>
                     <Link href={`/products/${product.slug}`} onClick={onClose}
                         className="block text-center text-[11px] underline transition-colors"

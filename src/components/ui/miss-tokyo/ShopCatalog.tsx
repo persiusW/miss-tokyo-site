@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { ShopClient } from "@/components/ui/miss-tokyo/ShopClient";
+import { getApplicableRule } from "@/lib/autoDiscount";
 
 interface ShopCatalogProps {
     title?: string;
@@ -56,10 +57,16 @@ export default async function ShopCatalog({
         productsQuery = productsQuery.order("sort_order", { ascending: true }).order("created_at", { ascending: false });
     }
 
-    const [{ data: products }, { data: categories }, { data: storeSettingsData }] = await Promise.all([
+    const now = new Date().toISOString();
+    const [{ data: products }, { data: categories }, { data: storeSettingsData }, { data: autoRules }] = await Promise.all([
         productsQuery,
         supabase.from("categories").select("id, name, slug, image_url").eq("is_active", true).order("name"),
         supabase.from("store_settings").select("shop_grid_cols, shop_product_limit, shop_mobile_cols, shop_show_title, shop_image_stretch").eq("id", "default").single(),
+        supabase.from("automatic_discounts")
+            .select("id, title, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope")
+            .eq("is_active", true)
+            .lte("starts_at", now)
+            .or(`ends_at.is.null,ends_at.gt.${now}`),
     ]);
 
     const shopGridCols = ([2, 3, 4, 5].includes(storeSettingsData?.shop_grid_cols)
@@ -74,11 +81,13 @@ export default async function ShopCatalog({
     const shopShowTitle = storeSettingsData?.shop_show_title ?? true;
     const shopImageStretch = storeSettingsData?.shop_image_stretch ?? false;
 
+    const rules = autoRules ?? [];
     const formattedProducts = (products || []).map((p: any) => {
         const isOnSale = p.is_sale === true;
         const salePrice = isOnSale && p.discount_value > 0
             ? `GH₵ ${(p.price_ghs * (1 - p.discount_value / 100)).toFixed(2)}`
             : null;
+        const autoRule = getApplicableRule(p.id, p.category_ids || null, rules);
         return {
             slug: p.slug || p.id,
             name: p.name,
@@ -92,15 +101,14 @@ export default async function ShopCatalog({
             sizes: p.available_sizes || [],
             createdAt: p.created_at,
             ribbon: (() => {
-                if (!p.track_inventory) return p.ribbon ?? null;
-                // track_variant_inventory: sum variant counts (product.inventory_count = 9999 sentinel)
-                // product-level tracking: use inventory_count directly (9999 = unlimited)
-                const stock = p.track_variant_inventory
-                    ? (p.product_variants || []).reduce((sum: number, v: any) => sum + (v.inventory_count ?? 0), 0)
-                    : (p.inventory_count === 9999 ? 9999 : (p.inventory_count ?? 0));
+                const stock = p.track_inventory
+                    ? (p.track_variant_inventory
+                        ? (p.product_variants || []).reduce((sum: number, v: any) => sum + (v.inventory_count ?? 0), 0)
+                        : (p.inventory_count === 9999 ? 9999 : (p.inventory_count ?? 0)))
+                    : 9999;
                 if (stock <= 0) return p.preorder_enabled ? "Pre-order" : "Sold Out";
                 if (stock > 0 && stock <= 3) return `Only ${stock} Left`;
-                return p.ribbon ?? null;
+                return isOnSale ? null : (autoRule?.title ?? p.ribbon ?? null);
             })(),
             isOnSale,
             salePrice,

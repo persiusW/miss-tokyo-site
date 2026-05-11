@@ -21,8 +21,8 @@ const nextConfig: NextConfig = {
   },
   poweredByHeader: false, // SPD-12: suppress X-Powered-By header
   images: {
-    formats: ["image/avif", "image/webp"],
-    qualities: [75, 85, 90],
+    formats: ["image/webp"],
+    qualities: [85, 90, 95],
     // Image optimization enabled — Vercel Pro plan
     remotePatterns: [
       {
