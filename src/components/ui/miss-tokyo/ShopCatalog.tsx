@@ -24,7 +24,7 @@ export default async function ShopCatalog({
     
     // Build the products query dynamically
     // Exclude out-of-stock products: show only items that don't track inventory OR have stock > 0
-    let productsQuery = supabase.from("products").select("id, slug, name, price_ghs, image_urls, category_type, category_ids, available_colors, available_sizes, created_at, sort_order, ribbon, track_inventory, track_variant_inventory, inventory_count, is_sale, discount_value, product_variants(inventory_count)").eq("is_active", true)
+    let productsQuery = supabase.from("products").select("id, slug, name, price_ghs, image_urls, category_type, category_ids, available_colors, available_sizes, created_at, sort_order, ribbon, track_inventory, track_variant_inventory, inventory_count, is_sale, discount_value, preorder_enabled, product_variants(inventory_count)").eq("is_active", true)
         .or("track_inventory.eq.false,inventory_count.gt.0");
 
     if (isSaleOnly) {
@@ -98,7 +98,7 @@ export default async function ShopCatalog({
                 const stock = p.track_variant_inventory
                     ? (p.product_variants || []).reduce((sum: number, v: any) => sum + (v.inventory_count ?? 0), 0)
                     : (p.inventory_count === 9999 ? 9999 : (p.inventory_count ?? 0));
-                if (stock <= 0) return "Sold Out";
+                if (stock <= 0) return p.preorder_enabled ? "Pre-order" : "Sold Out";
                 if (stock > 0 && stock <= 3) return `Only ${stock} Left`;
                 return p.ribbon ?? null;
             })(),

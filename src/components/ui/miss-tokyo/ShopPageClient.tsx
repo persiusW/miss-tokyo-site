@@ -149,9 +149,9 @@ function ShopProductCard({
                     {isOutOfStock ? (
                         <span
                             className="absolute top-[10px] left-[10px] z-10 text-[9px] font-medium tracking-[0.1em] uppercase px-2 py-[3px]"
-                            style={{ borderRadius: 2, background: "#7A7167", color: "#fff" }}
+                            style={{ borderRadius: 2, background: product.preorder_enabled ? "#C9963A" : "#7A7167", color: "#fff" }}
                         >
-                            Sold Out
+                            {product.preorder_enabled ? "Pre-order" : "Sold Out"}
                         </span>
                     ) : ribbonLabel ? (
                         <span
