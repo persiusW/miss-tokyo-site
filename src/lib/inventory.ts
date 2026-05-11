@@ -179,14 +179,18 @@ export async function reserveStock(orderId: string, items: ReserveItem[]): Promi
 // Returns true if reservations were found and stock was decremented.
 // Returns false if no reservation row existed (caller should apply fallback).
 export async function confirmSale(orderId: string): Promise<boolean> {
-    const { data: reservations, error: fetchError } = await supabaseAdmin
+    // Atomically claim the reservation by deleting it and reading the rows back.
+    // Only ONE concurrent caller (verify or webhook) gets non-empty rows — the other
+    // gets [] and returns false immediately. This prevents double-decrement oversells.
+    const { data: reservations, error: deleteError } = await supabaseAdmin
         .from("online_reservations")
-        .select("product_id, variant_id, quantity, expires_at")
-        .eq("order_id", orderId);
+        .delete()
+        .eq("order_id", orderId)
+        .select("product_id, variant_id, quantity, expires_at");
 
-    if (fetchError) throw new Error(fetchError.message);
+    if (deleteError) throw new Error(deleteError.message);
     if (!reservations?.length) {
-        return false;
+        return false; // No reservation, or already claimed by a concurrent caller
     }
 
     const now = new Date();
@@ -238,12 +242,6 @@ export async function confirmSale(orderId: string): Promise<boolean> {
                 .eq("id", productId)
         )
     );
-
-    // Delete the reservation row — sale is confirmed
-    await supabaseAdmin
-        .from("online_reservations")
-        .delete()
-        .eq("order_id", orderId);
 
     return true;
 }

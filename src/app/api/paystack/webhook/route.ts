@@ -416,9 +416,9 @@ export async function POST(req: Request) {
                     .single();
 
                 // Use payment_status for idempotency — NOT order.status.
-                // The verify page previously set order.status before the webhook fired,
-                // causing isAlreadyProcessed=true and stock was never decremented.
-                if (existingOrder && existingOrder.payment_status !== "pending") {
+                // "processing" means the verify route atomically claimed the order and is
+                // currently decrementing stock — treat as already processed.
+                if (existingOrder && !["pending"].includes(existingOrder.payment_status)) {
                     console.log(`[webhook] Order ${orderId} already processed (payment_status=${existingOrder.payment_status}). Skipping inventory deductions.`);
                     isAlreadyProcessed = true;
                 }
@@ -660,7 +660,7 @@ export async function POST(req: Request) {
                         ...(customerId ? { customer_id: customerId } : {}),
                     })
                     .eq("id", orderId)
-                    .in("payment_status", ["pending"]); // idempotency: only update if still pending
+                    .in("payment_status", ["pending", "processing"]); // "processing" = verify claimed it but may have stalled
 
                 if (error) {
                     console.error("Webhook: Failed to update order:", error);
