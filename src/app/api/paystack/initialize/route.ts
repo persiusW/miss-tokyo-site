@@ -378,10 +378,30 @@ export async function POST(request: Request) {
                 await reserveStock(orderId, reserveItems);
             } catch (err: any) {
                 await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
-                return NextResponse.json(
-                    { error: err.message ?? "One or more items are no longer available." },
-                    { status: 409 }
-                );
+
+                // The DB raises: "Insufficient stock for product: <uuid> (available: N, requested: N)"
+                // Parse it and substitute a human-readable message with the product name + size.
+                let friendlyError = "One or more items are no longer available. Please update your cart and try again.";
+                const uuidMatch = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(err.message ?? "");
+                const availMatch = /available:\s*(\d+)/i.exec(err.message ?? "");
+                if (uuidMatch) {
+                    const pid = uuidMatch[1];
+                    const productName = dbProductMap[pid]?.name;
+                    const available = availMatch ? parseInt(availMatch[1]) : null;
+                    const problemItem = cartArr.find((i: any) => i.productId === pid);
+                    const sizeLabel = problemItem?.size ? ` in size ${problemItem.size}` : "";
+                    if (productName) {
+                        if (available === 0) {
+                            friendlyError = `"${productName}"${sizeLabel} just sold out. Please remove it from your cart.`;
+                        } else if (available !== null) {
+                            friendlyError = `"${productName}"${sizeLabel} only has ${available} unit${available === 1 ? "" : "s"} left. Please update your cart quantity.`;
+                        } else {
+                            friendlyError = `"${productName}"${sizeLabel} doesn't have enough stock. Please update your cart.`;
+                        }
+                    }
+                }
+
+                return NextResponse.json({ error: friendlyError }, { status: 409 });
             }
         }
 
