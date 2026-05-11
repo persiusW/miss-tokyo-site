@@ -86,6 +86,7 @@ function ShopProductCard({
         if (product.track_inventory === false) return false;
         return (product.inventory_count ?? 0) <= 0;
     }, [product.track_inventory, product.inventory_count]);
+    const isPreorderMode = isOutOfStock && product.preorder_enabled;
 
     useEffect(() => {
         try {
@@ -186,11 +187,11 @@ function ShopProductCard({
                     {/* Quick Add — always visible on mobile, hover-only on desktop */}
                     <div className="absolute bottom-[10px] left-[10px] right-[10px] flex gap-[6px] z-10 md:opacity-0 md:translate-y-[6px] md:group-hover:opacity-100 md:group-hover:translate-y-0 md:transition-all md:duration-200">
                         <button
-                            disabled={isOutOfStock}
+                            disabled={isOutOfStock && !isPreorderMode}
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                if (isOutOfStock) return;
+                                if (isOutOfStock && !isPreorderMode) return;
                                 const hasVariants = (product.available_sizes?.length ?? 0) > 0 || (product.available_colors?.length ?? 0) > 0;
                                 if (hasVariants) { onQuickAdd(product); return; }
                                 addItem({
@@ -203,25 +204,28 @@ function ShopProductCard({
                                     quantity: 1,
                                     imageUrl: product.image_urls?.[0] || "",
                                     inventoryCount: product.inventory_count,
+                                    isPreOrder: isPreorderMode,
                                 }, false);
                                 setAddState("added");
                                 setTimeout(() => setAddState("idle"), 1500);
                             }}
                             className="flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-80"
                             style={{
-                                background: isOutOfStock ? "#E8D5C4" : addState === "added" ? "#22c55e" : "#fff",
-                                color: isOutOfStock ? "#7A7167" : addState === "added" ? "#fff" : "#141210",
+                                background: isOutOfStock && !isPreorderMode ? "#E8D5C4" : isPreorderMode ? "#C9963A" : addState === "added" ? "#22c55e" : "#fff",
+                                color: isOutOfStock && !isPreorderMode ? "#7A7167" : isPreorderMode ? "#fff" : addState === "added" ? "#fff" : "#141210",
                                 borderRadius: 2,
                                 border: "none",
                             }}
                             onMouseEnter={e => { if (addState === "idle" && !isOutOfStock) { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
                             onMouseLeave={e => { if (addState === "idle" && !isOutOfStock) { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; } }}
                         >
-                            {isOutOfStock
+                            {isOutOfStock && !isPreorderMode
                                 ? "OUT OF STOCK"
-                                : addState === "added"
-                                    ? <><Check size={12} strokeWidth={2.5} /> Added</>
-                                    : <><ShoppingBag size={12} strokeWidth={1.8} /> Add to Cart</>
+                                : isPreorderMode
+                                    ? "Pre-Order"
+                                    : addState === "added"
+                                        ? <><Check size={12} strokeWidth={2.5} /> Added</>
+                                        : <><ShoppingBag size={12} strokeWidth={1.8} /> Add to Cart</>
                             }
                         </button>
                     </div>
