@@ -84,14 +84,13 @@ export async function POST(request: Request) {
 
             // Aggregate total ordered quantity per product across all cart items.
             // Buying 1×S + 1×M + 1×L of the same product = 3 units, not 1.
-            // Preorder bypass ONLY applies when the product is truly out of stock (inventory=0).
-            // If stock remains, normal limits apply even for preorder-enabled products.
+            // Preorder bypass is driven by which button the customer clicked at add-to-cart time:
+            // isPreOrder=true → they clicked "Pre-Order", skip stock limits for that item.
+            // isPreOrder=false/undefined → they clicked "Add to Cart", enforce stock normally.
             const qtyByProductId: Record<string, number> = {};
             for (const item of cartArr) {
                 if (!item.productId) continue;
-                const p = dbProductMap[item.productId];
-                const isOOS = (p?.inventory_count ?? 0) === 0;
-                if (p?.preorder_enabled && isOOS) continue; // truly OOS — no stock limit
+                if (item.isPreOrder) continue; // pre-order intent — no stock limit
                 qtyByProductId[item.productId] = (qtyByProductId[item.productId] ?? 0) + (item.quantity ?? 1);
             }
 
@@ -102,9 +101,7 @@ export async function POST(request: Request) {
             }, {});
             const checkedProducts = new Set<string>();
             for (const item of cartArr) {
-                const p = dbProductMap[item.productId];
-                const isOOS = (p?.inventory_count ?? 0) === 0;
-                if (p?.preorder_enabled && isOOS) continue; // allow pre-order when truly OOS
+                if (item.isPreOrder) continue; // pre-order intent — no stock limit
                 if (checkedProducts.has(item.productId)) continue;
                 checkedProducts.add(item.productId);
                 const stock = dbStockMap[item.productId];
@@ -125,9 +122,7 @@ export async function POST(request: Request) {
             if (variantTrackedProductIds.size > 0) {
                 const variantCartItems = cartArr.filter(i => {
                     if (!variantTrackedProductIds.has(i.productId)) return false;
-                    const p = dbProductMap[i.productId];
-                    const isOOS = (p?.inventory_count ?? 0) === 0;
-                    return !(p?.preorder_enabled && isOOS); // include in check unless truly OOS preorder
+                    return !i.isPreOrder; // skip if user clicked Pre-Order
                 });
                 if (variantCartItems.length > 0) {
                     const { data: dbVariants } = await supabaseAdmin
@@ -157,8 +152,7 @@ export async function POST(request: Request) {
             // OOS enforcement — uses dbProductMap (already fetched above, now includes track_inventory + name)
             const seenOosProducts = new Set<string>();
             for (const item of cartArr) {
-                const pOos = dbProductMap[item.productId];
-                if (pOos?.preorder_enabled && (pOos?.inventory_count ?? 0) === 0) continue;
+                if (item.isPreOrder) continue; // pre-order intent — skip OOS block
                 const p = dbProductMap[item.productId];
                 const totalQty = qtyByProductId[item.productId] ?? (item.quantity ?? 1);
                 if (p && p.track_inventory && (p.inventory_count ?? 0) < totalQty && !seenOosProducts.has(item.productId)) {
