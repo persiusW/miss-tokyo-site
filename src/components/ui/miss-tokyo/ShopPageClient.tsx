@@ -234,7 +234,7 @@ function ShopProductCard({
 
             {/* Info */}
             <Link href={`/products/${product.slug}`} className="block">
-                <p className="text-[10px] tracking-[0.1em] uppercase mb-1" style={{ color: "#C9A96E" }}>
+                <p className="text-[10px] tracking-[0.1em] uppercase mb-1" style={{ color: "#E8485A" }}>
                     {product.category_name || ""}
                 </p>
                 <p className="text-[13px] mb-[5px]" style={{ color: "#141210" }}>{product.name}</p>
