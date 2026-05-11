@@ -69,11 +69,39 @@ export default function CatalogProductsPage() {
     };
 
     const handleToggleActive = async (id: string, current: boolean) => {
-        const { error } = await supabase.from("products").update({ is_active: !current }).eq("id", id);
-        if (error) {
+        const next = !current;
+        // Optimistic update
+        setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: next } : p));
+        const res = await fetch("/api/admin/products", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, is_active: next }),
+        });
+        if (!res.ok) {
+            // Revert on failure
+            setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: current } : p));
             toast.error("Failed to update visibility.");
+        }
+    };
+
+    const handleBulkSetVisibility = async (visible: boolean) => {
+        const ids = [...selectedIds];
+        // Optimistic update
+        setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, is_active: visible } : p));
+        const results = await Promise.allSettled(
+            ids.map(id => fetch("/api/admin/products", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, is_active: visible }),
+            }))
+        );
+        const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
+        if (failed > 0) {
+            toast.error(`${failed} product${failed !== 1 ? "s" : ""} failed to update.`);
+            fetchProducts(); // Re-sync on partial failure
         } else {
-            setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: !current } : p));
+            toast.success(`${ids.length} product${ids.length !== 1 ? "s" : ""} ${visible ? "visible" : "hidden"}.`);
+            setSelectedIds([]);
         }
     };
 
@@ -231,11 +259,27 @@ export default function CatalogProductsPage() {
                     </span>
                     <div className="flex items-center gap-6">
                         <button
+                            onClick={() => handleBulkSetVisibility(true)}
+                            className="flex items-center gap-1.5 text-xs uppercase tracking-widest text-neutral-600 hover:text-black font-semibold transition-colors"
+                            title="Show all selected"
+                        >
+                            <Eye size={13} />
+                            Show All
+                        </button>
+                        <button
+                            onClick={() => handleBulkSetVisibility(false)}
+                            className="flex items-center gap-1.5 text-xs uppercase tracking-widest text-neutral-600 hover:text-black font-semibold transition-colors"
+                            title="Hide all selected"
+                        >
+                            <EyeOff size={13} />
+                            Hide All
+                        </button>
+                        <button
                             onClick={openWholesaleModal}
                             className="flex items-center gap-2 text-xs uppercase tracking-widest text-emerald-700 hover:text-emerald-900 font-semibold transition-colors"
                         >
                             <Tag size={13} />
-                            Assign Wholesale Category
+                            Assign Wholesale
                         </button>
                         <button
                             onClick={handleBulkUntrack}
