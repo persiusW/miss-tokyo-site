@@ -54,6 +54,7 @@ export default function CheckoutPage() {
     const [loading, setLoading] = useState(false);
     const [stockChecking, setStockChecking] = useState(false);
     const [stockError, setStockError] = useState<string | null>(null);
+    const [stockIssueIds, setStockIssueIds] = useState<Set<string>>(new Set());
 
     // Store Settings
     const [enablePickup, setEnablePickup] = useState(false);
@@ -168,17 +169,20 @@ export default function CheckoutPage() {
             .then(data => {
                 if (!data.results) return;
                 const issues: string[] = [];
+                const issueIds = new Set<string>();
                 for (const result of data.results) {
                     const cartItem = items.find(i => i.productId === result.productId);
                     if (!cartItem) continue;
                     if (!result.isActive) {
                         issues.push(`"${cartItem.name}" is no longer available.`);
+                        issueIds.add(cartItem.productId);
                     } else if (!cartItem.isPreOrder && result.available < cartItem.quantity) {
                         issues.push(`"${cartItem.name}" only has ${result.available} unit${result.available === 1 ? "" : "s"} left.`);
+                        issueIds.add(cartItem.productId);
                     }
                 }
-                if (issues.length > 0) setStockError(issues.join(" "));
-                else setStockError(null);
+                if (issues.length > 0) { setStockError(issues.join(" ")); setStockIssueIds(issueIds); }
+                else { setStockError(null); setStockIssueIds(new Set()); }
             })
             .catch(() => {
                 // Don't block checkout on network failure — server catches it at reserve time
@@ -324,20 +328,24 @@ export default function CheckoutPage() {
             const stockData = await stockRes.json();
             if (stockData.results) {
                 const issues: string[] = [];
+                const issueIds = new Set<string>();
                 for (const result of stockData.results) {
                     const cartItem = items.find(i => i.productId === result.productId);
                     if (!cartItem) continue;
                     if (!result.isActive) {
                         issues.push(`"${cartItem.name}" is no longer available.`);
+                        issueIds.add(cartItem.productId);
                     } else if (!cartItem.isPreOrder && result.available < cartItem.quantity) {
                         issues.push(result.available === 0
                             ? `"${cartItem.name}" just sold out. Please remove it from your cart.`
                             : `"${cartItem.name}" only has ${result.available} left. Please update your cart.`
                         );
+                        issueIds.add(cartItem.productId);
                     }
                 }
                 if (issues.length > 0) {
                     setStockError(issues.join(" "));
+                    setStockIssueIds(issueIds);
                     setStockChecking(false);
                     return;
                 }
@@ -608,22 +616,26 @@ export default function CheckoutPage() {
                 {/* Regular Items */}
                 {items.filter(i => !i.isPreOrder).length > 0 && (
                     <div className="space-y-6">
-                        {items.filter(i => !i.isPreOrder).map(item => (
-                            <div key={item.id} className="flex gap-4 items-center">
-                                <div className="w-16 h-16 bg-white overflow-hidden flex-shrink-0 border border-neutral-200 relative">
-                                    {item.imageUrl ? (
-                                        <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="64px" />
-                                    ) : (
-                                        <div className="w-full h-full bg-neutral-100" />
-                                    )}
+                        {items.filter(i => !i.isPreOrder).map(item => {
+                            const hasIssue = stockIssueIds.has(item.productId);
+                            return (
+                                <div key={item.id} className={`flex gap-4 items-center rounded-sm transition-colors ${hasIssue ? "bg-red-50 border border-red-200 p-2 -mx-2" : ""}`}>
+                                    <div className={`w-16 h-16 bg-white overflow-hidden flex-shrink-0 border relative ${hasIssue ? "border-red-300" : "border-neutral-200"}`}>
+                                        {item.imageUrl ? (
+                                            <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="64px" />
+                                        ) : (
+                                            <div className="w-full h-full bg-neutral-100" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className={`font-medium text-sm ${hasIssue ? "text-red-700" : "text-neutral-900"}`}>{item.name}</h3>
+                                        <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} · Qty: {item.quantity}</p>
+                                        {hasIssue && <p className="text-[10px] text-red-500 mt-0.5 font-medium">Out of stock</p>}
+                                    </div>
+                                    <p className={`font-medium text-sm ${hasIssue ? "text-red-400 line-through" : ""}`}>GHS {(getEffectivePrice(item) * item.quantity).toFixed(2)}</p>
                                 </div>
-                                <div className="flex-1">
-                                    <h3 className="font-medium text-sm text-neutral-900">{item.name}</h3>
-                                    <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} · Qty: {item.quantity}</p>
-                                </div>
-                                <p className="font-medium text-sm">GHS {(getEffectivePrice(item) * item.quantity).toFixed(2)}</p>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 
