@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { config } from "dotenv";
+
+// Load .env.test so TEST_ADMIN_EMAIL / TEST_ADMIN_PASSWORD are available to the setup step
+config({ path: ".env.test" });
 
 /**
  * Playwright configuration for Miss Tokyo e-commerce E2E tests.
