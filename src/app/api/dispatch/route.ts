@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
         // ── Fetch orders ──────────────────────────────────────────────────────
         const { data: orders, error: ordersError } = await supabaseAdmin
             .from("orders")
-            .select("id, customer_name, customer_email, customer_phone, shipping_address, total_amount, status, assigned_rider_id")
+            .select("id, customer_name, customer_email, customer_phone, shipping_address, total_amount, status, assigned_rider_id, is_mixed_order, items, customer_metadata")
             .in("id", orderIds);
 
         if (ordersError || !orders) {
@@ -51,10 +51,18 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Batch update orders ───────────────────────────────────────────────
-        const { error: updateError } = await supabaseAdmin
-            .from("orders")
-            .update({ status: "shipped", assigned_rider_id: riderId })
-            .in("id", orderIds);
+        // For mixed orders, stamp regular_items_dispatched_at so the admin UI
+        // can show the partial-fulfillment dot without a schema change.
+        const now = new Date().toISOString();
+        for (const order of orders) {
+            const meta = (order.customer_metadata as Record<string, unknown>) ?? {};
+            const updatePayload: Record<string, unknown> = { status: "shipped", assigned_rider_id: riderId };
+            if (order.is_mixed_order && !meta.regular_items_dispatched_at) {
+                updatePayload.customer_metadata = { ...meta, regular_items_dispatched_at: now };
+            }
+            await supabaseAdmin.from("orders").update(updatePayload).eq("id", order.id);
+        }
+        const updateError = null; // individual updates above; kept for downstream error-check shape
 
         if (updateError) {
             return NextResponse.json({ error: "Failed to update orders." }, { status: 500 });
@@ -84,18 +92,42 @@ export async function POST(req: NextRequest) {
                         ? `<img src="${rider.image_url}" alt="${rider.full_name}" style="width:80px;height:80px;object-fit:cover;border-radius:4px;margin-top:8px;"/>`
                         : "";
 
+                    const isMixed = !!(order as any).is_mixed_order;
+                    const orderItems: any[] = Array.isArray((order as any).items) ? (order as any).items : [];
+                    const regularItems = orderItems.filter(i => !i.isPreOrder);
+                    const preorderItems = orderItems.filter(i => i.isPreOrder);
+
+                    const shippingNowBlock = isMixed && regularItems.length > 0
+                        ? `<div style="margin-bottom:20px;">
+                            <p style="font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:#737373;margin:0 0 8px;">Shipping Now</p>
+                            ${regularItems.map(i => `<p style="font-size:13px;color:#171717;margin:0 0 4px;">${i.name || "Item"}${i.size ? ` · ${i.size}` : ""} × ${i.quantity || 1}</p>`).join("")}
+                           </div>`
+                        : "";
+
+                    const preorderPendingBlock = isMixed && preorderItems.length > 0
+                        ? `<div style="background:#fffbeb;border:1px solid #fef3c7;padding:16px;margin-bottom:20px;">
+                            <p style="font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:#d97706;margin:0 0 8px;">Pre-Order Items — Ships Separately</p>
+                            ${preorderItems.map(i => `<p style="font-size:13px;color:#171717;margin:0 0 4px;">${i.name || "Item"}${i.size ? ` · ${i.size}` : ""} × ${i.quantity || 1}</p>`).join("")}
+                            <p style="font-size:12px;color:#92400e;margin:8px 0 0;">We will notify you separately when these items are ready to dispatch.</p>
+                           </div>`
+                        : "";
+
+                    const introText = isMixed
+                        ? `Hello ${order.customer_name || "valued customer"}, your in-stock items from order <strong>#${ref}</strong> are on their way. Your pre-order items will be dispatched in a separate shipment once they arrive.`
+                        : `Hello ${order.customer_name || "valued customer"}, your order <strong>#${ref}</strong> has been dispatched and is on its way to you.`;
+
                     return resend.emails.send({
                         from: `${bizName} <${fromEmail}>`,
                         to: order.customer_email!,
-                        subject: `Your order #${ref} is on its way!`,
+                        subject: isMixed ? `Your available items from #${ref} are on their way!` : `Your order #${ref} is on its way!`,
                         html: `
                         <div style="font-family:Georgia,serif;background:#fafaf9;padding:40px 20px;">
                           <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;padding:48px;">
                             <h1 style="font-size:20px;letter-spacing:.15em;text-transform:uppercase;margin:0 0 6px;">${bizName}</h1>
                             <p style="color:#737373;font-size:11px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 36px;">Order Dispatched</p>
-                            <p style="font-size:14px;color:#171717;margin:0 0 24px;">
-                              Hello ${order.customer_name || "valued customer"}, your order <strong>#${ref}</strong> has been dispatched and is on its way to you.
-                            </p>
+                            <p style="font-size:14px;color:#171717;margin:0 0 24px;">${introText}</p>
+                            ${shippingNowBlock}
+                            ${preorderPendingBlock}
                             <div style="background:#f9f9f9;border:1px solid #e5e5e5;padding:20px;margin-bottom:28px;">
                               <p style="font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:#737373;margin:0 0 8px;">Your Delivery Rider</p>
                               <p style="font-size:15px;font-weight:600;color:#171717;margin:0 0 4px;">${rider.full_name}</p>
