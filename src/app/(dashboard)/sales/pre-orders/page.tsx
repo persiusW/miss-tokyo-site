@@ -15,7 +15,7 @@ async function fetchPreOrderStats(orders: any[]) {
 export default async function PreOrdersPage() {
     const { data: orders } = await supabase
         .from("orders")
-        .select("id, customer_name, customer_email, customer_phone, total_amount, status, paystack_reference, shipping_address, delivery_method, created_at, has_preorder")
+        .select("id, customer_name, customer_email, customer_phone, total_amount, status, payment_status, paystack_reference, shipping_address, delivery_method, created_at, has_preorder, is_mixed_order, customer_metadata")
         .eq("has_preorder", true)
         .order("created_at", { ascending: false })
         .limit(500);

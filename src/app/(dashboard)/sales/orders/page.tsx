@@ -10,7 +10,8 @@ export default async function OrdersPage() {
     const [{ data: orders }, stats] = await Promise.all([
         supabase
             .from("orders")
-            .select("id, customer_name, customer_email, customer_phone, total_amount, status, payment_status, paystack_reference, shipping_address, delivery_method, created_at")
+            .select("id, customer_name, customer_email, customer_phone, total_amount, status, payment_status, paystack_reference, shipping_address, delivery_method, created_at, has_preorder, is_mixed_order, customer_metadata")
+            .or("has_preorder.eq.false,is_mixed_order.eq.true")
             .order("created_at", { ascending: false })
             .limit(500),
         fetchOrderStats(),

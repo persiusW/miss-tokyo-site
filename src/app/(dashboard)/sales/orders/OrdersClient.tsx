@@ -22,6 +22,8 @@ type Order = {
     delivery_method: string | null;
     created_at: string;
     has_preorder?: boolean;
+    is_mixed_order?: boolean;
+    customer_metadata?: Record<string, any> | null;
 };
 
 type Rider = {
@@ -577,12 +579,33 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                                     </span>
                                 </td>
                                 <td className="px-4 py-4 text-neutral-700">
-                                    {order.customer_name || order.customer_email || "—"}
-                                    {order.has_preorder && (
-                                        <span className="inline-block text-[9px] font-semibold uppercase tracking-widest bg-amber-100 text-amber-700 px-2 py-0.5 rounded-sm ml-1">
-                                            Pre-Order
-                                        </span>
-                                    )}
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span>{order.customer_name || order.customer_email || "—"}</span>
+                                        {order.is_mixed_order ? (
+                                            <>
+                                                <span className="text-[9px] font-semibold uppercase tracking-widest bg-amber-100 text-amber-700 px-2 py-0.5 rounded-sm">
+                                                    Mixed
+                                                </span>
+                                                {(() => {
+                                                    const dispatched = order.customer_metadata?.regular_items_dispatched_at;
+                                                    if (!dispatched) return null;
+                                                    const isFulfilled = ["fulfilled", "delivered"].includes(order.status);
+                                                    return (
+                                                        <span
+                                                            title={isFulfilled ? "Fully fulfilled" : "In-stock items shipped · Pre-order items pending"}
+                                                            className={`text-[11px] ${isFulfilled ? "text-emerald-500" : "text-blue-500"}`}
+                                                        >
+                                                            ●
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </>
+                                        ) : order.has_preorder ? (
+                                            <span className="text-[9px] font-semibold uppercase tracking-widest bg-amber-100 text-amber-700 px-2 py-0.5 rounded-sm">
+                                                Pre-Order
+                                            </span>
+                                        ) : null}
+                                    </div>
                                 </td>
                                 <td className="px-4 py-4">
                                     <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded-sm ${

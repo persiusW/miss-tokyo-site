@@ -279,6 +279,8 @@ export async function POST(request: Request) {
 
         // Use the cart-item flag — this covers both product-level and category-inherited preorder
         const hasPreorder = cartArr.some((item: any) => item.isPreOrder === true);
+        // Mixed = has at least one preorder AND at least one regular (in-stock) item
+        const isMixedOrder = hasPreorder && cartArr.some((item: any) => item.isPreOrder !== true);
 
         // Create a pending order BEFORE redirecting to Paystack.
         // This guarantees orders are always recorded, regardless of webhook/verify reliability.
@@ -297,6 +299,7 @@ export async function POST(request: Request) {
                 total_amount: amountWithFee,
                 status: "pending",
                 has_preorder: hasPreorder,
+                is_mixed_order: isMixedOrder,
                 items: cartArr,
                 discount_code: clientMetadata?.discount_code || null,
                 discount_amount: Number(clientMetadata?.discount_amount) || 0,
