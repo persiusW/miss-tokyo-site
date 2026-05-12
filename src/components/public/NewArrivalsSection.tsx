@@ -12,18 +12,34 @@ interface Product {
     discount_value: number;
     inventory_count: number | null;
     track_inventory: boolean | null;
+    preorder_enabled: boolean;
 }
 
 export async function NewArrivalsSection() {
     const db = createClient();
-    const { data } = await db
-        .from("products")
-        .select("slug, name, price_ghs, image_urls, is_sale, discount_value, inventory_count, track_inventory")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(16);
+    const [{ data }, { data: preorderCats }] = await Promise.all([
+        db
+            .from("products")
+            .select("slug, name, price_ghs, image_urls, is_sale, discount_value, inventory_count, track_inventory, preorder_enabled, category_ids, category_type")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(16),
+        db
+            .from("categories")
+            .select("id, name, preorder_enabled")
+            .eq("preorder_enabled", true),
+    ]);
 
-    const products = (data ?? []) as Product[];
+    const preorderCatById = new Map((preorderCats ?? []).map((c: any) => [c.id, true]));
+    const preorderCatByName = new Map((preorderCats ?? []).map((c: any) => [(c.name ?? "").toLowerCase(), true]));
+
+    const products: Product[] = (data ?? []).map((p: any) => ({
+        ...p,
+        preorder_enabled: p.preorder_enabled ||
+            (p.category_ids as string[] | null)?.some((id: string) => preorderCatById.has(id)) ||
+            (p.category_type ? preorderCatByName.has((p.category_type as string).toLowerCase()) : false),
+    }));
+
     if (products.length === 0) return null;
 
     return (

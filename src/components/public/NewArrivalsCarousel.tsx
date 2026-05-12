@@ -23,6 +23,7 @@ interface Product {
     discount_value: number;
     inventory_count: number | null;
     track_inventory: boolean | null;
+    preorder_enabled?: boolean;
 }
 
 interface NewArrivalsCarouselProps {
@@ -49,6 +50,7 @@ export function NewArrivalsCarousel({ products }: NewArrivalsCarouselProps) {
                     const isOnSale = p.is_sale && p.discount_value > 0;
                     const salePrice = isOnSale ? p.price_ghs * (1 - p.discount_value / 100) : null;
                     const isOos = p.track_inventory && (p.inventory_count ?? 0) <= 0;
+                    const isPreorder = isOos && p.preorder_enabled;
 
                     return (
                         <Link key={p.slug} href={`/products/${p.slug}`} className="group block">
@@ -77,7 +79,11 @@ export function NewArrivalsCarousel({ products }: NewArrivalsCarouselProps) {
                                         />
                                     );
                                 })()}
-                                {isOos ? (
+                                {isPreorder ? (
+                                    <span className="absolute top-2.5 left-2.5 text-white text-[9px] tracking-[0.15em] uppercase px-2 py-1 font-bold leading-none" style={{ background: "#C9963A" }}>
+                                        PRE-ORDER
+                                    </span>
+                                ) : isOos ? (
                                     <span className="absolute top-2.5 left-2.5 bg-neutral-500 text-white text-[9px] tracking-[0.15em] uppercase px-2 py-1 font-bold leading-none">
                                         SOLD OUT
                                     </span>
