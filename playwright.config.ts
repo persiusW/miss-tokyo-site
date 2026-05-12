@@ -67,7 +67,7 @@ export default defineConfig({
         // ── 4. Dashboard — requires admin session saved by admin-setup ───────
         {
             name: "dashboard",
-            testMatch: /dashboard\.spec\.ts/,
+            testMatch: /\/(dashboard|mixed-orders)\.spec\.ts/,
             dependencies: ["admin-setup"],
             use: {
                 ...devices["Desktop Chrome"],
