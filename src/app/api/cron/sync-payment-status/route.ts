@@ -39,12 +39,14 @@ export async function GET(req: Request) {
     // - payment_status="processing": verify/webhook claimed it but may have crashed before finalising
     //   (only pick up if stuck > 5 min to avoid racing with an in-flight verify call)
     const stuckCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const ghostCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: pendingOrders, error } = await supabaseAdmin
         .from("orders")
-        .select("id, customer_email, customer_name, customer_phone, total_amount, items, customer_metadata, paystack_reference, discount_code, discount_amount, delivery_method, payment_status")
+        .select("id, created_at, customer_email, customer_name, customer_phone, total_amount, items, customer_metadata, paystack_reference, discount_code, discount_amount, delivery_method, payment_status")
         .or(`payment_status.eq.pending,and(payment_status.eq.processing,created_at.lt.${stuckCutoff})`)
         .not("paystack_reference", "is", null)
-        .neq("paystack_reference", "");
+        .neq("paystack_reference", "")
+        .neq("paystack_reference", "dummy-ref");
 
     if (error) {
         console.error("[sync-payment-status] DB fetch failed:", error.message);
@@ -67,7 +69,23 @@ export async function GET(req: Request) {
         try {
             const paystackStatus = await verifyReference(order.paystack_reference!);
 
-            if (!paystackStatus) { results.skipped++; return; }
+            if (!paystackStatus) {
+                // Paystack doesn't know this reference. If the order is older than 24h
+                // it's a ghost (test order, failed init, etc.) — cancel and clean up.
+                const orderAge = new Date(order.created_at!);
+                if (orderAge < new Date(ghostCutoff)) {
+                    await supabaseAdmin
+                        .from("orders")
+                        .update({ status: "cancelled", payment_status: "cancelled" })
+                        .eq("id", order.id)
+                        .in("payment_status", ["pending", "processing"]);
+                    await releaseReservation(order.id).catch(() => {});
+                    results.abandoned++;
+                } else {
+                    results.skipped++;
+                }
+                return;
+            }
 
             if (paystackStatus === "success") {
                 const meta = (order.customer_metadata as Record<string, unknown>) ?? {};
