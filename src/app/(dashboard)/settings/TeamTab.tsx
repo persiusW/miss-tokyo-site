@@ -40,7 +40,6 @@ type ActivityLog = {
        changes?: Record<string, { from: any; to: any }>;
     };
     created_at: string;
-    profiles?: { full_name: string; email: string };
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -172,7 +171,7 @@ export function TeamTab() {
 
             let query = supabase
                 .from("activity_logs")
-                .select("*, profiles(full_name, email)")
+                .select("*")
                 .gte("created_at", startOfDay)
                 .lte("created_at", endOfDay)
                 .order("created_at", { ascending: false })
@@ -185,7 +184,10 @@ export function TeamTab() {
                 query = query.eq("action_type", filterAction);
             }
 
-            const { data } = await query;
+            const { data, error: logsError } = await query;
+            if (logsError) {
+                console.error("[activity-logs] fetch failed:", logsError.message);
+            }
             if (data) {
                 if (isLoadMore) {
                     setLogs(prev => [...prev, ...data as any]);
@@ -584,7 +586,7 @@ export function TeamTab() {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-3 whitespace-nowrap">
-                                                        <div className="font-semibold text-neutral-900">{log.profiles?.full_name || "Unknown"}</div>
+                                                        <div className="font-semibold text-neutral-900">{allStaff.find(s => s.id === log.user_id)?.full_name || "Unknown"}</div>
                                                         <div className="text-[10px] text-neutral-400 uppercase tracking-widest mt-0.5">{ROLE_LABELS[log.user_role] || log.user_role}</div>
                                                     </td>
                                                     <td className="px-6 py-3 whitespace-nowrap">
