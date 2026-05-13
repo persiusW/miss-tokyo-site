@@ -232,5 +232,13 @@ export async function sendPasswordResetLink(targetEmail: string) {
         return { success: false, error: "Reset link generated but email failed to send." };
     }
 
+    await logActivity({
+        userId: userData.user.id,
+        userRole: callerData.role,
+        actionType: "RESET_PASSWORD",
+        resource: "team",
+        details: { target_email: targetEmail },
+    });
+
     return { success: true };
 }
