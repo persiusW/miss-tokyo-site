@@ -5,6 +5,7 @@ import { RealtimeStockMonitor } from "@/components/ui/miss-tokyo/RealtimeStockMo
 import { AdminSidebar } from "@/components/ui/miss-tokyo/AdminSidebar";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { logSignIn } from "@/lib/utils/logSignIn";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -47,6 +48,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     const isAuthorized = ["admin", "owner", "sales_staff"].includes(userRole || "");
     if (!isAuthorized) {
         redirect("/admin/login?error=unauthorized");
+    }
+
+    if (userRole && ["owner", "sales_staff"].includes(userRole)) {
+        logSignIn(user.id, userRole).catch(() => {}); // fire-and-forget, don't block render
     }
 
     const isFullAccess = userRole === "admin" || userRole === "owner";
