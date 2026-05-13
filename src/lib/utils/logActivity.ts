@@ -32,8 +32,8 @@ function computeDiff(oldObj: any, newObj: any) {
 }
 
 export async function logActivity({ userId, userRole, actionType, resource, resourceId, oldData, newData, details = {} }: ActivityLogProps) {
-    if (userRole === "admin") {
-        return; // We only log CRUD tasks for owner and sales_staff
+    if (!["owner", "sales_staff"].includes(userRole)) {
+        return;
     }
 
     // Compute diff for UPDATE actions or if both exist
