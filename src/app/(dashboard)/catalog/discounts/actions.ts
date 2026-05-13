@@ -8,7 +8,7 @@ async function getCallerOrFail() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
-    const { data: profile } = await supabaseAdmin
+    const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", user.id)
@@ -36,7 +36,7 @@ export async function createCoupon(payload: Record<string, unknown>) {
         resourceId: data.id,
         details: { code: payload.code, discount_type: payload.discount_type, discount_value: payload.discount_value },
     });
-    return { data };
+    return { success: true, data };
 }
 
 export async function toggleCoupon(id: string, currentIsActive: boolean, code: string) {
