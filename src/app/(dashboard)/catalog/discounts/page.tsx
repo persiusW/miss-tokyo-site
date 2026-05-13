@@ -148,8 +148,8 @@ export default function DiscountsPage() {
         } else {
             toast.success("Discount deleted.");
             setCoupons(prev => prev.filter(c => c.id !== id));
+            setConfirmDeleteId(null);
         }
-        setConfirmDeleteId(null);
     };
 
     const categoryName = (id: string | null) =>
