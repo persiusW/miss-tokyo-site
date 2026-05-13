@@ -49,6 +49,59 @@ const ROLE_LABELS: Record<string, string> = {
     sales_staff: "Sales Staff"
 };
 
+const ACTION_LABELS: Record<string, string> = {
+    CREATE: "Created",
+    UPDATE: "Updated",
+    DELETE: "Deleted",
+    CREATE_DISCOUNT: "Discount Created",
+    TOGGLE_DISCOUNT: "Discount Toggled",
+    DELETE_DISCOUNT: "Discount Deleted",
+    CREATE_AUTO_DISCOUNT: "Auto-Discount Created",
+    UPDATE_AUTO_DISCOUNT: "Auto-Discount Updated",
+    TOGGLE_AUTO_DISCOUNT: "Auto-Discount Toggled",
+    DELETE_AUTO_DISCOUNT: "Auto-Discount Deleted",
+    PACKED_ORDER: "Packed",
+    DISPATCHED_ORDER: "Dispatched",
+    DELIVERED_ORDER: "Delivered",
+    ASSIGNED_RIDER: "Rider Assigned",
+    UPDATE_STATUS: "Status Updated",
+    INVITE: "Invited",
+    REMOVE_MEMBER: "Removed",
+    RESET_PASSWORD: "Password Reset",
+    SIGN_IN: "Signed In",
+};
+
+function getActionColor(actionType: string): string {
+    if (["CREATE", "CREATE_DISCOUNT", "CREATE_AUTO_DISCOUNT"].includes(actionType)) return "bg-green-50 text-green-700";
+    if (["DELETE", "DELETE_DISCOUNT", "DELETE_AUTO_DISCOUNT", "REMOVE_MEMBER"].includes(actionType)) return "bg-red-50 text-red-700";
+    if (["UPDATE", "UPDATE_AUTO_DISCOUNT", "UPDATE_STATUS", "TOGGLE_DISCOUNT", "TOGGLE_AUTO_DISCOUNT"].includes(actionType)) return "bg-blue-50 text-blue-700";
+    if (["SIGN_IN"].includes(actionType)) return "bg-purple-50 text-purple-700";
+    return "bg-neutral-100 text-neutral-700";
+}
+
+function getSummary(log: any): string {
+    const d = log.details ?? {};
+    switch (log.action_type) {
+        case "PACKED_ORDER":         return `Packed Order #${d.order_number ?? "—"}`;
+        case "ASSIGNED_RIDER":       return `Assigned Order #${d.order_number ?? "—"} to ${d.rider_name ?? "Rider"}`;
+        case "DISPATCHED_ORDER":     return `Dispatched Order #${d.order_number ?? "—"}`;
+        case "DELIVERED_ORDER":      return `Delivered Order #${d.order_number ?? "—"}`;
+        case "UPDATE_STATUS":        return `Order #${d.order_number ?? "—"}: ${d.previous_status ?? d.new_fulfillment_status ?? "?"} → ${d.new_status ?? "?"}`;
+        case "CREATE_DISCOUNT":      return `Created discount ${d.code ?? "—"}`;
+        case "TOGGLE_DISCOUNT":      return `${d.is_active ? "Enabled" : "Disabled"} discount ${d.code ?? "—"}`;
+        case "DELETE_DISCOUNT":      return `Deleted discount ${d.code ?? "—"}`;
+        case "CREATE_AUTO_DISCOUNT": return `Created auto-discount: ${d.title ?? "—"}`;
+        case "UPDATE_AUTO_DISCOUNT": return `Updated auto-discount: ${d.title ?? "—"}`;
+        case "TOGGLE_AUTO_DISCOUNT": return `${d.is_active ? "Enabled" : "Disabled"} auto-discount: ${d.title ?? "—"}`;
+        case "DELETE_AUTO_DISCOUNT": return `Deleted auto-discount: ${d.title ?? "—"}`;
+        case "INVITE":               return `Invited ${d.email ?? "—"} as ${d.role ?? "—"}`;
+        case "REMOVE_MEMBER":        return `Removed team member`;
+        case "RESET_PASSWORD":       return `Sent password reset to ${d.target_email ?? "—"}`;
+        case "SIGN_IN":              return `Signed in`;
+        default:                     return d.resource_name ?? log.resource ?? "—";
+    }
+}
+
 const ROLE_COLORS: Record<string, string> = {
     owner: "bg-black text-white",
     admin: "bg-neutral-800 text-white",
@@ -71,6 +124,8 @@ export function TeamTab() {
     const [invitePhone, setInvitePhone] = useState("");
     const [inviteRole, setInviteRole] = useState("sales_staff");
     const [inviting, setInviting] = useState(false);
+
+    const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
     // Filter states
     const [filterUserId, setFilterUserId] = useState<string>("all");
@@ -437,15 +492,33 @@ export function TeamTab() {
                                     className="bg-transparent text-sm border-b border-neutral-300 outline-none focus:border-black py-1 cursor-pointer"
                                 >
                                     <option value="all">All Actions</option>
-                                    <option value="CREATE">Created</option>
-                                    <option value="UPDATE">Updated</option>
-                                    <option value="DELETE">Deleted</option>
-                                    <option value="PACKED_ORDER">Packed</option>
-                                    <option value="DISPATCHED_ORDER">Dispatched</option>
-                                    <option value="DELIVERED_ORDER">Delivered</option>
-                                    <option value="ASSIGNED_RIDER">Rider Assigned</option>
-                                    <option value="INVITE">Invited</option>
-                                    <option value="REMOVE_MEMBER">Removed</option>
+                                    <optgroup label="Orders">
+                                        <option value="PACKED_ORDER">Packed</option>
+                                        <option value="DISPATCHED_ORDER">Dispatched</option>
+                                        <option value="DELIVERED_ORDER">Delivered</option>
+                                        <option value="ASSIGNED_RIDER">Rider Assigned</option>
+                                        <option value="UPDATE_STATUS">Status Updated</option>
+                                    </optgroup>
+                                    <optgroup label="Discounts">
+                                        <option value="CREATE_DISCOUNT">Discount Created</option>
+                                        <option value="TOGGLE_DISCOUNT">Discount Toggled</option>
+                                        <option value="DELETE_DISCOUNT">Discount Deleted</option>
+                                        <option value="CREATE_AUTO_DISCOUNT">Auto-Discount Created</option>
+                                        <option value="UPDATE_AUTO_DISCOUNT">Auto-Discount Updated</option>
+                                        <option value="TOGGLE_AUTO_DISCOUNT">Auto-Discount Toggled</option>
+                                        <option value="DELETE_AUTO_DISCOUNT">Auto-Discount Deleted</option>
+                                    </optgroup>
+                                    <optgroup label="Catalog">
+                                        <option value="CREATE">Product/Category Created</option>
+                                        <option value="UPDATE">Product/Category Updated</option>
+                                        <option value="DELETE">Category Deleted</option>
+                                    </optgroup>
+                                    <optgroup label="Team">
+                                        <option value="INVITE">Invited</option>
+                                        <option value="REMOVE_MEMBER">Removed</option>
+                                        <option value="RESET_PASSWORD">Password Reset</option>
+                                        <option value="SIGN_IN">Sign In</option>
+                                    </optgroup>
                                 </select>
                             </div>
                             <button 
@@ -476,62 +549,61 @@ export function TeamTab() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-neutral-50 text-sm">
-                                        {logs.map(log => (
-                                            <tr key={log.id} className="hover:bg-neutral-50 transition-colors align-top">
-                                                <td className="px-6 py-4 text-neutral-500 text-[11px] whitespace-nowrap">
-                                                    {new Date(log.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="font-semibold text-neutral-900">{log.profiles?.full_name || "Unknown"}</div>
-                                                    <div className="text-[10px] text-neutral-400 uppercase tracking-widest mt-0.5">{ROLE_LABELS[log.user_role] || log.user_role}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className={`font-mono text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${
-                                                        log.action_type === 'CREATE' ? 'bg-green-50 text-green-700' :
-                                                        log.action_type === 'DELETE' ? 'bg-red-50 text-red-700' :
-                                                        log.action_type === 'UPDATE' ? 'bg-blue-50 text-blue-700' :
-                                                        'bg-neutral-100 text-neutral-700'
-                                                    }`}>
-                                                        {log.action_type}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 min-w-[300px]">
-                                                    <div className="flex items-center gap-1.5 mb-1.5">
-                                                        <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">{log.resource}:</span>
-                                                        <span className="font-medium text-neutral-900">
-                                                            {log.action_type === 'PACKED_ORDER' ? `Packed Order #${log.details?.order_number}` :
-                                                             log.action_type === 'ASSIGNED_RIDER' ? `Assigned Order #${log.details?.order_number} to ${log.details?.rider_name || 'Rider'}` :
-                                                             log.action_type === 'DISPATCHED_ORDER' ? `Dispatched Order #${log.details?.order_number}` :
-                                                             log.action_type === 'DELIVERED_ORDER' ? `Delivered Order #${log.details?.order_number}` :
-                                                             log.details?.resource_name || "—"}
+                                        {logs.map(log => {
+                                            const isExpanded = expandedLogId === log.id;
+                                            const summary = getSummary(log);
+                                            return (
+                                                <tr
+                                                    key={log.id}
+                                                    onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                                                    className="hover:bg-neutral-50 transition-colors cursor-pointer"
+                                                >
+                                                    <td className="px-6 py-3 text-neutral-500 text-[11px] whitespace-nowrap">
+                                                        {new Date(log.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                    </td>
+                                                    <td className="px-6 py-3 whitespace-nowrap">
+                                                        <div className="font-semibold text-neutral-900">{log.profiles?.full_name || "Unknown"}</div>
+                                                        <div className="text-[10px] text-neutral-400 uppercase tracking-widest mt-0.5">{ROLE_LABELS[log.user_role] || log.user_role}</div>
+                                                    </td>
+                                                    <td className="px-6 py-3 whitespace-nowrap">
+                                                        <span className={`font-mono text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${getActionColor(log.action_type)}`}>
+                                                            {ACTION_LABELS[log.action_type] || log.action_type}
                                                         </span>
-                                                    </div>
-                                                    
-                                                    {!['PACKED_ORDER', 'ASSIGNED_RIDER', 'DISPATCHED_ORDER', 'DELIVERED_ORDER'].includes(log.action_type) && log.details?.changes && (
-                                                        <div className="space-y-1.5 mt-2 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100">
-                                                            {Object.entries(log.details.changes).map(([field, delta]: [string, any]) => (
-                                                                <div key={field} className="text-[11px] flex flex-wrap items-center gap-x-2">
-                                                                    <span className="font-semibold text-neutral-500 capitalize">{field.replace(/_/g, ' ')}:</span>
-                                                                    <span className="text-red-500 line-through decoration-red-300 opacity-60">
-                                                                        {typeof delta.from === 'object' ? 'Data' : String(delta.from ?? 'null')}
-                                                                    </span>
-                                                                    <span className="text-neutral-400">→</span>
-                                                                    <span className="text-green-600 font-medium">
-                                                                        {typeof delta.to === 'object' ? 'Data' : String(delta.to ?? 'null')}
-                                                                    </span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-
-                                                    {['PACKED_ORDER', 'ASSIGNED_RIDER', 'DISPATCHED_ORDER', 'DELIVERED_ORDER'].includes(log.action_type) && (
-                                                        <div className="text-[11px] text-neutral-500 mt-1">
-                                                            Status: {log.details?.previous_status} → <span className="text-green-600 font-semibold">{log.details?.new_status}</span>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                    </td>
+                                                    <td className="px-6 py-3 min-w-[260px]">
+                                                        <div className="text-sm text-neutral-700">{summary}</div>
+                                                        {isExpanded && (
+                                                            <div className="mt-2 space-y-1 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100">
+                                                                {log.details?.changes && Object.entries(log.details.changes).map(([field, delta]: [string, any]) => (
+                                                                    <div key={field} className="text-[11px] flex flex-wrap items-center gap-x-2">
+                                                                        <span className="font-semibold text-neutral-500 capitalize">{field.replace(/_/g, ' ')}:</span>
+                                                                        <span className="text-red-500 line-through decoration-red-300 opacity-60">
+                                                                            {typeof delta.from === 'object' ? 'Data' : String(delta.from ?? 'null')}
+                                                                        </span>
+                                                                        <span className="text-neutral-400">→</span>
+                                                                        <span className="text-green-600 font-medium">
+                                                                            {typeof delta.to === 'object' ? 'Data' : String(delta.to ?? 'null')}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                                {!log.details?.changes && log.details && (
+                                                                    <div className="text-[11px] text-neutral-500 space-y-0.5">
+                                                                        {Object.entries(log.details)
+                                                                            .filter(([k]) => !['resource_name', 'changes'].includes(k))
+                                                                            .map(([k, v]) => (
+                                                                                <div key={k}>
+                                                                                    <span className="font-semibold capitalize">{k.replace(/_/g, ' ')}:</span>{' '}
+                                                                                    <span>{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '—')}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             )}
