@@ -102,6 +102,31 @@ test.describe("Dashboard session guard", () => {
 
 // ── Full login → overview → logout cycle ─────────────────────────────────────
 
+/**
+ * Helper — submit the admin login form and assert we reach /overview.
+ * Fails fast (3 s) if the form shows a credential error rather than waiting
+ * the full 20 s timeout, producing a clear message in CI output.
+ */
+async function loginAsAdmin(page: import("@playwright/test").Page) {
+    await page.goto(ROUTES.adminLogin);
+    await page.locator('input[type="email"]').first().fill(ADMIN_AUTH.email);
+    await page.locator('input[type="password"]').first().fill(ADMIN_AUTH.password);
+    await page.locator('button[type="submit"]').click();
+
+    // Detect a credential error within 3 s so the test fails with a helpful
+    // message instead of silently timing out after 20 s.
+    const errorEl = page.locator('[class*="red"], [role="alert"]').first();
+    const maybeError = await errorEl.textContent({ timeout: 3_000 }).catch(() => null);
+    if (maybeError?.trim()) {
+        throw new Error(
+            `Login rejected — check TEST_ADMIN_EMAIL/TEST_ADMIN_PASSWORD in .env.test. ` +
+            `Form error: "${maybeError.trim()}"`
+        );
+    }
+
+    await expect(page).toHaveURL(/\/overview/, { timeout: 20_000 });
+}
+
 test.describe("Admin login and logout cycle", () => {
 
     test.beforeEach(async ({}) => {
@@ -111,22 +136,11 @@ test.describe("Admin login and logout cycle", () => {
     });
 
     test("valid credentials land on /overview", async ({ page }) => {
-        await page.goto(ROUTES.adminLogin);
-
-        await page.locator('input[type="email"]').first().fill(ADMIN_AUTH.email);
-        await page.locator('input[type="password"]').first().fill(ADMIN_AUTH.password);
-        await page.locator('button[type="submit"]').click();
-
-        await expect(page).toHaveURL(/\/overview/, { timeout: 20_000 });
+        await loginAsAdmin(page);
     });
 
     test("logout clears session and redirects to login", async ({ page }) => {
-        // Log in first.
-        await page.goto(ROUTES.adminLogin);
-        await page.locator('input[type="email"]').first().fill(ADMIN_AUTH.email);
-        await page.locator('input[type="password"]').first().fill(ADMIN_AUTH.password);
-        await page.locator('button[type="submit"]').click();
-        await expect(page).toHaveURL(/\/overview/, { timeout: 20_000 });
+        await loginAsAdmin(page);
 
         // The logout route is POST-only. Use page.request.post so the browser
         // session cookies are sent and cleared server-side without browser navigation.
@@ -138,12 +152,7 @@ test.describe("Admin login and logout cycle", () => {
     });
 
     test("after logout, /overview redirects back to login", async ({ page }) => {
-        // Log in.
-        await page.goto(ROUTES.adminLogin);
-        await page.locator('input[type="email"]').first().fill(ADMIN_AUTH.email);
-        await page.locator('input[type="password"]').first().fill(ADMIN_AUTH.password);
-        await page.locator('button[type="submit"]').click();
-        await expect(page).toHaveURL(/\/overview/, { timeout: 20_000 });
+        await loginAsAdmin(page);
 
         // POST to logout endpoint to clear the server-side session.
         await page.request.post("/api/auth/logout");
