@@ -1,11 +1,8 @@
 // Test-only page: renders OrdersClient with hardcoded fixture data so Playwright
 // can assert badge/dot rendering logic without needing to inject SSR data.
 // Protected by dashboard auth (same route group). Never appears in nav.
+import { notFound } from "next/navigation";
 import { OrdersClient } from "../sales/orders/OrdersClient";
-
-if (process.env.NODE_ENV === "production") {
-    throw new Error("test-orders page must not be used in production");
-}
 
 const NOW = new Date().toISOString();
 
@@ -93,6 +90,7 @@ const FIXTURES = [
 ];
 
 export default function TestOrdersPage() {
+    if (process.env.NODE_ENV === "production") notFound();
     return (
         <div className="space-y-6">
             <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">
