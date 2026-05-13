@@ -120,8 +120,65 @@ export async function updateFulfillmentStatus(orderId: string, fulfillment_statu
         return { success: false, error: error.message };
     }
 
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    if (profile) {
+        await logActivity({
+            userId: user.id,
+            userRole: profile.role,
+            actionType: "UPDATE_STATUS",
+            resource: "order",
+            resourceId: orderId,
+            details: {
+                order_number: orderId.slice(0, 8),
+                previous_status: fulfillment_status,
+                new_status: syncedStatus ?? fulfillment_status,
+            },
+        });
+    }
+
     revalidatePath(`/sales/orders/${orderId}`, "page");
     revalidatePath("/sales/orders", "page");
 
+    return { success: true };
+}
+
+export async function bulkUpdateOrderStatus(orderIds: string[], newStatus: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "Unauthorized" };
+
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    if (!profile) return { success: false, error: "Profile not found" };
+
+    const updateData: any = { status: newStatus };
+    if (newStatus === "packed") {
+        updateData.packed_by = user.id;
+    }
+
+    const { error } = await supabaseAdmin.from("orders").update(updateData).in("id", orderIds);
+    if (error) return { success: false, error: error.message };
+
+    const actionType = newStatus === "packed" ? "PACKED_ORDER"
+        : newStatus === "shipped" ? "DISPATCHED_ORDER"
+        : "UPDATE_STATUS";
+
+    await Promise.allSettled(
+        orderIds.map(orderId =>
+            logActivity({
+                userId: user.id,
+                userRole: profile.role,
+                actionType,
+                resource: "order",
+                resourceId: orderId,
+                details: {
+                    order_number: orderId.slice(0, 8),
+                    new_status: newStatus,
+                    bulk: true,
+                },
+            })
+        )
+    );
+
+    revalidatePath("/sales/orders", "page");
     return { success: true };
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { MoreHorizontal, Copy, Printer, Eye, Truck, X, Search, Store } from "lucide-react";
+import { updateOrderStatus, bulkUpdateOrderStatus } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -274,37 +275,32 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     const bulkUpdate = async (status: string) => {
         setBulkLoading(true);
         const ids = [...selected];
-        
-        const updateData: any = { status };
-        if (status === "packed") {
-            const { data } = await supabase.auth.getUser();
-            if (data?.user?.id) updateData.packed_by = data.user.id;
+
+        const result = await bulkUpdateOrderStatus(ids, status);
+        if (!result.success) {
+            toast.error("Failed to update orders.");
+            setBulkLoading(false);
+            return;
         }
 
-        const { error } = await supabase.from("orders").update(updateData).in("id", ids);
-        if (error) {
-            toast.error("Failed to update orders.");
-        } else {
-            toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} → ${status}.`);
-            setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, ...updateData } : o));
-            setSelected(new Set());
+        toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} → ${status}.`);
+        setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, status } : o));
+        setSelected(new Set());
 
-            // Trigger Email/SMS
-            if (status === "fulfilled" || status === "cancelled" || status === "packed") {
-                await Promise.all(ids.map(async orderId => {
-                    try {
-                        const res = await fetch("/api/email/fulfillment", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ orderId, type: status }),
-                        });
-                        if (!res.ok) throw new Error(await res.text());
-                    } catch (err) {
-                        console.error("Auto-email failed for", orderId, err);
-                        toast.error(`Notification failed for order ${orderId.substring(0, 8).toUpperCase()}`);
-                    }
-                }));
-            }
+        if (status === "fulfilled" || status === "cancelled" || status === "packed") {
+            await Promise.all(ids.map(async orderId => {
+                try {
+                    const res = await fetch("/api/email/fulfillment", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ orderId, type: status }),
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                } catch (err) {
+                    console.error("Auto-email failed for", orderId, err);
+                    toast.error(`Notification failed for order ${orderId.substring(0, 8).toUpperCase()}`);
+                }
+            }));
         }
         setBulkLoading(false);
     };
@@ -372,8 +368,8 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     const markFulfilledForOrder = async (order: Order) => {
         setOpenDropdown(null);
         setDropdownPos(null);
-        const { error } = await supabase.from("orders").update({ status: "fulfilled" }).eq("id", order.id);
-        if (error) { toast.error("Failed to mark fulfilled."); return; }
+        const result = await updateOrderStatus(order.id, "fulfilled");
+        if (!result.success) { toast.error("Failed to mark fulfilled."); return; }
         toast.success("Order marked fulfilled.");
         setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "fulfilled" } : o));
         try {
