@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { Plus, Trash2 } from "lucide-react";
+import { createCoupon, toggleCoupon, deleteCoupon } from "./actions";
 
 type DiscountType = "fixed" | "percentage" | "free_shipping" | "sale_price" | "buy_x_get_y";
 
@@ -116,9 +117,9 @@ export default function DiscountsPage() {
             category_id:     form.category_id     || null,
         };
 
-        const { error } = await supabase.from("coupons").insert([payload]);
-        if (error) {
-            toast.error(error.message || "Failed to create discount.");
+        const result = await createCoupon(payload);
+        if (result.error) {
+            toast.error(result.error || "Failed to create discount.");
         } else {
             toast.success("Discount created.");
             setForm(EMPTY_FORM);
@@ -129,13 +130,20 @@ export default function DiscountsPage() {
     };
 
     const toggleActive = async (id: string, is_active: boolean) => {
+        const code = coupons.find(c => c.id === id)?.code ?? "";
         setCoupons(prev => prev.map(c => c.id === id ? { ...c, is_active: !is_active } : c));
-        await supabase.from("coupons").update({ is_active: !is_active }).eq("id", id);
+        const result = await toggleCoupon(id, is_active, code);
+        if (result.error) {
+            // Roll back optimistic update
+            setCoupons(prev => prev.map(c => c.id === id ? { ...c, is_active } : c));
+            toast.error("Failed to update.");
+        }
     };
 
     const handleDelete = async (id: string) => {
-        const { error } = await supabase.from("coupons").delete().eq("id", id);
-        if (error) {
+        const code = coupons.find(c => c.id === id)?.code ?? "";
+        const result = await deleteCoupon(id, code);
+        if (result.error) {
             toast.error("Failed to delete discount.");
         } else {
             toast.success("Discount deleted.");
