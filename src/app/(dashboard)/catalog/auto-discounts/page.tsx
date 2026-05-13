@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { Plus, Trash2 } from "lucide-react";
+import { saveAutoDiscount, toggleAutoDiscount, deleteAutoDiscount } from "./actions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -197,13 +198,10 @@ export default function AutoDiscountsPage() {
             ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
         };
 
-        const { error } = editingId
-            ? await supabase.from("automatic_discounts").update(payload).eq("id", editingId)
-            : await supabase.from("automatic_discounts").insert([payload]);
-
+        const result = await saveAutoDiscount(payload, editingId);
         setSaving(false);
-        if (error) {
-            toast.error("Failed to save: " + error.message);
+        if (result.error) {
+            toast.error("Failed to save: " + result.error);
         } else {
             toast.success(editingId ? "Updated." : "Created.");
             closeForm();
@@ -215,14 +213,12 @@ export default function AutoDiscountsPage() {
     // ── Toggle active ─────────────────────────────────────────────────────────
 
     const toggleActive = async (rule: AutoDiscount) => {
-        const { error } = await supabase
-            .from("automatic_discounts")
-            .update({ is_active: !rule.is_active })
-            .eq("id", rule.id);
-        if (error) {
+        setRules(prev => prev.map(r => r.id === rule.id ? { ...r, is_active: !r.is_active } : r));
+        const result = await toggleAutoDiscount(rule.id, rule.is_active, rule.title);
+        if (result.error) {
+            setRules(prev => prev.map(r => r.id === rule.id ? { ...r, is_active: rule.is_active } : r));
             toast.error("Failed to update.");
         } else {
-            setRules(prev => prev.map(r => r.id === rule.id ? { ...r, is_active: !r.is_active } : r));
             fetch("/api/admin/revalidate-discounts", { method: "POST" });
         }
     };
@@ -231,8 +227,9 @@ export default function AutoDiscountsPage() {
 
     const deleteRule = async (id: string) => {
         if (!confirm("Delete this automatic discount rule?")) return;
-        const { error } = await supabase.from("automatic_discounts").delete().eq("id", id);
-        if (error) {
+        const title = rules.find(r => r.id === id)?.title ?? "";
+        const result = await deleteAutoDiscount(id, title);
+        if (result.error) {
             toast.error("Failed to delete.");
         } else {
             toast.success("Deleted.");
