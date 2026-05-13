@@ -13,7 +13,6 @@ export async function logSignIn(userId: string, userRole: string) {
         .eq("user_id", userId)
         .eq("action_type", "SIGN_IN")
         .gte("created_at", oneHourAgo)
-        .limit(1)
         .maybeSingle();
 
     if (recent) return; // already logged within the last hour
