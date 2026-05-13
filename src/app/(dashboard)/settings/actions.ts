@@ -53,7 +53,7 @@ export async function inviteTeamMember(data: InviteData) {
     // LOG ACTIVITY
     await logActivity({
         userId: userData.user.id,
-        userRole: callerProfile?.role || 'admin',
+        userRole: callerProfile?.role ?? '',
         actionType: "INVITE",
         resource: "team",
         details: { email: data.email, role: data.role }

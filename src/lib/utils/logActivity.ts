@@ -38,9 +38,10 @@ export async function logActivity({ userId, userRole, actionType, resource, reso
 
     // Compute diff for UPDATE actions or if both exist
     const diff = (oldData && newData) ? computeDiff(oldData, newData) : null;
+    const computedName = newData?.name || oldData?.name || details?.name || details?.full_name;
     const finalDetails = {
         ...details,
-        resource_name: newData?.name || oldData?.name || details?.name || details?.full_name,
+        ...(computedName && !details?.resource_name ? { resource_name: computedName } : {}),
         changes: diff
     };
 

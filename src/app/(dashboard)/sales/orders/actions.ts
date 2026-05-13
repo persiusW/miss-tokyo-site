@@ -55,7 +55,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
     let actionType = "UPDATE_STATUS";
     if (newStatus === "packed") actionType = "PACKED_ORDER";
     else if (newStatus === "shipped") actionType = "DISPATCHED_ORDER";
-    else if (newStatus === "delivered") actionType = "DELIVERED_ORDER";
+    else if (newStatus === "delivered" || newStatus === "fulfilled") actionType = "DELIVERED_ORDER";
     
     // If rider_id changed
     if (updateData.assigned_rider_id && updateData.assigned_rider_id !== oldData.assigned_rider_id) {
@@ -164,6 +164,7 @@ export async function bulkUpdateOrderStatus(orderIds: string[], newStatus: strin
 
     const actionType = newStatus === "packed" ? "PACKED_ORDER"
         : newStatus === "shipped" ? "DISPATCHED_ORDER"
+        : (newStatus === "delivered" || newStatus === "fulfilled") ? "DELIVERED_ORDER"
         : "UPDATE_STATUS";
 
     await Promise.allSettled(
