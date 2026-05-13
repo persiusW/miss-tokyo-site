@@ -130,7 +130,7 @@ export async function updateFulfillmentStatus(orderId: string, fulfillment_statu
             resourceId: orderId,
             details: {
                 order_number: orderId.slice(0, 8),
-                previous_status: fulfillment_status,
+                new_fulfillment_status: fulfillment_status,
                 new_status: syncedStatus ?? fulfillment_status,
             },
         });
@@ -150,7 +150,11 @@ export async function bulkUpdateOrderStatus(orderIds: string[], newStatus: strin
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
     if (!profile) return { success: false, error: "Profile not found" };
 
-    const updateData: any = { status: newStatus };
+    const syncedFulfillment = STATUS_TO_FULFILLMENT[newStatus];
+    const updateData: any = {
+        status: newStatus,
+        ...(syncedFulfillment ? { fulfillment_status: syncedFulfillment } : {}),
+    };
     if (newStatus === "packed") {
         updateData.packed_by = user.id;
     }
