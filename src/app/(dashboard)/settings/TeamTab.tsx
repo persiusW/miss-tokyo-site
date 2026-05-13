@@ -556,10 +556,21 @@ export function TeamTab() {
                                                 <tr
                                                     key={log.id}
                                                     onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                                                    className="hover:bg-neutral-50 transition-colors cursor-pointer"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' || e.key === ' ') {
+                                                            e.preventDefault();
+                                                            setExpandedLogId(isExpanded ? null : log.id);
+                                                        }
+                                                    }}
+                                                    tabIndex={0}
+                                                    aria-expanded={isExpanded}
+                                                    className={`hover:bg-neutral-50 transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:ring-inset ${isExpanded ? 'bg-neutral-50/70' : ''}`}
                                                 >
                                                     <td className="px-6 py-3 text-neutral-500 text-[11px] whitespace-nowrap">
-                                                        {new Date(log.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={`text-neutral-300 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`} style={{ fontSize: '8px' }}>▶</span>
+                                                            {new Date(log.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-3 whitespace-nowrap">
                                                         <div className="font-semibold text-neutral-900">{log.profiles?.full_name || "Unknown"}</div>
