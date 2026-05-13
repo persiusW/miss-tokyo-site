@@ -79,6 +79,16 @@ function getActionColor(actionType: string): string {
     return "bg-neutral-100 text-neutral-700";
 }
 
+function getPageLabel(actionType: string): string {
+    if (["PACKED_ORDER", "DISPATCHED_ORDER", "DELIVERED_ORDER", "ASSIGNED_RIDER", "UPDATE_STATUS"].includes(actionType)) return "Orders";
+    if (["CREATE_DISCOUNT", "TOGGLE_DISCOUNT", "DELETE_DISCOUNT"].includes(actionType)) return "Discounts";
+    if (["CREATE_AUTO_DISCOUNT", "UPDATE_AUTO_DISCOUNT", "TOGGLE_AUTO_DISCOUNT", "DELETE_AUTO_DISCOUNT"].includes(actionType)) return "Auto Discounts";
+    if (["CREATE", "UPDATE", "DELETE"].includes(actionType)) return "Catalog";
+    if (["INVITE", "REMOVE_MEMBER", "RESET_PASSWORD"].includes(actionType)) return "Team";
+    if (actionType === "SIGN_IN") return "Session";
+    return "—";
+}
+
 function getSummary(log: any): string {
     const d = log.details ?? {};
     switch (log.action_type) {
@@ -545,6 +555,7 @@ export function TeamTab() {
                                             <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Timestamp</th>
                                             <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Staff Member</th>
                                             <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Action</th>
+                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Page</th>
                                             <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Details</th>
                                         </tr>
                                     </thead>
@@ -579,6 +590,11 @@ export function TeamTab() {
                                                     <td className="px-6 py-3 whitespace-nowrap">
                                                         <span className={`font-mono text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${getActionColor(log.action_type)}`}>
                                                             {ACTION_LABELS[log.action_type] || log.action_type}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-3 whitespace-nowrap">
+                                                        <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500 bg-neutral-100 px-2 py-1 rounded">
+                                                            {getPageLabel(log.action_type)}
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-3 min-w-[260px]">
