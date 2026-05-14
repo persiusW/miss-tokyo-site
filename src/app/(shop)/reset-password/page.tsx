@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 export default function ResetPasswordPage() {
@@ -12,18 +13,51 @@ export default function ResetPasswordPage() {
     const [error, setError] = useState("");
     const [ready, setReady] = useState(false);
 
-    // Supabase puts the recovery token in the URL hash on redirect.
-    // Calling getSession() after page load lets Supabase parse and exchange it.
     useEffect(() => {
-        supabase.auth.getSession().then(({ data }: { data: any }) => {
-            if (data.session) setReady(true);
-        });
+        // Parse both implicit flow (#access_token) and PKCE flow (?code) from the URL.
+        // The forgot-password route generates the link server-side via supabaseAdmin, so
+        // no PKCE verifier is stored in the browser — we must handle the exchange manually.
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const params = new URLSearchParams(window.location.search);
 
+        const accessToken = hash.get("access_token");
+        const refreshToken = hash.get("refresh_token");
+        const type = hash.get("type");
+        const code = params.get("code");
+
+        if (type === "recovery" && accessToken && refreshToken) {
+            supabase.auth
+                .setSession({ access_token: accessToken, refresh_token: refreshToken })
+                .then(({ error: err }: { error: any }) => {
+                    if (err) setError("Your reset link has expired. Please request a new one.");
+                    else setReady(true);
+                });
+            return;
+        }
+
+        if (code) {
+            supabase.auth
+                .exchangeCodeForSession(code)
+                .then(({ error: err }: { error: any }) => {
+                    if (err) setError("Your reset link has expired. Please request a new one.");
+                    else setReady(true);
+                });
+            return;
+        }
+
+        // Fallback: listen for auth state events in case Supabase auto-processes the URL
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
-            if (event === "PASSWORD_RECOVERY") setReady(true);
+            if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
         });
 
-        return () => subscription.unsubscribe();
+        const timeout = setTimeout(() => {
+            setError("Invalid or expired reset link. Please request a new one.");
+        }, 8000);
+
+        return () => {
+            subscription.unsubscribe();
+            clearTimeout(timeout);
+        };
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -66,7 +100,19 @@ export default function ResetPasswordPage() {
                     <div className="h-px w-10 bg-black mx-auto"></div>
                 </div>
 
-                {!ready ? (
+                {error && !ready ? (
+                    <div className="text-center">
+                        <p className="text-[10px] uppercase tracking-[0.3em] text-red-500 font-bold mb-8 leading-relaxed">
+                            {error}
+                        </p>
+                        <Link
+                            href="/login"
+                            className="inline-block bg-black text-white px-12 py-5 text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-neutral-900 transition-all duration-500 rounded-none shadow-sm"
+                        >
+                            Request New Link
+                        </Link>
+                    </div>
+                ) : !ready ? (
                     <p className="text-center text-sm text-neutral-400 italic">Verifying your reset link…</p>
                 ) : (
                     <form onSubmit={handleSubmit} className="flex flex-col gap-10">

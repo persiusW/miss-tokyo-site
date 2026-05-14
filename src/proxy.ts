@@ -94,12 +94,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     }
 
     // Already authenticated — redirect away from login pages
-    if (pathname === "/admin/login" && user) {
-        const dest = request.nextUrl.clone();
-        dest.pathname = "/overview";
-        return applySecurityHeaders(NextResponse.redirect(dest));
-    }
-    if (pathname === "/login" && user) {
+    if ((pathname === "/login" || pathname === "/admin/login") && user) {
         const dest = request.nextUrl.clone();
         dest.pathname = "/";
         return applySecurityHeaders(NextResponse.redirect(dest));

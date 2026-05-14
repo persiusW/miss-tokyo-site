@@ -1,12 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 
 export default function RegisterPage() {
-    const router = useRouter();
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -20,24 +17,20 @@ export default function RegisterPage() {
         setError("");
 
         try {
-            const { data, error: authError } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        full_name: name,
-                    }
-                }
+            const res = await fetch("/api/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password, full_name: name }),
             });
 
-            if (authError) {
-                setError(authError.message);
+            const json = await res.json();
+
+            if (!res.ok || json.error) {
+                setError(json.error || "Registration failed. Please try again.");
                 return;
             }
 
-            if (data.user) {
-                setSuccess(true);
-            }
+            setSuccess(true);
         } catch (err) {
             console.error(err);
             setError("An unexpected error occurred. Please try again.");
@@ -50,9 +43,9 @@ export default function RegisterPage() {
         return (
             <div className="min-h-screen flex items-center justify-center bg-white px-6">
                 <div className="w-full max-w-md text-center">
-                    <h1 className="font-serif text-3xl tracking-[0.3em] uppercase text-black mb-6">Success</h1>
+                    <h1 className="font-serif text-3xl tracking-[0.3em] uppercase text-black mb-6">Check Your Email</h1>
                     <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-400 leading-relaxed mb-12 font-bold">
-                        Your account has been registered. Please check your email for a confirmation link to finalize your membership.
+                        A confirmation link has been sent to {email}. Please check your inbox to activate your membership.
                     </p>
                     <Link 
                         href="/login" 

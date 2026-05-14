@@ -54,18 +54,19 @@ export async function POST(req: NextRequest) {
         // For mixed orders, stamp regular_items_dispatched_at so the admin UI
         // can show the partial-fulfillment dot without a schema change.
         const now = new Date().toISOString();
+        const failedIds: string[] = [];
         for (const order of orders) {
             const meta = (order.customer_metadata as Record<string, unknown>) ?? {};
             const updatePayload: Record<string, unknown> = { status: "shipped", assigned_rider_id: riderId };
             if (order.is_mixed_order && !meta.regular_items_dispatched_at) {
                 updatePayload.customer_metadata = { ...meta, regular_items_dispatched_at: now };
             }
-            await supabaseAdmin.from("orders").update(updatePayload).eq("id", order.id);
+            const { error: updateErr } = await supabaseAdmin.from("orders").update(updatePayload).eq("id", order.id);
+            if (updateErr) failedIds.push(order.id);
         }
-        const updateError = null; // individual updates above; kept for downstream error-check shape
 
-        if (updateError) {
-            return NextResponse.json({ error: "Failed to update orders." }, { status: 500 });
+        if (failedIds.length > 0) {
+            return NextResponse.json({ error: `Failed to update ${failedIds.length} order(s).` }, { status: 500 });
         }
 
         // ── Fetch business settings (needed for email + SMS) ──────────────────
