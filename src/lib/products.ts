@@ -137,7 +137,13 @@ const getCachedProducts = unstable_cache(
         query = query.range(from, from + 24 - 1);
 
         const { data, count, error } = await query;
-        if (error) console.error("[getProducts] Supabase Error:", error);
+        if (error) {
+            // PGRST103: offset exceeds available rows (e.g. page=4 on an empty category)
+            if ((error as any).code === "PGRST103") {
+                return { products: [], total: 0, minPrice, maxPrice };
+            }
+            console.error("[getProducts] Supabase Error:", error);
+        }
 
         const products: ShopProduct[] = (data || []).map((p: any) => {
             const matchedCat = p.category_type ? catMap.get(p.category_type.toLowerCase()) : null;
