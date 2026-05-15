@@ -419,6 +419,27 @@ export async function POST(request: Request) {
 
                 return NextResponse.json({ error: friendlyError }, { status: 409 });
             }
+        } else if (productId && dbProductMap[productId]) {
+            // Single-product path: no cartItems array supplied. Reserve product-level
+            // stock so two concurrent buyers can't both claim the last unit.
+            // Skip for untracked inventory (9999 sentinel) and pre-orders.
+            const singleProduct = dbProductMap[productId];
+            if (singleProduct.track_inventory !== false && !singleProduct.preorder_enabled) {
+                try {
+                    await reserveStock(orderId, [{ productId, variantId: null, quantity: 1 }]);
+                } catch (err: any) {
+                    await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+                    const availMatch = /available:\s*(\d+)/i.exec(err.message ?? "");
+                    const available = availMatch ? parseInt(availMatch[1]) : null;
+                    const name = singleProduct.name ?? "This item";
+                    const friendlyError = available === 0
+                        ? `"${name}" just sold out.`
+                        : available !== null
+                        ? `"${name}" only has ${available} unit${available === 1 ? "" : "s"} left.`
+                        : `"${name}" is no longer available.`;
+                    return NextResponse.json({ error: friendlyError }, { status: 409 });
+                }
+            }
         }
 
         const response = await fetch("https://api.paystack.co/transaction/initialize", {
