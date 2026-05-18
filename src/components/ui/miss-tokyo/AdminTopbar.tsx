@@ -1,0 +1,102 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
+type Props = {
+    user: { name: string; initials: string; role: string };
+    onMenu: () => void;
+};
+
+function getCrumbs(pathname: string): string[] {
+    const seg = (s: string) => s.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+    if (pathname === "/overview") return ["Overview"];
+    if (pathname.startsWith("/sales/analytics")) return ["Sales", "Analytics"];
+    if (pathname.match(/^\/sales\/orders\/[^/]+$/)) return ["Sales", "Orders", "Order"];
+    if (pathname.startsWith("/sales/orders")) return ["Sales", "Orders"];
+    if (pathname.startsWith("/sales/pre-orders")) return ["Sales", "Pre-Orders"];
+    if (pathname.startsWith("/sales/riders")) return ["Sales", "Riders"];
+    if (pathname.startsWith("/sales/payments")) return ["Sales", "Payments"];
+    if (pathname.startsWith("/sales/wholesalers")) return ["Sales", "Wholesalers"];
+    if (pathname.startsWith("/pos/history")) return ["Sales", "POS History"];
+    if (pathname.startsWith("/pos")) return ["Sales", "Point of Sale"];
+    if (pathname.startsWith("/catalog/products/low-stock")) return ["Catalogue", "Products", "Low Stock"];
+    if (pathname.startsWith("/catalog/products/new")) return ["Catalogue", "Products", "New"];
+    if (pathname.match(/^\/catalog\/products\/[^/]+\/edit$/)) return ["Catalogue", "Products", "Edit"];
+    if (pathname.startsWith("/catalog/products")) return ["Catalogue", "Products"];
+    if (pathname.startsWith("/catalog/categories")) return ["Catalogue", "Categories"];
+    if (pathname.startsWith("/catalog/discounts")) return ["Catalogue", "Discounts"];
+    if (pathname.startsWith("/catalog/auto-discounts")) return ["Catalogue", "Auto Discounts"];
+    if (pathname.startsWith("/catalog/gift-cards")) return ["Catalogue", "Gift Cards"];
+    if (pathname.match(/^\/customers\/[^/]+$/) && !pathname.includes("abandoned") && !pathname.includes("forms") && !pathname.includes("requests")) return ["Customers", "Profile"];
+    if (pathname.startsWith("/customers/abandoned")) return ["Customers", "Abandoned Carts"];
+    if (pathname.startsWith("/customers/forms")) return ["Customers", "Forms"];
+    if (pathname.startsWith("/customers/requests")) return ["Customers", "Custom Requests"];
+    if (pathname.startsWith("/customers")) return ["Customers"];
+    if (pathname.match(/^\/finance\/invoices\/[^/]+$/)) return ["Finance", "Invoices", "Detail"];
+    if (pathname.startsWith("/finance/invoices")) return ["Finance", "Invoices"];
+    if (pathname.startsWith("/finance/links")) return ["Finance", "Pay Links"];
+    if (pathname.startsWith("/finance")) return ["Finance"];
+    if (pathname.startsWith("/settings")) return ["Settings"];
+    if (pathname.startsWith("/cms")) return ["Settings", "CMS"];
+    if (pathname.startsWith("/seo")) return ["Settings", "SEO"];
+    if (pathname.startsWith("/team")) return ["Settings", "Team"];
+    if (pathname.startsWith("/communications")) return ["Communications", "Emails"];
+
+    const parts = pathname.split("/").filter(Boolean);
+    return parts.map(seg);
+}
+
+export function AdminTopbar({ user, onMenu }: Props) {
+    const pathname = usePathname();
+    const crumbs = getCrumbs(pathname);
+
+    return (
+        <div className="admin-topbar">
+            {/* Hamburger — mobile only */}
+            <button className="admin-hamburger" onClick={onMenu} aria-label="Open navigation">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                    <line x1="3" y1="7" x2="21" y2="7" />
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="17" x2="21" y2="17" />
+                </svg>
+            </button>
+
+            {/* Breadcrumb */}
+            <div className="admin-crumb">
+                {crumbs.slice(0, -1).map((c, i) => (
+                    <span key={i}>{c}<span className="sep"> / </span></span>
+                ))}
+                <span className="here">{crumbs[crumbs.length - 1]}</span>
+            </div>
+
+            <div className="admin-topbar-spacer" />
+
+            {/* Global search */}
+            <div className="admin-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+                </svg>
+                <input placeholder="Search orders, products…" />
+                <kbd>⌘K</kbd>
+            </div>
+
+            {/* Bell */}
+            <button className="admin-icon-btn" title="Notifications" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 8a6 6 0 1 1 12 0c0 6 2 7 2 7H4s2-1 2-7Z" />
+                    <path d="M10 19a2 2 0 0 0 4 0" />
+                </svg>
+            </button>
+
+            {/* User chip */}
+            <div className="admin-user-chip">
+                <div className="admin-user-avatar">{user.initials}</div>
+                <div>
+                    <div className="admin-user-name">{user.name}</div>
+                    <div className="admin-user-role">{user.role}</div>
+                </div>
+            </div>
+        </div>
+    );
+}

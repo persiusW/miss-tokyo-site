@@ -33,14 +33,7 @@ export default async function RidersReportPage() {
         const inTransit = rOrders.filter(o => o.status === "shipped").length;
         const totalRevenue = rOrders.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
         const dates = rOrders.map(o => o.created_at).sort().reverse();
-        return {
-            ...r,
-            totalOrders: rOrders.length,
-            delivered,
-            inTransit,
-            totalRevenue,
-            lastDate: dates[0] ?? null,
-        };
+        return { ...r, totalOrders: rOrders.length, delivered, inTransit, totalRevenue, lastDate: dates[0] ?? null };
     });
 
     const totalDispatched = orders.length;
@@ -48,97 +41,91 @@ export default async function RidersReportPage() {
     const totalRevenue = orders.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
 
     return (
-        <div className="space-y-10">
-            <header>
-                <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Rider Reports</h1>
-                <p className="text-neutral-500">Delivery performance across all assigned riders.</p>
-            </header>
+        <>
+            <div className="ac-page-head">
+                <div>
+                    <h1 className="ac-page-h1">Rider Reports</h1>
+                    <p className="ac-page-sub">Delivery performance across all assigned riders.</p>
+                </div>
+            </div>
 
-            {/* Summary KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="ac-kpi-grid" style={{ marginBottom: 24 }}>
                 {[
-                    { label: "Active Riders",     value: riders.filter(r => r.is_active).length },
-                    { label: "Total Dispatched",  value: totalDispatched },
-                    { label: "Total Delivered",   value: totalDelivered },
-                    { label: "Revenue Handled",   value: `GH₵ ${totalRevenue.toFixed(2)}` },
-                ].map(({ label, value }) => (
-                    <div key={label} className="bg-white border border-neutral-200 p-6">
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500 mb-3 block">{label}</span>
-                        <span className="text-2xl font-serif">{value}</span>
+                    { label: "Active Riders",    value: riders.filter(r => r.is_active).length, mono: false },
+                    { label: "Total Dispatched", value: totalDispatched, mono: false },
+                    { label: "Total Delivered",  value: totalDelivered, mono: false },
+                    { label: "Revenue Handled",  value: totalRevenue, mono: true },
+                ].map(({ label, value, mono }) => (
+                    <div key={label} className="ac-kpi">
+                        <span className="ac-kpi-label">{label}</span>
+                        <span className="ac-kpi-value">
+                            {mono && <span className="ac-kpi-ccy">GH₵ </span>}
+                            {mono ? Number(value).toFixed(2) : value}
+                        </span>
                     </div>
                 ))}
             </div>
 
-            {/* Riders table */}
-            <div className="bg-white border border-neutral-200">
-                <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest">All Riders</h2>
-                    <span className="text-xs text-neutral-400">{rows.length} riders</span>
+            <div className="ac-card flush">
+                <div className="ac-card-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span className="ac-card-title">All Riders</span>
+                    <span style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{rows.length} riders</span>
                 </div>
-
                 {rows.length === 0 ? (
-                    <div className="px-8 py-16 text-center text-neutral-400 italic font-serif text-sm">
-                        No riders found. Add riders in Settings to track dispatch performance.
+                    <div className="ac-empty">
+                        <p className="ac-empty-title">No riders found.</p>
+                        <p style={{ fontSize: 12, color: "var(--ac-ink-4)", marginTop: 4 }}>Add riders in Settings to track dispatch performance.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-neutral-50 border-b border-neutral-100">
+                    <div className="ac-table-wrap">
+                        <table className="ac-table">
+                            <thead>
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Rider</th>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Phone</th>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Bike Reg</th>
-                                    <th className="px-6 py-3 text-center text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Total Orders</th>
-                                    <th className="px-6 py-3 text-center text-[10px] uppercase tracking-widest font-semibold text-neutral-400">In Transit</th>
-                                    <th className="px-6 py-3 text-center text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Delivered</th>
-                                    <th className="px-6 py-3 text-right text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Revenue</th>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Status</th>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Last Active</th>
-                                    <th className="px-6 py-3"></th>
+                                    <th>Rider</th>
+                                    <th>Phone</th>
+                                    <th>Bike Reg</th>
+                                    <th className="r">Total</th>
+                                    <th className="r">In Transit</th>
+                                    <th className="r">Delivered</th>
+                                    <th className="r">Revenue</th>
+                                    <th>Status</th>
+                                    <th>Last Active</th>
+                                    <th style={{ width: 60 }}></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-neutral-50">
+                            <tbody>
                                 {rows.map(r => (
-                                    <tr key={r.id} className="hover:bg-neutral-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
+                                    <tr key={r.id}>
+                                        <td>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                                 {r.image_url ? (
-                                                    <img src={r.image_url} alt={r.full_name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                                    <img src={r.image_url} alt={r.full_name} style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                                                 ) : (
-                                                    <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center shrink-0">
-                                                        <span className="text-xs font-semibold text-neutral-400">{r.full_name.charAt(0)}</span>
+                                                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--ac-panel-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--ac-line)" }}>
+                                                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ac-ink-3)" }}>{r.full_name.charAt(0)}</span>
                                                     </div>
                                                 )}
-                                                <span className="font-medium text-neutral-900">{r.full_name}</span>
+                                                <span style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{r.full_name}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-neutral-500 text-xs">{r.phone_number}</td>
-                                        <td className="px-6 py-4 text-neutral-500 text-xs font-mono">{r.bike_reg || "—"}</td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="font-semibold text-neutral-900">{r.totalOrders}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className={`text-xs font-medium ${r.inTransit > 0 ? "text-blue-600" : "text-neutral-400"}`}>{r.inTransit}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className={`text-xs font-medium ${r.delivered > 0 ? "text-green-600" : "text-neutral-400"}`}>{r.delivered}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right font-medium text-neutral-800">
+                                        <td style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>{r.phone_number}</td>
+                                        <td style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-3)" }}>{r.bike_reg || "—"}</td>
+                                        <td className="r" style={{ fontWeight: 600 }}>{r.totalOrders}</td>
+                                        <td className="r" style={{ color: r.inTransit > 0 ? "var(--ac-accent)" : "var(--ac-ink-4)" }}>{r.inTransit}</td>
+                                        <td className="r" style={{ color: r.delivered > 0 ? "var(--ac-accent)" : "var(--ac-ink-4)" }}>{r.delivered}</td>
+                                        <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500 }}>
                                             {r.totalRevenue > 0 ? `GH₵ ${r.totalRevenue.toFixed(2)}` : "—"}
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded font-semibold ${r.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-400"}`}>
+                                        <td>
+                                            <span className={`ac-badge ${r.is_active ? "ac-badge-ok" : "ac-badge-inactive"}`}>
                                                 {r.is_active ? "Active" : "Inactive"}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-neutral-400 text-xs">
+                                        <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>
                                             {r.lastDate ? new Date(r.lastDate).toLocaleDateString("en-GB") : "—"}
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <Link href={`/sales/riders/${r.id}`}
-                                                className="text-[10px] uppercase tracking-widest text-neutral-500 hover:text-black border-b border-neutral-200 hover:border-black transition-colors">
-                                                View →
-                                            </Link>
+                                        <td>
+                                            <Link href={`/sales/riders/${r.id}`} className="ac-text-link" style={{ fontSize: 11 }}>View →</Link>
                                         </td>
                                     </tr>
                                 ))}
@@ -147,6 +134,6 @@ export default async function RidersReportPage() {
                     </div>
                 )}
             </div>
-        </div>
+        </>
     );
 }

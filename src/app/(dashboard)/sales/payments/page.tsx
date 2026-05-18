@@ -20,72 +20,70 @@ export default async function PaymentsPage() {
         .reduce((sum: number, p: any) => sum + Number(p.total_amount), 0);
 
     return (
-        <div className="space-y-12">
-            <header>
-                <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Payments</h1>
-                <p className="text-neutral-500">Confirmed Paystack transactions.</p>
-            </header>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Total Collected</span>
-                    <span className="text-3xl font-serif">GH₵ {total.toFixed(2)}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">ALL TIME</span>
-                </div>
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">This Month</span>
-                    <span className="text-3xl font-serif">GH₵ {monthlyTotal.toFixed(2)}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">CURRENT PERIOD</span>
-                </div>
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Transactions</span>
-                    <span className="text-3xl font-serif">{payments?.length || 0}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">CONFIRMED PAYMENTS</span>
+        <>
+            <div className="ac-page-head">
+                <div>
+                    <h1 className="ac-page-h1">Payments</h1>
+                    <p className="ac-page-sub">Confirmed Paystack transactions.</p>
                 </div>
             </div>
 
-            <div className="bg-white border border-neutral-200 overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
-                        <tr>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Paystack Ref</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Customer</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Amount</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Date</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                        {(!payments || payments.length === 0) ? (
+            <div className="ac-kpi-grid" style={{ marginBottom: 24 }}>
+                <div className="ac-kpi">
+                    <span className="ac-kpi-label">Total Collected</span>
+                    <span className="ac-kpi-value"><span className="ac-kpi-ccy">GH₵ </span>{total.toFixed(2)}</span>
+                    <span className="ac-kpi-sub">All time</span>
+                </div>
+                <div className="ac-kpi">
+                    <span className="ac-kpi-label">This Month</span>
+                    <span className="ac-kpi-value"><span className="ac-kpi-ccy">GH₵ </span>{monthlyTotal.toFixed(2)}</span>
+                    <span className="ac-kpi-sub">Current period</span>
+                </div>
+                <div className="ac-kpi">
+                    <span className="ac-kpi-label">Transactions</span>
+                    <span className="ac-kpi-value">{payments?.length || 0}</span>
+                    <span className="ac-kpi-sub">Confirmed payments</span>
+                </div>
+            </div>
+
+            <div className="ac-card flush">
+                <div className="ac-table-wrap">
+                    <table className="ac-table">
+                        <thead>
                             <tr>
-                                <td colSpan={4} className="px-6 py-16 text-center text-neutral-500 italic font-serif">
-                                    No confirmed payments on record.
-                                </td>
+                                <th>Paystack Ref</th>
+                                <th>Customer</th>
+                                <th className="r">Amount</th>
+                                <th className="r">Date</th>
                             </tr>
-                        ) : (
-                            payments.map((p: any) => (
-                                <tr key={p.id} className="hover:bg-neutral-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <span className="font-mono text-xs text-neutral-600 bg-neutral-50 px-2 py-1 rounded">
-                                            {p.paystack_reference || '—'}
+                        </thead>
+                        <tbody>
+                            {(!payments || payments.length === 0) ? (
+                                <tr><td colSpan={4} className="ac-table-empty">No confirmed payments on record.</td></tr>
+                            ) : payments.map((p: any) => (
+                                <tr key={p.id}>
+                                    <td>
+                                        <span style={{ fontFamily: "var(--f-mono)", fontSize: 11, background: "var(--ac-panel-2)", padding: "3px 8px", borderRadius: "var(--r-sm)", color: "var(--ac-ink-3)" }}>
+                                            {p.paystack_reference || "—"}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <a href={`mailto:${p.customer_email}`} className="text-neutral-700 hover:text-black hover:underline">
+                                    <td>
+                                        <a href={`mailto:${p.customer_email}`} className="ac-text-link" style={{ fontSize: 13 }}>
                                             {p.customer_email}
                                         </a>
                                     </td>
-                                    <td className="px-6 py-4 text-right font-semibold text-green-700">
+                                    <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 600, color: "var(--ac-accent)" }}>
                                         GH₵ {Number(p.total_amount).toFixed(2)}
                                     </td>
-                                    <td className="px-6 py-4 text-right text-neutral-500 text-xs">
-                                        {new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    <td className="r" style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>
+                                        {new Date(p.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                                     </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        </>
     );
 }

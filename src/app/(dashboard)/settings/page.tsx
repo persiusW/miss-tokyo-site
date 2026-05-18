@@ -123,33 +123,29 @@ export default function SettingsPage() {
     ];
 
     return (
-        <div className="max-w-7xl mx-auto px-4">
-            <header className="mb-6">
-                <h1 className="text-[20px] font-medium text-neutral-900 tracking-tight font-serif uppercase tracking-widest">Settings</h1>
-                <p className="text-xs text-neutral-500 mt-1 uppercase tracking-wider">Business details, store configuration, and operations.</p>
-            </header>
-
-            {/* Horizontal Tabs */}
-            <div className="flex overflow-x-auto border-b border-neutral-200 hide-scrollbar mb-8">
-                <nav className="flex gap-8">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.key}
-                            onClick={() => setActiveTab(tab.key)}
-                            className={`whitespace-nowrap pb-4 px-1 border-b-2 text-xs uppercase tracking-widest font-semibold transition-all ${activeTab === tab.key
-                                    ? "border-black text-black"
-                                    : "border-transparent text-neutral-400 hover:text-neutral-600"
-                                }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </nav>
+        <>
+            <div className="ac-page-head">
+                <div>
+                    <h1 className="ac-page-h1">Settings</h1>
+                    <p className="ac-page-sub">Business details, store configuration, and operations.</p>
+                </div>
             </div>
 
-            {/* Full Width Content Area */}
-            <div className="w-full">
-                {activeTab === "business" && <><BusinessTab /><div className="mt-8"><BusinessSettingsTab /></div></>}
+            <div className="ac-tabs" style={{ marginBottom: 28, overflowX: "auto" }}>
+                {tabs.map((tab) => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`ac-tab ${activeTab === tab.key ? "active" : ""}`}
+                        style={{ whiteSpace: "nowrap" }}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            <div>
+                {activeTab === "business" && <><BusinessTab /><div style={{ marginTop: 24 }}><BusinessSettingsTab /></div></>}
                 {activeTab === "store" && <StoreTab />}
                 {activeTab === "shipping" && <ShippingTab />}
                 {activeTab === "seo" && <SEOTab />}
@@ -160,7 +156,7 @@ export default function SettingsPage() {
                 {activeTab === "team" && <TeamTab />}
                 {activeTab === "product-page" && <ProductPageTab />}
             </div>
-        </div>
+        </>
     );
 }
 
@@ -202,15 +198,15 @@ function BusinessTab() {
     };
 
     if (loading) {
-        return <p className="text-neutral-400 italic font-serif">Loading...</p>;
+        return <div className="ac-empty"><p className="ac-empty-title">Loading...</p></div>;
     }
 
     return (
-        <form onSubmit={handleSave} className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, alignItems: "start" }}>
                 {/* Left: Brand / Logo */}
-                <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Brand</h2>
+                <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)", paddingBottom: 10, borderBottom: "1px solid var(--ac-line)" }}>Brand</p>
                     <ImageUploader
                         bucket="site-assets"
                         folder="logos"
@@ -220,72 +216,42 @@ function BusinessTab() {
                         label="Business Logo"
                     />
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Tax Rate (%)</label>
-                        <input
-                            type="number" name="tax_rate" min="0" max="100" step="0.1"
-                            value={form.tax_rate}
-                            onChange={handleChange}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="0"
-                        />
-                        <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">Applied to taxable order totals.</p>
+                        <label className="ac-label">Tax Rate (%)</label>
+                        <input type="number" name="tax_rate" min="0" max="100" step="0.1"
+                            value={form.tax_rate} onChange={handleChange}
+                            className="ac-input" style={{ marginTop: 6 }} placeholder="0" />
+                        <p style={{ fontSize: 10, color: "var(--ac-ink-4)", textTransform: "uppercase", letterSpacing: ".05em", marginTop: 4 }}>Applied to taxable order totals.</p>
                     </div>
                 </div>
 
                 {/* Right: Business Details */}
-                <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Business Details</h2>
+                <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)", paddingBottom: 10, borderBottom: "1px solid var(--ac-line)" }}>Business Details</p>
 
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Business Name</label>
-                        <input
-                            type="text" name="business_name" required
-                            value={form.business_name}
-                            onChange={handleChange}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="Miss Tokyo"
-                        />
+                        <label className="ac-label">Business Name</label>
+                        <input type="text" name="business_name" required value={form.business_name} onChange={handleChange}
+                            className="ac-input" style={{ marginTop: 6 }} placeholder="Miss Tokyo" />
                     </div>
-
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Business Email</label>
-                        <input
-                            type="email" name="email"
-                            value={form.email}
-                            onChange={handleChange}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="hello@misstokyo.shop"
-                        />
+                        <label className="ac-label">Business Email</label>
+                        <input type="email" name="email" value={form.email} onChange={handleChange}
+                            className="ac-input" style={{ marginTop: 6 }} placeholder="hello@misstokyo.shop" />
                     </div>
-
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Contact / Phone</label>
-                        <input
-                            type="text" name="contact"
-                            value={form.contact}
-                            onChange={handleChange}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                            placeholder="+233 ..."
-                        />
+                        <label className="ac-label">Contact / Phone</label>
+                        <input type="text" name="contact" value={form.contact} onChange={handleChange}
+                            className="ac-input" style={{ marginTop: 6 }} placeholder="+233 ..." />
                     </div>
-
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Business Address</label>
-                        <textarea
-                            name="address" rows={2}
-                            value={form.address}
-                            onChange={handleChange}
-                            className="w-full border border-neutral-200 p-3 bg-transparent outline-none focus:border-black transition-colors resize-none text-sm"
-                            placeholder="123 Main Street, Accra, Ghana"
-                        />
+                        <label className="ac-label">Business Address</label>
+                        <textarea name="address" rows={2} value={form.address} onChange={handleChange}
+                            className="ac-textarea" style={{ marginTop: 6 }} placeholder="123 Main Street, Accra, Ghana" />
                     </div>
 
-                    <div className="flex justify-end items-center gap-6 pt-2">
-                        {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved</span>}
-                        <button
-                            type="submit" disabled={saving}
-                            className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                        >
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 14, paddingTop: 4 }}>
+                        {saved && <span style={{ fontSize: 11, color: "var(--ac-accent)", textTransform: "uppercase", letterSpacing: ".06em" }}>Saved</span>}
+                        <button type="submit" disabled={saving} className="ac-btn ac-btn-primary">
                             {saving ? "Saving..." : "Save Settings"}
                         </button>
                     </div>
@@ -373,283 +339,168 @@ function StoreTab() {
     };
 
     if (loading) {
-        return <p className="text-neutral-400 italic font-serif">Loading...</p>;
+        return <div className="ac-empty"><p className="ac-empty-title">Loading...</p></div>;
     }
+
+    const secTitle = (label: string) => (
+        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: ".08em", color: "var(--ac-ink-3)", paddingBottom: 10, borderBottom: "1px solid var(--ac-line)" }}>{label}</p>
+    );
+    const subLabel = (text: string) => (
+        <p style={{ fontSize: 10, color: "var(--ac-ink-4)", textTransform: "uppercase" as const, letterSpacing: ".05em", marginTop: 3 }}>{text}</p>
+    );
 
     return (
         <>
-            <form onSubmit={handleSave} className="space-y-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 20, alignItems: "start" }}>
                     {/* Left column */}
-                    <div className="space-y-8">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                         {/* Store Configuration */}
-                        <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Store Configuration</h2>
+                        <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                            {secTitle("Store Configuration")}
 
-                            <div>
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={form.enable_store_pickup}
-                                        onChange={(e) => setForm(p => ({ ...p, enable_store_pickup: e.target.checked }))}
-                                        className="w-4 h-4 accent-black"
-                                    />
-                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Store Pickup</span>
-                                </label>
-                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Allow customers to pick up orders directly from the atelier.</p>
-                            </div>
+                            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                                <input type="checkbox" className="ac-checkbox" checked={form.enable_store_pickup}
+                                    onChange={(e) => setForm(p => ({ ...p, enable_store_pickup: e.target.checked }))} />
+                                <div>
+                                    <span className="ac-label">Enable Store Pickup</span>
+                                    {subLabel("Allow customers to pick up orders directly from the atelier.")}
+                                </div>
+                            </label>
 
-                            <div className="pt-4 border-t border-neutral-100">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={form.maintenance_mode}
-                                        onChange={(e) => setForm(p => ({ ...p, maintenance_mode: e.target.checked }))}
-                                        className="w-4 h-4 accent-black"
-                                    />
-                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Coming Soon / Maintenance Mode</span>
-                                </label>
-                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Restrict access to the shop and show a coming soon placeholder.</p>
-                            </div>
+                            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", paddingTop: 12, borderTop: "1px solid var(--ac-line)" }}>
+                                <input type="checkbox" className="ac-checkbox" checked={form.maintenance_mode}
+                                    onChange={(e) => setForm(p => ({ ...p, maintenance_mode: e.target.checked }))} />
+                                <div>
+                                    <span className="ac-label">Enable Coming Soon / Maintenance Mode</span>
+                                    {subLabel("Restrict access to the shop and show a coming soon placeholder.")}
+                                </div>
+                            </label>
 
-                            <div className="pt-4 border-t border-neutral-100">
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Default Landing Page</label>
-                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mb-3">Choose which page customers land on when they visit the site root (/).</p>
-                                <div className="flex gap-3">
+                            <div style={{ paddingTop: 12, borderTop: "1px solid var(--ac-line)" }}>
+                                <label className="ac-label">Default Landing Page</label>
+                                {subLabel("Choose which page customers land on when they visit the site root (/).")}
+                                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                                     {([
                                         { value: "home", label: "Home" },
                                         { value: "shop", label: "Shop" },
                                         { value: "gallery", label: "Gallery" },
                                     ] as const).map(opt => (
-                                        <button
-                                            key={opt.value}
-                                            type="button"
+                                        <button key={opt.value} type="button"
                                             onClick={() => setForm(p => ({ ...p, homepage_route: opt.value }))}
-                                            className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.homepage_route === opt.value ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                                        >
+                                            style={{ flex: 1, padding: "8px 0", fontSize: 12, fontWeight: 600, border: `1px solid ${form.homepage_route === opt.value ? "var(--ac-accent)" : "var(--ac-line)"}`, background: form.homepage_route === opt.value ? "var(--ac-accent)" : "transparent", color: form.homepage_route === opt.value ? "#fff" : "var(--ac-ink-3)", cursor: "pointer", borderRadius: "var(--r-sm)" }}>
                                             {opt.label}
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-neutral-100 mt-6 grid grid-cols-1 gap-6">
+                            <div style={{ paddingTop: 12, borderTop: "1px solid var(--ac-line)", display: "flex", flexDirection: "column", gap: 14 }}>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Shoe Sizes</label>
-                                    <TagInput
-                                        value={form.global_sizes}
-                                        onChange={(tags) => setForm(p => ({ ...p, global_sizes: tags }))}
-                                        placeholder="Type a size and press Enter…"
-                                    />
-                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each size.</p>
+                                    <label className="ac-label">Global Shoe Sizes</label>
+                                    <div style={{ marginTop: 6 }}>
+                                        <TagInput value={form.global_sizes} onChange={(tags) => setForm(p => ({ ...p, global_sizes: tags }))} placeholder="Type a size and press Enter…" />
+                                    </div>
+                                    {subLabel("Press Enter or , to add each size.")}
                                 </div>
-
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Colors</label>
-                                    <TagInput
-                                        value={form.global_colors}
-                                        onChange={(tags) => setForm(p => ({ ...p, global_colors: tags }))}
-                                        placeholder="Type a color and press Enter…"
-                                    />
-                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each color.</p>
+                                    <label className="ac-label">Global Colors</label>
+                                    <div style={{ marginTop: 6 }}>
+                                        <TagInput value={form.global_colors} onChange={(tags) => setForm(p => ({ ...p, global_colors: tags }))} placeholder="Type a color and press Enter…" />
+                                    </div>
+                                    {subLabel("Press Enter or , to add each color.")}
                                 </div>
-
-                                {/* <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Stitching Options</label>
-                                    <TagInput
-                                        value={form.global_stitching}
-                                        onChange={(tags) => setForm(p => ({ ...p, global_stitching: tags }))}
-                                        placeholder="Type an option and press Enter…"
-                                    />
-                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each stitching style.</p>
-                                </div> */}
                             </div>
                         </div>
                     </div>{/* end left column */}
 
                     {/* Right column */}
-                    <div className="space-y-8">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                         {/* Visual Merchandising */}
-                        <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Visual Merchandising</h2>
-                            <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
-                                Control the product columns on desktop and how many items appear in the homepage featured grid. Mobile stays 2-column, tablet stays 2-column.
-                            </p>
+                        <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                            {secTitle("Visual Merchandising")}
+                            {subLabel("Control the product columns on desktop and how many items appear in the homepage featured grid.")}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Homepage Grid Columns</label>
-                                    <div className="flex gap-3">
-                                        {([2, 3, 4, 5] as const).map(n => (
-                                            <button
-                                                key={n}
-                                                type="button"
-                                                onClick={() => setForm(p => ({ ...p, home_grid_cols: n }))}
-                                                className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.home_grid_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                                            >
+                            {([
+                                { label: "Homepage Grid Columns", field: "home_grid_cols" as const, opts: [2,3,4,5] as const, note: "Columns on the homepage collection grid." },
+                                { label: "Shop Page Grid Columns", field: "shop_grid_cols" as const, opts: [2,3,4,5] as const, note: "Columns on the full shop listing grid." },
+                                { label: "Shop Mobile Columns",    field: "shop_mobile_cols" as const, opts: [1,2] as const, note: "Grid columns on mobile devices." },
+                                { label: "Featured Products on Homepage", field: "home_product_limit" as const, opts: [4,6,8,12] as const, note: "Number shown in the homepage collection grid." },
+                                { label: "Shop — Products Per Page", field: "shop_product_limit" as const, opts: [8,12,16,24,32] as const, note: "Total products loaded per page on shop listing." },
+                            ] as const).map(({ label, field, opts, note }) => (
+                                <div key={field} style={{ paddingTop: 12, borderTop: "1px solid var(--ac-line)" }}>
+                                    <label className="ac-label">{label}</label>
+                                    <div style={{ display: "flex", gap: 6, marginTop: 8, maxWidth: 320 }}>
+                                        {(opts as readonly number[]).map(n => (
+                                            <button key={n} type="button" onClick={() => setForm(p => ({ ...p, [field]: n }))}
+                                                style={{ flex: 1, padding: "7px 0", fontSize: 12, fontWeight: 600, border: `1px solid ${(form[field] as number) === n ? "var(--ac-accent)" : "var(--ac-line)"}`, background: (form[field] as number) === n ? "var(--ac-accent)" : "transparent", color: (form[field] as number) === n ? "#fff" : "var(--ac-ink-3)", cursor: "pointer", borderRadius: "var(--r-sm)" }}>
                                                 {n}
                                             </button>
                                         ))}
                                     </div>
-                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Columns on the homepage collection grid.</p>
+                                    {subLabel(note)}
                                 </div>
+                            ))}
 
+                            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", paddingTop: 12, borderTop: "1px solid var(--ac-line)" }}>
+                                <input type="checkbox" className="ac-checkbox" checked={form.shop_show_title}
+                                    onChange={(e) => setForm(p => ({ ...p, shop_show_title: e.target.checked }))} />
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page Grid Columns</label>
-                                    <div className="flex gap-3">
-                                        {([2, 3, 4, 5] as const).map(n => (
-                                            <button
-                                                key={n}
-                                                type="button"
-                                                onClick={() => setForm(p => ({ ...p, shop_grid_cols: n }))}
-                                                className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_grid_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                                            >
-                                                {n}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Columns on the full shop listing grid.</p>
+                                    <span className="ac-label">Show Shop Page Title &amp; Subtitle</span>
+                                    {subLabel("Display the hero text header above the product grid on the shop page.")}
                                 </div>
+                            </label>
 
+                            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", paddingTop: 12, borderTop: "1px solid var(--ac-line)" }}>
+                                <input type="checkbox" className="ac-checkbox" checked={form.shop_image_stretch}
+                                    onChange={(e) => setForm(p => ({ ...p, shop_image_stretch: e.target.checked }))} />
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page Mobile Columns</label>
-                                    <div className="flex gap-3 max-w-[160px]">
-                                        {([1, 2] as const).map(n => (
-                                            <button
-                                                key={n}
-                                                type="button"
-                                                onClick={() => setForm(p => ({ ...p, shop_mobile_cols: n }))}
-                                                className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_mobile_cols === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                                            >
-                                                {n}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Grid columns on mobile devices.</p>
+                                    <span className="ac-label">Stretch Product Images to Fill Frame</span>
+                                    {subLabel("When on, images fill the card exactly (may distort). When off, images are cropped to fit.")}
                                 </div>
-                            </div>
-
-                            <div className="pt-6 border-t border-neutral-100">
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Featured Products on Homepage</label>
-                                <div className="flex gap-3 max-w-xs">
-                                    {([4, 6, 8, 12] as const).map(n => (
-                                        <button
-                                            key={n}
-                                            type="button"
-                                            onClick={() => setForm(p => ({ ...p, home_product_limit: n }))}
-                                            className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.home_product_limit === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                                        >
-                                            {n}
-                                        </button>
-                                    ))}
-                                </div>
-                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Number of products shown in the homepage collection grid.</p>
-                            </div>
-
-                            <div className="pt-6 border-t border-neutral-100">
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-4">Shop Page — Products Per Page</label>
-                                <div className="flex gap-3 max-w-sm">
-                                    {([8, 12, 16, 24, 32] as const).map(n => (
-                                        <button
-                                            key={n}
-                                            type="button"
-                                            onClick={() => setForm(p => ({ ...p, shop_product_limit: n }))}
-                                            className={`flex-1 py-3 text-sm font-semibold border transition-colors ${form.shop_product_limit === n ? "bg-black text-white border-black" : "bg-white text-neutral-500 border-neutral-200 hover:border-black hover:text-black"}`}
-                                        >
-                                            {n}
-                                        </button>
-                                    ))}
-                                </div>
-                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Total products loaded per page on the shop listing.</p>
-                            </div>
-
-                            <div className="pt-6 border-t border-neutral-100">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={form.shop_show_title}
-                                        onChange={(e) => setForm(p => ({ ...p, shop_show_title: e.target.checked }))}
-                                        className="w-4 h-4 accent-black"
-                                    />
-                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Show Shop Page Title &amp; Subtitle</span>
-                                </label>
-                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">Display the hero text header above the product grid on the shop page.</p>
-                            </div>
-
-                            <div className="pt-6 border-t border-neutral-100">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={form.shop_image_stretch}
-                                        onChange={(e) => setForm(p => ({ ...p, shop_image_stretch: e.target.checked }))}
-                                        className="w-4 h-4 accent-black"
-                                    />
-                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stretch Product Images to Fill Frame</span>
-                                </label>
-                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">When on, images fill the card exactly (may distort). When off, images are cropped to fit.</p>
-                            </div>
+                            </label>
                         </div>
 
                     </div>{/* end right column */}
                 </div>{/* end grid */}
 
                 {/* Platform Fees */}
-                <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Platform Fees</h2>
-                    <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
-                        A percentage-based fee applied to all orders, invoices, and payment links to offset processing charges.
-                    </p>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    {secTitle("Platform Fees")}
+                    {subLabel("A percentage-based fee applied to all orders, invoices, and payment links to offset processing charges.")}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Fee Percentage (%)</label>
-                            <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.1"
+                            <label className="ac-label">Fee Percentage (%)</label>
+                            <input type="number" min="0" max="100" step="0.1"
                                 value={form.platform_fee_percentage}
                                 onChange={(e) => setForm(p => ({ ...p, platform_fee_percentage: parseFloat(e.target.value) || 0 }))}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                                placeholder="2.5"
-                            />
-                            <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">e.g. 2.5 adds 2.5% to every order total.</p>
+                                className="ac-input" style={{ marginTop: 6 }} placeholder="2.5" />
+                            {subLabel("e.g. 2.5 adds 2.5% to every order total.")}
                         </div>
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Fee Label</label>
-                            <input
-                                type="text"
+                            <label className="ac-label">Fee Label</label>
+                            <input type="text"
                                 value={form.platform_fee_label}
                                 onChange={(e) => setForm(p => ({ ...p, platform_fee_label: e.target.value }))}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                                placeholder="Service Charge"
-                            />
-                            <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Label shown to customers on receipts.</p>
+                                className="ac-input" style={{ marginTop: 6 }} placeholder="Service Charge" />
+                            {subLabel("Label shown to customers on receipts.")}
                         </div>
                     </div>
-
-                    <div className="pt-4 border-t border-neutral-100">
-                        <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={form.show_fee_at_checkout}
-                                onChange={(e) => setForm(p => ({ ...p, show_fee_at_checkout: e.target.checked }))}
-                                className="w-4 h-4 accent-black"
-                            />
-                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Show Fee as Itemised Line at Checkout</span>
-                        </label>
-                        <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase ml-7">
-                            When off, the fee is silently rolled into "Shipping &amp; Handling" so the total still adds up without a visible surcharge line.
-                        </p>
-                    </div>
+                    <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", paddingTop: 12, borderTop: "1px solid var(--ac-line)" }}>
+                        <input type="checkbox" className="ac-checkbox" checked={form.show_fee_at_checkout}
+                            onChange={(e) => setForm(p => ({ ...p, show_fee_at_checkout: e.target.checked }))} />
+                        <div>
+                            <span className="ac-label">Show Fee as Itemised Line at Checkout</span>
+                            {subLabel("When off, the fee is silently rolled into \"Shipping & Handling\".")}
+                        </div>
+                    </label>
                 </div>
 
                 {/* Feature Toggles */}
-                <div className="bg-white border border-neutral-200 p-8 space-y-5">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Feature Toggles</h2>
-                    <p className="text-[10px] text-neutral-400 tracking-wider uppercase">Enable or disable storefront sections. Hidden sections are removed from the navigation.</p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8">
+                <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+                    {secTitle("Feature Toggles")}
+                    {subLabel("Enable or disable storefront sections. Hidden sections are removed from the navigation.")}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
                         {([
                             { key: "enable_gift_cards" as const, label: "Gift Cards", desc: "Show the gift card purchase page in the navbar." },
                             { key: "enable_gallery" as const, label: "Gallery", desc: "Show the gallery page and nav link." },
@@ -657,106 +508,76 @@ function StoreTab() {
                             { key: "enable_whitelabel" as const, label: "White Labelling", desc: "Show the white labelling / custom order page." },
                             { key: "enable_custom_requests" as const, label: "Custom Requests", desc: "Enable the custom order request form and admin submissions inbox." },
                         ] as const).map(({ key, label, desc }) => (
-                            <div key={key} className="py-4 border-b border-neutral-100 last:border-b-0">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input type="checkbox" checked={form[key]}
-                                        onChange={(e) => setForm(p => ({ ...p, [key]: e.target.checked }))}
-                                        className="w-4 h-4 accent-black" />
-                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">{label}</span>
-                                </label>
-                                <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">{desc}</p>
-                            </div>
+                            <label key={key} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 0", borderBottom: "1px solid var(--ac-line)", cursor: "pointer" }}>
+                                <input type="checkbox" className="ac-checkbox" checked={form[key]}
+                                    onChange={(e) => setForm(p => ({ ...p, [key]: e.target.checked }))} />
+                                <div>
+                                    <span className="ac-label">{label}</span>
+                                    {subLabel(desc)}
+                                </div>
+                            </label>
                         ))}
                     </div>
                 </div>
 
                 {/* Wholesale Configuration */}
-                <div className="bg-white border border-neutral-200 p-8 space-y-6">
-                    <div>
-                        <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Wholesale / B2B Configuration</h2>
-                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">
-                            Enable B2B wholesale pricing with quantity-based tiers. Wholesale users see custom pricing instead of retail prices on the storefront.
-                        </p>
-                    </div>
-
-                    <div>
-                        <label className="flex items-center gap-3 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={form.wholesale_enabled}
-                                onChange={(e) => setForm(p => ({ ...p, wholesale_enabled: e.target.checked }))}
-                                className="w-4 h-4 accent-black"
-                            />
-                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Enable Global Tier-Based Pricing</span>
-                        </label>
-                        <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase ml-7">
-                            When on, users with the Wholesale role see tier-based pricing on product pages.
-                        </p>
-                    </div>
-
-                    <div className="pt-6 border-t border-neutral-100 space-y-6">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-[10px] uppercase tracking-[0.1em] font-bold text-black">Wholesale Exclusive Categories</h3>
-                            <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded">Access Protection</span>
+                <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    {secTitle("Wholesale / B2B Configuration")}
+                    {subLabel("Enable B2B wholesale pricing with quantity-based tiers. Wholesale users see custom pricing instead of retail prices.")}
+                    <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                        <input type="checkbox" className="ac-checkbox" checked={form.wholesale_enabled}
+                            onChange={(e) => setForm(p => ({ ...p, wholesale_enabled: e.target.checked }))} />
+                        <div>
+                            <span className="ac-label">Enable Global Tier-Based Pricing</span>
+                            {subLabel("When on, users with the Wholesale role see tier-based pricing on product pages.")}
                         </div>
-                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
-                            Toggle categories that should be restricted to wholesale users only. Products assigned ONLY to these will be hidden from retail customers.
-                        </p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    </label>
+                    <div style={{ paddingTop: 14, borderTop: "1px solid var(--ac-line)", display: "flex", flexDirection: "column", gap: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".1em", color: "var(--ac-ink)" }}>Wholesale Exclusive Categories</p>
+                            <span className="ac-badge ac-badge-ok" style={{ fontSize: 9 }}>Access Protection</span>
+                        </div>
+                        {subLabel("Toggle categories restricted to wholesale users only. Products ONLY in these are hidden from retail customers.")}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 6 }}>
                             {allCategories.map(cat => (
-                                <button
-                                    key={cat.id}
-                                    type="button"
+                                <button key={cat.id} type="button"
                                     onClick={() => {
                                         const next = new Set(wholesaleCatIds);
                                         if (next.has(cat.id)) next.delete(cat.id);
                                         else next.add(cat.id);
                                         setWholesaleCatIds(next);
                                     }}
-                                    className={`flex items-center gap-3 px-3 py-2.5 border text-[9px] font-bold uppercase tracking-widest transition-all ${wholesaleCatIds.has(cat.id)
-                                            ? "bg-black text-white border-black"
-                                            : "bg-white text-neutral-400 border-neutral-100 hover:border-neutral-200"
-                                        }`}
-                                >
-                                    <div className={`w-1.5 h-1.5 rounded-full ${wholesaleCatIds.has(cat.id) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-neutral-100"}`} />
+                                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: `1px solid ${wholesaleCatIds.has(cat.id) ? "var(--ac-accent)" : "var(--ac-line)"}`, background: wholesaleCatIds.has(cat.id) ? "var(--ac-accent)" : "transparent", color: wholesaleCatIds.has(cat.id) ? "#fff" : "var(--ac-ink-3)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", cursor: "pointer", borderRadius: "var(--r-sm)" }}>
+                                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: wholesaleCatIds.has(cat.id) ? "rgba(255,255,255,0.8)" : "var(--ac-line)", flexShrink: 0 }} />
                                     {cat.name}
                                 </button>
                             ))}
                         </div>
                     </div>
-
                     {form.wholesale_enabled && (
-                        <div className="pt-6 border-t border-neutral-100 space-y-6">
-                            <p className="text-[10px] text-neutral-400 tracking-wider uppercase">
-                                Define the quantity range for each pricing tier. These ranges apply globally across all products.
-                            </p>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div style={{ paddingTop: 14, borderTop: "1px solid var(--ac-line)", display: "flex", flexDirection: "column", gap: 12 }}>
+                            {subLabel("Define the quantity range for each pricing tier. These ranges apply globally.")}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
                                 {([1, 2, 3] as const).map(tier => (
-                                    <div key={tier} className="space-y-4 p-5 border border-neutral-100 bg-neutral-50">
-                                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Tier {tier}</p>
-                                        <div className="grid grid-cols-2 gap-3">
+                                    <div key={tier} style={{ padding: "14px 16px", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", background: "var(--ac-panel-2)", display: "flex", flexDirection: "column", gap: 10 }}>
+                                        <p className="ac-label">Tier {tier}</p>
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                                             <div>
-                                                <label className="block text-[9px] uppercase tracking-widest text-neutral-400 mb-1">Min Qty</label>
-                                                <input
-                                                    type="number" min="1"
+                                                <label className="ac-label" style={{ fontSize: 9 }}>Min Qty</label>
+                                                <input type="number" min="1"
                                                     value={form[`wholesale_tier_${tier}_min` as keyof StoreSettings] as number}
                                                     onChange={e => setForm(p => ({ ...p, [`wholesale_tier_${tier}_min`]: parseInt(e.target.value) || 1 }))}
-                                                    className="w-full border-b border-neutral-300 bg-transparent py-1.5 outline-none focus:border-black text-sm text-center transition-colors"
-                                                />
+                                                    className="ac-input" style={{ marginTop: 4, textAlign: "center" }} />
                                             </div>
                                             <div>
-                                                <label className="block text-[9px] uppercase tracking-widest text-neutral-400 mb-1">Max Qty</label>
-                                                <input
-                                                    type="number" min="1"
+                                                <label className="ac-label" style={{ fontSize: 9 }}>Max Qty</label>
+                                                <input type="number" min="1"
                                                     value={form[`wholesale_tier_${tier}_max` as keyof StoreSettings] as number}
                                                     onChange={e => setForm(p => ({ ...p, [`wholesale_tier_${tier}_max`]: parseInt(e.target.value) || 1 }))}
-                                                    className="w-full border-b border-neutral-300 bg-transparent py-1.5 outline-none focus:border-black text-sm text-center transition-colors"
-                                                />
+                                                    className="ac-input" style={{ marginTop: 4, textAlign: "center" }} />
                                             </div>
                                         </div>
-                                        <p className="text-[9px] text-neutral-400 tracking-widest uppercase">
-                                            {form[`wholesale_tier_${tier}_min` as keyof StoreSettings]} – {form[`wholesale_tier_${tier}_max` as keyof StoreSettings]} units
-                                        </p>
+                                        {subLabel(`${form[`wholesale_tier_${tier}_min` as keyof StoreSettings]} – ${form[`wholesale_tier_${tier}_max` as keyof StoreSettings]} units`)}
                                     </div>
                                 ))}
                             </div>
@@ -764,12 +585,9 @@ function StoreTab() {
                     )}
                 </div>
 
-                <div className="flex justify-end items-center gap-6">
-                    {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved successfully</span>}
-                    <button
-                        type="submit" disabled={saving}
-                        className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                    >
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 14 }}>
+                    {saved && <span style={{ fontSize: 11, color: "var(--ac-accent)", textTransform: "uppercase", letterSpacing: ".06em" }}>Saved</span>}
+                    <button type="submit" disabled={saving} className="ac-btn ac-btn-primary">
                         {saving ? "Saving..." : "Save Store Settings"}
                     </button>
                 </div>
@@ -831,67 +649,40 @@ function CarouselConfigSection() {
     if (loading) return null;
 
     return (
-        <div className="bg-white border border-neutral-200 p-8 space-y-6">
-            <div className="border-b border-neutral-100 pb-4">
-                <h2 className="text-xs font-semibold uppercase tracking-widest">Homepage Carousel Tabs</h2>
-                <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">
-                    Configure the tabs on the "A Moment For New" carousel. Filter by category or show all products.
-                </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="ac-card" style={{ marginTop: 20, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)", paddingBottom: 10, borderBottom: "1px solid var(--ac-line)" }}>Homepage Carousel Tabs</p>
+            <p style={{ fontSize: 10, color: "var(--ac-ink-4)", textTransform: "uppercase", letterSpacing: ".05em" }}>
+                Configure the tabs on the "A Moment For New" carousel. Filter by category or show all products.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
                 {tabs.map((tab, i) => (
-                    <div key={i} className="space-y-4 border border-neutral-100 p-5">
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">Tab {i + 1}</p>
-
+                    <div key={i} style={{ border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", padding: "16px", display: "flex", flexDirection: "column", gap: 12 }}>
+                        <p className="ac-label">Tab {i + 1}</p>
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">Label</label>
-                            <input
-                                type="text"
-                                value={tab.label}
-                                onChange={e => updateTab(i, "label", e.target.value)}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
-                                placeholder="e.g. New In"
-                            />
+                            <label className="ac-label">Label</label>
+                            <input type="text" value={tab.label} onChange={e => updateTab(i, "label", e.target.value)}
+                                className="ac-input" style={{ marginTop: 4 }} placeholder="e.g. New In" />
                         </div>
-
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">Sort Order</label>
-                            <select
-                                value={tab.mode}
-                                onChange={e => updateTab(i, "mode", e.target.value)}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
-                            >
+                            <label className="ac-label">Sort Order</label>
+                            <select value={tab.mode} onChange={e => updateTab(i, "mode", e.target.value)} className="ac-select" style={{ marginTop: 4 }}>
                                 <option value="newest">Newest First</option>
                                 <option value="sort_order">Admin Sort Order (Bestsellers)</option>
                             </select>
                         </div>
-
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">Category Filter</label>
-                            <select
-                                value={tab.category_name}
-                                onChange={e => updateTab(i, "category_name", e.target.value)}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors text-sm"
-                            >
+                            <label className="ac-label">Category Filter</label>
+                            <select value={tab.category_name} onChange={e => updateTab(i, "category_name", e.target.value)} className="ac-select" style={{ marginTop: 4 }}>
                                 <option value="">All Products</option>
-                                {categories.map(c => (
-                                    <option key={c.slug} value={c.name}>{c.name}</option>
-                                ))}
+                                {categories.map(c => <option key={c.slug} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
                     </div>
                 ))}
             </div>
-
-            <div className="flex justify-end items-center gap-6 pt-2">
-                {saved && <span className="text-xs text-green-600 tracking-wider uppercase">Saved</span>}
-                <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="px-8 py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                >
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 14 }}>
+                {saved && <span style={{ fontSize: 11, color: "var(--ac-accent)", textTransform: "uppercase", letterSpacing: ".06em" }}>Saved</span>}
+                <button type="button" onClick={handleSave} disabled={saving} className="ac-btn ac-btn-primary">
                     {saving ? "Saving..." : "Save Carousel Config"}
                 </button>
             </div>
@@ -970,74 +761,45 @@ function SEOTab() {
 
     const titleLength = formData.title.length;
     const descriptionLength = formData.description.length;
-    const titleColor = titleLength > 60 ? "text-red-500" : "text-neutral-500";
-    const descColor = descriptionLength > 160 ? "text-red-500" : "text-neutral-500";
+    const titleColor = titleLength > 60 ? "var(--ac-danger)" : "var(--ac-ink-4)";
+    const descColor  = descriptionLength > 160 ? "var(--ac-danger)" : "var(--ac-ink-4)";
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 24 }}>
             {/* Editor Form */}
-            <div className="bg-white p-8 border border-neutral-200">
-                <form onSubmit={handleSave} className="space-y-8">
+            <div className="ac-card" style={{ padding: "20px 24px" }}>
+                <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
-                        <label htmlFor="page_path" className="block text-xs uppercase tracking-widest font-semibold mb-3">Target Route</label>
-                        <select
-                            id="page_path"
-                            value={selectedPath}
-                            onChange={(e) => setSelectedPath(e.target.value)}
-                            className="w-full border-b border-black bg-transparent py-2 outline-none focus:border-neutral-400 transition-colors uppercase text-sm font-medium tracking-wide appearance-none"
-                        >
+                        <label className="ac-label" htmlFor="page_path">Target Route</label>
+                        <select id="page_path" value={selectedPath} onChange={(e) => setSelectedPath(e.target.value)}
+                            className="ac-select" style={{ marginTop: 6 }}>
                             <option value="/">Home (/)</option>
                             <option value="/shop">Shop (/shop)</option>
                             <option value="/craft">Craft (/craft)</option>
                             <option value="/custom">Custom (/custom)</option>
                         </select>
                     </div>
-
                     <div>
-                        <div className="flex justify-between items-end mb-3">
-                            <label htmlFor="title" className="block text-xs uppercase tracking-widest font-semibold">Meta Title</label>
-                            <span className={`text-[10px] tracking-widest ${titleColor}`}>{titleLength} / 60</span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 6 }}>
+                            <label className="ac-label" htmlFor="title">Meta Title</label>
+                            <span style={{ fontSize: 10, color: titleColor, letterSpacing: ".06em" }}>{titleLength} / 60</span>
                         </div>
-                        <input
-                            type="text"
-                            id="title"
-                            name="title"
-                            value={formData.title}
-                            onChange={handleChange}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                            placeholder="Miss Tokyo | Handcrafted in Ghana"
-                        />
+                        <input type="text" id="title" name="title" value={formData.title} onChange={handleChange}
+                            className="ac-input" placeholder="Miss Tokyo | Handcrafted in Ghana" />
                     </div>
-
                     <div>
-                        <div className="flex justify-between items-end mb-3">
-                            <label htmlFor="description" className="block text-xs uppercase tracking-widest font-semibold">Meta Description</label>
-                            <span className={`text-[10px] tracking-widest ${descColor}`}>{descriptionLength} / 160</span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 6 }}>
+                            <label className="ac-label" htmlFor="description">Meta Description</label>
+                            <span style={{ fontSize: 10, color: descColor, letterSpacing: ".06em" }}>{descriptionLength} / 160</span>
                         </div>
-                        <textarea
-                            id="description"
-                            name="description"
-                            rows={4}
-                            value={formData.description}
-                            onChange={handleChange}
-                            className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black transition-colors resize-y"
-                            placeholder="Discover our latest collection..."
-                        ></textarea>
+                        <textarea id="description" name="description" rows={4} value={formData.description} onChange={handleChange}
+                            className="ac-textarea" placeholder="Discover our latest collection..." />
                     </div>
-
                     <div>
-                        <label htmlFor="keywords" className="block text-xs uppercase tracking-widest font-semibold mb-3">Keywords (Comma Separated)</label>
-                        <input
-                            type="text"
-                            id="keywords"
-                            name="keywords"
-                            value={formData.keywords}
-                            onChange={handleChange}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
-                            placeholder="leather, bespoke, artisanal, ghana"
-                        />
+                        <label className="ac-label" htmlFor="keywords">Keywords (Comma Separated)</label>
+                        <input type="text" id="keywords" name="keywords" value={formData.keywords} onChange={handleChange}
+                            className="ac-input" style={{ marginTop: 6 }} placeholder="leather, bespoke, artisanal, ghana" />
                     </div>
-
                     <div>
                         <ImageUploader
                             bucket="site-assets"
@@ -1048,53 +810,46 @@ function SEOTab() {
                             label="Social Share Image"
                         />
                     </div>
-
-                    <button
-                        type="submit"
-                        disabled={loading || saving}
-                        className="w-full py-5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors mt-8 disabled:opacity-50"
-                    >
+                    <button type="submit" disabled={loading || saving} className="ac-btn ac-btn-primary" style={{ width: "100%", marginTop: 8 }}>
                         {saving ? "Saving..." : "Save Route Metadata"}
                     </button>
                 </form>
             </div>
 
             {/* Live Preview Console */}
-            <div className="space-y-8">
-                <div className="sticky top-8">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4 mb-6">Google Search Preview</h2>
-                    <div className="bg-white p-6 border border-neutral-200 shadow-sm font-sans max-w-md">
-                        <div className="text-[12px] text-neutral-800 flex items-center gap-2 mb-2">
-                            <div className="w-6 h-6 rounded-full bg-neutral-200 overflow-hidden flex items-center justify-center">
-                                <span className="font-serif italic text-[10px]">B</span>
-                            </div>
-                            <div>
-                                <p className="font-medium">Miss Tokyo</p>
-                                <p className="text-neutral-500 text-[10px]">https://misstokyo.shop{selectedPath}</p>
-                            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)", paddingBottom: 10, borderBottom: "1px solid var(--ac-line)" }}>Google Search Preview</p>
+                <div style={{ background: "var(--ac-panel)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-md)", padding: "16px 18px", fontFamily: "Arial, sans-serif", maxWidth: 480 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 12 }}>
+                        <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--ac-panel-2)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                            <span style={{ fontFamily: "var(--f-display)", fontStyle: "italic", fontSize: 10 }}>B</span>
                         </div>
-                        <h3 className="text-[#1a0dab] text-lg font-medium cursor-pointer hover:underline mb-1 w-full truncate">
-                            {formData.title || "Page Title Will Appear Here"}
-                        </h3>
-                        <p className="text-[13px] text-[#4d5156] leading-snug line-clamp-2">
-                            {formData.description || "The meta description will appear here. Keep it under 160 characters to prevent it from being truncated in search results."}
-                        </p>
+                        <div>
+                            <p style={{ fontWeight: 500, color: "var(--ac-ink)", fontSize: 12 }}>Miss Tokyo</p>
+                            <p style={{ color: "var(--ac-ink-4)", fontSize: 10 }}>https://misstokyo.shop{selectedPath}</p>
+                        </div>
                     </div>
+                    <h3 style={{ color: "#1a0dab", fontSize: 18, fontWeight: 400, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {formData.title || "Page Title Will Appear Here"}
+                    </h3>
+                    <p style={{ fontSize: 13, color: "#4d5156", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {formData.description || "The meta description will appear here. Keep it under 160 characters to prevent truncation."}
+                    </p>
+                </div>
 
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4 mb-6 mt-12">Social Card Preview</h2>
-                    <div className="bg-white border text-center border-neutral-200 shadow-sm font-sans max-w-md overflow-hidden rounded-md">
-                        <div className="w-full h-48 bg-neutral-100 flex items-center justify-center text-neutral-400 capitalize">
-                            {formData.og_image_url ? (
-                                <img src={formData.og_image_url} alt="Social Cover" className="w-full h-full object-cover" />
-                            ) : (
-                                "No Image Provided"
-                            )}
-                        </div>
-                        <div className="p-4 bg-neutral-50 border-t border-neutral-200 text-left">
-                            <p className="text-[10px] uppercase tracking-widest text-neutral-500 mb-1">misstokyo.shop</p>
-                            <h3 className="font-medium text-neutral-900 mb-1 truncate">{formData.title || "Page Title"}</h3>
-                            <p className="text-xs text-neutral-500 truncate">{formData.description || "Page description..."}</p>
-                        </div>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)", paddingBottom: 10, borderBottom: "1px solid var(--ac-line)", marginTop: 8 }}>Social Card Preview</p>
+                <div style={{ border: "1px solid var(--ac-line)", borderRadius: "var(--r-md)", overflow: "hidden", maxWidth: 480 }}>
+                    <div style={{ width: "100%", height: 192, background: "var(--ac-panel-2)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ac-ink-4)", fontSize: 12 }}>
+                        {formData.og_image_url ? (
+                            <img src={formData.og_image_url} alt="Social Cover" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                            "No Image Provided"
+                        )}
+                    </div>
+                    <div style={{ padding: "12px 16px", background: "var(--ac-panel)", borderTop: "1px solid var(--ac-line)" }}>
+                        <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)", marginBottom: 4 }}>misstokyo.shop</p>
+                        <h3 style={{ fontSize: 13, fontWeight: 500, color: "var(--ac-ink)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formData.title || "Page Title"}</h3>
+                        <p style={{ fontSize: 11, color: "var(--ac-ink-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formData.description || "Page description..."}</p>
                     </div>
                 </div>
             </div>

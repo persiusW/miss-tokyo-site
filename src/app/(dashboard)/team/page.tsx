@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { X, Mail, UserPlus } from "lucide-react";
 
 type TeamMember = {
     id: string;
@@ -14,15 +13,15 @@ type TeamMember = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-    owner: "Owner",
-    admin: "Admin",
+    owner:       "Owner",
+    admin:       "Admin",
     sales_staff: "Sales Staff",
 };
 
-const ROLE_COLORS: Record<string, string> = {
-    owner: "bg-neutral-900 text-white",
-    admin: "bg-neutral-800 text-white",
-    sales_staff: "bg-neutral-100 text-neutral-700",
+const ROLE_BADGE: Record<string, string> = {
+    owner:       "ac-badge ac-badge-fulfilled",
+    admin:       "ac-badge ac-badge-paid",
+    sales_staff: "ac-badge ac-badge-info",
 };
 
 export default function TeamPage() {
@@ -85,144 +84,127 @@ export default function TeamPage() {
     };
 
     return (
-        <div className="space-y-10 max-w-4xl">
-            <header className="flex items-start justify-between">
+        <>
+            <div className="ac-page-head">
                 <div>
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Team</h1>
-                    <p className="text-neutral-500">Manage who has access to the admin dashboard and their permission level.</p>
+                    <h1 className="ac-page-h1">Team</h1>
+                    <p className="ac-page-sub">Manage who has access to the admin dashboard and their permission level.</p>
                 </div>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
-                >
-                    <UserPlus size={14} />
+                <button onClick={() => setShowModal(true)} className="ac-btn ac-btn-primary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ display: "inline", marginRight: 6 }}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                     Invite Member
                 </button>
-            </header>
+            </div>
 
-            {/* Roles legend */}
-            <div className="bg-white border border-neutral-200 p-6">
-                <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-4">Permission Levels</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Permission levels */}
+            <div className="ac-card" style={{ marginBottom: 24 }}>
+                <div className="ac-card-head"><span className="ac-card-title">Permission Levels</span></div>
+                <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 20 }}>
                     {[
-                        { role: "Owner", desc: "Full system access. Cannot be removed." },
-                        { role: "Admin", desc: "Full access to all sections and settings." },
+                        { role: "Owner",       desc: "Full system access. Cannot be removed." },
+                        { role: "Admin",       desc: "Full access to all sections and settings." },
                         { role: "Sales Staff", desc: "Access to Products, Sales, and Customers only." },
                     ].map(({ role, desc }) => (
-                        <div key={role} className="space-y-1">
-                            <p className="text-xs font-semibold uppercase tracking-widest">{role}</p>
-                            <p className="text-[10px] text-neutral-400 tracking-wider leading-relaxed uppercase">{desc}</p>
+                        <div key={role}>
+                            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-2)", marginBottom: 4 }}>{role}</p>
+                            <p style={{ fontSize: 11, color: "var(--ac-ink-4)", textTransform: "uppercase", letterSpacing: ".05em", lineHeight: 1.6 }}>{desc}</p>
                         </div>
                     ))}
                 </div>
             </div>
 
             {/* Team table */}
-            <div className="bg-white border border-neutral-200">
-                <div className="px-8 py-4 border-b border-neutral-100">
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">
-                        {members.length} {members.length === 1 ? "member" : "members"}
-                    </p>
+            <div className="ac-card flush">
+                <div className="ac-card-head">
+                    <span className="ac-card-title">Members</span>
+                    <span style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{members.length} {members.length === 1 ? "member" : "members"}</span>
                 </div>
-
                 {loading ? (
-                    <p className="px-8 py-10 text-neutral-400 italic font-serif">Loading team...</p>
+                    <div className="ac-empty"><p className="ac-empty-title">Loading team...</p></div>
                 ) : members.length === 0 ? (
-                    <p className="px-8 py-10 text-neutral-400 italic font-serif">No team members yet.</p>
+                    <div className="ac-empty"><p className="ac-empty-title">No team members yet.</p></div>
                 ) : (
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b border-neutral-100">
-                                <th className="px-8 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Member</th>
-                                <th className="px-4 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Role</th>
-                                <th className="px-4 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Joined</th>
-                                <th className="px-8 py-3" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {members.map(member => (
-                                <tr key={member.id} className="border-b border-neutral-50 last:border-b-0">
-                                    <td className="px-8 py-4">
-                                        <p className="text-sm font-semibold">{member.full_name || "—"}</p>
-                                        <p className="text-[10px] text-neutral-400 tracking-wide">{member.email}</p>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <span className={`text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-sm ${ROLE_COLORS[member.role] || "bg-neutral-100"}`}>
-                                            {ROLE_LABELS[member.role] || member.role}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-4 text-[11px] text-neutral-500">
-                                        {new Date(member.created_at).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-8 py-4 text-right">
-                                        {member.role !== "owner" && (
-                                            <button
-                                                onClick={() => handleRemove(member)}
-                                                className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-red-600 transition-colors font-semibold"
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
-                                    </td>
+                    <div className="ac-table-wrap">
+                        <table className="ac-table">
+                            <thead>
+                                <tr>
+                                    <th>Member</th>
+                                    <th>Role</th>
+                                    <th>Joined</th>
+                                    <th style={{ width: 80 }}></th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {members.map(member => (
+                                    <tr key={member.id}>
+                                        <td>
+                                            <div style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{member.full_name || "—"}</div>
+                                            <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{member.email}</div>
+                                        </td>
+                                        <td>
+                                            <span className={ROLE_BADGE[member.role] || "ac-badge ac-badge-inactive"}>
+                                                {ROLE_LABELS[member.role] || member.role}
+                                            </span>
+                                        </td>
+                                        <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>
+                                            {new Date(member.created_at).toLocaleDateString()}
+                                        </td>
+                                        <td style={{ textAlign: "right" }}>
+                                            {member.role !== "owner" && (
+                                                <button onClick={() => handleRemove(member)}
+                                                    style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
+                                                    onMouseEnter={e => (e.currentTarget.style.color = "var(--ac-danger)")}
+                                                    onMouseLeave={e => (e.currentTarget.style.color = "var(--ac-ink-4)")}>
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 
             {/* Invite Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white w-full max-w-md border border-neutral-200 shadow-2xl">
-                        <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
-                            <h2 className="font-serif text-lg tracking-widest uppercase">Invite Team Member</h2>
-                            <button onClick={() => setShowModal(false)} className="text-neutral-400 hover:text-black">
-                                <X size={18} />
-                            </button>
+                <div className="ac-modal">
+                    <div className="ac-modal-box" style={{ maxWidth: 460 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                            <h2 style={{ fontFamily: "var(--f-display)", fontSize: 18, fontWeight: 600, color: "var(--ac-ink)" }}>Invite Team Member</h2>
+                            <button onClick={() => setShowModal(false)}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", fontSize: 22 }}>×</button>
                         </div>
-                        <form onSubmit={handleInvite} className="p-8 space-y-6">
+                        <form onSubmit={handleInvite} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Email Address</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={inviteEmail}
+                                <label className="ac-label">Email Address</label>
+                                <input type="email" required value={inviteEmail}
                                     onChange={e => setInviteEmail(e.target.value)}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
+                                    className="ac-input" style={{ marginTop: 6 }}
                                     placeholder="staff@misstokyo.com"
-                                />
+                                    autoFocus />
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Role</label>
-                                <select
-                                    value={inviteRole}
+                                <label className="ac-label">Role</label>
+                                <select value={inviteRole}
                                     onChange={e => setInviteRole(e.target.value as "admin" | "sales_staff")}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors appearance-none"
-                                >
+                                    className="ac-select" style={{ marginTop: 6 }}>
                                     <option value="sales_staff">Sales Staff</option>
                                     <option value="admin">Admin</option>
                                 </select>
-                                <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">
+                                <p style={{ fontSize: 10, color: "var(--ac-ink-4)", textTransform: "uppercase", letterSpacing: ".06em", marginTop: 6 }}>
                                     {inviteRole === "sales_staff"
                                         ? "Access to Products, Sales, and Customers only."
                                         : "Full access to all sections and settings."}
                                 </p>
                             </div>
-                            <div className="flex items-center gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 py-3 border border-neutral-200 text-xs uppercase tracking-widest hover:bg-neutral-50 transition-colors"
-                                >
+                            <div style={{ display: "flex", gap: 10, paddingTop: 4 }}>
+                                <button type="button" onClick={() => setShowModal(false)} className="ac-btn ac-btn-ghost" style={{ flex: 1 }}>
                                     Cancel
                                 </button>
-                                <button
-                                    type="submit"
-                                    disabled={inviting}
-                                    className="flex-1 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    <Mail size={12} />
+                                <button type="submit" disabled={inviting} className="ac-btn ac-btn-primary" style={{ flex: 1 }}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ display: "inline", marginRight: 6 }}><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22 7 12 13 2 7"/></svg>
                                     {inviting ? "Sending..." : "Send Invite"}
                                 </button>
                             </div>
@@ -230,6 +212,6 @@ export default function TeamPage() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { Plus, X, Search, Eye, Ban, Send } from "lucide-react";
 
 type GiftCard = {
     id: string;
@@ -53,11 +52,11 @@ const EMPTY_FORM: IssueForm = {
 const PRESET_VALUES = [50, 100, 200, 300, 500];
 
 const STATUS_BADGE: Record<string, string> = {
-    active:          "bg-green-50 text-green-700",
-    redeemed:        "bg-neutral-100 text-neutral-500",
-    expired:         "bg-amber-50 text-amber-700",
-    cancelled:       "bg-rose-50 text-rose-600",
-    pending_payment: "bg-blue-50 text-blue-700",
+    active:          "ac-badge-ok",
+    redeemed:        "ac-badge-inactive",
+    expired:         "ac-badge-warn",
+    cancelled:       "ac-badge-danger",
+    pending_payment: "ac-badge-info",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -73,17 +72,14 @@ export default function GiftCardsPage() {
     const [statusFilter, setStatusFilter] = useState("");
     const [search, setSearch] = useState("");
 
-    // Modal: issue
     const [showIssueModal, setShowIssueModal] = useState(false);
     const [form, setForm] = useState<IssueForm>(EMPTY_FORM);
     const [issuing, setIssuing] = useState(false);
 
-    // Slide-over: view
     const [viewCard, setViewCard] = useState<GiftCard | null>(null);
     const [redemptions, setRedemptions] = useState<Redemption[]>([]);
     const [loadingRedemptions, setLoadingRedemptions] = useState(false);
 
-    // Stats
     const [stats, setStats] = useState({ issued: 0, totalValue: 0, outstanding: 0, redeemedMonth: 0 });
 
     const fetchCards = useCallback(async () => {
@@ -177,174 +173,170 @@ export default function GiftCardsPage() {
     };
 
     return (
-        <div className="space-y-8 max-w-6xl">
-            {/* Header */}
-            <header className="flex items-center justify-between">
+        <>
+            <div className="ac-page-head">
                 <div>
-                    <h1 className="text-[20px] font-medium text-neutral-900 tracking-tight">Gift Cards</h1>
-                    <p className="text-sm text-neutral-500 mt-1">Issue and manage gift cards for customers.</p>
+                    <h1 className="ac-page-h1">Gift Cards</h1>
+                    <p className="ac-page-sub">Issue and manage gift cards for customers.</p>
                 </div>
-                <button
-                    onClick={() => setShowIssueModal(true)}
-                    className="flex items-center gap-2 bg-black text-white px-5 py-2.5 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors rounded-lg"
-                >
-                    <Plus size={13} /> Issue Gift Card
+                <button onClick={() => setShowIssueModal(true)} className="ac-btn ac-btn-primary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ display: "inline", marginRight: 6 }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Issue Gift Card
                 </button>
-            </header>
+            </div>
 
-            {/* Stat cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* KPI strip */}
+            <div className="ac-kpi-grid" style={{ marginBottom: 24 }}>
                 {[
-                    { label: "Total Issued", value: stats.issued },
-                    { label: "Total Value", value: `GH₵ ${stats.totalValue.toFixed(2)}` },
-                    { label: "Outstanding", value: `GH₵ ${stats.outstanding.toFixed(2)}` },
-                    { label: "Redeemed This Month", value: stats.redeemedMonth },
-                ].map(({ label, value }) => (
-                    <div key={label} className="bg-white rounded-2xl shadow-sm p-5">
-                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">{label}</p>
-                        <p className="text-2xl font-light font-serif text-neutral-900">{value}</p>
+                    { label: "Total Issued", value: stats.issued, mono: false },
+                    { label: "Total Value", value: stats.totalValue, mono: true, prefix: "GH₵" },
+                    { label: "Outstanding", value: stats.outstanding, mono: true, prefix: "GH₵" },
+                    { label: "Redeemed This Month", value: stats.redeemedMonth, mono: false },
+                ].map(({ label, value, mono, prefix }) => (
+                    <div key={label} className="ac-kpi">
+                        <span className="ac-kpi-label">{label}</span>
+                        <span className="ac-kpi-value">
+                            {prefix && <span className="ac-kpi-ccy">{prefix} </span>}
+                            {mono ? Number(value).toFixed(2) : value}
+                        </span>
                     </div>
                 ))}
             </div>
 
             {/* Filter bar */}
-            <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-3 items-center">
-                <div className="relative flex-1 min-w-[200px]">
-                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                    <input
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Search code, email…"
-                        className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-200 rounded-lg outline-none focus:border-black transition-colors"
-                    />
+            <div className="ac-card" style={{ marginBottom: 16 }}>
+                <div style={{ padding: "12px 16px", display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                    <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ac-ink-4)", pointerEvents: "none" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input value={search} onChange={e => setSearch(e.target.value)}
+                            placeholder="Search code, email…"
+                            className="ac-input" style={{ paddingLeft: 32 }} />
+                    </div>
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="ac-select" style={{ minWidth: 140 }}>
+                        <option value="">All statuses</option>
+                        {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
                 </div>
-                <select
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                    className="text-sm border border-neutral-200 rounded-lg px-3 py-2 outline-none focus:border-black bg-white"
-                >
-                    <option value="">All statuses</option>
-                    {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-2xl shadow-sm overflow-x-auto">
-                <table className="w-full text-sm text-left whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-100">
-                        <tr>
-                            {["Code", "Recipient", "Sender", "Amount", "Balance", "Status", "Issued", ""].map(h => (
-                                <th key={h} className="px-5 py-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-400">{h}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-50">
-                        {loading ? (
-                            <tr><td colSpan={8} className="px-6 py-12 text-center text-neutral-400 italic font-serif">Loading…</td></tr>
-                        ) : cards.length === 0 ? (
-                            <tr><td colSpan={8} className="px-6 py-16 text-center text-neutral-400 italic font-serif">No gift cards found.</td></tr>
-                        ) : cards.map(g => (
-                            <tr key={g.id} className="hover:bg-neutral-50 transition-colors">
-                                <td className="px-5 py-4 font-mono font-semibold text-[12px] tracking-widest">{g.code}</td>
-                                <td className="px-5 py-4">
-                                    <div className="text-sm">{g.recipient_name || "—"}</div>
-                                    {g.recipient_email && <div className="text-[10px] text-neutral-400">{g.recipient_email}</div>}
-                                </td>
-                                <td className="px-5 py-4">
-                                    <div className="text-sm">{g.sender_name || "—"}</div>
-                                    {g.purchased_by_email && <div className="text-[10px] text-neutral-400">{g.purchased_by_email}</div>}
-                                </td>
-                                <td className="px-5 py-4 font-medium">{fmt(Number(g.initial_value))}</td>
-                                <td className="px-5 py-4">
-                                    <span className={Number(g.remaining_value) <= 0 ? "text-neutral-400" : "text-green-700 font-medium"}>
-                                        {fmt(Number(g.remaining_value))}
-                                    </span>
-                                </td>
-                                <td className="px-5 py-4">
-                                    <span className={`px-2.5 py-1 text-[10px] uppercase tracking-widest rounded-md font-semibold ${STATUS_BADGE[g.status] || "bg-neutral-100 text-neutral-500"}`}>
-                                        {STATUS_LABELS[g.status] || g.status}
-                                    </span>
-                                </td>
-                                <td className="px-5 py-4 text-[11px] text-neutral-500">
-                                    {new Date(g.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="px-5 py-4">
-                                    <button
-                                        onClick={() => openView(g)}
-                                        className="text-neutral-400 hover:text-black transition-colors"
-                                        title="View"
-                                    >
-                                        <Eye size={14} />
-                                    </button>
-                                </td>
+            <div className="ac-card flush">
+                <div className="ac-table-wrap">
+                    <table className="ac-table">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Recipient</th>
+                                <th>Sender</th>
+                                <th className="r">Amount</th>
+                                <th className="r">Balance</th>
+                                <th>Status</th>
+                                <th>Issued</th>
+                                <th style={{ width: 40 }}></th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan={8} className="ac-table-empty">Loading…</td></tr>
+                            ) : cards.length === 0 ? (
+                                <tr><td colSpan={8} className="ac-table-empty">No gift cards found.</td></tr>
+                            ) : cards.map(g => (
+                                <tr key={g.id}>
+                                    <td style={{ fontFamily: "var(--f-mono)", fontWeight: 600, fontSize: 12, letterSpacing: ".08em" }}>{g.code}</td>
+                                    <td>
+                                        <div style={{ fontWeight: 500, fontSize: 13, color: "var(--ac-ink)" }}>{g.recipient_name || "—"}</div>
+                                        {g.recipient_email && <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{g.recipient_email}</div>}
+                                    </td>
+                                    <td>
+                                        <div style={{ fontSize: 13, color: "var(--ac-ink)" }}>{g.sender_name || "—"}</div>
+                                        {g.purchased_by_email && <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{g.purchased_by_email}</div>}
+                                    </td>
+                                    <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500 }}>{fmt(Number(g.initial_value))}</td>
+                                    <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500, color: Number(g.remaining_value) <= 0 ? "var(--ac-ink-4)" : "var(--ac-accent)" }}>
+                                        {fmt(Number(g.remaining_value))}
+                                    </td>
+                                    <td>
+                                        <span className={`ac-badge ${STATUS_BADGE[g.status] || "ac-badge-inactive"}`}>
+                                            {STATUS_LABELS[g.status] || g.status}
+                                        </span>
+                                    </td>
+                                    <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>
+                                        {new Date(g.created_at).toLocaleDateString()}
+                                    </td>
+                                    <td>
+                                        <button onClick={() => openView(g)}
+                                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", display: "flex", alignItems: "center" }}
+                                            onMouseEnter={e => (e.currentTarget.style.color = "var(--ac-ink)")}
+                                            onMouseLeave={e => (e.currentTarget.style.color = "var(--ac-ink-4)")}>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* ── Issue Modal ─────────────────────────────────────────────── */}
             {showIssueModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white w-full max-w-lg rounded-2xl border border-neutral-200 shadow-2xl">
-                        <div className="flex items-center justify-between px-8 py-5 border-b border-neutral-100">
-                            <h2 className="font-serif text-lg tracking-widest uppercase">Issue Gift Card</h2>
-                            <button onClick={() => setShowIssueModal(false)} className="text-neutral-400 hover:text-black"><X size={18} /></button>
+                <div className="ac-modal">
+                    <div className="ac-modal-box" style={{ maxWidth: 520 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                            <h2 style={{ fontFamily: "var(--f-display)", fontSize: 18, fontWeight: 600, color: "var(--ac-ink)" }}>Issue Gift Card</h2>
+                            <button onClick={() => setShowIssueModal(false)}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", fontSize: 22, lineHeight: 1 }}>×</button>
                         </div>
-                        <form onSubmit={handleIssue} className="px-8 py-6 space-y-5">
+                        <form onSubmit={handleIssue} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Amount (GH₵)</label>
-                                <div className="flex gap-2 mb-3 flex-wrap">
+                                <label className="ac-label">Amount (GH₵)</label>
+                                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                                     {PRESET_VALUES.map(v => (
                                         <button key={v} type="button"
                                             onClick={() => setForm(p => ({ ...p, initial_value: String(v) }))}
-                                            className={`px-4 py-2 text-xs uppercase tracking-widest border transition-colors rounded ${form.initial_value === String(v) ? "bg-black text-white border-black" : "border-neutral-200 text-neutral-500 hover:border-black"}`}>
+                                            className={`ac-btn ac-btn-sm ${form.initial_value === String(v) ? "ac-btn-primary" : "ac-btn-ghost"}`}>
                                             {v}
                                         </button>
                                     ))}
                                 </div>
                                 <input required type="number" min="1" step="0.01" value={form.initial_value}
                                     onChange={e => setForm(p => ({ ...p, initial_value: e.target.value }))}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm"
+                                    className="ac-input" style={{ marginTop: 8 }}
                                     placeholder="Custom amount" />
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Recipient Email *</label>
+                                <label className="ac-label">Recipient Email *</label>
                                 <input required type="email" value={form.recipient_email}
                                     onChange={e => setForm(p => ({ ...p, recipient_email: e.target.value }))}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm"
+                                    className="ac-input" style={{ marginTop: 4 }}
                                     placeholder="customer@example.com" />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Recipient Name</label>
+                                    <label className="ac-label">Recipient Name</label>
                                     <input type="text" value={form.recipient_name}
                                         onChange={e => setForm(p => ({ ...p, recipient_name: e.target.value }))}
-                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm"
+                                        className="ac-input" style={{ marginTop: 4 }}
                                         placeholder="Ama Owusu" />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">From (Sender)</label>
+                                    <label className="ac-label">From (Sender)</label>
                                     <input type="text" value={form.sender_name}
                                         onChange={e => setForm(p => ({ ...p, sender_name: e.target.value }))}
-                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm"
+                                        className="ac-input" style={{ marginTop: 4 }}
                                         placeholder="Your name" />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Message (Optional)</label>
+                                <label className="ac-label">Message (Optional)</label>
                                 <textarea rows={2} value={form.message}
                                     onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
-                                    className="w-full border border-neutral-200 p-3 bg-transparent outline-none focus:border-black text-sm resize-none rounded-lg"
+                                    className="ac-textarea" style={{ marginTop: 4 }}
                                     placeholder="A personal note..." />
                             </div>
-                            <div className="flex justify-end gap-3 pt-2">
-                                <button type="button" onClick={() => setShowIssueModal(false)}
-                                    className="px-5 py-2.5 text-xs uppercase tracking-widest border border-neutral-200 text-neutral-500 hover:border-black hover:text-black rounded-lg">
-                                    Cancel
-                                </button>
-                                <button type="submit" disabled={issuing}
-                                    className="px-8 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50 rounded-lg">
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 8 }}>
+                                <button type="button" onClick={() => setShowIssueModal(false)} className="ac-btn ac-btn-ghost">Cancel</button>
+                                <button type="submit" disabled={issuing} className="ac-btn ac-btn-primary">
                                     {issuing ? "Issuing..." : "Issue & Send Email"}
                                 </button>
                             </div>
@@ -355,40 +347,50 @@ export default function GiftCardsPage() {
 
             {/* ── View Slide-over ─────────────────────────────────────────── */}
             {viewCard && (
-                <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setViewCard(null)} />
-                    <div className="relative w-full max-w-md bg-white h-full overflow-y-auto shadow-2xl flex flex-col">
-                        <div className="flex items-center justify-between px-7 py-5 border-b border-neutral-100 sticky top-0 bg-white z-10">
-                            <h2 className="font-mono text-sm font-bold tracking-widest">{viewCard.code}</h2>
-                            <button onClick={() => setViewCard(null)} className="text-neutral-400 hover:text-black"><X size={18} /></button>
+                <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", justifyContent: "flex-end" }}>
+                    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.4)" }} onClick={() => setViewCard(null)} />
+                    <div style={{
+                        position: "relative", width: "100%", maxWidth: 400,
+                        background: "var(--ac-panel)",
+                        borderLeft: "1px solid var(--ac-line)",
+                        height: "100%", overflowY: "auto",
+                        display: "flex", flexDirection: "column",
+                        boxShadow: "-8px 0 40px rgba(0,0,0,.25)",
+                    }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--ac-line)", position: "sticky", top: 0, background: "var(--ac-panel)", zIndex: 10 }}>
+                            <h2 style={{ fontFamily: "var(--f-mono)", fontSize: 13, fontWeight: 700, letterSpacing: ".08em", color: "var(--ac-ink)" }}>{viewCard.code}</h2>
+                            <button onClick={() => setViewCard(null)}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", fontSize: 20 }}>×</button>
                         </div>
 
-                        <div className="p-7 space-y-6 flex-1">
+                        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20, flex: 1 }}>
                             {/* Status + actions */}
-                            <div className="flex items-center gap-3">
-                                <span className={`px-3 py-1 text-[10px] uppercase tracking-widest rounded-md font-semibold ${STATUS_BADGE[viewCard.status] || "bg-neutral-100"}`}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                                <span className={`ac-badge ${STATUS_BADGE[viewCard.status] || "ac-badge-inactive"}`}>
                                     {STATUS_LABELS[viewCard.status] || viewCard.status}
                                 </span>
                                 {viewCard.status === "active" && (
-                                    <button
-                                        onClick={() => handleCancel(viewCard)}
-                                        className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-neutral-400 hover:text-rose-600 transition-colors"
-                                    >
-                                        <Ban size={12} /> Cancel
+                                    <button onClick={() => handleCancel(viewCard)}
+                                        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }}
+                                        onMouseEnter={e => (e.currentTarget.style.color = "var(--ac-danger)")}
+                                        onMouseLeave={e => (e.currentTarget.style.color = "var(--ac-ink-4)")}>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                                        Cancel
                                     </button>
                                 )}
                                 {viewCard.status === "active" && viewCard.delivery_mode === "email" && viewCard.recipient_email && (
-                                    <button
-                                        onClick={() => handleResend(viewCard)}
-                                        className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-neutral-400 hover:text-black transition-colors"
-                                    >
-                                        <Send size={12} /> Resend
+                                    <button onClick={() => handleResend(viewCard)}
+                                        style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }}
+                                        onMouseEnter={e => (e.currentTarget.style.color = "var(--ac-ink)")}
+                                        onMouseLeave={e => (e.currentTarget.style.color = "var(--ac-ink-4)")}>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                        Resend
                                     </button>
                                 )}
                             </div>
 
                             {/* Details */}
-                            <div className="space-y-3 text-sm">
+                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                                 {[
                                     { label: "Amount", val: fmt(Number(viewCard.initial_value)) },
                                     { label: "Balance", val: fmt(Number(viewCard.remaining_value)) },
@@ -401,37 +403,37 @@ export default function GiftCardsPage() {
                                     { label: "Expires", val: viewCard.expires_at ? new Date(viewCard.expires_at).toLocaleDateString() : "Never" },
                                     { label: "Issued", val: new Date(viewCard.created_at).toLocaleString() },
                                 ].map(({ label, val }) => (
-                                    <div key={label} className="flex justify-between border-b border-neutral-50 pb-3">
-                                        <span className="text-[10px] uppercase tracking-widest text-neutral-400">{label}</span>
-                                        <span className="text-neutral-800 font-medium text-xs">{val}</span>
+                                    <div key={label} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--ac-line)", paddingBottom: 10 }}>
+                                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>{label}</span>
+                                        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ac-ink)" }}>{val}</span>
                                     </div>
                                 ))}
                                 {viewCard.message && (
-                                    <div className="pt-2">
-                                        <p className="text-[10px] uppercase tracking-widest text-neutral-400 mb-1">Message</p>
-                                        <p className="text-sm text-neutral-600 italic">"{viewCard.message}"</p>
+                                    <div style={{ paddingTop: 4 }}>
+                                        <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginBottom: 6 }}>Message</p>
+                                        <p style={{ fontSize: 13, color: "var(--ac-ink-3)", fontStyle: "italic" }}>"{viewCard.message}"</p>
                                     </div>
                                 )}
                             </div>
 
                             {/* Redemption history */}
                             <div>
-                                <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-3">Redemption History</p>
+                                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-4)", marginBottom: 10 }}>Redemption History</p>
                                 {loadingRedemptions ? (
-                                    <p className="text-sm text-neutral-400 italic">Loading…</p>
+                                    <p style={{ fontSize: 13, color: "var(--ac-ink-4)", fontStyle: "italic" }}>Loading…</p>
                                 ) : redemptions.length === 0 ? (
-                                    <p className="text-sm text-neutral-400 italic">No redemptions yet.</p>
+                                    <p style={{ fontSize: 13, color: "var(--ac-ink-4)", fontStyle: "italic" }}>No redemptions yet.</p>
                                 ) : (
-                                    <div className="space-y-2">
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                         {redemptions.map(r => (
-                                            <div key={r.id} className="bg-neutral-50 rounded-lg p-3 text-xs">
-                                                <div className="flex justify-between mb-1">
-                                                    <span className="font-semibold text-rose-600">-{fmt(r.amount_used)}</span>
-                                                    <span className="text-neutral-400">{new Date(r.redeemed_at).toLocaleDateString()}</span>
+                                            <div key={r.id} style={{ background: "var(--ac-panel-2)", borderRadius: "var(--r-sm)", padding: "10px 12px" }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                                    <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 600, color: "var(--ac-danger)" }}>-{fmt(r.amount_used)}</span>
+                                                    <span style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(r.redeemed_at).toLocaleDateString()}</span>
                                                 </div>
-                                                <div className="text-neutral-500">
+                                                <div style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>
                                                     {fmt(r.balance_before)} → {fmt(r.balance_after)}
-                                                    {r.redeemed_by && <span className="ml-2">by {r.redeemed_by}</span>}
+                                                    {r.redeemed_by && <span style={{ marginLeft: 8 }}>by {r.redeemed_by}</span>}
                                                 </div>
                                             </div>
                                         ))}
@@ -442,6 +444,6 @@ export default function GiftCardsPage() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

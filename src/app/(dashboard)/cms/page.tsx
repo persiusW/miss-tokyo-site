@@ -27,33 +27,27 @@ export default function CMSPage() {
     ];
 
     return (
-        <div className="max-w-7xl mx-auto px-4">
-            <header className="mb-6">
-                <h1 className="text-[20px] font-medium text-neutral-900 tracking-tight font-serif uppercase tracking-widest">CMS</h1>
-                <p className="text-xs text-neutral-500 mt-1 uppercase tracking-wider">Hero slides, homepage sections, navigation, and editorial content.</p>
-            </header>
-
-            {/* Horizontal Tabs */}
-            <div className="flex overflow-x-auto border-b border-neutral-200 hide-scrollbar mb-8">
-                <nav className="flex gap-8">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.key}
-                            onClick={() => setActiveTab(tab.key)}
-                            className={`whitespace-nowrap pb-4 px-1 border-b-2 text-xs uppercase tracking-widest font-semibold transition-all ${
-                                activeTab === tab.key
-                                    ? "border-black text-black"
-                                    : "border-transparent text-neutral-400 hover:text-neutral-600"
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </nav>
+        <>
+            <div className="ac-page-head">
+                <div>
+                    <h1 className="ac-page-h1">CMS</h1>
+                    <p className="ac-page-sub">Hero slides, homepage sections, navigation, and editorial content.</p>
+                </div>
             </div>
 
-            {/* Full Width Content Area */}
-            <div className="w-full">
+            <div className="ac-tabs" style={{ marginBottom: 28 }}>
+                {tabs.map(tab => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`ac-tab ${activeTab === tab.key ? "active" : ""}`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            <div>
                 {activeTab === "hero-slides" && <HeroSlidesTab />}
                 {activeTab === "trust-bar"   && <TrustBarTab />}
                 {activeTab === "homepage"    && <HomepageSectionsTab />}
@@ -63,6 +57,6 @@ export default function CMSPage() {
                 {activeTab === "gift-cards"  && <GiftCardsTab />}
                 {activeTab === "assets"      && <AssetsTab />}
             </div>
-        </div>
+        </>
     );
 }

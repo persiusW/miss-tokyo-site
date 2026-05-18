@@ -1,10 +1,10 @@
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { fetchOrderStats } from "@/lib/utils/metrics";
 import { OrdersClient } from "./OrdersClient";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
 
 export default async function OrdersPage() {
     const [{ data: orders }, stats] = await Promise.all([
@@ -17,52 +17,59 @@ export default async function OrdersPage() {
         fetchOrderStats(),
     ]);
 
-    if (!orders) {
-        console.error("[OrdersPage] Failed to load orders from Supabase");
-    }
+    if (!orders) console.error("[OrdersPage] Failed to load orders from Supabase");
 
-    const allOrders = orders ?? [];
+    const kpis = [
+        {
+            label: "Total Revenue",
+            prefix: "GH₵",
+            value: stats.totalRevenue.toFixed(2),
+            sub: "Paid · Processing · Fulfilled",
+        },
+        {
+            label: "Unfulfilled",
+            value: String(stats.pendingCount + stats.processingCount),
+            sub: `${stats.pendingCount} Pending · ${stats.processingCount} Processing`,
+            color: "var(--ac-warn)",
+        },
+        {
+            label: "Fulfilled",
+            value: String(stats.fulfilledCount),
+            sub: "Shipped · Delivered",
+            color: "var(--ac-accent)",
+        },
+        {
+            label: "Cancelled",
+            value: String(stats.cancelledCount),
+            sub: "Cancelled · Refunded",
+        },
+    ];
 
     return (
-        <div className="space-y-6">
-            <header>
-                <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Orders</h1>
-                <p className="text-neutral-500">All customer orders and their fulfilment status.</p>
-            </header>
-
-            {/* Summary Cards — sourced from metrics.ts (matches Overview & Analytics) */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Total Revenue</span>
-                    <span className="text-3xl font-serif">GH₵ {stats.totalRevenue.toFixed(2)}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">
-                        PAID · PROCESSING · FULFILLED
-                    </span>
-                </div>
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Unfulfilled</span>
-                    <span className="text-3xl font-serif text-amber-600">
-                        {stats.pendingCount + stats.processingCount}
-                    </span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">
-                        {stats.pendingCount} PENDING · {stats.processingCount} PROCESSING
-                    </span>
-                </div>
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Fulfilled</span>
-                    <span className="text-3xl font-serif text-green-700">{stats.fulfilledCount}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">SHIPPED · DELIVERED</span>
-                </div>
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Cancelled</span>
-                    <span className="text-3xl font-serif text-neutral-500">{stats.cancelledCount}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">
-                        CANCELLED · REFUNDED
-                    </span>
+        <>
+            {/* Page heading */}
+            <div className="ac-page-head">
+                <div>
+                    <h1 className="ac-page-h1">Orders</h1>
+                    <p className="ac-page-sub">All customer orders and their fulfilment status.</p>
                 </div>
             </div>
 
-            <OrdersClient orders={allOrders} />
-        </div>
+            {/* KPI strip */}
+            <div className="ac-kpi-grid">
+                {kpis.map(({ label, prefix, value, sub, color }) => (
+                    <div key={label} className="ac-kpi">
+                        <div className="ac-kpi-label">{label}</div>
+                        <div className="ac-kpi-value" style={color ? { color } : {}}>
+                            {prefix && <span className="ac-kpi-ccy">{prefix}</span>}
+                            {value}
+                        </div>
+                        <div className="ac-kpi-sub">{sub}</div>
+                    </div>
+                ))}
+            </div>
+
+            <OrdersClient orders={orders ?? []} />
+        </>
     );
 }

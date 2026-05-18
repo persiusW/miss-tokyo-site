@@ -1,6 +1,5 @@
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import Link from "next/link";
-import { Pencil } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -14,90 +13,77 @@ export default async function LowStockPage() {
         .order("inventory_count", { ascending: true });
 
     return (
-        <div className="space-y-10">
-            <header className="flex items-center justify-between">
+        <>
+            <div className="ac-page-head">
                 <div>
-                    <div className="flex items-center gap-2 text-sm text-neutral-500 mb-4">
-                        <Link href="/catalog/products" className="hover:text-black">Products</Link>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ac-ink-3)", marginBottom: 8 }}>
+                        <Link href="/catalog/products" className="ac-text-link">Products</Link>
                         <span>/</span>
-                        <span className="text-black">Low Stock</span>
+                        <span style={{ color: "var(--ac-ink)" }}>Low Stock</span>
                     </div>
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Low Stock</h1>
-                    <p className="text-neutral-500">
+                    <h1 className="ac-page-h1">Low Stock</h1>
+                    <p className="ac-page-sub">
                         {products?.length ?? 0} product{products?.length !== 1 ? "s" : ""} with fewer than 5 units remaining.
                     </p>
                 </div>
-                <Link
-                    href="/catalog/products"
-                    className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black transition-colors border-b border-neutral-300 hover:border-black pb-0.5"
-                >
-                    ← All Products
-                </Link>
-            </header>
-
-            <div className="bg-white border border-neutral-200 overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
-                        <tr>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Product</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Category</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Price</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Stock</th>
-                            <th className="px-6 py-4"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                        {!products || products.length === 0 ? (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-16 text-center text-neutral-400 italic font-serif">
-                                    All products are sufficiently stocked.
-                                </td>
-                            </tr>
-                        ) : (
-                            products.map(p => (
-                                <tr key={p.id} className="hover:bg-neutral-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-neutral-100 overflow-hidden flex-shrink-0">
-                                                {p.image_urls?.[0] ? (
-                                                    <img src={p.image_urls[0]} alt={p.name} className="object-cover w-full h-full" />
-                                                ) : (
-                                                    <div className="w-full h-full bg-neutral-200" />
-                                                )}
-                                            </div>
-                                            <span className="font-medium text-neutral-900">{p.name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-neutral-500 text-xs uppercase tracking-wider">{p.category_type || "—"}</td>
-                                    <td className="px-6 py-4 text-right font-medium">GH₵ {Number(p.price_ghs).toFixed(2)}</td>
-                                    <td className="px-6 py-4 text-right">
-                                        {p.inventory_count === 0 ? (
-                                            <span className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1 rounded text-xs font-semibold">
-                                                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                                Out of stock
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-1 rounded text-xs font-semibold">
-                                                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                                                {p.inventory_count} remaining
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <Link
-                                            href={`/catalog/products/${p.id}/edit`}
-                                            className="text-neutral-400 hover:text-black transition-colors"
-                                            title="Edit"
-                                        >
-                                            <Pencil size={15} />
-                                        </Link>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                <Link href="/catalog/products" className="ac-btn ac-btn-ghost">← All Products</Link>
             </div>
-        </div>
+
+            <div className="ac-card flush">
+                <div className="ac-table-wrap">
+                    <table className="ac-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th className="r">Price</th>
+                                <th className="r">Stock</th>
+                                <th style={{ width: 40 }}></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {!products || products.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="ac-table-empty">All products are sufficiently stocked.</td>
+                                </tr>
+                            ) : (
+                                products.map(p => (
+                                    <tr key={p.id}>
+                                        <td>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                                <div style={{ width: 44, height: 44, background: "var(--ac-panel-2)", borderRadius: "var(--r-sm)", overflow: "hidden", flexShrink: 0, border: "1px solid var(--ac-line)" }}>
+                                                    {p.image_urls?.[0] ? (
+                                                        <img src={p.image_urls[0]} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                    ) : null}
+                                                </div>
+                                                <span style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{p.name}</span>
+                                            </div>
+                                        </td>
+                                        <td style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>{p.category_type || "—"}</td>
+                                        <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500 }}>GH₵ {Number(p.price_ghs).toFixed(2)}</td>
+                                        <td className="r">
+                                            {p.inventory_count === 0 ? (
+                                                <span className="ac-badge ac-badge-danger">Out of stock</span>
+                                            ) : (
+                                                <span className="ac-badge ac-badge-warn">{p.inventory_count} remaining</span>
+                                            )}
+                                        </td>
+                                        <td>
+                                            <Link
+                                                href={`/catalog/products/${p.id}/edit`}
+                                                className="ac-btn ac-btn-ghost ac-btn-sm"
+                                                style={{ padding: "4px 8px" }}
+                                            >
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z"/></svg>
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </>
     );
 }

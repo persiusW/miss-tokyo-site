@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
+import "./admin.css";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
 import { RealtimeStockMonitor } from "@/components/ui/miss-tokyo/RealtimeStockMonitor";
-import { AdminSidebar } from "@/components/ui/miss-tokyo/AdminSidebar";
+import { AdminShellClient } from "@/components/ui/miss-tokyo/AdminShellClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { logSignIn } from "@/lib/utils/logSignIn";
@@ -21,6 +22,12 @@ async function safeQuery<T>(fn: () => PromiseLike<{ data: T | null }>, ms = 8000
     }
 }
 
+function getInitials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+}
+
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
     const serverClient = await createClient();
     const [{ data: { user } }, storeData, bizData] = await Promise.all([
@@ -31,49 +38,43 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     const storeSettings = storeData as { enable_custom_requests: boolean } | null;
     const businessSettings = bizData as { business_name: string } | null;
 
-    if (!user) {
-        redirect("/admin/login");
-    }
+    if (!user) redirect("/admin/login");
 
-    let userRole: string | null = null;
-    if (user) {
-        const { data: profile } = await supabaseAdmin
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .single();
-        userRole = profile?.role ?? null;
-    }
+    const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+    const userRole = profile?.role ?? null;
 
     const isAuthorized = ["admin", "owner", "sales_staff"].includes(userRole || "");
-    if (!isAuthorized) {
-        redirect("/admin/login?error=unauthorized");
-    }
+    if (!isAuthorized) redirect("/admin/login?error=unauthorized");
 
     if (userRole && ["owner", "sales_staff"].includes(userRole)) {
-        logSignIn(user.id, userRole).catch(() => {}); // fire-and-forget, don't block render
+        logSignIn(user.id, userRole).catch(() => {});
     }
 
     const isFullAccess = userRole === "admin" || userRole === "owner";
     const showCustomRequests = storeSettings?.enable_custom_requests ?? true;
     const businessName = businessSettings?.business_name ?? "Miss Tokyo";
 
+    const displayName = (user.user_metadata?.full_name as string | undefined) || user.email || "Admin";
+    const topbarUser = {
+        name: displayName,
+        initials: getInitials(displayName),
+        role: userRole ?? "staff",
+    };
+
     return (
         <>
-            <div className="h-screen overflow-hidden bg-neutral-50 font-sans flex text-neutral-900">
-                <AdminSidebar
-                    isFullAccess={isFullAccess}
-                    showCustomRequests={showCustomRequests}
-                    businessName={businessName}
-                />
-
-                {/* Main content — offset on mobile for the fixed top bar */}
-                <main className="flex-1 min-w-0 overflow-y-auto w-full md:w-auto p-6 md:p-12 pt-20 md:pt-12">
-                    <div className="max-w-7xl mx-auto">
-                        {children}
-                    </div>
-                </main>
-            </div>
+            <AdminShellClient
+                businessName={businessName}
+                isFullAccess={isFullAccess}
+                showCustomRequests={showCustomRequests}
+                user={topbarUser}
+            >
+                {children}
+            </AdminShellClient>
             <Toaster />
             <RealtimeStockMonitor />
         </>

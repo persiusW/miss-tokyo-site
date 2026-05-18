@@ -216,198 +216,168 @@ export default function CatalogProductsPage() {
     const handleToggleActiveRow = useCallback((id: string, current: boolean) => handleToggleActive(id, current), [products]);
 
     return (
-        <div className="space-y-12">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <>
+            {/* Page heading */}
+            <div className="ac-page-head">
                 <div>
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">
+                    <h1 className="ac-page-h1">
                         Products
                         {!loading && (
-                            <span className="ml-3 text-lg font-sans text-neutral-400 tracking-normal normal-case">
-                                ({filteredProducts.length}{searchQuery ? ` of ${products.length}` : ""})
-                            </span>
+                            <em style={{ fontSize: 22, marginLeft: 12 }}>
+                                {filteredProducts.length}{searchQuery ? ` / ${products.length}` : ""}
+                            </em>
                         )}
                     </h1>
-                    <p className="text-neutral-500">Manage your atelier's collection and inventory.</p>
+                    <p className="ac-page-sub">Manage your atelier&apos;s collection and inventory.</p>
                 </div>
-                <div className="flex items-center gap-4">
-                    <input
-                        type="text"
-                        placeholder="SEARCH PRODUCTS..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="px-4 py-3 text-xs tracking-widest uppercase border border-neutral-200 outline-none focus:border-black transition-colors w-64 bg-transparent"
-                    />
-                    <Link
-                        href="/catalog/products/low-stock"
-                        className="border border-amber-400 text-amber-700 px-5 py-3 text-xs uppercase tracking-widest hover:bg-amber-50 transition-colors whitespace-nowrap"
-                    >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div className="admin-search" style={{ width: 220 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ac-ink-4)" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                        <input
+                            type="text" placeholder="Search products…"
+                            value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    <Link href="/catalog/products/low-stock" className="ac-btn ac-btn-ghost" style={{ color: "var(--ac-warn)", borderColor: "color-mix(in oklab, var(--ac-warn) 35%, var(--ac-line))" }}>
                         Low Stock
                     </Link>
-                    <Link
-                        href="/catalog/products/new"
-                        className="bg-black text-white px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors whitespace-nowrap"
-                    >
+                    <Link href="/catalog/products/new" className="ac-btn ac-btn-primary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
                         New Product
                     </Link>
                 </div>
-            </header>
-
-            {selectedIds.length > 0 && (
-                <div className="bg-neutral-50 border border-neutral-200 p-4 flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-widest font-semibold text-neutral-600">
-                        {selectedIds.length} item{selectedIds.length !== 1 ? "s" : ""} selected
-                    </span>
-                    <div className="flex items-center gap-6">
-                        <button
-                            onClick={() => handleBulkSetVisibility(true)}
-                            className="flex items-center gap-1.5 text-xs uppercase tracking-widest text-neutral-600 hover:text-black font-semibold transition-colors"
-                            title="Show all selected"
-                        >
-                            <Eye size={13} />
-                            Show All
-                        </button>
-                        <button
-                            onClick={() => handleBulkSetVisibility(false)}
-                            className="flex items-center gap-1.5 text-xs uppercase tracking-widest text-neutral-600 hover:text-black font-semibold transition-colors"
-                            title="Hide all selected"
-                        >
-                            <EyeOff size={13} />
-                            Hide All
-                        </button>
-                        <button
-                            onClick={openWholesaleModal}
-                            className="flex items-center gap-2 text-xs uppercase tracking-widest text-emerald-700 hover:text-emerald-900 font-semibold transition-colors"
-                        >
-                            <Tag size={13} />
-                            Assign Wholesale
-                        </button>
-                        <button
-                            onClick={handleBulkUntrack}
-                            className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black font-semibold transition-colors"
-                        >
-                            Untrack Inventory
-                        </button>
-                        <button
-                            onClick={handleBulkDelete}
-                            className="text-xs uppercase tracking-widest text-red-600 hover:text-red-800 font-semibold"
-                        >
-                            Delete Selected
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <div className="bg-white border border-neutral-200 overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
-                        <tr>
-                            <th className="px-6 py-4 w-12 text-center text-xs font-semibold uppercase tracking-widest text-neutral-500">
-                                <input
-                                    type="checkbox"
-                                    className="w-4 h-4 accent-black align-middle cursor-pointer"
-                                    checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
-                                    onChange={toggleSelectAll}
-                                />
-                            </th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Product</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">SKU</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Inventory</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Price</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Pre-Order</th>
-                            <th className="px-6 py-4"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                        {loading ? (
-                            <tr>
-                                <td colSpan={7} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td>
-                            </tr>
-                        ) : (!filteredProducts || filteredProducts.length === 0) ? (
-                            <tr>
-                                <td colSpan={7} className="px-6 py-12 text-center text-neutral-500 italic font-serif">
-                                    No products found.
-                                </td>
-                            </tr>
-                        ) : (
-                            filteredProducts.map((product: Product) => (
-                                <ProductRow
-                                    key={product.id}
-                                    product={product}
-                                    isSelected={selectedIds.includes(product.id)}
-                                    isConfirming={confirmDeleteId === product.id}
-                                    onToggleSelect={toggleSelect}
-                                    onToggleActive={handleToggleActiveRow}
-                                    onTogglePreorder={togglePreorder}
-                                    onDeleteClick={handleDeleteClick}
-                                    onConfirmDelete={handleConfirmDeleteRow}
-                                    onCancelDelete={handleCancelDelete}
-                                    router={router}
-                                />
-                            ))
-                        )}
-                    </tbody>
-                </table>
             </div>
-            {/* Wholesale Category Assignment Modal */}
-            {showWholesaleModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl">
-                        <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
-                            <div>
-                                <h2 className="font-serif text-lg tracking-widest uppercase">Assign Wholesale Category</h2>
-                                <p className="text-[10px] text-neutral-400 mt-0.5 uppercase tracking-widest">
-                                    {selectedIds.length} product{selectedIds.length !== 1 ? "s" : ""} selected
-                                </p>
-                            </div>
-                            <button onClick={() => setShowWholesaleModal(false)} className="text-neutral-400 hover:text-black">
-                                <X size={18} />
+
+            {/* Table card */}
+            <div className="ac-card flush">
+                {/* Bulk bar (inside card, above table) */}
+                {selectedIds.length > 0 && (
+                    <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "10px 20px", borderBottom: "1px solid var(--ac-line)",
+                        background: "var(--ac-panel-2)",
+                    }}>
+                        <span className="ac-bulk-label">{selectedIds.length} selected</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <button className="ac-btn ac-btn-ghost ac-btn-sm" onClick={() => handleBulkSetVisibility(true)} type="button">Show All</button>
+                            <button className="ac-btn ac-btn-ghost ac-btn-sm" onClick={() => handleBulkSetVisibility(false)} type="button">Hide All</button>
+                            <button className="ac-btn ac-btn-ghost ac-btn-sm" onClick={openWholesaleModal} type="button" style={{ color: "var(--ac-accent)", borderColor: "color-mix(in oklab, var(--ac-accent) 30%, var(--ac-line))" }}>
+                                Assign Wholesale
+                            </button>
+                            <button className="ac-btn ac-btn-ghost ac-btn-sm" onClick={handleBulkUntrack} type="button">Untrack Inventory</button>
+                            <button className="ac-btn ac-btn-sm" onClick={handleBulkDelete} type="button" style={{ background: "color-mix(in oklab, var(--ac-danger) 12%, transparent)", color: "var(--ac-danger)", borderColor: "color-mix(in oklab, var(--ac-danger) 25%, transparent)" }}>
+                                Delete Selected
                             </button>
                         </div>
-                        <div className="p-8 space-y-6">
-                            {wholesaleCategories.length === 0 ? (
-                                <p className="text-neutral-400 italic text-sm font-serif text-center py-4">
-                                    No wholesale categories found. Enable a category's "Wholesale" toggle first.
-                                </p>
+                    </div>
+                )}
+
+                <div className="ac-table-wrap">
+                    <table className="ac-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: 44 }}>
+                                    <input type="checkbox" className="ac-checkbox"
+                                        checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length}
+                                        onChange={toggleSelectAll} />
+                                </th>
+                                <th>Product</th>
+                                <th>SKU</th>
+                                <th>Status</th>
+                                <th className="r">Inventory</th>
+                                <th className="r">Price</th>
+                                <th>Pre-Order</th>
+                                <th style={{ width: 90 }}></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan={8} className="ac-table-empty">Loading…</td></tr>
+                            ) : (!filteredProducts || filteredProducts.length === 0) ? (
+                                <tr><td colSpan={8} className="ac-table-empty">No products found.</td></tr>
                             ) : (
-                                <>
-                                    <p className="text-[10px] text-neutral-500 uppercase tracking-widest leading-relaxed">
-                                        Select a wholesale category. Its tier pricing will be applied to all selected products that don't have product-level overrides.
-                                    </p>
-                                    <div className="space-y-2">
-                                        {wholesaleCategories.map(cat => (
-                                            <label key={cat.id}
-                                                className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-all ${selectedWholesaleCatId === cat.id ? "border-black bg-neutral-50" : "border-neutral-200 hover:border-neutral-300"}`}>
-                                                <div className="flex items-center gap-3">
-                                                    <input type="radio" name="wholesale-cat" value={cat.id} checked={selectedWholesaleCatId === cat.id}
-                                                        onChange={() => setSelectedWholesaleCatId(cat.id)} className="accent-black" />
-                                                    <span className="text-sm font-medium">{cat.name}</span>
-                                                </div>
-                                                <div className="text-[10px] text-neutral-400 text-right">
-                                                    {cat.wholesale_tier_1_price != null && <div>T1: GH₵{cat.wholesale_tier_1_price}</div>}
-                                                    {cat.wholesale_tier_2_price != null && <div>T2: GH₵{cat.wholesale_tier_2_price}</div>}
-                                                    {cat.wholesale_tier_3_price != null && <div>T3: GH₵{cat.wholesale_tier_3_price}</div>}
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
-                                    <div className="flex items-center gap-3 pt-2">
-                                        <button onClick={() => setShowWholesaleModal(false)}
-                                            className="flex-1 py-3 border border-neutral-200 text-xs uppercase tracking-widest hover:bg-neutral-50 transition-colors rounded-lg">
-                                            Cancel
-                                        </button>
-                                        <button onClick={handleBulkAssignWholesale} disabled={assigning || !selectedWholesaleCatId}
-                                            className="flex-1 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 rounded-lg">
-                                            {assigning ? "Assigning..." : "Assign Category"}
-                                        </button>
-                                    </div>
-                                </>
+                                filteredProducts.map((product: Product) => (
+                                    <ProductRow
+                                        key={product.id}
+                                        product={product}
+                                        isSelected={selectedIds.includes(product.id)}
+                                        isConfirming={confirmDeleteId === product.id}
+                                        onToggleSelect={toggleSelect}
+                                        onToggleActive={handleToggleActiveRow}
+                                        onTogglePreorder={togglePreorder}
+                                        onDeleteClick={handleDeleteClick}
+                                        onConfirmDelete={handleConfirmDeleteRow}
+                                        onCancelDelete={handleCancelDelete}
+                                        router={router}
+                                    />
+                                ))
                             )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Wholesale modal */}
+            {showWholesaleModal && (
+                <div className="ac-modal-scrim" onClick={e => { if (e.target === e.currentTarget) setShowWholesaleModal(false); }}>
+                    <div className="ac-modal">
+                        <div className="ac-modal-head">
+                            <div>
+                                <div className="ac-modal-title">Assign Wholesale</div>
+                                <div style={{ fontSize: 11, color: "var(--ac-ink-3)", marginTop: 4 }}>
+                                    {selectedIds.length} product{selectedIds.length !== 1 ? "s" : ""} selected
+                                </div>
+                            </div>
+                            <button className="ac-modal-close" onClick={() => setShowWholesaleModal(false)} type="button">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                        </div>
+                        <div className="ac-modal-body">
+                            {wholesaleCategories.length === 0 ? (
+                                <div className="ac-empty">
+                                    <div className="ac-empty-title">No wholesale categories found</div>
+                                    <div className="ac-empty-sub">Enable a category&apos;s Wholesale toggle first.</div>
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                    <p style={{ fontSize: 11, color: "var(--ac-ink-3)", fontFamily: "var(--f-mono)", letterSpacing: ".06em", marginBottom: 6 }}>
+                                        Tier pricing applied to selected products without overrides.
+                                    </p>
+                                    {wholesaleCategories.map(cat => (
+                                        <label key={cat.id} style={{
+                                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                                            padding: "12px 14px",
+                                            border: `1px solid ${selectedWholesaleCatId === cat.id ? "var(--ac-accent)" : "var(--ac-line)"}`,
+                                            borderRadius: "var(--r-md)", cursor: "pointer",
+                                            background: selectedWholesaleCatId === cat.id ? "color-mix(in oklab, var(--ac-accent) 6%, transparent)" : "transparent",
+                                        }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                <input type="radio" name="wholesale-cat" value={cat.id}
+                                                    checked={selectedWholesaleCatId === cat.id}
+                                                    onChange={() => setSelectedWholesaleCatId(cat.id)}
+                                                    className="ac-checkbox" />
+                                                <span style={{ fontSize: 13, color: "var(--ac-ink-2)" }}>{cat.name}</span>
+                                            </div>
+                                            <div style={{ fontSize: 10, color: "var(--ac-ink-4)", textAlign: "right", fontFamily: "var(--f-mono)" }}>
+                                                {cat.wholesale_tier_1_price != null && <div>T1: GH₵{cat.wholesale_tier_1_price}</div>}
+                                                {cat.wholesale_tier_2_price != null && <div>T2: GH₵{cat.wholesale_tier_2_price}</div>}
+                                                {cat.wholesale_tier_3_price != null && <div>T3: GH₵{cat.wholesale_tier_3_price}</div>}
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="ac-modal-foot">
+                            <button className="ac-btn ac-btn-ghost" onClick={() => setShowWholesaleModal(false)} type="button">Cancel</button>
+                            <button className="ac-btn ac-btn-accent" onClick={handleBulkAssignWholesale} disabled={assigning || !selectedWholesaleCatId} type="button">
+                                {assigning ? "Assigning…" : "Assign Category"}
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }
 
@@ -463,138 +433,104 @@ const ProductRow = React.memo(({
 
     return (
         <tr
-            className={`hover:bg-neutral-50 transition-colors cursor-pointer ${!product.is_active ? "opacity-50" : ""}`}
+            className={!product.is_active ? "selected" : ""}
             onClick={() => router.push(`/catalog/products/${product.id}/edit`)}
+            style={!product.is_active ? { opacity: .5 } : {}}
         >
-            <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                <input
-                    type="checkbox"
-                    className="w-4 h-4 accent-black align-middle cursor-pointer"
-                    checked={isSelected}
-                    onChange={() => onToggleSelect(product.id)}
-                />
+            <td onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" className="ac-checkbox" checked={isSelected} onChange={() => onToggleSelect(product.id)} />
             </td>
-            <td className="px-6 py-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-neutral-100 relative overflow-hidden flex-shrink-0">
+            <td>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: "var(--r-sm)", background: "var(--ac-panel-2)", overflow: "hidden", flexShrink: 0, border: "1px solid var(--ac-line)" }}>
                         {product.image_urls?.[0] ? (
-                            <img src={product.image_urls[0]} alt={product.name} className="object-cover w-full h-full" />
-                        ) : (
-                            <div className="w-full h-full bg-neutral-200" />
-                        )}
+                            <img src={product.image_urls[0]} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : null}
                     </div>
                     <div>
-                        <p className="font-medium text-neutral-900">{product.name}</p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                            <p className="text-xs text-neutral-500">{product.category_type || "No Primary Category"}</p>
+                        <div style={{ fontSize: 13, color: "var(--ac-ink)", fontWeight: 500 }}>{product.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                            <span style={{ fontSize: 11, color: "var(--ac-ink-4)", fontFamily: "var(--f-mono)" }}>{product.category_type || "Uncategorised"}</span>
                             {product.category_ids && product.category_ids.length > 0 && (
-                                <span className="text-[10px] px-1.5 py-0.5 bg-neutral-100 text-neutral-400 rounded-full font-medium">
-                                    +{product.category_ids.length}
-                                </span>
+                                <span className="ac-badge ac-badge-info" style={{ fontSize: 8 }}>+{product.category_ids.length}</span>
                             )}
                         </div>
                     </div>
                 </div>
             </td>
-            <td className="px-6 py-4">
-                <span className="text-xs font-mono text-neutral-500">{displaySku}</span>
+            <td>
+                <span style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-4)" }}>{displaySku}</span>
             </td>
-            <td className="px-6 py-4">
-                <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${product.is_active ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-600'}`}>
-                    {product.is_active ? 'Active' : 'Draft'}
+            <td>
+                <span className={`ac-badge ${product.is_active ? "ac-badge-active" : "ac-badge-inactive"}`}>
+                    {product.is_active ? "Active" : "Draft"}
                 </span>
             </td>
-            <td className="px-6 py-4 text-right">
+            <td className="r">
                 {!product.track_inventory ? (
-                    <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">Untracked</span>
+                    <span style={{ fontFamily: "var(--f-mono)", fontSize: 10, color: "var(--ac-ink-4)", textTransform: "uppercase", letterSpacing: ".1em" }}>Untracked</span>
                 ) : isLowStock ? (
-                    <div className="inline-flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1 rounded">
-                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                        <span className="font-medium">{displayCount} left</span>
-                    </div>
+                    <span className="ac-badge ac-badge-danger">{displayCount} left</span>
                 ) : (
-                    <span className="text-neutral-600 font-medium">{displayCount}</span>
+                    <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-ink-2)" }}>{displayCount}</span>
                 )}
             </td>
-            <td className="px-6 py-4 text-right font-medium">
-                GH₵ {product.price_ghs}
+            <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-ink-2)" }}>
+                GH₵&nbsp;{product.price_ghs}
             </td>
-            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                <div className="flex flex-col gap-1">
-                    <label className="flex items-center gap-2 cursor-pointer">
+            <td onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
                         <input
-                            type="checkbox"
-                            checked={product.preorder_enabled}
+                            type="checkbox" checked={product.preorder_enabled} className="ac-checkbox"
                             onChange={e => {
                                 if (!e.target.checked) { onTogglePreorder(product.id, false, null); setWeeksInput(""); }
                                 else { onTogglePreorder(product.id, true, weeksInput ? weeksToDate(Number(weeksInput)) : null); }
                             }}
-                            className="w-4 h-4 accent-amber-500"
                         />
-                        <span className="text-[11px] text-neutral-600">Enable</span>
+                        <span style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>Enable</span>
                     </label>
                     {product.preorder_enabled && (
-                        <div className="flex flex-col gap-0.5">
-                            <div className="flex items-center gap-1">
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                                 <input
-                                    type="number"
-                                    min="1"
-                                    max="52"
-                                    value={weeksInput}
+                                    type="number" min="1" max="52" value={weeksInput}
                                     onChange={e => setWeeksInput(e.target.value)}
-                                    onBlur={() => {
-                                        const w = Number(weeksInput);
-                                        if (w >= 1) onTogglePreorder(product.id, true, weeksToDate(w));
-                                    }}
-                                    className="w-14 text-[11px] border border-amber-300 rounded px-1.5 py-0.5 text-neutral-700 bg-amber-50 outline-none focus:border-amber-500"
+                                    onBlur={() => { const w = Number(weeksInput); if (w >= 1) onTogglePreorder(product.id, true, weeksToDate(w)); }}
+                                    style={{ width: 48, fontFamily: "var(--f-mono)", fontSize: 11, border: "1px solid var(--ac-warn)", borderRadius: "var(--r-sm)", padding: "2px 6px", background: "transparent", color: "var(--ac-ink-2)", outline: "none" }}
                                     placeholder="wks"
                                 />
-                                <span className="text-[10px] text-neutral-400">wks</span>
+                                <span style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>wks</span>
                             </div>
                             {product.preorder_estimated_date && (
-                                <span className="text-[10px] text-amber-600">Est. {fmtEstDate(product.preorder_estimated_date)}</span>
+                                <span style={{ fontSize: 10, color: "var(--ac-warn)", fontFamily: "var(--f-mono)" }}>Est. {fmtEstDate(product.preorder_estimated_date)}</span>
                             )}
                         </div>
                     )}
                 </div>
             </td>
-            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+            <td onClick={(e) => e.stopPropagation()}>
                 {isConfirming ? (
-                    <div className="flex items-center gap-3 justify-end">
-                        <span className="text-xs text-neutral-500">Delete?</span>
-                        <button
-                            onClick={() => onConfirmDelete(product.id)}
-                            className="text-xs uppercase tracking-widest text-red-600 hover:text-red-800 font-semibold"
-                        >
-                            Yes
-                        </button>
-                        <button
-                            onClick={onCancelDelete}
-                            className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black"
-                        >
-                            No
-                        </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                        <span style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>Delete?</span>
+                        <button className="ac-btn ac-btn-danger ac-btn-sm" onClick={() => onConfirmDelete(product.id)} type="button">Yes</button>
+                        <button className="ac-btn ac-btn-ghost ac-btn-sm" onClick={onCancelDelete} type="button">No</button>
                     </div>
                 ) : (
-                    <div className="flex items-center gap-3 justify-end">
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end" }}>
                         <button
-                            onClick={() => onToggleActive(product.id, product.is_active)}
-                            className={`transition-colors ${product.is_active ? "text-neutral-400 hover:text-black" : "text-neutral-300 hover:text-black"}`}
+                            onClick={() => onToggleActive(product.id, product.is_active)} type="button"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: product.is_active ? "var(--ac-ink-3)" : "var(--ac-ink-4)", display: "flex" }}
                             title={product.is_active ? "Hide from store" : "Show on store"}
                         >
                             {product.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
                         </button>
-                        <Link
-                            href={`/catalog/products/${product.id}/edit`}
-                            className="text-neutral-400 hover:text-black transition-colors"
-                            title="Edit"
-                        >
+                        <Link href={`/catalog/products/${product.id}/edit`} style={{ color: "var(--ac-ink-3)", display: "flex" }} title="Edit">
                             <Pencil size={15} />
                         </Link>
                         <button
-                            onClick={() => onDeleteClick(product.id)}
-                            className="text-neutral-400 hover:text-red-600 transition-colors"
-                            title="Delete"
+                            onClick={() => onDeleteClick(product.id)} type="button"
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", display: "flex" }} title="Delete"
                         >
                             <Trash2 size={15} />
                         </button>

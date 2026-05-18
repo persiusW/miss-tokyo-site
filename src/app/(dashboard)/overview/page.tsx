@@ -1,21 +1,23 @@
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { fetchOrderStats, fetchRecentActivity } from "@/lib/utils/metrics";
-import { Wallet, Package, CheckCircle, TrendingUp, AlertTriangle } from "lucide-react";
 import { CategoryDonutChart, ConversionFunnelChart } from "@/components/ui/miss-tokyo/OverviewCharts";
 import { PushNotificationBanner } from "@/components/ui/PushNotificationBanner";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-    paid:        { bg: "bg-emerald-50",  text: "text-emerald-700",  dot: "bg-emerald-400" },
-    fulfilled:   { bg: "bg-blue-50",     text: "text-blue-700",     dot: "bg-blue-400" },
-    delivered:   { bg: "bg-blue-50",     text: "text-blue-700",     dot: "bg-blue-400" },
-    processing:  { bg: "bg-blue-50",     text: "text-blue-700",     dot: "bg-blue-400" },
-    pending:     { bg: "bg-amber-50",    text: "text-amber-700",    dot: "bg-amber-400" },
-    packed:      { bg: "bg-purple-50",   text: "text-purple-700",   dot: "bg-purple-400" },
-    cancelled:   { bg: "bg-rose-50",     text: "text-rose-700",     dot: "bg-rose-400" },
-    refunded:    { bg: "bg-rose-50",     text: "text-rose-700",     dot: "bg-rose-400" },
+const STATUS_CLASS: Record<string, string> = {
+    paid:        "ac-badge-paid",
+    fulfilled:   "ac-badge-fulfilled",
+    delivered:   "ac-badge-delivered",
+    processing:  "ac-badge-processing",
+    pending:     "ac-badge-pending",
+    packed:      "ac-badge-packed",
+    shipped:     "ac-badge-shipped",
+    cancelled:   "ac-badge-cancelled",
+    refunded:    "ac-badge-refunded",
+    failed:      "ac-badge-failed",
 };
 
 export default async function DashboardOverviewPage() {
@@ -27,7 +29,7 @@ export default async function DashboardOverviewPage() {
         lowStockProductsRes,
     ] = await Promise.all([
         fetchOrderStats(),
-        fetchRecentActivity(5),
+        fetchRecentActivity(8),
         supabase.from("products").select("id, category_type").eq("is_active", true),
         supabase.from("orders").select("status"),
         supabase.from("products")
@@ -38,21 +40,10 @@ export default async function DashboardOverviewPage() {
             .order("inventory_count"),
     ]);
 
-    const { data: productRows, error: productRowsError } = productRowsRes;
-    const { data: orderStatuses, error: orderStatusesError } = orderStatusesRes;
-    const { data: lowStockProducts, error: lowStockProductsError } = lowStockProductsRes;
+    const { data: productRows } = productRowsRes;
+    const { data: orderStatuses } = orderStatusesRes;
+    const { data: lowStockProducts } = lowStockProductsRes;
 
-    if (orderStatusesError) {
-        console.error("Supabase Fetch Error (orders):", orderStatusesError.message, orderStatusesError.details, orderStatusesError.hint);
-    }
-    if (productRowsError) {
-        console.error("Supabase Fetch Error (productRows):", productRowsError.message, productRowsError.details, productRowsError.hint);
-    }
-    if (lowStockProductsError) {
-        console.error("Supabase Fetch Error (lowStockProducts):", lowStockProductsError.message, lowStockProductsError.details, lowStockProductsError.hint);
-    }
-
-    // Products by category (catalog distribution, not revenue)
     const categoryMap: Record<string, number> = {};
     for (const p of (productRows ?? [])) {
         const key = (p as any).category_type || "Uncategorised";
@@ -61,13 +52,11 @@ export default async function DashboardOverviewPage() {
     const totalProducts = productRows?.length ?? 0;
     const categoryEntries = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]);
 
-    // Order status counts
     const statusMap: Record<string, number> = {};
     for (const o of (orderStatuses ?? [])) {
         statusMap[o.status] = (statusMap[o.status] ?? 0) + 1;
     }
 
-    // Conversion funnel
     const funnelMax = Math.max(stats.totalOrders, 1);
     const funnelSteps = [
         { label: "Orders",    value: stats.totalOrders,        h: 100 },
@@ -75,181 +64,189 @@ export default async function DashboardOverviewPage() {
         { label: "Fulfilled", value: stats.fulfilledCount,     h: Math.round((stats.fulfilledCount / funnelMax) * 100) },
     ];
 
-    const kpiCards = [
+    const kpis = [
         {
             label: "Total Revenue",
-            value: `GH₵ ${stats.totalRevenue.toFixed(2)}`,
-            sub: "Lifetime Sales",
-            Icon: Wallet,
-            iconBg: "bg-emerald-50",
-            iconColor: "text-emerald-600",
+            prefix: "GH₵",
+            value: stats.totalRevenue.toFixed(2),
+            sub: "Paid · Processing · Fulfilled",
         },
         {
             label: "Unfulfilled",
             value: String(stats.pendingCount + stats.processingCount),
-            sub: "Paid · Awaiting Ship",
-            Icon: Package,
-            iconBg: "bg-amber-50",
-            iconColor: "text-amber-600",
-            valueColor: "text-amber-600",
+            sub: `${stats.pendingCount} Pending · ${stats.processingCount} Processing`,
+            accent: "warn",
         },
         {
             label: "Fulfilled",
             value: String(stats.fulfilledCount),
             sub: "Shipped · Delivered",
-            Icon: CheckCircle,
-            iconBg: "bg-blue-50",
-            iconColor: "text-blue-600",
-            valueColor: "text-blue-600",
+            accent: "ok",
         },
         {
             label: "Avg. Order Value",
-            value: `GH₵ ${stats.avgOrderValue.toFixed(2)}`,
+            prefix: "GH₵",
+            value: stats.avgOrderValue.toFixed(2),
             sub: "Per Paid Order",
-            Icon: TrendingUp,
-            iconBg: "bg-purple-50",
-            iconColor: "text-purple-600",
         },
     ];
 
     return (
-        <div className="space-y-10">
-            <header>
-                <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Overview</h1>
-                <p className="text-neutral-500">Welcome back. Here is what is happening at the atelier today.</p>
-            </header>
-
+        <>
             <PushNotificationBanner />
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {kpiCards.map(({ label, value, sub, Icon, iconBg, iconColor, valueColor }) => (
-                    <div
-                        key={label}
-                        className="bg-white rounded-2xl shadow-sm p-6 flex flex-col justify-between relative overflow-hidden hover:shadow-md transition-shadow duration-200"
-                    >
-                        <div className={`absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center ${iconBg}`}>
-                            <Icon size={16} className={iconColor} />
+            {/* Page heading */}
+            <div className="ac-page-head">
+                <div>
+                    <h1 className="ac-page-h1">Overview <em>·</em></h1>
+                    <p className="ac-page-sub">
+                        Welcome back. Here is what&apos;s happening at the atelier.
+                        <span className="ac-live">Live</span>
+                    </p>
+                </div>
+                <Link href="/sales/orders" className="ac-btn ac-btn-ghost">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M4 6h16l-1.5 11a2 2 0 0 1-2 1.7H7.5a2 2 0 0 1-2-1.7L4 6Z"/></svg>
+                    View Orders
+                </Link>
+            </div>
+
+            {/* KPI strip */}
+            <div className="ac-kpi-grid">
+                {kpis.map(({ label, prefix, value, sub, accent }) => (
+                    <div key={label} className="ac-kpi">
+                        <div className="ac-kpi-label">{label}</div>
+                        <div
+                            className="ac-kpi-value"
+                            style={accent ? { color: accent === "warn" ? "var(--ac-warn)" : "var(--ac-accent)" } : {}}
+                        >
+                            {prefix && <span className="ac-kpi-ccy">{prefix}</span>}
+                            {value}
                         </div>
-                        <span className="text-xs font-semibold text-neutral-400 mb-6 block">{label}</span>
-                        <span className={`text-3xl font-serif ${valueColor ?? "text-neutral-900"}`}>{value}</span>
-                        <span className="text-[10px] text-neutral-400 mt-2 block uppercase tracking-wider">{sub}</span>
+                        <div className="ac-kpi-sub">{sub}</div>
                     </div>
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Products by Category — Donut Chart */}
-                <div className="bg-white rounded-2xl shadow-sm p-6">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Catalog by Category</h2>
+            {/* Charts row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div className="ac-card">
+                    <div className="ac-card-head">
+                        <h2 className="ac-card-title">Catalog by Category</h2>
+                    </div>
                     <CategoryDonutChart categoryEntries={categoryEntries} totalProducts={totalProducts} />
                 </div>
-
-                {/* Live Conversion Funnel */}
-                <div className="bg-white rounded-2xl shadow-sm p-6">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Conversion Funnel</h2>
+                <div className="ac-card">
+                    <div className="ac-card-head">
+                        <h2 className="ac-card-title">Conversion Funnel</h2>
+                    </div>
                     <ConversionFunnelChart funnelSteps={funnelSteps} conversionRate={stats.conversionRate} />
                 </div>
             </div>
 
-            {/* Order Status Breakdown */}
+            {/* Order status breakdown */}
             {Object.keys(statusMap).length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm p-6">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Order Status Breakdown</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {Object.entries(statusMap).map(([status, count]) => {
-                            const style = STATUS_STYLES[status] ?? { bg: "bg-neutral-50", text: "text-neutral-600", dot: "bg-neutral-400" };
-                            return (
-                                <div
-                                    key={status}
-                                    className={`p-5 rounded-xl ${style.bg} hover:shadow-md transition-all duration-200 cursor-default`}
-                                >
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <span className={`w-2 h-2 rounded-full ${style.dot}`} />
-                                        <span className={`text-[10px] uppercase tracking-widest font-semibold ${style.text} capitalize`}>
-                                            {status}
-                                        </span>
-                                    </div>
-                                    <div className={`text-3xl font-serif ${style.text}`}>{count}</div>
-                                </div>
-                            );
-                        })}
+                <div className="ac-card">
+                    <div className="ac-card-head">
+                        <h2 className="ac-card-title">Order Status Breakdown</h2>
                     </div>
-                </div>
-            )}
-
-            {/* Recent Activity */}
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-neutral-100">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Recent Activity</h2>
-                </div>
-                {recentActivity.length === 0 ? (
-                    <div className="px-6 py-12 text-center text-neutral-400 italic font-serif">
-                        No recent activity to display.
-                    </div>
-                ) : (
-                    <ul className="divide-y divide-neutral-50">
-                        {recentActivity.map((item) => (
-                            <li
-                                key={`${item.type}-${item.id}`}
-                                className="px-6 py-4 flex items-center justify-between hover:bg-neutral-50 transition-colors"
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                        {Object.entries(statusMap).map(([status, count]) => (
+                            <div
+                                key={status}
+                                style={{
+                                    background: "var(--ac-panel-2)",
+                                    border: "1px solid var(--ac-line)",
+                                    borderRadius: "var(--r-md)",
+                                    padding: "14px 16px",
+                                }}
                             >
-                                <div>
-                                    <p className="text-sm text-neutral-900">
-                                        <span className="font-medium">{item.label}</span>
-                                        {" "}placed an order.
-                                    </p>
-                                    <p className="text-xs text-neutral-400 mt-0.5">{item.sub}</p>
-                                </div>
-                                <div className="text-right flex-shrink-0 ml-4">
-                                    {(() => {
-                                        const style = STATUS_STYLES[item.status] ?? { bg: "bg-neutral-100", text: "text-neutral-600" };
-                                        return (
-                                            <span className={`text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full font-medium ${style.bg} ${style.text}`}>
-                                                {item.status}
-                                            </span>
-                                        );
-                                    })()}
-                                    <p className="text-[10px] text-neutral-400 mt-2">
-                                        {new Date(item.created_at).toLocaleDateString()}
-                                    </p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-
-            {/* Low Stock Alert */}
-            {lowStockProducts && lowStockProducts.length > 0 && (
-                <div className="bg-amber-50 rounded-2xl border border-amber-100 p-6">
-                    <div className="flex items-center justify-between mb-5">
-                        <div className="flex items-center gap-3">
-                            <AlertTriangle size={16} className="text-amber-600" />
-                            <span className="text-[10px] uppercase tracking-widest font-semibold text-amber-700">Low Stock Alert</span>
-                            <span className="bg-amber-200 text-amber-800 text-[10px] px-2 py-0.5 font-semibold rounded-full">
-                                {lowStockProducts.length}{lowStockProducts.length === 15 ? "+" : ""}
-                            </span>
-                        </div>
-                        <a
-                            href="/catalog/products/low-stock"
-                            className="text-[10px] uppercase tracking-widest font-semibold text-amber-700 hover:text-amber-900 border-b border-amber-400 hover:border-amber-700 transition-colors pb-0.5"
-                        >
-                            View All →
-                        </a>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {lowStockProducts.slice(0, 15).map(p => (
-                            <div key={p.id} className="bg-white rounded-xl border border-amber-100 px-4 py-3 hover:shadow-sm transition-shadow">
-                                <div className="text-sm font-medium text-neutral-800 truncate">{p.name}</div>
-                                <div className={`text-xs mt-1 font-semibold ${p.inventory_count === 0 ? "text-rose-600" : "text-amber-600"}`}>
-                                    {p.inventory_count === 0 ? "Out of stock" : `${p.inventory_count} remaining`}
+                                <span className={`ac-badge ${STATUS_CLASS[status] ?? "ac-badge-info"}`} style={{ marginBottom: 10, display: "inline-flex" }}>
+                                    {status === "ready_for_pickup" ? "Ready" : status}
+                                </span>
+                                <div style={{ fontFamily: "var(--f-display)", fontSize: 32, color: "var(--ac-ink)", lineHeight: 1 }}>
+                                    {count}
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
             )}
-        </div>
+
+            {/* Low stock alert */}
+            {lowStockProducts && lowStockProducts.length > 0 && (
+                <div className="ac-card" style={{ borderColor: "color-mix(in oklab, var(--ac-warn) 30%, var(--ac-line))" }}>
+                    <div className="ac-card-head">
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ac-warn)" strokeWidth="1.8" strokeLinecap="round"><path d="M12 3.5 22 19H2L12 3.5Z"/><path d="M12 10v4M12 17v.5"/></svg>
+                            <h2 className="ac-card-title" style={{ color: "var(--ac-warn)" }}>Low Stock Alert</h2>
+                            <span className="ac-badge ac-badge-warn">{lowStockProducts.length}{lowStockProducts.length === 15 ? "+" : ""}</span>
+                        </div>
+                        <Link href="/catalog/products/low-stock" className="ac-text-link">View All →</Link>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+                        {lowStockProducts.slice(0, 16).map(p => (
+                            <div
+                                key={p.id}
+                                style={{
+                                    background: "var(--ac-panel-2)",
+                                    border: "1px solid var(--ac-line)",
+                                    borderRadius: "var(--r-sm)",
+                                    padding: "10px 12px",
+                                }}
+                            >
+                                <div style={{ fontSize: 13, color: "var(--ac-ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {p.name}
+                                </div>
+                                <div style={{ fontSize: 11, marginTop: 4, fontFamily: "var(--f-mono)", letterSpacing: ".06em", color: p.inventory_count === 0 ? "var(--ac-danger)" : "var(--ac-warn)" }}>
+                                    {p.inventory_count === 0 ? "Out of stock" : `${p.inventory_count} left`}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Recent activity */}
+            <div className="ac-card flush">
+                <div className="ac-card-head" style={{ padding: "16px 20px 0" }}>
+                    <h2 className="ac-card-title">Recent Activity</h2>
+                </div>
+                {recentActivity.length === 0 ? (
+                    <div className="ac-empty">
+                        <div className="ac-empty-title">No recent activity</div>
+                    </div>
+                ) : (
+                    <div>
+                        {recentActivity.map((item) => (
+                            <div
+                                key={`${item.type}-${item.id}`}
+                                style={{
+                                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                                    padding: "13px 20px", borderTop: "1px solid var(--ac-line)",
+                                }}
+                            >
+                                <div>
+                                    <div style={{ fontSize: 13, color: "var(--ac-ink-2)" }}>
+                                        <span style={{ color: "var(--ac-ink)", fontWeight: 500 }}>{item.label}</span>
+                                        {" "}placed an order
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2, fontFamily: "var(--f-mono)" }}>
+                                        {item.sub}
+                                    </div>
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                                    <span className={`ac-badge ${STATUS_CLASS[item.status] ?? "ac-badge-info"}`}>
+                                        {item.status}
+                                    </span>
+                                    <span style={{ fontSize: 10, color: "var(--ac-ink-4)", fontFamily: "var(--f-mono)" }}>
+                                        {new Date(item.created_at).toLocaleDateString()}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </>
     );
 }
