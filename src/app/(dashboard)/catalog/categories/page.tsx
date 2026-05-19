@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
-import { Pencil, Trash2, X, Check, Star, Tag, Copy, Search, LayoutGrid, List } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { createCategory, updateCategory, deleteCategory } from "./actions";
 
@@ -48,20 +47,20 @@ function WholesalePricingFields({
         { key: "t3" as const, label: `Tier 3 — ${tierConfig.tier3Min}–${tierConfig.tier3Max} units` },
     ];
     return (
-        <div className="grid grid-cols-3 gap-4 mt-4 p-4 bg-neutral-50 border border-neutral-200 rounded-lg">
-            <p className="col-span-3 text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-1">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 12, padding: 14, background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-md)" }}>
+            <p style={{ gridColumn: "1 / -1", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-4)", marginBottom: 4 }}>
                 Category Wholesale Tier Prices
             </p>
             {tiers.map(({ key, label }) => (
                 <div key={key}>
-                    <label className="block text-[10px] uppercase tracking-widest text-neutral-400 mb-1">{label}</label>
-                    <div className="flex items-center gap-1">
-                        <span className="text-neutral-400 text-xs">GH₵</span>
+                    <label style={{ display: "block", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginBottom: 4 }}>{label}</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ color: "var(--ac-ink-4)", fontSize: 11 }}>GH₵</span>
                         <input
                             type="number" min="0" step="0.01"
                             value={prices[key]}
                             onChange={e => onChange({ ...prices, [key]: e.target.value })}
-                            className="w-full border-b border-neutral-300 bg-transparent py-1 outline-none focus:border-black text-sm transition-colors"
+                            className="ac-input"
                             placeholder="0.00"
                         />
                     </div>
@@ -306,7 +305,7 @@ export default function CategoriesPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div className="admin-search" style={{ position: "relative" }}>
-                        <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ac-ink-4)", pointerEvents: "none" }} />
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ac-ink-4)" strokeWidth="1.8" strokeLinecap="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                         <input
                             type="text"
                             value={search}
@@ -324,7 +323,7 @@ export default function CategoriesPage() {
                             className="ac-btn ac-btn-ghost ac-btn-sm"
                             style={{ borderRadius: 0, border: "none", background: viewMode === "list" ? "var(--ac-ink)" : "transparent", color: viewMode === "list" ? "var(--ac-bg)" : "var(--ac-ink-4)" }}
                         >
-                            <List size={14} />
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                         </button>
                         <button
                             onClick={() => setViewMode("grid")}
@@ -332,7 +331,7 @@ export default function CategoriesPage() {
                             className="ac-btn ac-btn-ghost ac-btn-sm"
                             style={{ borderRadius: 0, border: "none", background: viewMode === "grid" ? "var(--ac-ink)" : "transparent", color: viewMode === "grid" ? "var(--ac-bg)" : "var(--ac-ink-4)" }}
                         >
-                            <LayoutGrid size={14} />
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                         </button>
                     </div>
                     <button
@@ -459,7 +458,7 @@ export default function CategoriesPage() {
                                         title={cat.is_featured ? "Unfeature" : "Feature on homepage"}
                                         style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", cursor: "pointer", color: cat.is_featured ? "var(--ac-warn)" : "rgba(255,255,255,.6)" }}
                                     >
-                                        <Star size={16} fill={cat.is_featured ? "currentColor" : "none"} />
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill={cat.is_featured ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                                     </button>
                                     <div style={{ position: "absolute", top: 8, left: 8, display: "flex", flexDirection: "column", gap: 3 }}>
                                         {cat.is_wholesale && <span className="ac-badge ac-badge-ok" style={{ fontSize: 9 }}>B2B</span>}
@@ -485,11 +484,11 @@ export default function CategoriesPage() {
                                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                         {!cat.is_wholesale && (
                                             <button onClick={() => handleDuplicateAsWholesale(cat)} disabled={saving} title="Duplicate as Wholesale" style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>
-                                                <Copy size={13} />
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                             </button>
                                         )}
                                         <button onClick={() => startEdit(cat)} title="Edit" style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>
-                                            <Pencil size={13} />
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                         </button>
                                         {confirmDeleteId === cat.id ? (
                                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -498,7 +497,7 @@ export default function CategoriesPage() {
                                             </div>
                                         ) : (
                                             <button onClick={() => setConfirmDeleteId(cat.id)} title="Delete" style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>
-                                                <Trash2 size={13} />
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                                             </button>
                                         )}
                                     </div>
@@ -601,10 +600,10 @@ export default function CategoriesPage() {
                                         <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end" }}>
                                             <button onClick={() => handleSaveEdit(cat.id)} disabled={saving}
                                                 style={{ color: "var(--ac-accent)", background: "none", border: "none", cursor: "pointer" }} title="Save">
-                                                <Check size={16} />
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
                                             </button>
                                             <button onClick={cancelEdit} style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }} title="Cancel">
-                                                <X size={16} />
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                             </button>
                                         </div>
                                     </td>
@@ -637,7 +636,7 @@ export default function CategoriesPage() {
                                         <button onClick={() => toggleFeatured(cat.id, cat.is_featured)}
                                             title={cat.is_featured ? "Unfeature" : "Feature on homepage"}
                                             style={{ color: cat.is_featured ? "var(--ac-warn)" : "var(--ac-line)", background: "none", border: "none", cursor: "pointer" }}>
-                                            <Star size={16} fill={cat.is_featured ? "currentColor" : "none"} />
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill={cat.is_featured ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                                         </button>
                                     </td>
                                     <td>
@@ -670,14 +669,14 @@ export default function CategoriesPage() {
                                                 {!cat.is_wholesale && (
                                                     <button onClick={() => handleDuplicateAsWholesale(cat)} disabled={saving} title="Duplicate as Wholesale"
                                                         style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }}>
-                                                        <Copy size={14} />
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                                     </button>
                                                 )}
                                                 <button onClick={() => startEdit(cat)} style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }} title="Edit">
-                                                    <Pencil size={14} />
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                                 </button>
                                                 <button onClick={() => setConfirmDeleteId(cat.id)} style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }} title="Delete">
-                                                    <Trash2 size={14} />
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                                                 </button>
                                             </div>
                                         )}

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Download, ChevronDown } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -91,10 +90,7 @@ function CollapsibleTable({
                 onClick={() => setOpen(o => !o)}
             >
                 <div className="flex items-center gap-3">
-                    <ChevronDown
-                        size={14}
-                        className={`text-neutral-400 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
-                    />
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ac-ink-4)" strokeWidth="2" strokeLinecap="round" style={{ transition: "transform 200ms", transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}><polyline points="6 9 12 15 18 9"/></svg>
                     <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-500">{label}</h3>
                     {rowCount > 0 && (
                         <span className="text-[10px] bg-neutral-100 text-neutral-500 px-2 py-0.5 rounded-full font-medium">
@@ -105,9 +101,9 @@ function CollapsibleTable({
                 <button
                     onClick={e => { e.stopPropagation(); onExport(); }}
                     disabled={exportDisabled}
-                    className="flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-widest font-semibold border border-neutral-200 text-neutral-500 hover:text-black hover:border-black rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="ac-btn ac-btn-ghost ac-btn-sm"
                 >
-                    <Download size={12} />
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Export CSV
                 </button>
             </div>
@@ -298,10 +294,7 @@ function DiscountCodeRow({ row }: { row: DiscountRow }) {
             >
                 <td className="px-6 py-3.5">
                     <div className="flex items-center gap-2">
-                        <ChevronDown
-                            size={13}
-                            className={`text-neutral-400 flex-shrink-0 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
-                        />
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ac-ink-4)" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, transition: "transform 200ms", transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}><polyline points="6 9 12 15 18 9"/></svg>
                         <div>
                             {row.name !== row.code && (
                                 <div className="font-medium text-neutral-800 text-xs mb-0.5">{row.name}</div>

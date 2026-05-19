@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { toast } from "@/lib/toast";
-import { Link2, ExternalLink } from "lucide-react";
 
 type Props = {
     docId: string;
@@ -45,21 +44,22 @@ export function InvoiceActions({ docId, docAmount, customerEmail }: Props) {
     };
 
     return (
-        <div className="flex items-center gap-3">
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button
                 onClick={copyPublicLink}
-                className="flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-widest border border-neutral-200 text-neutral-600 hover:border-black hover:text-black transition-colors"
+                className="ac-btn ac-btn-ghost"
                 title="Copy a read-only URL to share with your client"
             >
-                <Link2 size={13} /> Public Link
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                Public Link
             </button>
 
             <button
                 onClick={generatePaystackLink}
                 disabled={generatingPaystack}
-                className="flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-widest bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                className="ac-btn ac-btn-primary"
             >
-                {generatingPaystack ? "Generating..." : "Paystack Link"}
+                {generatingPaystack ? "Generating…" : "Paystack Link"}
             </button>
 
             {paystackUrl && (
@@ -67,9 +67,11 @@ export function InvoiceActions({ docId, docAmount, customerEmail }: Props) {
                     href={paystackUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                    className="ac-text-link"
+                    style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}
                 >
-                    <ExternalLink size={12} /> Open
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Open
                 </a>
             )}
         </div>

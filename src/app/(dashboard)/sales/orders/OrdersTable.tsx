@@ -5,16 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { MoreHorizontal, Copy, Printer, RefreshCw, Eye } from "lucide-react";
 
-const STATUS_STYLES: Record<string, string> = {
-    paid:        "bg-green-50 text-green-700",
-    processing:  "bg-blue-50 text-blue-700",
-    pending:     "bg-amber-50 text-amber-700",
-    fulfilled:   "bg-emerald-50 text-emerald-700",
-    delivered:   "bg-emerald-100 text-emerald-800",
-    cancelled:   "bg-red-50 text-red-600",
-    refunded:    "bg-neutral-100 text-neutral-600",
+const STATUS_BADGE: Record<string, string> = {
+    paid:        "ac-badge ac-badge-paid",
+    processing:  "ac-badge ac-badge-processing",
+    pending:     "ac-badge ac-badge-pending",
+    fulfilled:   "ac-badge ac-badge-fulfilled",
+    delivered:   "ac-badge ac-badge-delivered",
+    cancelled:   "ac-badge ac-badge-cancelled",
+    refunded:    "ac-badge ac-badge-refunded",
 };
 
 type Order = {
@@ -37,7 +36,6 @@ export function OrdersTable({ orders: initialOrders }: Props) {
     const [bulkLoading, setBulkLoading] = useState(false);
     const dropdownRef = useRef<HTMLTableSectionElement>(null);
 
-    // Close dropdown on outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -51,11 +49,8 @@ export function OrdersTable({ orders: initialOrders }: Props) {
     const allSelected = orders.length > 0 && selected.size === orders.length;
 
     const toggleAll = () => {
-        if (allSelected) {
-            setSelected(new Set());
-        } else {
-            setSelected(new Set(orders.map(o => o.id)));
-        }
+        if (allSelected) { setSelected(new Set()); }
+        else { setSelected(new Set(orders.map(o => o.id))); }
     };
 
     const toggleOne = (id: string) => {
@@ -69,11 +64,7 @@ export function OrdersTable({ orders: initialOrders }: Props) {
     const bulkUpdate = async (status: string) => {
         setBulkLoading(true);
         const ids = [...selected];
-        const { error } = await supabase
-            .from("orders")
-            .update({ status })
-            .in("id", ids);
-
+        const { error } = await supabase.from("orders").update({ status }).in("id", ids);
         if (error) {
             toast.error("Failed to update orders.");
         } else {
@@ -91,159 +82,129 @@ export function OrdersTable({ orders: initialOrders }: Props) {
     };
 
     const handleRowClick = (e: React.MouseEvent, orderId: string) => {
-        // Don't navigate if clicking checkbox, button, link, or input
         const target = e.target as HTMLElement;
         if (target.closest("input, button, a, [data-no-nav]")) return;
         router.push(`/sales/orders/${orderId}`);
     };
 
     return (
-        <div className="relative">
+        <div style={{ position: "relative" }}>
             {/* Bulk Actions Bar */}
             {selected.size > 0 && (
-                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-black text-white px-6 py-4 shadow-2xl">
-                    <span className="text-xs uppercase tracking-widest text-neutral-300 mr-2">
+                <div style={{ position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", alignItems: "center", gap: 10, background: "var(--ac-ink)", color: "var(--ac-bg)", padding: "14px 20px", boxShadow: "0 8px 32px rgba(0,0,0,.4)", borderRadius: "var(--r-md)" }}>
+                    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginRight: 8 }}>
                         {selected.size} selected
                     </span>
-                    <button
-                        onClick={() => bulkUpdate("fulfilled")}
-                        disabled={bulkLoading}
-                        className="text-xs uppercase tracking-widest px-4 py-2 bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50"
-                    >
+                    <button onClick={() => bulkUpdate("fulfilled")} disabled={bulkLoading}
+                        style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", padding: "6px 14px", background: "var(--ac-accent)", color: "#fff", border: "none", borderRadius: "var(--r-sm)", cursor: "pointer", opacity: bulkLoading ? 0.5 : 1 }}>
                         Mark Completed
                     </button>
-                    <button
-                        onClick={() => bulkUpdate("processing")}
-                        disabled={bulkLoading}
-                        className="text-xs uppercase tracking-widest px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-50"
-                    >
+                    <button onClick={() => bulkUpdate("processing")} disabled={bulkLoading}
+                        style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", padding: "6px 14px", background: "color-mix(in oklab, #3b82f6 80%, transparent)", color: "#fff", border: "none", borderRadius: "var(--r-sm)", cursor: "pointer", opacity: bulkLoading ? 0.5 : 1 }}>
                         Mark Shipped
                     </button>
-                    <button
-                        onClick={() => bulkUpdate("cancelled")}
-                        disabled={bulkLoading}
-                        className="text-xs uppercase tracking-widest px-4 py-2 bg-neutral-700 hover:bg-neutral-600 transition-colors disabled:opacity-50"
-                    >
+                    <button onClick={() => bulkUpdate("cancelled")} disabled={bulkLoading}
+                        style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", padding: "6px 14px", background: "var(--ac-panel-2)", color: "var(--ac-bg)", border: "none", borderRadius: "var(--r-sm)", cursor: "pointer", opacity: bulkLoading ? 0.5 : 1 }}>
                         Archive
                     </button>
-                    <button
-                        onClick={() => setSelected(new Set())}
-                        className="ml-2 text-neutral-400 hover:text-white transition-colors text-xs uppercase tracking-widest"
-                    >
+                    <button onClick={() => setSelected(new Set())}
+                        style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginLeft: 4 }}>
                         Cancel
                     </button>
                 </div>
             )}
 
-            <div className="bg-white border border-neutral-200 overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
-                        <tr>
-                            <th className="px-4 py-4 w-10">
-                                <input
-                                    type="checkbox"
-                                    checked={allSelected}
-                                    onChange={toggleAll}
-                                    className="w-4 h-4 cursor-pointer accent-black"
-                                />
-                            </th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Order ID</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Customer</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Amount</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Reference</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Date</th>
-                            <th className="px-4 py-4 w-12"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100" ref={dropdownRef}>
-                        {orders.length === 0 ? (
+            <div className="ac-card flush">
+                <div className="ac-table-wrap">
+                    <table className="ac-table">
+                        <thead>
                             <tr>
-                                <td colSpan={8} className="px-6 py-16 text-center text-neutral-500 italic font-serif">
-                                    No orders have been placed yet.
-                                </td>
+                                <th style={{ width: 44 }}>
+                                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="ac-checkbox" />
+                                </th>
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th className="r">Amount</th>
+                                <th>Status</th>
+                                <th>Reference</th>
+                                <th className="r">Date</th>
+                                <th style={{ width: 48 }}></th>
                             </tr>
-                        ) : (
-                            orders.map((order) => (
-                                <tr
-                                    key={order.id}
-                                    onClick={(e) => handleRowClick(e, order.id)}
-                                    className={`hover:bg-neutral-50 transition-colors cursor-pointer ${selected.has(order.id) ? "bg-neutral-50" : ""}`}
-                                >
-                                    <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
-                                        <input
-                                            type="checkbox"
-                                            checked={selected.has(order.id)}
-                                            onChange={() => toggleOne(order.id)}
-                                            className="w-4 h-4 cursor-pointer accent-black"
-                                        />
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <span className="font-mono text-xs text-neutral-600">
-                                            {order.id.substring(0, 8).toUpperCase()}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <span className="text-neutral-700">
+                        </thead>
+                        <tbody ref={dropdownRef}>
+                            {orders.length === 0 ? (
+                                <tr><td colSpan={8} className="ac-table-empty">No orders have been placed yet.</td></tr>
+                            ) : (
+                                orders.map(order => (
+                                    <tr key={order.id} onClick={e => handleRowClick(e, order.id)}
+                                        className={selected.has(order.id) ? "selected" : ""}
+                                        style={{ cursor: "pointer" }}>
+                                        <td onClick={e => e.stopPropagation()}>
+                                            <input type="checkbox" checked={selected.has(order.id)}
+                                                onChange={() => toggleOne(order.id)} className="ac-checkbox" />
+                                        </td>
+                                        <td>
+                                            <span style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-3)" }}>
+                                                {order.id.substring(0, 8).toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td style={{ color: "var(--ac-ink-2)" }}>
                                             {order.customer_name || order.customer_email || "—"}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-4 text-right font-medium">
-                                        GH₵ {Number(order.total_amount ?? 0).toFixed(2)}
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
-                                            {order.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <span className="font-mono text-xs text-neutral-500">
-                                            {order.paystack_reference || "—"}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-4 text-right text-neutral-500 text-xs">
-                                        {new Date(order.created_at).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-4 py-4 text-right relative" onClick={e => e.stopPropagation()}>
-                                        <button
-                                            onClick={() => setOpenDropdown(openDropdown === order.id ? null : order.id)}
-                                            className="p-1.5 text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors"
-                                            title="Actions"
-                                        >
-                                            <MoreHorizontal size={16} />
-                                        </button>
+                                        </td>
+                                        <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500, color: "var(--ac-ink-2)" }}>
+                                            GH₵ {Number(order.total_amount ?? 0).toFixed(2)}
+                                        </td>
+                                        <td>
+                                            <span className={STATUS_BADGE[order.status] ?? "ac-badge ac-badge-inactive"}>
+                                                {order.status}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-4)" }}>
+                                                {order.paystack_reference || "—"}
+                                            </span>
+                                        </td>
+                                        <td className="r" style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>
+                                            {new Date(order.created_at).toLocaleDateString()}
+                                        </td>
+                                        <td style={{ textAlign: "right", position: "relative" }} onClick={e => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => setOpenDropdown(openDropdown === order.id ? null : order.id)}
+                                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", padding: 4, display: "flex", alignItems: "center" }}
+                                                title="Actions"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                                            </button>
 
-                                        {openDropdown === order.id && (
-                                            <div className="absolute right-4 top-12 z-20 bg-white border border-neutral-200 shadow-lg min-w-[180px] py-1">
-                                                <button
-                                                    onClick={() => copyOrderId(order.id)}
-                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50 hover:text-black transition-colors text-left"
-                                                >
-                                                    <Copy size={13} /> Copy Order ID
-                                                </button>
-                                                <Link
-                                                    href={`/sales/orders/${order.id}?print=1`}
-                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50 hover:text-black transition-colors"
-                                                    onClick={() => setOpenDropdown(null)}
-                                                >
-                                                    <Printer size={13} /> Print Invoice
-                                                </Link>
-                                                <div className="border-t border-neutral-100 my-1" />
-                                                <Link
-                                                    href={`/sales/orders/${order.id}`}
-                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50 hover:text-black transition-colors"
-                                                    onClick={() => setOpenDropdown(null)}
-                                                >
-                                                    <Eye size={13} /> View Details
-                                                </Link>
-                                            </div>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                                            {openDropdown === order.id && (
+                                                <div style={{ position: "absolute", right: 8, top: "calc(100% + 4px)", zIndex: 20, background: "var(--ac-panel)", border: "1px solid var(--ac-line)", boxShadow: "0 8px 24px rgba(0,0,0,.15)", minWidth: 180, borderRadius: "var(--r-md)", padding: "4px 0", overflow: "hidden" }}>
+                                                    <button onClick={() => copyOrderId(order.id)}
+                                                        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-2)", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                        Copy Order ID
+                                                    </button>
+                                                    <Link href={`/sales/orders/${order.id}?print=1`}
+                                                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-2)", textDecoration: "none" }}
+                                                        onClick={() => setOpenDropdown(null)}>
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                                        Print Invoice
+                                                    </Link>
+                                                    <div style={{ borderTop: "1px solid var(--ac-line)", margin: "4px 0" }} />
+                                                    <Link href={`/sales/orders/${order.id}`}
+                                                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-2)", textDecoration: "none" }}
+                                                        onClick={() => setOpenDropdown(null)}>
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                        View Details
+                                                    </Link>
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { Bell, BellOff, Rss, Send, CheckCircle2 } from "lucide-react";
 
 const TEMPLATE_VARS = [
     { label: "{order_id}",      desc: "Order reference" },
@@ -197,8 +196,8 @@ export function NotificationsTab() {
                         </p>
                     </div>
                     {subscribed
-                        ? <CheckCircle2 size={20} className="text-emerald-500 shrink-0 mt-0.5" />
-                        : <Bell size={20} className="text-neutral-300 shrink-0 mt-0.5" />
+                        ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ac-accent)" strokeWidth="1.8" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 2 }}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ac-ink-4)" strokeWidth="1.8" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 2 }}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                     }
                 </div>
 
@@ -237,9 +236,9 @@ export function NotificationsTab() {
                                     type="button"
                                     onClick={handleSubscribe}
                                     disabled={loading || permission === "denied" || !supported}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-black text-white text-[10px] uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-40"
+                                    className="ac-btn ac-btn-primary"
                                 >
-                                    <Bell size={12} />
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                                     {loading ? "Subscribing…" : "Enable Notifications"}
                                 </button>
                             ) : (
@@ -248,18 +247,19 @@ export function NotificationsTab() {
                                         type="button"
                                         onClick={handleTestNotification}
                                         disabled={testSending}
-                                        className="flex items-center gap-2 px-4 py-2.5 border border-neutral-300 text-neutral-600 text-[10px] uppercase tracking-widest hover:bg-neutral-50 transition-colors disabled:opacity-40"
+                                        className="ac-btn ac-btn-ghost"
                                     >
-                                        <Send size={12} />
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                                         {testSending ? "Sending…" : "Send Test"}
                                     </button>
                                     <button
                                         type="button"
                                         onClick={handleUnsubscribe}
                                         disabled={loading}
-                                        className="flex items-center gap-2 px-4 py-2.5 border border-neutral-200 text-neutral-400 text-[10px] uppercase tracking-widest hover:text-red-500 hover:border-red-200 transition-colors disabled:opacity-40"
+                                        className="ac-btn ac-btn-ghost"
+                                        style={{ color: "var(--ac-ink-4)" }}
                                     >
-                                        <BellOff size={12} />
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                                         Disable
                                     </button>
                                 </>
@@ -334,7 +334,7 @@ VAPID_SUBJECT=mailto:admin@misstokyo.shop`}</pre>
             {/* ── RSS Feed ── */}
             <div className="bg-white border border-neutral-200 p-6 space-y-4">
                 <div className="flex items-start gap-3">
-                    <Rss size={18} className="text-orange-400 shrink-0 mt-0.5" />
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="1.8" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 2 }}><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1" fill="#fb923c"/></svg>
                     <div>
                         <h2 className="text-xs font-semibold uppercase tracking-widest mb-1">RSS Feed — New Arrivals</h2>
                         <p className="text-[11px] text-neutral-500 leading-relaxed">

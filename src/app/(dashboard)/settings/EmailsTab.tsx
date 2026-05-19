@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { Mail, MessageSquare, Send, X } from "lucide-react";
 
 type Channel = "email" | "sms";
 
@@ -125,11 +124,11 @@ function EmailPreview({ event, template, bizName }: { event: EventDef; template:
     const subject = template.subject || event.label;
 
     return (
-        <div className="bg-neutral-50 rounded-sm border border-neutral-200 overflow-hidden text-xs">
-            <div className="bg-white border-b border-neutral-200 px-4 py-3 space-y-1">
-                <p className="text-[10px] text-neutral-400 uppercase tracking-widest">Preview</p>
-                <p className="text-neutral-700"><span className="text-neutral-400">Subject:</span> {subject}</p>
-                <p className="text-neutral-500 text-[10px]">From: {name} &lt;no-reply@resend.dev&gt;</p>
+        <div style={{ background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-md)", overflow: "hidden", fontSize: 12 }}>
+            <div style={{ background: "var(--ac-panel)", borderBottom: "1px solid var(--ac-line)", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 4 }}>
+                <p style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>Preview</p>
+                <p style={{ color: "var(--ac-ink-2)" }}><span style={{ color: "var(--ac-ink-4)" }}>Subject:</span> {subject}</p>
+                <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>From: {name} &lt;no-reply@resend.dev&gt;</p>
             </div>
             <div style={{ fontFamily: "Georgia, serif", padding: "24px 20px", background: "#fafaf9" }}>
                 <div style={{ maxWidth: 480, margin: "0 auto", background: "white", border: "1px solid #e5e5e5", padding: "32px 36px" }}>
@@ -174,18 +173,18 @@ function SmsPreview({ template }: { template: CommTemplate }) {
     const raw = [template.greeting, template.body_text].filter(Boolean).join(" ") || "Your SMS message will appear here.";
     const preview = injectDummyVars(raw);
     return (
-        <div className="bg-neutral-50 rounded-sm border border-neutral-200 overflow-hidden">
-            <div className="bg-white border-b border-neutral-200 px-4 py-3 space-y-1">
-                <p className="text-[10px] text-neutral-400 uppercase tracking-widest">SMS Preview</p>
-                <p className="text-[10px] text-neutral-400">Variables shown with sample values</p>
+        <div style={{ background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-md)", overflow: "hidden" }}>
+            <div style={{ background: "var(--ac-panel)", borderBottom: "1px solid var(--ac-line)", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 4 }}>
+                <p style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>SMS Preview</p>
+                <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>Variables shown with sample values</p>
             </div>
-            <div className="p-6 flex justify-center">
-                <div className="bg-neutral-800 text-white rounded-2xl rounded-tl-sm px-4 py-3 max-w-[260px] text-sm leading-relaxed whitespace-pre-wrap">
+            <div style={{ padding: 24, display: "flex", justifyContent: "center" }}>
+                <div style={{ background: "#1f2937", color: "#fff", borderRadius: "16px 16px 16px 4px", padding: "12px 16px", maxWidth: 260, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
                     {preview}
                 </div>
             </div>
-            <div className="px-4 pb-4 text-center">
-                <p className={`text-[10px] ${raw.length > 160 ? "text-red-500" : "text-neutral-400"}`}>
+            <div style={{ padding: "0 16px 16px", textAlign: "center" }}>
+                <p style={{ fontSize: 10, color: raw.length > 160 ? "var(--ac-danger)" : "var(--ac-ink-4)" }}>
                     {raw.length} chars · {Math.ceil(raw.length / 160)} SMS credit{Math.ceil(raw.length / 160) > 1 ? "s" : ""}
                 </p>
             </div>
@@ -252,116 +251,87 @@ function ChannelTab({
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div style={{ display: "grid", gridTemplateColumns: "180px 1fr 1fr", gap: 24, alignItems: "start" }}>
             {/* Left: event selector */}
-            <div className="space-y-1">
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {events.map(ev => (
-                    <button
-                        key={ev.key}
-                        type="button"
-                        onClick={() => onSelectKey(ev.key)}
-                        className={`w-full text-left px-4 py-3 transition-colors border-l-2 ${
-                            selectedKey === ev.key
-                                ? "border-black bg-neutral-50 text-black"
-                                : "border-transparent text-neutral-500 hover:text-black hover:bg-neutral-50"
-                        }`}
-                    >
-                        <p className="text-xs font-semibold uppercase tracking-widest">{ev.label}</p>
-                        {ev.adminOnly && (
-                            <span className="text-[10px] text-neutral-400 uppercase tracking-widest">Admin only</span>
-                        )}
-                        {ev.previewTag && !ev.adminOnly && (
-                            <span className="text-[10px] text-neutral-400 uppercase tracking-widest">{ev.previewTag}</span>
-                        )}
+                    <button key={ev.key} type="button" onClick={() => onSelectKey(ev.key)}
+                        style={{
+                            width: "100%", textAlign: "left", padding: "10px 12px", cursor: "pointer",
+                            background: selectedKey === ev.key ? "var(--ac-panel-2)" : "transparent",
+                            border: "none", borderLeft: `2px solid ${selectedKey === ev.key ? "var(--ac-accent)" : "transparent"}`,
+                            color: selectedKey === ev.key ? "var(--ac-ink)" : "var(--ac-ink-4)",
+                            transition: "all .15s",
+                        }}>
+                        <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em" }}>{ev.label}</p>
+                        {ev.adminOnly && <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)" }}>Admin only</span>}
+                        {ev.previewTag && !ev.adminOnly && <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)" }}>{ev.previewTag}</span>}
                     </button>
                 ))}
             </div>
 
             {/* Middle: editable fields */}
-            <div className="space-y-6">
-                <div className="bg-white border border-neutral-200 p-6 space-y-5">
+            <div>
+                <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
                     <div>
-                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-1">Event</p>
-                        <p className="text-sm font-semibold">{selectedEvent?.label}</p>
-                        <p className="text-[10px] text-neutral-400 mt-1 leading-relaxed">{selectedEvent?.description}</p>
+                        <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-4)", marginBottom: 4 }}>Event</p>
+                        <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ac-ink)" }}>{selectedEvent?.label}</p>
+                        <p style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4, lineHeight: 1.6 }}>{selectedEvent?.description}</p>
                     </div>
 
                     {channel === "email" && (
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Subject Line</label>
-                            <input
-                                type="text"
-                                value={tpl.subject ?? ""}
+                            <label className="ac-label">Subject Line</label>
+                            <input type="text" value={tpl.subject ?? ""}
                                 onChange={e => onUpdate(selectedKey, "subject", e.target.value)}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
-                                placeholder={`${selectedEvent?.label} — Miss Tokyo`}
-                            />
+                                className="ac-input" placeholder={`${selectedEvent?.label} — Miss Tokyo`} />
                         </div>
                     )}
 
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Greeting</label>
-                        <input
-                            type="text"
-                            value={tpl.greeting ?? ""}
+                        <label className="ac-label">Greeting</label>
+                        <input type="text" value={tpl.greeting ?? ""}
                             onChange={e => onUpdate(selectedKey, "greeting", e.target.value)}
-                            className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
-                            placeholder={channel === "email" ? "Dear Customer," : "Miss Tokyo:"}
-                        />
+                            className="ac-input" placeholder={channel === "email" ? "Dear Customer," : "Miss Tokyo:"} />
                     </div>
 
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">
-                            {channel === "email" ? "Body Text" : "Message"}
-                        </label>
-                        <textarea
-                            ref={bodyRef}
-                            rows={channel === "email" ? 5 : 3}
+                        <label className="ac-label">{channel === "email" ? "Body Text" : "Message"}</label>
+                        <textarea ref={bodyRef} rows={channel === "email" ? 5 : 3}
                             value={tpl.body_text}
                             onChange={e => onUpdate(selectedKey, "body_text", e.target.value)}
-                            className="w-full border border-neutral-200 bg-transparent p-3 outline-none focus:border-black text-sm transition-colors resize-y"
-                            placeholder={
-                                channel === "email"
-                                    ? "Your message body. Dynamic values like order ID and rider name are injected automatically."
-                                    : "Short SMS message. Keep under 160 chars. Use variables below."
-                            }
-                        />
+                            className="ac-textarea" style={{ resize: "vertical" }}
+                            placeholder={channel === "email"
+                                ? "Your message body. Dynamic values like order ID and rider name are injected automatically."
+                                : "Short SMS message. Keep under 160 chars. Use variables below."
+                            } />
                         {channel === "sms" && (
-                            <p className={`text-[10px] mt-1 tracking-wide ${tpl.body_text.length > 160 ? "text-red-500" : "text-neutral-400"}`}>
+                            <p style={{ fontSize: 10, marginTop: 4, color: tpl.body_text.length > 160 ? "var(--ac-danger)" : "var(--ac-ink-4)" }}>
                                 {tpl.body_text.length} / 160 characters
                             </p>
                         )}
                     </div>
 
-                    <div className="bg-neutral-50 border border-neutral-100 p-3 space-y-2">
-                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Available variables</p>
-                        <div className="flex flex-wrap gap-1.5">
+                    <div style={{ background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                        <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Available variables</p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                             {TEMPLATE_VARS.map(v => (
-                                <button
-                                    key={v.key}
-                                    type="button"
-                                    onClick={() => insertVar(v.label)}
-                                    className="font-mono text-[10px] px-2 py-1 bg-white border border-neutral-200 text-neutral-600 hover:border-black hover:text-black transition-colors rounded-sm"
-                                    title={`Click to insert ${v.label}`}
-                                >
+                                <button key={v.key} type="button" onClick={() => insertVar(v.label)}
+                                    style={{ fontFamily: "var(--f-mono)", fontSize: 10, padding: "3px 8px", background: "var(--ac-panel)", border: "1px solid var(--ac-line)", color: "var(--ac-ink-3)", cursor: "pointer", borderRadius: "var(--r-sm)" }}
+                                    title={`Click to insert ${v.label}`}>
                                     {v.label}
                                 </button>
                             ))}
                         </div>
-                        <p className="text-[10px] text-neutral-400">Click a variable to insert it at cursor position.</p>
+                        <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>Click a variable to insert it at cursor position.</p>
                     </div>
 
-                    <div className="flex items-center gap-4 pt-2">
-                        <button
-                            type="button"
-                            onClick={() => onSave(selectedKey)}
-                            disabled={saving === saveKey}
-                            className="px-6 py-2.5 bg-black text-white text-[10px] uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                        >
-                            {saving === saveKey ? "Saving..." : "Save Template"}
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, paddingTop: 4 }}>
+                        <button type="button" onClick={() => onSave(selectedKey)} disabled={saving === saveKey} className="ac-btn ac-btn-primary">
+                            {saving === saveKey ? "Saving…" : "Save Template"}
                         </button>
                         {saved === saveKey && (
-                            <span className="text-[10px] text-green-600 uppercase tracking-wider">Saved</span>
+                            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-accent)" }}>Saved</span>
                         )}
                     </div>
                 </div>
@@ -509,45 +479,33 @@ export function EmailsTab() {
         }
     };
 
-    if (loading) return <p className="text-neutral-400 italic font-serif">Loading...</p>;
+    if (loading) return <div className="ac-empty"><p className="ac-empty-title">Loading…</p></div>;
 
     const activeEmailEventLabel = ALL_EVENTS.find(e => e.key === emailSelectedKey)?.label ?? "Email";
     const activeSmsEventLabel   = ALL_EVENTS.find(e => e.key === smsSelectedKey)?.label ?? "SMS";
 
     return (
-        <div className="space-y-8">
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {/* Header with test actions */}
-            <div className="flex items-center justify-between">
-                <p className="text-xs text-neutral-500">Edit transactional message templates and send test notifications.</p>
-                <div className="flex gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setEmailModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-black text-white text-[10px] uppercase tracking-widest hover:bg-neutral-800 transition-colors"
-                    >
-                        <Mail size={12} /> Test Email
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <p style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>Edit transactional message templates and send test notifications.</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" onClick={() => setEmailModal(true)} className="ac-btn ac-btn-primary ac-btn-sm">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        Test Email
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => setSmsModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-2 border border-neutral-300 text-neutral-600 text-[10px] uppercase tracking-widest hover:bg-neutral-50 transition-colors"
-                    >
-                        <MessageSquare size={12} /> Test SMS
+                    <button type="button" onClick={() => setSmsModal(true)} className="ac-btn ac-btn-ghost ac-btn-sm">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        Test SMS
                     </button>
                 </div>
             </div>
 
             {/* Channel switcher */}
-            <div className="flex gap-0 border-b border-neutral-200">
+            <div className="ac-tabs">
                 {(["email", "sms"] as Channel[]).map(ch => (
-                    <button
-                        key={ch}
-                        type="button"
-                        onClick={() => setChannel(ch)}
-                        className={`px-8 py-3 text-xs font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
-                            channel === ch ? "border-black text-black" : "border-transparent text-neutral-400 hover:text-black"
-                        }`}
-                    >
+                    <button key={ch} type="button" onClick={() => setChannel(ch)}
+                        className={`ac-tab ${channel === ch ? "active" : ""}`}>
                         {ch === "email" ? "Email Templates" : "SMS Templates"}
                     </button>
                 ))}
@@ -568,37 +526,33 @@ export function EmailsTab() {
 
             {/* Test Email Modal */}
             {emailModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="bg-white w-full max-w-md mx-4 p-8 rounded-2xl shadow-xl">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-semibold text-base">Send Test Email</h3>
-                            <button type="button" onClick={() => setEmailModal(false)} className="text-neutral-400 hover:text-black"><X size={18} /></button>
+                <div className="ac-modal-scrim" onClick={e => { if (e.target === e.currentTarget) setEmailModal(false); }}>
+                    <div className="ac-modal">
+                        <div className="ac-modal-head">
+                            <div className="ac-modal-title">Send Test Email</div>
+                            <button type="button" onClick={() => setEmailModal(false)} className="ac-modal-close">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
                         </div>
-                        <p className="text-xs text-neutral-500 mb-1">
-                            Sending: <span className="font-semibold text-black">{activeEmailEventLabel}</span> template with dummy data.
-                        </p>
-                        <p className="text-[10px] text-neutral-400 mb-5">
-                            Variables like {"{order_id}"} and {"{customer_name}"} will be replaced with test values.
-                        </p>
-                        <label className="block text-xs uppercase tracking-widest text-neutral-500 mb-1.5">Email Address</label>
-                        <input
-                            type="email"
-                            value={testEmail}
-                            onChange={e => setTestEmail(e.target.value)}
-                            onKeyDown={e => e.key === "Enter" && sendTestEmail()}
-                            placeholder="you@example.com"
-                            autoFocus
-                            className="w-full border border-neutral-200 px-3 py-2.5 text-sm rounded-lg mb-6 focus:outline-none focus:ring-2 focus:ring-black/10"
-                        />
-                        <div className="flex gap-3">
-                            <button type="button" onClick={() => setEmailModal(false)} className="flex-1 border border-neutral-200 py-2.5 text-xs uppercase tracking-widest rounded-lg hover:bg-neutral-50">Cancel</button>
-                            <button
-                                type="button"
-                                onClick={sendTestEmail}
-                                disabled={testSending}
-                                className="flex-1 bg-black text-white py-2.5 text-xs uppercase tracking-widest rounded-lg hover:bg-neutral-800 disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                <Send size={13} />{testSending ? "Sending…" : "Send Test"}
+                        <div className="ac-modal-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            <p style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>
+                                Sending: <strong style={{ color: "var(--ac-ink)" }}>{activeEmailEventLabel}</strong> template with dummy data.
+                            </p>
+                            <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>
+                                Variables like {"{"+"order_id"+"}"} and {"{"+"customer_name"+"}"} will be replaced with test values.
+                            </p>
+                            <div>
+                                <label className="ac-label">Email Address</label>
+                                <input type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)}
+                                    onKeyDown={e => e.key === "Enter" && sendTestEmail()}
+                                    placeholder="you@example.com" autoFocus className="ac-input" />
+                            </div>
+                        </div>
+                        <div className="ac-modal-foot">
+                            <button type="button" onClick={() => setEmailModal(false)} className="ac-btn ac-btn-ghost">Cancel</button>
+                            <button type="button" onClick={sendTestEmail} disabled={testSending} className="ac-btn ac-btn-primary">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                {testSending ? "Sending…" : "Send Test"}
                             </button>
                         </div>
                     </div>
@@ -607,35 +561,31 @@ export function EmailsTab() {
 
             {/* Test SMS Modal */}
             {smsModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="bg-white w-full max-w-md mx-4 p-8 rounded-2xl shadow-xl">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-semibold text-base">Send Test SMS</h3>
-                            <button type="button" onClick={() => setSmsModal(false)} className="text-neutral-400 hover:text-black"><X size={18} /></button>
+                <div className="ac-modal-scrim" onClick={e => { if (e.target === e.currentTarget) setSmsModal(false); }}>
+                    <div className="ac-modal">
+                        <div className="ac-modal-head">
+                            <div className="ac-modal-title">Send Test SMS</div>
+                            <button type="button" onClick={() => setSmsModal(false)} className="ac-modal-close">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
                         </div>
-                        <p className="text-xs text-neutral-500 mb-5">
-                            Sending: <span className="font-semibold text-black">{activeSmsEventLabel}</span> template via MNotify.
-                        </p>
-                        <label className="block text-xs uppercase tracking-widest text-neutral-500 mb-1.5">Phone Number</label>
-                        <input
-                            type="tel"
-                            value={testPhone}
-                            onChange={e => setTestPhone(e.target.value)}
-                            onKeyDown={e => e.key === "Enter" && sendTestSMS()}
-                            placeholder="0200000000 or +233200000000"
-                            autoFocus
-                            className="w-full border border-neutral-200 px-3 py-2.5 text-sm rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-black/10"
-                        />
-                        <p className="text-[10px] text-neutral-400 mb-6">Ghana numbers only. Format: 0XXXXXXXXX or +233XXXXXXXXX</p>
-                        <div className="flex gap-3">
-                            <button type="button" onClick={() => setSmsModal(false)} className="flex-1 border border-neutral-200 py-2.5 text-xs uppercase tracking-widest rounded-lg hover:bg-neutral-50">Cancel</button>
-                            <button
-                                type="button"
-                                onClick={sendTestSMS}
-                                disabled={testSending}
-                                className="flex-1 bg-black text-white py-2.5 text-xs uppercase tracking-widest rounded-lg hover:bg-neutral-800 disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                <Send size={13} />{testSending ? "Sending…" : "Send Test"}
+                        <div className="ac-modal-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            <p style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>
+                                Sending: <strong style={{ color: "var(--ac-ink)" }}>{activeSmsEventLabel}</strong> template via MNotify.
+                            </p>
+                            <div>
+                                <label className="ac-label">Phone Number</label>
+                                <input type="tel" value={testPhone} onChange={e => setTestPhone(e.target.value)}
+                                    onKeyDown={e => e.key === "Enter" && sendTestSMS()}
+                                    placeholder="0200000000 or +233200000000" autoFocus className="ac-input" />
+                            </div>
+                            <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>Ghana numbers only. Format: 0XXXXXXXXX or +233XXXXXXXXX</p>
+                        </div>
+                        <div className="ac-modal-foot">
+                            <button type="button" onClick={() => setSmsModal(false)} className="ac-btn ac-btn-ghost">Cancel</button>
+                            <button type="button" onClick={sendTestSMS} disabled={testSending} className="ac-btn ac-btn-primary">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                {testSending ? "Sending…" : "Send Test"}
                             </button>
                         </div>
                     </div>

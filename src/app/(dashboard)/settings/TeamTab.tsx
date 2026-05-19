@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { X, Mail, UserPlus, CheckCircle, Clock, KeyRound } from "lucide-react";
 import { inviteTeamMember, removeTeamMember, sendPasswordResetLink } from "@/app/(dashboard)/settings/actions";
 
 type TeamMember = {
@@ -350,7 +349,7 @@ export function TeamTab() {
                         onClick={() => setShowModal(true)}
                         className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-[10px] md:text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors rounded-lg whitespace-nowrap"
                     >
-                        <UserPlus size={14} />
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                         Invite Member
                     </button>
                 )}
@@ -399,7 +398,7 @@ export function TeamTab() {
                                                         title="Send password reset link"
                                                         className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-black transition-colors disabled:opacity-50"
                                                     >
-                                                        <KeyRound size={12} />
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="7" cy="17" r="3"/><path d="M10.3 14.7L18 7"/><path d="M14 11l2 2"/><path d="M17 7l2 2"/></svg>
                                                         {sendingResetId === member.id ? "Sending..." : "Reset"}
                                                     </button>
                                                     {(member.role !== "owner" && member.role !== "admin") && (
@@ -661,8 +660,8 @@ export function TeamTab() {
                     <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl">
                         <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
                             <h2 className="font-serif text-lg tracking-widest uppercase">Invite New Member</h2>
-                            <button onClick={() => setShowModal(false)} className="text-neutral-400 hover:text-black">
-                                <X size={18} />
+                            <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)" }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
                         </div>
                         <form onSubmit={handleInvite} className="p-8 space-y-6">
@@ -723,7 +722,7 @@ export function TeamTab() {
                                     disabled={inviting}
                                     className="flex-1 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 rounded-lg"
                                 >
-                                    <Mail size={12} />
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                                     {inviting ? "Sending..." : "Send Invite"}
                                 </button>
                             </div>

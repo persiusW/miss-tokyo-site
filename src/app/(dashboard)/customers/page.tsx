@@ -4,8 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { X } from "lucide-react";
-
 type Source = "order" | "custom_request" | "newsletter" | "manual";
 
 type Contact = {
@@ -23,13 +21,6 @@ const SOURCE_LABELS: Record<Source, string> = {
     custom_request: "Custom Request",
     newsletter: "Newsletter",
     manual: "Manual",
-};
-
-const SOURCE_STYLES: Record<Source, string> = {
-    order: "bg-green-50 text-green-700",
-    custom_request: "bg-amber-50 text-amber-700",
-    newsletter: "bg-blue-50 text-blue-700",
-    manual: "bg-neutral-100 text-neutral-600",
 };
 
 function downloadCSV(rows: Contact[], filename: string) {
