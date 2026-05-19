@@ -1,10 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import type { Theme } from "./AdminShellClient";
 
 type Props = {
     user: { name: string; initials: string; role: string };
     onMenu: () => void;
+    theme: Theme;
+    onTheme: (t: Theme) => void;
 };
 
 function getCrumbs(pathname: string): string[] {
@@ -38,8 +41,6 @@ function getCrumbs(pathname: string): string[] {
     if (pathname.startsWith("/finance/links")) return ["Finance", "Pay Links"];
     if (pathname.startsWith("/finance")) return ["Finance"];
     if (pathname.startsWith("/settings")) return ["Settings"];
-    if (pathname.startsWith("/cms")) return ["Settings", "CMS"];
-    if (pathname.startsWith("/seo")) return ["Settings", "SEO"];
     if (pathname.startsWith("/team")) return ["Settings", "Team"];
     if (pathname.startsWith("/communications")) return ["Communications", "Emails"];
 
@@ -47,7 +48,7 @@ function getCrumbs(pathname: string): string[] {
     return parts.map(seg);
 }
 
-export function AdminTopbar({ user, onMenu }: Props) {
+export function AdminTopbar({ user, onMenu, theme, onTheme }: Props) {
     const pathname = usePathname();
     const crumbs = getCrumbs(pathname);
 
@@ -79,6 +80,41 @@ export function AdminTopbar({ user, onMenu }: Props) {
                 </svg>
                 <input placeholder="Search orders, products…" />
                 <kbd>⌘K</kbd>
+            </div>
+
+            {/* Theme toggle */}
+            <div className="ac-theme-toggle">
+                <button
+                    type="button"
+                    title="System theme"
+                    className={`ac-theme-btn${theme === "system" ? " active" : ""}`}
+                    onClick={() => onTheme("system")}
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    title="Light theme"
+                    className={`ac-theme-btn${theme === "light" ? " active" : ""}`}
+                    onClick={() => onTheme("light")}
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="4"/>
+                        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    title="Dark theme"
+                    className={`ac-theme-btn${theme === "dark" ? " active" : ""}`}
+                    onClick={() => onTheme("dark")}
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
             </div>
 
             {/* Bell */}

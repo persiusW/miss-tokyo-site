@@ -69,27 +69,26 @@ const PAGE_SIZE = 20;
 
 // ---- Toggle ---------------------------------------------------------------
 
-function Toggle({
-    on,
-    onToggle,
-}: {
-    on: boolean;
-    onToggle: () => void;
-}) {
+function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
     return (
         <button
             type="button"
             onClick={onToggle}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                on ? "bg-black" : "bg-neutral-200"
-            }`}
+            style={{
+                position: "relative", display: "inline-flex", alignItems: "center",
+                height: 20, width: 36, borderRadius: 999, border: "none",
+                background: on ? "var(--ac-accent)" : "var(--ac-line)",
+                cursor: "pointer", flexShrink: 0, transition: "background .15s",
+                outline: "none",
+            }}
             aria-pressed={on}
         >
-            <span
-                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                    on ? "translate-x-[18px]" : "translate-x-[3px]"
-                }`}
-            />
+            <span style={{
+                display: "inline-block", width: 14, height: 14, borderRadius: "50%",
+                background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.3)",
+                transform: on ? "translateX(19px)" : "translateX(3px)",
+                transition: "transform .15s",
+            }} />
         </button>
     );
 }

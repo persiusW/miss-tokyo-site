@@ -24,11 +24,11 @@ const Ico = {
     Cart:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 4h2l2.5 11a2 2 0 0 0 2 1.5h7.5a2 2 0 0 0 2-1.6L21 8H7"/><circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/></svg>,
     Finance:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
     Cog:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>,
-    Cms:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 14h6M7 17h10"/></svg>,
-    Globe:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/><path d="M2 12h20"/></svg>,
     Team:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
     Home:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/></svg>,
     Logout:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/><path d="M10 16l-4-4 4-4M6 12h11"/></svg>,
+    ChevronLeft:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>,
+    ChevronRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>,
 };
 
 // ─── Nav item ─────────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ const Ico = {
 import type { ReactElement } from "react";
 type NavItemDef = { label: string; href: string; Icon: () => ReactElement; badge?: string };
 
-function NavItem({ label, href, Icon, badge, onClose }: NavItemDef & { onClose: () => void }) {
+function NavItem({ label, href, Icon, badge, onClose, collapsed }: NavItemDef & { onClose: () => void; collapsed: boolean }) {
     const pathname = usePathname();
     const isActive =
         (href === "/overview" && pathname === "/overview") ||
@@ -47,19 +47,20 @@ function NavItem({ label, href, Icon, badge, onClose }: NavItemDef & { onClose: 
             href={href}
             className={`admin-nav-item${isActive ? " active" : ""}`}
             onClick={onClose}
+            title={collapsed ? label : undefined}
         >
             <Icon />
-            <span>{label}</span>
-            {badge && <span className="admin-nav-badge">{badge}</span>}
+            {!collapsed && <span className="admin-nav-label">{label}</span>}
+            {!collapsed && badge && <span className="admin-nav-badge">{badge}</span>}
         </Link>
     );
 }
 
-function NavGroup({ title, items, onClose }: { title: string; items: NavItemDef[]; onClose: () => void }) {
+function NavGroup({ title, items, onClose, collapsed }: { title: string; items: NavItemDef[]; onClose: () => void; collapsed: boolean }) {
     return (
         <div className="admin-nav-group">
-            <div className="admin-nav-title">{title}</div>
-            {items.map(item => <NavItem key={item.href} {...item} onClose={onClose} />)}
+            {!collapsed && <div className="admin-nav-title">{title}</div>}
+            {items.map(item => <NavItem key={item.href} {...item} onClose={onClose} collapsed={collapsed} />)}
         </div>
     );
 }
@@ -72,9 +73,11 @@ type Props = {
     showCustomRequests: boolean;
     mobileOpen: boolean;
     onClose: () => void;
+    collapsed: boolean;
+    onToggleCollapse: () => void;
 };
 
-export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, mobileOpen, onClose }: Props) {
+export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, mobileOpen, onClose, collapsed, onToggleCollapse }: Props) {
     const displayName = businessName || "Miss Tokyo";
 
     const overviewItems: NavItemDef[] = [
@@ -113,41 +116,51 @@ export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, m
     const settingsItems: NavItemDef[] = isFullAccess
         ? [
               { label: "Site Settings", href: "/settings", Icon: Ico.Cog },
-              { label: "CMS",           href: "/cms",      Icon: Ico.Cms,  badge: "New" },
-              { label: "SEO",           href: "/seo",      Icon: Ico.Globe },
               { label: "Team",          href: "/team",     Icon: Ico.Team },
           ]
         : [];
 
     return (
-        <aside className={`admin-sidebar${mobileOpen ? " open" : ""}`}>
+        <aside className={`admin-sidebar${mobileOpen ? " open" : ""}${collapsed ? " collapsed" : ""}`}>
             {/* Brand */}
             <div className="admin-brand">
                 <div className="admin-brand-mark">
                     <span className="admin-brand-dot" />
-                    <Link href="/overview" className="admin-brand-name" onClick={onClose}>
-                        {displayName}
-                    </Link>
+                    {!collapsed && (
+                        <Link href="/overview" className="admin-brand-name" onClick={onClose}>
+                            {displayName}
+                        </Link>
+                    )}
                 </div>
-                <div className="admin-brand-sub">Atelier Console</div>
+                {!collapsed && <div className="admin-brand-sub">Atelier Console</div>}
             </div>
 
             {/* Navigation */}
             <nav className="admin-nav">
-                <NavGroup title="Overview"  items={overviewItems}  onClose={onClose} />
-                <NavGroup title="Sales"     items={salesItems}     onClose={onClose} />
-                <NavGroup title="Catalogue" items={catalogueItems} onClose={onClose} />
-                <NavGroup title="Customers" items={customerItems}  onClose={onClose} />
+                <NavGroup title="Overview"  items={overviewItems}  onClose={onClose} collapsed={collapsed} />
+                <NavGroup title="Sales"     items={salesItems}     onClose={onClose} collapsed={collapsed} />
+                <NavGroup title="Catalogue" items={catalogueItems} onClose={onClose} collapsed={collapsed} />
+                <NavGroup title="Customers" items={customerItems}  onClose={onClose} collapsed={collapsed} />
                 {settingsItems.length > 0 && (
-                    <NavGroup title="Settings" items={settingsItems} onClose={onClose} />
+                    <NavGroup title="Settings" items={settingsItems} onClose={onClose} collapsed={collapsed} />
                 )}
             </nav>
 
+            {/* Collapse toggle */}
+            <button
+                type="button"
+                className="admin-sidebar-collapse-btn"
+                onClick={onToggleCollapse}
+                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+                {collapsed ? <Ico.ChevronRight /> : <Ico.ChevronLeft />}
+            </button>
+
             {/* Footer */}
             <div className="admin-sidebar-foot">
-                <Link href="/" className="admin-foot-link" onClick={onClose}>
+                <Link href="/" className="admin-foot-link" onClick={onClose} title={collapsed ? "Storefront" : undefined}>
                     <Ico.Home />
-                    Storefront
+                    {!collapsed && <span className="admin-foot-label">Storefront</span>}
                 </Link>
                 <LogoutButton className="admin-foot-link" iconEl={<Ico.Logout />} />
             </div>

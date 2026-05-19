@@ -9,10 +9,17 @@ import { EmailsTab } from "./EmailsTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { RidersTab } from "./RidersTab";
 import { SizeGuideTab } from "./SizeGuideTab";
-import { TeamTab } from "./TeamTab";
 import { BusinessSettingsTab } from "./BusinessSettingsTab";
 import { ShippingTab } from "./ShippingTab";
 import { ProductPageTab } from "./ProductPageTab";
+import { HeroSlidesTab } from "./HeroSlidesTab";
+import { TrustBarTab } from "./TrustBarTab";
+import { HomepageSectionsTab } from "./HomepageSectionsTab";
+import { NavigationTab } from "./NavigationTab";
+import { ReviewsTab } from "./ReviewsTab";
+import { AssetsTab } from "./AssetsTab";
+import { AboutPageTab } from "./AboutPageTab";
+import { GiftCardsTab } from "./GiftCardsTab";
 
 type BusinessSettings = {
     business_name: string;
@@ -104,22 +111,59 @@ type SiteMetadata = {
     keywords: string;
 };
 
-type TabKey = "business" | "store" | "shipping" | "seo" | "emails" | "notifications" | "riders" | "size-guide" | "team" | "product-page";
+type TabKey = "business" | "store" | "shipping" | "cms" | "seo" | "emails" | "notifications" | "riders" | "size-guide" | "product-page";
+type CmsTabKey = "hero-slides" | "trust-bar" | "homepage" | "navigation" | "reviews" | "about" | "gift-cards" | "assets";
+
+function CMSTab() {
+    const [activeCmsTab, setActiveCmsTab] = useState<CmsTabKey>("hero-slides");
+
+    const cmsTabs: { key: CmsTabKey; label: string }[] = [
+        { key: "hero-slides", label: "Hero Slides" },
+        { key: "trust-bar",   label: "Trust Bar" },
+        { key: "homepage",    label: "Sections" },
+        { key: "navigation",  label: "Navigation" },
+        { key: "reviews",     label: "Reviews" },
+        { key: "about",       label: "About Page" },
+        { key: "gift-cards",  label: "Gift Cards" },
+        { key: "assets",      label: "Site Assets" },
+    ];
+
+    return (
+        <>
+            <div className="ac-tabs" style={{ marginBottom: 24, borderBottom: "1px solid var(--ac-line-2)" }}>
+                {cmsTabs.map(tab => (
+                    <button key={tab.key} onClick={() => setActiveCmsTab(tab.key)}
+                        className={`ac-tab ${activeCmsTab === tab.key ? "active" : ""}`}>
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+            {activeCmsTab === "hero-slides" && <HeroSlidesTab />}
+            {activeCmsTab === "trust-bar"   && <TrustBarTab />}
+            {activeCmsTab === "homepage"    && <HomepageSectionsTab />}
+            {activeCmsTab === "navigation"  && <NavigationTab />}
+            {activeCmsTab === "reviews"     && <ReviewsTab />}
+            {activeCmsTab === "about"       && <AboutPageTab />}
+            {activeCmsTab === "gift-cards"  && <GiftCardsTab />}
+            {activeCmsTab === "assets"      && <AssetsTab />}
+        </>
+    );
+}
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<TabKey>("business");
 
     const tabs: { key: TabKey; label: string }[] = [
-        { key: "business", label: "Business" },
-        { key: "store", label: "Store" },
-        { key: "shipping", label: "Shipping" },
-        { key: "seo", label: "SEO" },
-        { key: "product-page", label: "Product Page" },
-        { key: "emails", label: "Emails" },
+        { key: "business",      label: "Business" },
+        { key: "store",         label: "Store" },
+        { key: "shipping",      label: "Shipping" },
+        { key: "cms",           label: "CMS" },
+        { key: "seo",           label: "SEO" },
+        { key: "emails",        label: "Emails" },
         { key: "notifications", label: "Notifications" },
-        { key: "riders", label: "Riders" },
-        { key: "size-guide", label: "Size Guide" },
-        { key: "team", label: "Team" },
+        { key: "riders",        label: "Riders" },
+        { key: "size-guide",    label: "Size Guide" },
+        { key: "product-page",  label: "Product Page" },
     ];
 
     return (
@@ -136,7 +180,7 @@ export default function SettingsPage() {
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
-                        className={`ac-tab ${activeTab === tab.key ? "active" : ""}`}
+                        className={`ac-tab${activeTab === tab.key ? " active" : ""}`}
                         style={{ whiteSpace: "nowrap" }}
                     >
                         {tab.label}
@@ -145,16 +189,16 @@ export default function SettingsPage() {
             </div>
 
             <div>
-                {activeTab === "business" && <><BusinessTab /><div style={{ marginTop: 24 }}><BusinessSettingsTab /></div></>}
-                {activeTab === "store" && <StoreTab />}
-                {activeTab === "shipping" && <ShippingTab />}
-                {activeTab === "seo" && <SEOTab />}
-                {activeTab === "emails" && <EmailsTab />}
+                {activeTab === "business"      && <><BusinessTab /><div style={{ marginTop: 24 }}><BusinessSettingsTab /></div></>}
+                {activeTab === "store"         && <StoreTab />}
+                {activeTab === "shipping"      && <ShippingTab />}
+                {activeTab === "cms"           && <CMSTab />}
+                {activeTab === "seo"           && <SEOTab />}
+                {activeTab === "emails"        && <EmailsTab />}
                 {activeTab === "notifications" && <NotificationsTab />}
-                {activeTab === "riders" && <RidersTab />}
-                {activeTab === "size-guide" && <SizeGuideTab />}
-                {activeTab === "team" && <TeamTab />}
-                {activeTab === "product-page" && <ProductPageTab />}
+                {activeTab === "riders"        && <RidersTab />}
+                {activeTab === "size-guide"    && <SizeGuideTab />}
+                {activeTab === "product-page"  && <ProductPageTab />}
             </div>
         </>
     );

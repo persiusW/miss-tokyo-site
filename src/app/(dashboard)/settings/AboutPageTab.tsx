@@ -11,7 +11,7 @@ function Accordion({ title, children }: { title: string; children: React.ReactNo
     return (
         <div className="ac-card" style={{ overflow: "hidden" }}>
             <button type="button" onClick={() => setOpen(o => !o)}
-                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: open ? "1px solid var(--ac-line)" : "none", background: "none", border: "none", borderBottom: open ? "1px solid var(--ac-line)" : "none", cursor: "pointer" }}>
+                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: "none", border: "none", borderBottom: open ? "1px solid var(--ac-line)" : "none", cursor: "pointer" }}>
                 <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>{title}</span>
                 {open
                     ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ac-ink-4)" strokeWidth="2" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>

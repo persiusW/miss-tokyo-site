@@ -18,7 +18,7 @@ export function LogoutButton({ className, iconEl }: Props = {}) {
     return (
         <button onClick={handleLogout} className={cls} type="button">
             {iconEl}
-            Sign Out
+            <span className="admin-foot-label">Sign Out</span>
         </button>
     );
 }
