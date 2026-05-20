@@ -195,12 +195,12 @@
 .admin-nav {
   flex: 1; overflow-y: auto;
   padding: 8px 10px;
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 8px;
 }
 .admin-nav::-webkit-scrollbar { width: 4px; }
 .admin-nav::-webkit-scrollbar-thumb { background: var(--ac-line-2); border-radius: 2px; }
 
-.admin-nav-group { display: flex; flex-direction: column; gap: 1px; }
+.admin-nav-group { display: flex; flex-direction: column; gap: 2px; }
 .admin-nav-title {
   font-family: var(--f-mono);
   font-size: 9px;
@@ -213,7 +213,7 @@
 .admin-nav-item {
   position: relative;
   display: flex; align-items: center; gap: 8px;
-  padding: 5px 10px;
+  padding: 6px 10px;
   color: var(--ac-ink-3);
   font-size: 12px;
   border-radius: var(--r-sm);
@@ -231,7 +231,7 @@
 .admin-nav-item.active { color: var(--ac-ink); background: color-mix(in oklab, var(--ac-ink) 7%, transparent); }
 .admin-nav-item.active::before {
   content: "";
-  position: absolute; left: -10px; top: 7px; bottom: 7px; width: 2px;
+  position: absolute; left: -10px; top: 8px; bottom: 8px; width: 2px;
   background: var(--ac-accent);
   border-radius: 0 2px 2px 0;
 }
