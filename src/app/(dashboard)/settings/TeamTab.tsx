@@ -69,12 +69,12 @@ const ACTION_LABELS: Record<string, string> = {
     SIGN_IN: "Signed In",
 };
 
-function getActionColor(actionType: string): string {
-    if (["CREATE", "CREATE_DISCOUNT", "CREATE_AUTO_DISCOUNT"].includes(actionType)) return "bg-green-50 text-green-700";
-    if (["DELETE", "DELETE_DISCOUNT", "DELETE_AUTO_DISCOUNT", "REMOVE_MEMBER"].includes(actionType)) return "bg-red-50 text-red-700";
-    if (["UPDATE", "UPDATE_AUTO_DISCOUNT", "UPDATE_STATUS", "TOGGLE_DISCOUNT", "TOGGLE_AUTO_DISCOUNT"].includes(actionType)) return "bg-blue-50 text-blue-700";
-    if (["SIGN_IN"].includes(actionType)) return "bg-purple-50 text-purple-700";
-    return "bg-neutral-100 text-neutral-700";
+function getActionBadgeClass(actionType: string): string {
+    if (["CREATE", "CREATE_DISCOUNT", "CREATE_AUTO_DISCOUNT"].includes(actionType)) return "ac-badge-ok";
+    if (["DELETE", "DELETE_DISCOUNT", "DELETE_AUTO_DISCOUNT", "REMOVE_MEMBER"].includes(actionType)) return "ac-badge-danger";
+    if (["UPDATE", "UPDATE_AUTO_DISCOUNT", "UPDATE_STATUS", "TOGGLE_DISCOUNT", "TOGGLE_AUTO_DISCOUNT"].includes(actionType)) return "ac-badge-processing";
+    if (["SIGN_IN"].includes(actionType)) return "ac-badge-packed";
+    return "ac-badge-inactive";
 }
 
 function getPageLabel(actionType: string, resource?: string): string {
@@ -113,10 +113,10 @@ function getSummary(log: any): string {
     }
 }
 
-const ROLE_COLORS: Record<string, string> = {
-    owner: "bg-black text-white",
-    admin: "bg-neutral-800 text-white",
-    sales_staff: "bg-neutral-100 text-neutral-700"
+const ROLE_BADGE_CLASS: Record<string, string> = {
+    owner: "ac-badge ac-badge-role-owner",
+    admin: "ac-badge ac-badge-role-admin",
+    sales_staff: "ac-badge ac-badge-role-staff",
 };
 
 const DASHBOARD_ROLES = ["owner", "admin", "sales_staff"] as const;
@@ -320,35 +320,22 @@ export function TeamTab() {
     };
 
     return (
-        <div className="space-y-8 max-w-5xl">
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 1000 }}>
             {/* Header / Tabs */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-100 pb-4">
-                <div className="flex items-center gap-6">
-                    <button 
-                        onClick={() => setActiveTab("members")}
-                        className={`text-xs uppercase tracking-widest font-semibold pb-4 border-b-2 transition-colors ${activeTab === 'members' ? 'border-black text-black' : 'border-transparent text-neutral-400 hover:text-black'}`}
-                    >
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+                <div className="ac-tabs" style={{ flex: 1, minWidth: 0 }}>
+                    <button className={`ac-tab${activeTab === 'members' ? ' active' : ''}`} onClick={() => setActiveTab("members")}>
                         Active Members
                     </button>
-                    <button 
-                        onClick={() => setActiveTab("pending")}
-                        className={`text-xs uppercase tracking-widest font-semibold pb-4 border-b-2 transition-colors ${activeTab === 'pending' ? 'border-black text-black' : 'border-transparent text-neutral-400 hover:text-black'}`}
-                    >
+                    <button className={`ac-tab${activeTab === 'pending' ? ' active' : ''}`} onClick={() => setActiveTab("pending")}>
                         Pending Invites
                     </button>
-                    <button 
-                        onClick={() => setActiveTab("logs")}
-                        className={`text-xs uppercase tracking-widest font-semibold pb-4 border-b-2 transition-colors ${activeTab === 'logs' ? 'border-black text-black' : 'border-transparent text-neutral-400 hover:text-black'}`}
-                    >
+                    <button className={`ac-tab${activeTab === 'logs' ? ' active' : ''}`} onClick={() => setActiveTab("logs")}>
                         Activity Logs
                     </button>
                 </div>
-                
                 {(activeTab === "members" || activeTab === "pending") && (
-                    <button
-                        onClick={() => setShowModal(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-[10px] md:text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors rounded-lg whitespace-nowrap"
-                    >
+                    <button onClick={() => setShowModal(true)} className="ac-btn ac-btn-primary" style={{ marginBottom: 1, flexShrink: 0 }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                         Invite Member
                     </button>
@@ -356,47 +343,47 @@ export function TeamTab() {
             </div>
 
             {/* Content areas based on tab */}
-            <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden">
+            <div className="ac-card" style={{ overflow: "hidden", padding: 0 }}>
                 
                 {/* ACTIVE MEMBERS TAB */}
                 {activeTab === "members" && (
-                    <div className="overflow-x-auto">
+                    <div style={{ overflowX: "auto" }}>
                         {loading ? (
-                            <p className="px-8 py-10 text-neutral-400 italic">Loading active members...</p>
+                            <div className="ac-empty"><p className="ac-empty-title">Loading active members...</p></div>
                         ) : members.length === 0 ? (
-                            <p className="px-8 py-10 text-neutral-400 italic">No team members yet.</p>
+                            <div className="ac-empty"><p className="ac-empty-title">No team members yet.</p></div>
                         ) : (
-                            <table className="w-full text-left bg-white">
-                                <thead className="bg-neutral-50 border-b border-neutral-100">
+                            <table className="ac-table" style={{ width: "100%" }}>
+                                <thead>
                                     <tr>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">User</th>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Role</th>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Joined</th>
-                                        <th className="px-6 py-4 text-right"></th>
+                                        <th>User</th>
+                                        <th>Role</th>
+                                        <th>Joined</th>
+                                        <th className="r"></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-neutral-50 text-sm">
+                                <tbody>
                                     {members.map(member => (
-                                        <tr key={member.id} className="hover:bg-neutral-50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="font-semibold text-neutral-900">{member.full_name || "—"}</div>
-                                                <div className="text-[11px] text-neutral-500 font-mono tracking-tight mt-0.5">{member.email}</div>
+                                        <tr key={member.id}>
+                                            <td>
+                                                <div style={{ fontWeight: 600, color: "var(--ac-ink)", fontSize: 13 }}>{member.full_name || "—"}</div>
+                                                <div style={{ fontSize: 11, color: "var(--ac-ink-3)", fontFamily: "var(--f-mono)", marginTop: 2 }}>{member.email}</div>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-md ${ROLE_COLORS[member.role] || "bg-neutral-100 text-neutral-700"}`}>
+                                            <td>
+                                                <span className={ROLE_BADGE_CLASS[member.role] || "ac-badge ac-badge-role-staff"}>
                                                     {ROLE_LABELS[member.role] || member.role}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-neutral-500 text-[11px]">
+                                            <td style={{ color: "var(--ac-ink-3)", fontSize: 12 }}>
                                                 {new Date(member.created_at).toLocaleDateString()}
                                             </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-3">
+                                            <td className="r">
+                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                                                     <button
                                                         onClick={() => handleSendReset(member)}
                                                         disabled={sendingResetId === member.id}
                                                         title="Send password reset link"
-                                                        className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-black transition-colors disabled:opacity-50"
+                                                        className="ac-btn ac-btn-ghost ac-btn-sm"
                                                     >
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="7" cy="17" r="3"/><path d="M10.3 14.7L18 7"/><path d="M14 11l2 2"/><path d="M17 7l2 2"/></svg>
                                                         {sendingResetId === member.id ? "Sending..." : "Reset"}
@@ -405,7 +392,7 @@ export function TeamTab() {
                                                         <button
                                                             onClick={() => handleRemove(member)}
                                                             disabled={removingId === member.id}
-                                                            className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                            className="ac-btn ac-btn-danger ac-btn-sm"
                                                         >
                                                             {removingId === member.id ? "Removing..." : "Remove"}
                                                         </button>
@@ -422,44 +409,41 @@ export function TeamTab() {
 
                 {/* PENDING INVITES TAB */}
                 {activeTab === "pending" && (
-                    <div className="overflow-x-auto">
+                    <div style={{ overflowX: "auto" }}>
                         {loading ? (
-                            <p className="px-8 py-10 text-neutral-400 italic">Loading pending invitations...</p>
+                            <div className="ac-empty"><p className="ac-empty-title">Loading pending invitations...</p></div>
                         ) : invites.length === 0 ? (
-                            <p className="px-8 py-10 text-neutral-400 italic">No pending invitations.</p>
+                            <div className="ac-empty"><p className="ac-empty-title">No pending invitations.</p></div>
                         ) : (
-                            <table className="w-full text-left bg-white">
-                                <thead className="bg-neutral-50 border-b border-neutral-100">
+                            <table className="ac-table" style={{ width: "100%" }}>
+                                <thead>
                                     <tr>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Invitee</th>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Role</th>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Sent on</th>
-                                        <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400 text-right">Actions</th>
+                                        <th>Invitee</th>
+                                        <th>Role</th>
+                                        <th>Sent on</th>
+                                        <th className="r">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-neutral-50 text-sm">
+                                <tbody>
                                     {invites.map(invite => (
-                                        <tr key={invite.id} className="hover:bg-neutral-50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="font-semibold text-neutral-900 flex items-center gap-2">
+                                        <tr key={invite.id}>
+                                            <td>
+                                                <div style={{ fontWeight: 600, color: "var(--ac-ink)", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
                                                     {invite.full_name}
-                                                    <span className="flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--ac-warn)", flexShrink: 0, display: "inline-block" }}></span>
                                                 </div>
-                                                <div className="text-[11px] text-neutral-500 font-mono tracking-tight mt-0.5">{invite.email}</div>
+                                                <div style={{ fontSize: 11, color: "var(--ac-ink-3)", fontFamily: "var(--f-mono)", marginTop: 2 }}>{invite.email}</div>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center text-[10px] uppercase tracking-widest font-bold px-3 py-1 rounded-md ${ROLE_COLORS[invite.role] || "bg-neutral-100 text-neutral-700"}`}>
+                                            <td>
+                                                <span className={ROLE_BADGE_CLASS[invite.role] || "ac-badge ac-badge-role-staff"}>
                                                     {ROLE_LABELS[invite.role] || invite.role}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-neutral-500 text-[11px]">
+                                            <td style={{ color: "var(--ac-ink-3)", fontSize: 12 }}>
                                                 {new Date(invite.created_at).toLocaleString()}
                                             </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button 
-                                                    onClick={() => handleRevoke(invite.id, invite.email)}
-                                                    className="text-[10px] font-semibold uppercase tracking-widest text-rose-500 hover:text-rose-700 transition-colors bg-rose-50 px-3 py-1.5 rounded-md"
-                                                >
+                                            <td className="r">
+                                                <button onClick={() => handleRevoke(invite.id, invite.email)} className="ac-btn ac-btn-danger ac-btn-sm">
                                                     Revoke
                                                 </button>
                                             </td>
@@ -473,24 +457,24 @@ export function TeamTab() {
 
                 {/* ACTIVITY LOGS TAB */}
                 {activeTab === "logs" && (
-                    <div className="space-y-4">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                         {/* Filters Bar */}
-                        <div className="px-8 py-4 bg-neutral-50 border-b border-neutral-100 flex flex-wrap items-center gap-6">
-                            <div className="flex items-center gap-2">
-                                <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Date:</label>
-                                <input 
+                        <div style={{ padding: "12px 24px", background: "var(--ac-panel-2)", borderBottom: "1px solid var(--ac-line)", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 20 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <label className="ac-label" style={{ fontSize: 9 }}>Date</label>
+                                <input
                                     type="date"
                                     value={filterDate}
                                     onChange={e => setFilterDate(e.target.value)}
-                                    className="bg-transparent text-sm border-b border-neutral-300 outline-none focus:border-black py-1 cursor-pointer"
+                                    className="ac-input" style={{ fontSize: 12, padding: "4px 8px", width: "auto" }}
                                 />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Staff:</label>
-                                <select 
-                                    value={filterUserId} 
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <label className="ac-label" style={{ fontSize: 9 }}>Staff</label>
+                                <select
+                                    value={filterUserId}
                                     onChange={e => setFilterUserId(e.target.value)}
-                                    className="bg-transparent text-sm border-b border-neutral-300 outline-none focus:border-black py-1 cursor-pointer"
+                                    className="ac-select" style={{ fontSize: 12, padding: "4px 8px" }}
                                 >
                                     <option value="all">All Members</option>
                                     {allStaff.map(s => (
@@ -498,12 +482,12 @@ export function TeamTab() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <label className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Action:</label>
-                                <select 
-                                    value={filterAction} 
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <label className="ac-label" style={{ fontSize: 9 }}>Action</label>
+                                <select
+                                    value={filterAction}
                                     onChange={e => setFilterAction(e.target.value)}
-                                    className="bg-transparent text-sm border-b border-neutral-300 outline-none focus:border-black py-1 cursor-pointer"
+                                    className="ac-select" style={{ fontSize: 12, padding: "4px 8px" }}
                                 >
                                     <option value="all">All Actions</option>
                                     <optgroup label="Orders">
@@ -535,35 +519,35 @@ export function TeamTab() {
                                     </optgroup>
                                 </select>
                             </div>
-                            <button 
-                                onClick={() => { 
-                                    setFilterUserId("all"); 
+                            <button
+                                onClick={() => {
+                                    setFilterUserId("all");
                                     setFilterAction("all");
                                     setFilterDate(new Date().toISOString().split('T')[0]);
                                 }}
-                                className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 hover:text-black transition-colors"
+                                className="ac-btn ac-btn-ghost ac-btn-sm"
                             >
                                 Reset Filters
                             </button>
                         </div>
 
-                        <div className="overflow-x-auto">
+                        <div style={{ overflowX: "auto" }}>
                             {loading ? (
-                                <p className="px-8 py-10 text-neutral-400 italic">Updating log view...</p>
+                                <div className="ac-empty"><p className="ac-empty-title">Updating log view...</p></div>
                             ) : logs.length === 0 ? (
-                                <p className="px-8 py-10 text-neutral-400 italic">No logs found matching your criteria.</p>
+                                <div className="ac-empty"><p className="ac-empty-title">No logs found matching your criteria.</p></div>
                             ) : (
-                                <table className="w-full text-left bg-white">
-                                    <thead className="bg-neutral-50/50 border-b border-neutral-100">
+                                <table className="ac-table" style={{ width: "100%" }}>
+                                    <thead>
                                         <tr>
-                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Timestamp</th>
-                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Staff Member</th>
-                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Action</th>
-                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Page</th>
-                                            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Details</th>
+                                            <th>Timestamp</th>
+                                            <th>Staff Member</th>
+                                            <th>Action</th>
+                                            <th>Page</th>
+                                            <th>Details</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-neutral-50 text-sm">
+                                    <tbody>
                                         {logs.map(log => {
                                             const isExpanded = expandedLogId === log.id;
                                             const summary = getSummary(log);
@@ -579,51 +563,51 @@ export function TeamTab() {
                                                     }}
                                                     tabIndex={0}
                                                     aria-expanded={isExpanded}
-                                                    className={`hover:bg-neutral-50 transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-neutral-300 focus:ring-inset ${isExpanded ? 'bg-neutral-50/70' : ''}`}
+                                                    style={{ cursor: "pointer" }}
                                                 >
-                                                    <td className="px-6 py-3 text-neutral-500 text-[11px] whitespace-nowrap">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className={`text-neutral-300 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`} style={{ fontSize: '8px' }}>▶</span>
+                                                    <td style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                            <span style={{ color: "var(--ac-ink-4)", fontSize: 8, transition: "transform .15s", transform: isExpanded ? "rotate(90deg)" : "none" }}>▶</span>
                                                             {new Date(log.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-3 whitespace-nowrap">
-                                                        <div className="font-semibold text-neutral-900">{allStaff.find(s => s.id === log.user_id)?.full_name || "Unknown"}</div>
-                                                        <div className="text-[10px] text-neutral-400 uppercase tracking-widest mt-0.5">{ROLE_LABELS[log.user_role] || log.user_role}</div>
+                                                    <td style={{ whiteSpace: "nowrap" }}>
+                                                        <div style={{ fontWeight: 600, color: "var(--ac-ink)", fontSize: 13 }}>{allStaff.find(s => s.id === log.user_id)?.full_name || "Unknown"}</div>
+                                                        <div style={{ fontSize: 10, color: "var(--ac-ink-3)", textTransform: "uppercase", letterSpacing: ".08em", marginTop: 2 }}>{ROLE_LABELS[log.user_role] || log.user_role}</div>
                                                     </td>
-                                                    <td className="px-6 py-3 whitespace-nowrap">
-                                                        <span className={`font-mono text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${getActionColor(log.action_type)}`}>
+                                                    <td style={{ whiteSpace: "nowrap" }}>
+                                                        <span className={`ac-badge ${getActionBadgeClass(log.action_type)}`}>
                                                             {ACTION_LABELS[log.action_type] || log.action_type}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-3 whitespace-nowrap">
-                                                        <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500 bg-neutral-100 px-2 py-1 rounded">
+                                                    <td style={{ whiteSpace: "nowrap" }}>
+                                                        <span className="ac-badge" style={{ background: "color-mix(in oklab, var(--ac-ink) 8%, transparent)", color: "var(--ac-ink-3)" }}>
                                                             {getPageLabel(log.action_type, log.resource)}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-3 min-w-[260px]">
-                                                        <div className="text-sm text-neutral-700">{summary}</div>
+                                                    <td style={{ minWidth: 260 }}>
+                                                        <div style={{ fontSize: 13, color: "var(--ac-ink-2)" }}>{summary}</div>
                                                         {isExpanded && (
-                                                            <div className="mt-2 space-y-1 bg-neutral-50 p-2.5 rounded-lg border border-neutral-100">
+                                                            <div style={{ marginTop: 8, padding: "10px 12px", background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", display: "flex", flexDirection: "column", gap: 4 }}>
                                                                 {log.details?.changes && Object.entries(log.details.changes).map(([field, delta]: [string, any]) => (
-                                                                    <div key={field} className="text-[11px] flex flex-wrap items-center gap-x-2">
-                                                                        <span className="font-semibold text-neutral-500 capitalize">{field.replace(/_/g, ' ')}:</span>
-                                                                        <span className="text-red-500 line-through decoration-red-300 opacity-60">
+                                                                    <div key={field} style={{ fontSize: 11, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                                                                        <span style={{ fontWeight: 600, color: "var(--ac-ink-3)", textTransform: "capitalize" }}>{field.replace(/_/g, ' ')}:</span>
+                                                                        <span style={{ color: "var(--ac-danger)", textDecoration: "line-through", opacity: 0.7 }}>
                                                                             {typeof delta.from === 'object' ? 'Data' : String(delta.from ?? 'null')}
                                                                         </span>
-                                                                        <span className="text-neutral-400">→</span>
-                                                                        <span className="text-green-600 font-medium">
+                                                                        <span style={{ color: "var(--ac-ink-4)" }}>→</span>
+                                                                        <span style={{ color: "var(--ac-accent)", fontWeight: 500 }}>
                                                                             {typeof delta.to === 'object' ? 'Data' : String(delta.to ?? 'null')}
                                                                         </span>
                                                                     </div>
                                                                 ))}
                                                                 {!log.details?.changes && log.details && (
-                                                                    <div className="text-[11px] text-neutral-500 space-y-0.5">
+                                                                    <div style={{ fontSize: 11, color: "var(--ac-ink-3)", display: "flex", flexDirection: "column", gap: 2 }}>
                                                                         {Object.entries(log.details)
                                                                             .filter(([k]) => !['resource_name', 'changes'].includes(k))
                                                                             .map(([k, v]) => (
                                                                                 <div key={k}>
-                                                                                    <span className="font-semibold capitalize">{k.replace(/_/g, ' ')}:</span>{' '}
+                                                                                    <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{k.replace(/_/g, ' ')}:</span>{' '}
                                                                                     <span>{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '—')}</span>
                                                                                 </div>
                                                                             ))}
@@ -640,11 +624,8 @@ export function TeamTab() {
                             )}
 
                             {hasMore && logs.length >= PAGE_SIZE && (
-                                <div className="p-6 border-t border-neutral-50 flex justify-center">
-                                    <button
-                                        onClick={() => setPage(prev => prev + 1)}
-                                        className="px-6 py-2 border border-neutral-200 text-[10px] uppercase tracking-widest font-semibold hover:bg-neutral-50 transition-colors rounded-lg"
-                                    >
+                                <div style={{ padding: "20px 24px", borderTop: "1px solid var(--ac-line)", display: "flex", justifyContent: "center" }}>
+                                    <button onClick={() => setPage(prev => prev + 1)} className="ac-btn ac-btn-ghost">
                                         Load More
                                     </button>
                                 </div>
@@ -656,72 +637,44 @@ export function TeamTab() {
 
             {/* Invite Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white w-full max-w-md rounded-2xl border border-neutral-200 shadow-2xl">
-                        <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
-                            <h2 className="font-serif text-lg tracking-widest uppercase">Invite New Member</h2>
-                            <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)" }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", padding: 16 }}>
+                    <div className="ac-card" style={{ width: "100%", maxWidth: 440, padding: 0 }}>
+                        <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--ac-line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".12em", color: "var(--ac-ink)" }}>Invite New Member</p>
+                            <button onClick={() => setShowModal(false)} className="admin-icon-btn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
                         </div>
-                        <form onSubmit={handleInvite} className="p-8 space-y-6">
+                        <form onSubmit={handleInvite} style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Full Name</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={inviteName}
-                                    onChange={e => setInviteName(e.target.value)}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
-                                    placeholder="Ama Staff"
-                                />
+                                <label className="ac-label">Full Name</label>
+                                <input type="text" required value={inviteName} onChange={e => setInviteName(e.target.value)}
+                                    className="ac-input" style={{ marginTop: 6 }} placeholder="Ama Staff" />
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Email Address</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={inviteEmail}
-                                    onChange={e => setInviteEmail(e.target.value)}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
-                                    placeholder="ama@misstokyo.com"
-                                />
+                                <label className="ac-label">Email Address</label>
+                                <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                                    className="ac-input" style={{ marginTop: 6 }} placeholder="ama@misstokyo.com" />
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Phone Number (Optional)</label>
-                                <input
-                                    type="text"
-                                    value={invitePhone}
-                                    onChange={e => setInvitePhone(e.target.value)}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
-                                    placeholder="+233..."
-                                />
+                                <label className="ac-label">Phone Number <span style={{ fontWeight: 400, color: "var(--ac-ink-4)" }}>(Optional)</span></label>
+                                <input type="text" value={invitePhone} onChange={e => setInvitePhone(e.target.value)}
+                                    className="ac-input" style={{ marginTop: 6 }} placeholder="+233..." />
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Role Assignment</label>
-                                <select
-                                    value={inviteRole}
-                                    onChange={e => setInviteRole(e.target.value)}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors cursor-pointer appearance-none"
-                                >
+                                <label className="ac-label">Role</label>
+                                <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
+                                    className="ac-select" style={{ marginTop: 6 }}>
                                     <option value="sales_staff">Sales Staff</option>
                                     <option value="admin">Admin</option>
                                     <option value="owner">Owner</option>
                                 </select>
                             </div>
-                            <div className="flex items-center gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 py-3 border border-neutral-200 text-xs uppercase tracking-widest hover:bg-neutral-50 transition-colors rounded-lg"
-                                >
+                            <div style={{ display: "flex", gap: 10, paddingTop: 8 }}>
+                                <button type="button" onClick={() => setShowModal(false)} className="ac-btn ac-btn-ghost" style={{ flex: 1 }}>
                                     Cancel
                                 </button>
-                                <button
-                                    type="submit"
-                                    disabled={inviting}
-                                    className="flex-1 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 rounded-lg"
-                                >
+                                <button type="submit" disabled={inviting} className="ac-btn ac-btn-primary" style={{ flex: 1 }}>
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                                     {inviting ? "Sending..." : "Send Invite"}
                                 </button>
