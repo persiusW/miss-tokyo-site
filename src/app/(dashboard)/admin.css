@@ -494,6 +494,9 @@
 .ac-badge-info       { background: color-mix(in oklab,var(--ac-info) 14%,transparent); color: var(--ac-info); }
 .ac-badge-danger     { background: color-mix(in oklab,var(--ac-danger) 14%,transparent); color: var(--ac-danger); }
 .ac-badge-ok         { background: color-mix(in oklab,var(--ac-accent) 14%,transparent); color: var(--ac-accent); }
+.ac-badge-role-owner { background: var(--ac-ink); color: var(--ac-bg); }
+.ac-badge-role-admin { background: color-mix(in oklab, var(--ac-ink) 80%, transparent); color: var(--ac-bg); }
+.ac-badge-role-staff { background: color-mix(in oklab, var(--ac-ink) 10%, transparent); color: var(--ac-ink-2); }
 
 /* ─── Tables ───────────────────────────────────────────────── */
 .ac-table-wrap { overflow-x: auto; }
@@ -535,15 +538,15 @@
   padding: 10px 16px;
   font-family: var(--f-mono); font-size: 10px;
   letter-spacing: .16em; text-transform: uppercase;
-  color: var(--ac-ink-3);
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  color: var(--ac-ink-2);
+  box-shadow: inset 0 -2px 0 transparent;
   cursor: pointer; white-space: nowrap;
-  background: transparent; border-top: none; border-left: none; border-right: none;
-  transition: color .12s;
+  background: transparent; border: none;
+  transition: color .12s, box-shadow .12s;
   display: flex; align-items: center; gap: 6px;
 }
 .ac-tab:hover { color: var(--ac-ink); }
-.ac-tab.active { color: var(--ac-ink); border-bottom-color: var(--ac-accent); }
+.ac-tab.active { color: var(--ac-ink); box-shadow: inset 0 -2px 0 var(--ac-accent); }
 .ac-tab-count {
   font-size: 9px; padding: 1px 5px; border-radius: 999px;
   background: color-mix(in oklab, var(--ac-ink) 8%, transparent);
