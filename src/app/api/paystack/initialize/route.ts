@@ -127,17 +127,17 @@ export async function POST(request: Request) {
                 if (variantCartItems.length > 0) {
                     const { data: dbVariants } = await supabaseAdmin
                         .from("product_variants")
-                        .select("product_id, size, color, stitching, inventory_count")
+                        .select("product_id, size, color, brand, inventory_count")
                         .in("product_id", [...variantTrackedProductIds]);
 
                     const variantStockMap: Record<string, number> = {};
                     for (const v of (dbVariants ?? [])) {
-                        const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+                        const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
                         variantStockMap[key] = v.inventory_count ?? 0;
                     }
 
                     for (const item of variantCartItems) {
-                        const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+                        const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
                         const variantStock = variantStockMap[key];
                         if (variantStock !== undefined && variantStock !== 9999 && (item.quantity ?? 1) > variantStock) {
                             return NextResponse.json(
@@ -352,10 +352,10 @@ export async function POST(request: Request) {
             if (variantTrackedIds.size > 0) {
                 const { data: currentVariants } = await supabaseAdmin
                     .from("product_variants")
-                    .select("id, product_id, size, color, stitching")
+                    .select("id, product_id, size, color, brand")
                     .in("product_id", [...variantTrackedIds]);
                 for (const v of currentVariants ?? []) {
-                    const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+                    const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
                     variantIdLookup[key] = v.id;
                 }
             }
@@ -373,7 +373,7 @@ export async function POST(request: Request) {
 
                 let resolvedVariantId: string | null = item.variantId ?? null;
                 if (variantTrackedIds.has(item.productId)) {
-                    const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+                    const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
                     resolvedVariantId = variantIdLookup[lookupKey] ?? null;
                 }
                 const mapKey = `${item.productId}|${resolvedVariantId ?? "null"}`;

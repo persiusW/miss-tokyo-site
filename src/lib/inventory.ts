@@ -11,7 +11,7 @@ export type ReserveItem = {
     variantId?: string | null;
     size?: string;
     color?: string;
-    stitching?: string;
+    brand?: string;
     quantity: number;
 };
 
@@ -58,11 +58,11 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
         if (variantItems.length > 0) {
             const { data: variants } = await supabaseAdmin
                 .from("product_variants")
-                .select("product_id, size, color, stitching, inventory_count")
+                .select("product_id, size, color, brand, inventory_count")
                 .in("product_id", variantTrackedIds);
 
             for (const v of variants ?? []) {
-                const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+                const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
                 variantStockMap[key] = (v as any).inventory_count ?? 0;
             }
         }
@@ -77,7 +77,7 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
 
         let stock: number;
         if (product.track_variant_inventory && item.size) {
-            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
             stock = variantStockMap[key] ?? 0;
         } else {
             stock = product.inventory_count ?? 0;
@@ -115,11 +115,11 @@ export async function getStockStatus(items: ReserveItem[]): Promise<StockStatus[
     if (variantTrackedIds.length > 0) {
         const { data: variants } = await supabaseAdmin
             .from("product_variants")
-            .select("product_id, size, color, stitching, inventory_count")
+            .select("product_id, size, color, brand, inventory_count")
             .in("product_id", variantTrackedIds);
 
         for (const v of variants ?? []) {
-            const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+            const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
             variantStockMap[key] = (v as any).inventory_count ?? 0;
         }
     }
@@ -132,7 +132,7 @@ export async function getStockStatus(items: ReserveItem[]): Promise<StockStatus[
 
         let available: number;
         if (product.track_variant_inventory && item.size) {
-            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
             available = variantStockMap[key] ?? 0;
         } else {
             available = product.inventory_count ?? 0;

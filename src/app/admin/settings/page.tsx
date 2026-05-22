@@ -19,7 +19,7 @@ type BusinessSettings = {
 type StoreSettings = {
     global_sizes: string[];
     global_colors: string[];
-    global_stitching: string[];
+    global_brands: string[];
     enable_store_pickup: boolean;
     maintenance_mode: boolean;
     home_grid_cols: 2 | 3 | 4;
@@ -39,7 +39,7 @@ const DEFAULT_BUSINESS: BusinessSettings = {
 const DEFAULT_STORE: StoreSettings = {
     global_sizes: ["S", "M", "L", "XL", "Free Size"],
     global_colors: ["Black", "White", "Grey"],
-    global_stitching: ["Standard", "Premium"],
+    global_brands: [],
     enable_store_pickup: false,
     maintenance_mode: false,
     home_grid_cols: 4,
@@ -211,7 +211,7 @@ function StoreTab() {
                     setForm({
                         global_sizes: sData.global_sizes || DEFAULT_STORE.global_sizes,
                         global_colors: sData.global_colors || DEFAULT_STORE.global_colors,
-                        global_stitching: sData.global_stitching || DEFAULT_STORE.global_stitching,
+                        global_brands: sData.global_brands || DEFAULT_STORE.global_brands,
                         enable_store_pickup: sData.enable_store_pickup || false,
                         maintenance_mode: sData.maintenance_mode || false,
                         home_grid_cols: sData.home_grid_cols || 4,
@@ -232,20 +232,20 @@ function StoreTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            const { 
-                global_sizes, 
-                global_colors, 
-                global_stitching, 
-                enable_store_pickup, 
-                maintenance_mode 
+            const {
+                global_sizes,
+                global_colors,
+                global_brands,
+                enable_store_pickup,
+                maintenance_mode
             } = form;
 
-            const { error: sError } = await supabase.from("store_settings").upsert({ 
-                id: 1, 
-                global_sizes, 
-                global_colors, 
-                global_stitching, 
-                enable_store_pickup, 
+            const { error: sError } = await supabase.from("store_settings").upsert({
+                id: 1,
+                global_sizes,
+                global_colors,
+                global_brands,
+                enable_store_pickup,
                 maintenance_mode,
                 updated_at: new Date().toISOString()
             }, { onConflict: "id" });

@@ -1,0 +1,26 @@
+/* [project]/src/app/playfairdisplay_f55ea386.module.css [app-client] (css) */
+@font-face {
+  font-family: playfairDisplay;
+  src: url("../media/playfair-s.p.e2c8389a.woff2") format("woff2");
+  font-display: swap;
+  font-weight: 400 900;
+}
+
+@font-face {
+  font-family: playfairDisplay Fallback;
+  src: local(Arial);
+  ascent-override: 108.2%;
+  descent-override: 25.1%;
+  line-gap-override: 0.0%;
+  size-adjust: 100.0%;
+}
+
+.playfairdisplay_f55ea386-module__So-4XW__className {
+  font-family: playfairDisplay, playfairDisplay Fallback, serif;
+}
+
+.playfairdisplay_f55ea386-module__So-4XW__variable {
+  --font-playfair-display: "playfairDisplay", "playfairDisplay Fallback", serif;
+}
+
+/*# sourceMappingURL=src_app_playfairdisplay_f55ea386_module_css_bad6b30c._.single.css.map*/

@@ -1,0 +1,43 @@
+{
+  "node": {
+    "609b0465f19908e0cfeae0dedb8873753b46dd92ff": {
+      "workers": {
+        "app/(dashboard)/overview/page": {
+          "moduleId": "[project]/.next-internal/server/app/(dashboard)/overview/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/lib/utils/logSignIn.ts [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false,
+          "exportedName": "logSignIn",
+          "filename": "src/lib/utils/logSignIn.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/overview/page": "rsc"
+      },
+      "filename": "src/lib/utils/logSignIn.ts",
+      "exportedName": "logSignIn"
+    },
+    "0082991162a7a4d8ca1719da9bbbd6a10afc2cff4f": {
+      "workers": {
+        "app/(shop)/account/orders/page": {
+          "moduleId": "[project]/.next-internal/server/app/(shop)/account/orders/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/(shop)/account/layout.tsx [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false,
+          "exportedName": "$$RSC_SERVER_ACTION_0",
+          "filename": "src/app/(shop)/account/layout.tsx"
+        },
+        "app/(shop)/account/page": {
+          "moduleId": "[project]/.next-internal/server/app/(shop)/account/page/actions.js { ACTIONS_MODULE0 => \"[project]/src/app/(shop)/account/layout.tsx [app-rsc] (ecmascript)\" } [app-rsc] (server actions loader, ecmascript)",
+          "async": false,
+          "exportedName": "$$RSC_SERVER_ACTION_0",
+          "filename": "src/app/(shop)/account/layout.tsx"
+        }
+      },
+      "layer": {
+        "app/(shop)/account/orders/page": "rsc",
+        "app/(shop)/account/page": "rsc"
+      },
+      "filename": "src/app/(shop)/account/layout.tsx",
+      "exportedName": "$$RSC_SERVER_ACTION_0"
+    }
+  },
+  "edge": {},
+  "encryptionKey": "RUXYjACbfPnCmtitDHW5fxbhhsnMYQnEEubWBA3+jqo="
+}

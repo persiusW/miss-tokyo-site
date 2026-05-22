@@ -16,8 +16,10 @@ export interface ShopProduct {
     category_slug: string | null;
     available_colors: string[] | null;
     available_sizes: string[] | null;
+    available_brands: string[] | null;
     color_variants: Array<{ name: string; hex: string; in_stock: boolean }> | null;
     size_variants: Array<{ label: string; in_stock: boolean }> | null;
+    brand_variants: Array<{ name: string; in_stock: boolean }> | null;
     bundle_label: string | null;
     badge: string | null;
     is_sale: boolean;
@@ -101,7 +103,7 @@ const getCachedProducts = unstable_cache(
             .select(
                 `id, name, slug, description, price_ghs, compare_at_price_ghs,
                  image_urls, is_featured, is_active, category_id, category_type, category_ids,
-                 available_colors, available_sizes, color_variants, size_variants,
+                 available_colors, available_sizes, available_brands, color_variants, size_variants, brand_variants,
                  bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, preorder_enabled, preorder_estimated_date, sku, created_at`,
                 { count: "exact" }
             );
@@ -173,6 +175,8 @@ const getCachedProducts = unstable_cache(
                 category_slug: matchedCat?.slug ?? null,
                 track_inventory: p.track_inventory ?? true,
                 track_variant_inventory: p.track_variant_inventory ?? false,
+                available_brands: p.available_brands ?? null,
+                brand_variants: p.brand_variants ?? null,
                 preorder_enabled: effectivePreorder,
                 preorder_estimated_date: effectivePreorderDate,
             };
@@ -279,7 +283,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
-             available_colors, available_sizes, color_variants, size_variants,
+             available_colors, available_sizes, available_brands, color_variants, size_variants, brand_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, preorder_enabled,
              sku, features_list, care_instructions, rating_average, review_count, created_at,
              wholesale_override, wholesale_price_tier_1, wholesale_price_tier_2, wholesale_price_tier_3`)
@@ -338,7 +342,7 @@ export async function getRelatedProducts(categoryType: string, currentSlug: stri
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
-             available_colors, available_sizes, color_variants, size_variants,
+             available_colors, available_sizes, available_brands, color_variants, size_variants, brand_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, created_at`)
         .eq("is_active", true)
         .ilike("category_type", categoryType)
@@ -354,6 +358,8 @@ export async function getRelatedProducts(categoryType: string, currentSlug: stri
         is_sale: p.is_sale ?? false,
         track_inventory: p.track_inventory ?? true,
         track_variant_inventory: p.track_variant_inventory ?? false,
+        available_brands: p.available_brands ?? null,
+        brand_variants: p.brand_variants ?? null,
         discount_value: p.discount_value ?? 0,
         inventory_count: p.inventory_count ?? 0,
         category_name: p.category_type ?? null,
@@ -464,7 +470,7 @@ export async function getVideoProducts(offset = 0): Promise<{
         .from("products")
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
-             available_colors, available_sizes, color_variants, size_variants,
+             available_colors, available_sizes, available_brands, color_variants, size_variants, brand_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, created_at`)
         .eq("is_active", true)
         // Exclude products that track inventory and have none left
@@ -491,6 +497,8 @@ export async function getVideoProducts(offset = 0): Promise<{
                 inventory_count: p.inventory_count ?? 0,
                 track_inventory: p.track_inventory ?? true,
                 track_variant_inventory: p.track_variant_inventory ?? false,
+                available_brands: p.available_brands ?? null,
+                brand_variants: p.brand_variants ?? null,
                 category_name: p.category_type ?? null,
                 category_slug: null,
                 video_url,

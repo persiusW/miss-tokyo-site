@@ -20,7 +20,7 @@ type OrderItem = {
     qty?: number;
     size?: string;
     color?: string;
-    stitching?: string;
+    brand?: string;
     imageUrl?: string;
 };
 

@@ -13,7 +13,7 @@ export function buildLineItemsHtml(items: any[]): string {
             const unitPrice = Number(item.price || 0);
             const qty = Number(item.quantity || 1);
             const lineTotal = unitPrice * qty;
-            const variant = [item.size, item.color, item.stitching]
+            const variant = [item.size, item.color, item.brand]
                 .filter(Boolean)
                 .map((v: string) => escHtml(v))
                 .join(" · ");
@@ -41,7 +41,7 @@ export function buildPreorderLineItemsHtml(items: any[]): string {
         const unitPrice = Number(item.price || 0);
         const qty = Number(item.quantity || 1);
         const lineTotal = unitPrice * qty;
-        const variant = [item.size, item.color, item.stitching]
+        const variant = [item.size, item.color, item.brand]
             .filter(Boolean)
             .map((v: string) => escHtml(v))
             .join(" · ");

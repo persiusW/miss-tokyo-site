@@ -1,0 +1,17 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(shop)/layout,_N_T_/(shop)/policies/layout,_N_T_/(shop)/policies/refund-policy/layout,_N_T_/(shop)/policies/refund-policy/page,_N_T_/policies/refund-policy"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHNob3Ap/policies/refund-policy/__PAGE__",
+    "/!KHNob3Ap/policies/refund-policy",
+    "/!KHNob3Ap/policies",
+    "/!KHNob3Ap",
+    "/_index",
+    "/_head"
+  ]
+}

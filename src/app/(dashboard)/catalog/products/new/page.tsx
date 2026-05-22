@@ -20,8 +20,11 @@ export default function NewProductPage() {
     const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
     const [globalColors, setGlobalColors] = useState<string[]>([]);
     const [selectedColors, setSelectedColors] = useState<string[]>([]);
-    // const [globalStitching, setGlobalStitching] = useState<string[]>([]);
-    // const [selectedStitching, setSelectedStitching] = useState<string[]>([]);
+    const [globalBrands, setGlobalBrands] = useState<string[]>([]);
+    const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+    const [sizeEnabled, setSizeEnabled] = useState(true);
+    const [colorEnabled, setColorEnabled] = useState(true);
+    const [brandEnabled, setBrandEnabled] = useState(false);
     const [trackInventory, setTrackInventory] = useState(true);
     const [wholesaleTierConfig, setWholesaleTierConfig] = useState<{ enabled: boolean; tier1Min: number; tier1Max: number; tier2Min: number; tier2Max: number; tier3Min: number; tier3Max: number } | null>(null);
     const [wholesalePrices, setWholesalePrices] = useState({ tier1: "", tier2: "", tier3: "" });
@@ -39,7 +42,7 @@ export default function NewProductPage() {
     useEffect(() => {
         Promise.all([
             supabase.from("categories").select("id, name, slug, is_wholesale").eq("is_active", true).order("name"),
-            supabase.from("store_settings").select("global_sizes, global_colors, global_stitching, wholesale_enabled, wholesale_tier_1_min, wholesale_tier_1_max, wholesale_tier_2_min, wholesale_tier_2_max, wholesale_tier_3_min, wholesale_tier_3_max").eq("id", "default").single()
+            supabase.from("store_settings").select("global_sizes, global_colors, global_brands, wholesale_enabled, wholesale_tier_1_min, wholesale_tier_1_max, wholesale_tier_2_min, wholesale_tier_2_max, wholesale_tier_3_min, wholesale_tier_3_max").eq("id", "default").single()
         ]).then(([{ data: catData }, { data: storeData }]) => {
             if (catData && catData.length > 0) {
                 setCategories(catData);
@@ -54,10 +57,9 @@ export default function NewProductPage() {
                     // Colors start unticked — admin selects which apply to this product
                     setSelectedColors([]);
                 }
-                // if (storeData.global_stitching) {
-                //     setGlobalStitching(storeData.global_stitching);
-                //     setSelectedStitching(storeData.global_stitching);
-                // }
+                if (storeData.global_brands) {
+                    setGlobalBrands(storeData.global_brands);
+                }
                 if (storeData.wholesale_enabled) {
                     setWholesaleTierConfig({
                         enabled: true,
@@ -95,9 +97,9 @@ export default function NewProductPage() {
         setSelectedColors(prev => prev.includes(col) ? prev.filter(s => s !== col) : [...prev, col]);
     };
 
-    // const toggleStitching = (stitch: string) => {
-    //     setSelectedStitching(prev => prev.includes(stitch) ? prev.filter(s => s !== stitch) : [...prev, stitch]);
-    // };
+    const toggleBrand = (b: string) => {
+        setSelectedBrands(prev => prev.includes(b) ? prev.filter(s => s !== b) : [...prev, b]);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -118,9 +120,9 @@ export default function NewProductPage() {
                     category_type: formData.category_type,
                     category_ids: selectedCategoryIds,
                     image_urls: imageUrls,
-                    available_sizes: selectedSizes,
-                    available_colors: selectedColors,
-                    // available_stitching: selectedStitching,
+                    available_sizes: sizeEnabled ? selectedSizes : [],
+                    available_colors: colorEnabled ? selectedColors : [],
+                    available_brands: brandEnabled ? selectedBrands : [],
                     wholesale_override: wholesaleOverride,
                     wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
                     wholesale_price_tier_2: wholesaleOverride && wholesalePrices.tier2 ? Number(wholesalePrices.tier2) : null,
@@ -288,68 +290,47 @@ export default function NewProductPage() {
                         <div className="bg-white p-8 border border-neutral-200 space-y-8">
                             <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Variants</h2>
 
+                            {/* Size section */}
                             <div>
-                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Sizes</label>
-                                {globalSizes.length === 0 ? (
-                                    <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading sizes from store settings...</p>
-                                ) : (
-                                    <div className="flex flex-wrap gap-4">
-                                        {globalSizes.map(size => (
-                                            <label key={size} className="flex items-center gap-2 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedSizes.includes(size)}
-                                                    onChange={() => toggleSize(size)}
-                                                    className="w-4 h-4 accent-black"
-                                                />
-                                                <span className="text-sm font-medium">{size}</span>
-                                            </label>
-                                        ))}
-                                    </div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="text-xs uppercase tracking-widest font-semibold">Sizes</label>
+                                    <button type="button" onClick={() => { if (sizeEnabled) setSelectedSizes([]); setSizeEnabled(v => !v); }} className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${sizeEnabled ? "bg-black" : "bg-neutral-300"}`}>
+                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${sizeEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                </div>
+                                {sizeEnabled && (globalSizes.length === 0
+                                    ? <p className="text-[10px] uppercase tracking-widest text-neutral-400">No sizes in store settings.</p>
+                                    : <div className="flex flex-wrap gap-4">{globalSizes.map(size => (<label key={size} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedSizes.includes(size)} onChange={() => toggleSize(size)} className="w-4 h-4 accent-black" /><span className="text-sm font-medium">{size}</span></label>))}</div>
                                 )}
                             </div>
 
+                            {/* Color section */}
                             <div className="pt-6 border-t border-neutral-100">
-                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Colors</label>
-                                {globalColors.length === 0 ? (
-                                    <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading colors from store settings...</p>
-                                ) : (
-                                    <div className="flex flex-wrap gap-4">
-                                        {globalColors.map(col => (
-                                            <label key={col} className="flex items-center gap-2 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedColors.includes(col)}
-                                                    onChange={() => toggleColor(col)}
-                                                    className="w-4 h-4 accent-black"
-                                                />
-                                                <span className="text-sm font-medium">{col}</span>
-                                            </label>
-                                        ))}
-                                    </div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="text-xs uppercase tracking-widest font-semibold">Colors</label>
+                                    <button type="button" onClick={() => { if (colorEnabled) setSelectedColors([]); setColorEnabled(v => !v); }} className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${colorEnabled ? "bg-black" : "bg-neutral-300"}`}>
+                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${colorEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                </div>
+                                {colorEnabled && (globalColors.length === 0
+                                    ? <p className="text-[10px] uppercase tracking-widest text-neutral-400">No colors in store settings.</p>
+                                    : <div className="flex flex-wrap gap-4">{globalColors.map(col => (<label key={col} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedColors.includes(col)} onChange={() => toggleColor(col)} className="w-4 h-4 accent-black" /><span className="text-sm font-medium">{col}</span></label>))}</div>
                                 )}
                             </div>
 
-                            {/* <div className="pt-6 border-t border-neutral-100">
-                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Available Stitching</label>
-                                {globalStitching.length === 0 ? (
-                                    <p className="text-[10px] uppercase tracking-widest text-neutral-400">Loading stitching from store settings...</p>
-                                ) : (
-                                    <div className="flex flex-wrap gap-4">
-                                        {globalStitching.map(stitch => (
-                                            <label key={stitch} className="flex items-center gap-2 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedStitching.includes(stitch)}
-                                                    onChange={() => toggleStitching(stitch)}
-                                                    className="w-4 h-4 accent-black"
-                                                />
-                                                <span className="text-sm font-medium">{stitch}</span>
-                                            </label>
-                                        ))}
-                                    </div>
+                            {/* Brand section */}
+                            <div className="pt-6 border-t border-neutral-100">
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="text-xs uppercase tracking-widest font-semibold">Brands</label>
+                                    <button type="button" onClick={() => { if (brandEnabled) setSelectedBrands([]); setBrandEnabled(v => !v); }} className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${brandEnabled ? "bg-black" : "bg-neutral-300"}`}>
+                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${brandEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                </div>
+                                {brandEnabled && (globalBrands.length === 0
+                                    ? <p className="text-[10px] uppercase tracking-widest text-neutral-400">No brands in store settings — add brands under Settings → Store.</p>
+                                    : <div className="flex flex-wrap gap-4">{globalBrands.map(b => (<label key={b} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedBrands.includes(b)} onChange={() => toggleBrand(b)} className="w-4 h-4 accent-black" /><span className="text-sm font-medium">{b}</span></label>))}</div>
                                 )}
-                            </div> */}
+                            </div>
                         </div>
                     </div>
 

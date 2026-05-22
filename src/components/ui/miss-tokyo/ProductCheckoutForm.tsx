@@ -14,7 +14,7 @@ interface ProductCheckoutFormProps {
     priceNum: number;
     price: string;
     colors: string[];
-    stitching?: string[];
+    brands?: string[];
     availableSizes: string[] | null;
     wholesale?: WholesaleData | null;
     trackInventory?: boolean;
@@ -27,7 +27,7 @@ interface ProductCheckoutFormProps {
 
 export function ProductCheckoutForm({
     productId, productName, productSlug, productImageUrl,
-    priceNum, price, colors, stitching = [], availableSizes,
+    priceNum, price, colors, brands = [], availableSizes,
     wholesale, trackInventory = true, trackVariantInventory = false,
     inventoryCount = 0, productVariants = [], onAddedToCart, openDrawerOnAdd,
 }: ProductCheckoutFormProps) {
@@ -67,7 +67,7 @@ export function ProductCheckoutForm({
         return colors[0] || "";
     })();
     const [selectedColor, setSelectedColor] = useState<string>(defaultColor);
-    const [selectedStitching, setSelectedStitching] = useState<string>(stitching[0] || "");
+    const [selectedBrand, setSelectedBrand] = useState<string>(brands[0] || "");
     const [quantity, setQuantity] = useState<number>(1);
 
     const isWholesale = wholesale?.enabled === true;
@@ -118,14 +118,14 @@ export function ProductCheckoutForm({
         }
 
         addItem({
-            id: `${productId}-${selectedSize}-${selectedColor}`,
+            id: `${productId}-${selectedSize}-${selectedColor}-${selectedBrand}`,
             productId,
             name: productName,
             slug: productSlug,
             price: priceNum,
             size: selectedSize,
             color: selectedColor,
-            stitching: selectedStitching,
+            brand: selectedBrand || undefined,
             quantity,
             imageUrl: productImageUrl,
             inventoryCount: effectiveInventory,
@@ -162,23 +162,23 @@ export function ProductCheckoutForm({
                 </div>
             </div>
 
-            {/* Stitching Selection */}
-            {/* {stitching.length > 0 && (
+            {/* Brand Selection */}
+            {brands.length > 0 && (
                 <div>
-                    <span className="block text-[10px] uppercase tracking-[0.3em] font-bold mb-5 text-neutral-400">Stitching Option</span>
+                    <span className="block text-[10px] uppercase tracking-[0.3em] font-bold mb-5 text-neutral-400">Brand</span>
                     <div className="flex gap-2 flex-wrap">
-                        {stitching.map(style => (
-                            <label key={style} className="cursor-pointer">
-                                <input type="radio" name="stitching" className="sr-only peer"
-                                    checked={selectedStitching === style} onChange={() => setSelectedStitching(style)} />
-                                <span className="flex items-center h-12 px-6 text-[10px] border border-neutral-100 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-all uppercase tracking-[0.2em] font-bold shadow-sm">
-                                    {style}
+                        {brands.map(b => (
+                            <label key={b} className="cursor-pointer">
+                                <input type="radio" name="brand" className="sr-only peer"
+                                    checked={selectedBrand === b} onChange={() => setSelectedBrand(b)} />
+                                <span className="flex items-center h-10 px-5 text-[10px] border border-[#C9A84C] peer-checked:bg-[#C9A84C]/10 peer-checked:border-[#C9A84C] transition-all uppercase tracking-[0.2em] font-bold rounded-full shadow-sm">
+                                    {b}
                                 </span>
                             </label>
                         ))}
                     </div>
                 </div>
-            )} */}
+            )}
 
             {/* Size Selection */}
             <div id={`size-section-${productId}`} className="transition-all duration-300">

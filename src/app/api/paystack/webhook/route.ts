@@ -529,7 +529,7 @@ export async function POST(req: Request) {
                             .in("id", pIds);
                         const fbProductMap = new Map((fbProducts ?? []).map((p: any) => [p.id, p]));
 
-                        // Resolve current variant IDs by (size, color, stitching) for tracked products
+                        // Resolve current variant IDs by (size, color, brand) for tracked products
                         const variantTrackedPIds = new Set<string>(
                             (fbProducts ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
                         );
@@ -537,10 +537,10 @@ export async function POST(req: Request) {
                         if (variantTrackedPIds.size > 0) {
                             const { data: fbVariants } = await supabaseAdmin
                                 .from("product_variants")
-                                .select("id, product_id, size, color, stitching, inventory_count")
+                                .select("id, product_id, size, color, brand, inventory_count")
                                 .in("product_id", [...variantTrackedPIds]);
                             for (const v of fbVariants ?? []) {
-                                const k = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+                                const k = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
                                 variantIdLookup[k] = v.id;
                             }
                         }
@@ -551,7 +551,7 @@ export async function POST(req: Request) {
                             const qty = item.quantity ?? 1;
 
                             if (product.track_variant_inventory) {
-                                const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+                                const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
                                 const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
                                 if (resolvedVariantId) {
                                     const { data: variant } = await supabaseAdmin

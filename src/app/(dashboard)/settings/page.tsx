@@ -26,7 +26,7 @@ type BusinessSettings = {
 type StoreSettings = {
     global_sizes: string[];
     global_colors: string[];
-    global_stitching: string[];
+    global_brands: string[];
     enable_store_pickup: boolean;
     maintenance_mode: boolean;
     home_grid_cols: 2 | 3 | 4 | 5;
@@ -67,7 +67,7 @@ const DEFAULT_BUSINESS: BusinessSettings = {
 const DEFAULT_STORE: StoreSettings = {
     global_sizes: ["39", "40", "41", "42", "43", "44", "45"],
     global_colors: ["Noir", "Cognac", "Sand"],
-    global_stitching: ["Tonal", "Contrast White"],
+    global_brands: [],
     enable_store_pickup: false,
     maintenance_mode: false,
     home_grid_cols: 4,
@@ -310,7 +310,7 @@ function StoreTab() {
                     setForm({
                         global_sizes: sData.global_sizes || DEFAULT_STORE.global_sizes,
                         global_colors: sData.global_colors || DEFAULT_STORE.global_colors,
-                        global_stitching: sData.global_stitching || DEFAULT_STORE.global_stitching,
+                        global_brands: sData.global_brands || DEFAULT_STORE.global_brands,
                         enable_store_pickup: sData.enable_store_pickup || false,
                         maintenance_mode: sData.maintenance_mode || false,
                         home_grid_cols: (sData.home_grid_cols as 2 | 3 | 4 | 5) || 4,
@@ -454,15 +454,15 @@ function StoreTab() {
                                     <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each color.</p>
                                 </div>
 
-                                {/* <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Stitching Options</label>
+                                <div>
+                                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Global Brands</label>
                                     <TagInput
-                                        value={form.global_stitching}
-                                        onChange={(tags) => setForm(p => ({ ...p, global_stitching: tags }))}
-                                        placeholder="Type an option and press Enter…"
+                                        value={form.global_brands}
+                                        onChange={(tags) => setForm(p => ({ ...p, global_brands: tags }))}
+                                        placeholder="Type a brand name and press Enter…"
                                     />
-                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each stitching style.</p>
-                                </div> */}
+                                    <p className="text-[10px] text-neutral-400 mt-2 tracking-wider uppercase">Press Enter or , to add each brand. These appear as selectable options on products with brand variants enabled.</p>
+                                </div>
                             </div>
                         </div>
                     </div>{/* end left column */}

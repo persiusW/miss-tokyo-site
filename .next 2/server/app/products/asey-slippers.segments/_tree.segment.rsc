@@ -1,0 +1,5 @@
+:HL["/_next/static/chunks/6080b21e72d04212.css","style"]
+:HL["/_next/static/media/cinzel-s.p.7f4e28d1.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/_next/static/media/geist-s.p.853070df.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/_next/static/media/playfair-s.p.e2c8389a.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+0:{"buildId":"Pv9NwSuWrM4RrPkzxaQVA","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"(shop)","paramType":null,"paramKey":"(shop)","hasRuntimePrefetch":false,"slots":{"children":{"name":"products","paramType":null,"paramKey":"products","hasRuntimePrefetch":false,"slots":{"children":{"name":"slug","paramType":"d","paramKey":"asey-slippers","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":false}},"isRootLayout":false}},"isRootLayout":false}},"isRootLayout":true},"staleTime":300}

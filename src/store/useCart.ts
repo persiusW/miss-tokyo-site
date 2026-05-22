@@ -11,7 +11,7 @@ export type CartItem = {
     price: number; // always the retail price (source of truth)
     size: string;
     color?: string;
-    stitching?: string;
+    brand?: string;
     quantity: number;
     imageUrl: string;
     cartAddedAt?: number; // Unix ms — set at addItem time, used for staleness detection

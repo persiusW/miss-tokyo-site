@@ -14,7 +14,7 @@ interface ProductCheckoutFormProps {
     priceNum: number;
     price: string;
     colors: string[];
-    stitching?: string[];
+    brands?: string[];
     availableSizes: string[] | null;
     wholesale?: WholesaleData | null;
     trackInventory?: boolean;
@@ -27,7 +27,7 @@ interface ProductCheckoutFormProps {
 
 export function ProductCheckoutForm({
     productId, productName, productSlug, productImageUrl,
-    priceNum, price, colors, stitching = [], availableSizes,
+    priceNum, price, colors, brands = [], availableSizes,
     wholesale, trackInventory = true, trackVariantInventory = false,
     inventoryCount = 0, productVariants = [], onAddedToCart, openDrawerOnAdd,
 }: ProductCheckoutFormProps) {
@@ -36,7 +36,7 @@ export function ProductCheckoutForm({
 
     const [selectedSize, setSelectedSize] = useState<string>("");
     const [selectedColor, setSelectedColor] = useState<string>(colors[0] || "");
-    const [selectedStitching, setSelectedStitching] = useState<string>(stitching[0] || "");
+    const [selectedBrand, setSelectedBrand] = useState<string>(brands[0] || "");
     const [quantity, setQuantity] = useState<number>(1);
 
     const isWholesale = wholesale?.enabled === true;
@@ -89,14 +89,14 @@ export function ProductCheckoutForm({
         }
 
         addItem({
-            id: `${productId}-${selectedSize}-${selectedColor}`,
+            id: `${productId}-${selectedSize}-${selectedColor}-${selectedBrand}`,
             productId,
             name: productName,
             slug: productSlug,
             price: priceNum,
             size: selectedSize,
             color: selectedColor,
-            stitching: selectedStitching,
+            brand: selectedBrand || undefined,
             quantity,
             imageUrl: productImageUrl,
             inventoryCount: effectiveInventory,

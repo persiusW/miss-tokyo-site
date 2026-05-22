@@ -160,7 +160,7 @@ export default function CheckoutPage() {
             variantId: null,
             size: i.size,
             color: i.color,
-            stitching: (i as { stitching?: string }).stitching ?? null,
+            brand: (i as { brand?: string }).brand ?? null,
             quantity: i.quantity,
         }));
 
@@ -322,7 +322,7 @@ export default function CheckoutPage() {
                 variantId: null,
                 size: i.size,
                 color: i.color,
-                stitching: (i as { stitching?: string }).stitching ?? null,
+                brand: (i as { brand?: string }).brand ?? null,
                 quantity: i.quantity,
             }));
             const stockRes = await fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`);

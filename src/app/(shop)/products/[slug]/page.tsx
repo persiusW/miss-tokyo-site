@@ -159,7 +159,7 @@ export default async function ProductPage({
         getProductReviews(product.id),
         supabaseAdmin
             .from("product_variants")
-            .select("size, color, stitching, inventory_count")
+            .select("size, color, brand, inventory_count")
             .eq("product_id", product.id),
         supabaseAdmin
             .from("products")
@@ -377,6 +377,8 @@ export default async function ProductPage({
                             trackVariantInventory={trackVariantInventory}
                             trackInventory={product.track_inventory}
                             productVariants={productVariants}
+                            availableBrands={product.available_brands}
+                            brandVariants={(product as any).brand_variants as any}
                             autoDiscountRule={applicableAutoRule as any}
                             preorderEnabled={effectivePreorderEnabled}
                             preorderEstimatedDate={effectivePreorderDate}

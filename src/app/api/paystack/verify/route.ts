@@ -123,10 +123,10 @@ export async function GET(req: Request) {
                             if (variantTrackedPIds.size > 0) {
                                 const { data: fbVariants } = await supabase
                                     .from("product_variants")
-                                    .select("id, product_id, size, color, stitching, inventory_count")
+                                    .select("id, product_id, size, color, brand, inventory_count")
                                     .in("product_id", [...variantTrackedPIds]);
                                 for (const v of fbVariants ?? []) {
-                                    const k = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+                                    const k = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
                                     variantIdLookup[k] = v.id;
                                 }
                             }
@@ -136,7 +136,7 @@ export async function GET(req: Request) {
                                 if (!product || product.track_inventory === false) return;
                                 const qty = item.quantity ?? 1;
                                 if (product.track_variant_inventory) {
-                                    const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+                                    const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
                                     const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
                                     if (resolvedVariantId) {
                                         const { data: variant } = await supabase
