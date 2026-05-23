@@ -156,7 +156,7 @@ export function NavBar({ initialUser }: { initialUser?: { id: string } | null })
                     <button
                         onClick={() => setMenuOpen(true)}
                         aria-label="Open navigation menu"
-                        className="xl:hidden flex flex-col justify-center items-end gap-[6px] w-8 h-8 rounded-none"
+                        className="hidden md:flex xl:hidden flex-col justify-center items-end gap-[6px] w-8 h-8 rounded-none"
                     >
                         <span className="block w-6 h-[1px] bg-white transition-all" />
                         <span className="block w-4 h-[1px] bg-white transition-all" />

@@ -196,3 +196,72 @@ html, body { overflow-x: clip; }
     background: white !important;
   }
 }
+
+/* ─── PWA Mobile Tab Bar ─────────────────────────────────────────────────── */
+
+/* Bottom padding for main content so it's never hidden by the tab bar */
+.pb-safe-tab {
+  padding-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .pb-safe-tab {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Tab bar container */
+.mobile-tab-bar {
+  display: none; /* hidden on desktop by default */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: #141210;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  z-index: 140;
+  align-items: flex-start;
+  justify-content: space-around;
+}
+
+@media (max-width: 768px) {
+  .mobile-tab-bar {
+    display: flex;
+  }
+}
+
+/* Individual tab items */
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-top: 10px;
+  color: #8C8479;
+  text-decoration: none;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-family: var(--font-cinzel);
+  transition: color 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.tab-item.active {
+  color: #F7F2EC;
+}
+
+.tab-item:not(.active):hover {
+  color: #BDB5AC;
+}
+
+/* Gold underline on active tab label */
+.tab-item.active span {
+  border-bottom: 1px solid #C9963A;
+  padding-bottom: 1px;
+}
