@@ -13,7 +13,7 @@ async function getCallerOrFail() {
         .select("role")
         .eq("id", user.id)
         .single();
-    if (!profile || !["owner", "sales_staff"].includes(profile.role)) return null;
+    if (!profile || !["admin", "owner", "sales_staff"].includes(profile.role)) return null;
     return { userId: user.id, userRole: profile.role };
 }
 

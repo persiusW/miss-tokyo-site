@@ -98,53 +98,57 @@ const getCachedProducts = unstable_cache(
             allCats.filter((c: any) => c.preorder_enabled).map((c: any) => [c.name.toLowerCase(), c])
         );
 
-        let query = db
-            .from("products")
-            .select(
-                `id, name, slug, description, price_ghs, compare_at_price_ghs,
+        const BASE_SELECT = `id, name, slug, description, price_ghs, compare_at_price_ghs,
                  image_urls, is_featured, is_active, category_id, category_type, category_ids,
-                 available_colors, available_sizes, available_brands, color_variants, size_variants, brand_variants,
-                 bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, preorder_enabled, preorder_estimated_date, sku, created_at`,
-                { count: "exact" }
-            );
+                 available_colors, available_sizes, color_variants, size_variants,
+                 bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, preorder_enabled, preorder_estimated_date, sku, created_at`;
+        const FULL_SELECT = BASE_SELECT + `, available_brands, brand_variants`;
 
-        query = query.or("is_active.eq.true,is_active.is.null");
-
-        if (category) {
-            const cat = catResult.data as { id: string; name: string } | null;
-            if (cat) {
-                query = query.or(`category_id.eq.${cat.id},category_type.ilike."${cat.name}",category_ids.cs.{"${cat.id}"}`);
-            } else {
-                const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-                query = query.ilike("category_type", fallbackName);
+        const buildQuery = (selectStr: string) => {
+            let qb = db.from("products").select(selectStr, { count: "exact" });
+            qb = qb.or("is_active.eq.true,is_active.is.null");
+            if (category) {
+                const cat = catResult.data as { id: string; name: string } | null;
+                if (cat) {
+                    qb = qb.or(`category_id.eq.${cat.id},category_type.ilike."${cat.name}",category_ids.cs.{"${cat.id}"}`);
+                } else {
+                    const fallbackName = category.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+                    qb = qb.ilike("category_type", fallbackName);
+                }
             }
-        }
+            if (q) qb = qb.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
+            if (sale) qb = qb.eq("is_sale", true);
+            if (inStock) qb = qb.gt("inventory_count", 0);
+            if (min) qb = qb.gte("price_ghs", parseFloat(min));
+            if (max) qb = qb.lte("price_ghs", parseFloat(max));
+            if (color) qb = qb.contains("available_colors", [color]);
+            if (size) qb = qb.contains("available_sizes", [size]);
+            switch (sort) {
+                case "price-asc":  qb = qb.order("price_ghs",  { ascending: true });  break;
+                case "price-desc": qb = qb.order("price_ghs",  { ascending: false }); break;
+                case "name-asc":   qb = qb.order("name",       { ascending: true });  break;
+                default:           qb = qb.order("created_at", { ascending: false }); break;
+            }
+            const from = (page - 1) * 24;
+            return qb.range(from, from + 24 - 1);
+        };
 
-        if (q) query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
-        if (sale) query = query.eq("is_sale", true);
-        if (inStock) query = query.gt("inventory_count", 0);
-        if (min) query = query.gte("price_ghs", parseFloat(min));
-        if (max) query = query.lte("price_ghs", parseFloat(max));
-        if (color) query = query.contains("available_colors", [color]);
-        if (size) query = query.contains("available_sizes", [size]);
-
-        switch (sort) {
-            case "price-asc":  query = query.order("price_ghs",  { ascending: true });  break;
-            case "price-desc": query = query.order("price_ghs",  { ascending: false }); break;
-            case "name-asc":   query = query.order("name",       { ascending: true });  break;
-            default:           query = query.order("created_at", { ascending: false }); break;
-        }
-
-        const from = (page - 1) * 24; // Use constant or PAGE_SIZE
-        query = query.range(from, from + 24 - 1);
-
-        const { data, count, error } = await query;
+        let { data, count, error } = await buildQuery(FULL_SELECT);
         if (error) {
             // PGRST103: offset exceeds available rows (e.g. page=4 on an empty category)
             if ((error as any).code === "PGRST103") {
                 return { products: [], total: 0, minPrice, maxPrice };
             }
-            console.error("[getProducts] Supabase Error:", error);
+            // 42703: column doesn't exist — DB migration pending; retry without brand columns
+            if ((error as any).code === "42703") {
+                const fallback = await buildQuery(BASE_SELECT);
+                data = fallback.data;
+                count = fallback.count;
+                error = fallback.error;
+                if (error) console.error("[getProducts] Fallback Supabase Error:", error);
+            } else {
+                console.error("[getProducts] Supabase Error:", error);
+            }
         }
 
         const products: ShopProduct[] = (data || []).map((p: any) => {
@@ -278,37 +282,46 @@ export interface RatingDistribution {
     pct: number;
 }
 
-export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
-    const { data, error } = await supabaseAdmin
-        .from("products")
-        .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
+const SLUG_SELECT_BASE = `id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
-             available_colors, available_sizes, available_brands, color_variants, size_variants, brand_variants,
+             available_colors, available_sizes, color_variants, size_variants,
              bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, preorder_enabled,
              sku, features_list, care_instructions, rating_average, review_count, created_at,
-             wholesale_override, wholesale_price_tier_1, wholesale_price_tier_2, wholesale_price_tier_3`)
+             wholesale_override, wholesale_price_tier_1, wholesale_price_tier_2, wholesale_price_tier_3`;
+const SLUG_SELECT_FULL = SLUG_SELECT_BASE + `, available_brands, brand_variants`;
+
+export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+    const runSlugQuery = (selectStr: string) => supabaseAdmin
+        .from("products")
+        .select(selectStr)
         .eq("slug", slug)
         .or("is_active.eq.true,is_active.is.null")
         .maybeSingle();
 
-    if (error) {
+    let result = await runSlugQuery(SLUG_SELECT_FULL) as { data: any; error: any };
+
+    if (result.error) {
         // PGRST002: transient PostgREST schema cache reload — retry once.
-        if ((error as any).code === "PGRST002") {
+        if (result.error.code === "PGRST002") {
             await new Promise(r => setTimeout(r, 500));
             return getProductBySlug(slug);
         }
-        // Transient gateway error (Supabase/Cloudflare 502/503 during Vercel build or at runtime).
-        // The Supabase JS client surfaces these as an error whose message contains raw HTML.
-        // Throwing here crashes the SSG build worker for every product; returning null lets the
-        // page call notFound() gracefully and ISR will rehydrate on the next request.
-        const msg = String((error as any)?.message ?? "");
-        if (msg.includes("<!DOCTYPE") || msg.includes("Bad gateway") || msg.includes("502") || msg.includes("503")) {
-            console.warn("[getProductBySlug] Transient gateway error for slug:", slug, "— skipping pre-render");
-            return null;
+        // 42703: column doesn't exist — DB migration pending; retry without brand columns.
+        if (result.error.code === "42703") {
+            result = await runSlugQuery(SLUG_SELECT_BASE) as { data: any; error: any };
         }
-        console.error("[getProductBySlug]", error);
-        throw error;
+        if (result.error) {
+            // Transient gateway error (Supabase/Cloudflare 502/503 during Vercel build or at runtime).
+            const msg = String(result.error?.message ?? "");
+            if (msg.includes("<!DOCTYPE") || msg.includes("Bad gateway") || msg.includes("502") || msg.includes("503")) {
+                console.warn("[getProductBySlug] Transient gateway error for slug:", slug, "— skipping pre-render");
+                return null;
+            }
+            console.error("[getProductBySlug]", result.error);
+            throw result.error;
+        }
     }
+    const data = result.data;
     if (!data) return null;
 
     // PERF-03: use cached categories — avoids a per-PDP round-trip
