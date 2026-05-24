@@ -3,6 +3,7 @@ import { Footer } from "@/components/ui/miss-tokyo/Footer";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
 import { CartDrawer } from "@/components/ui/miss-tokyo/CartDrawer";
 import { MobileTabBar } from "@/components/ui/miss-tokyo/MobileTabBar";
+import { PWAInstallBanner } from "@/components/ui/miss-tokyo/PWAInstallBanner";
 import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -69,6 +70,7 @@ export default async function ShopLayout({
             <Toaster />
             <CartDrawer />
             <MobileTabBar />
+            <PWAInstallBanner />
         </div>
     );
 }
