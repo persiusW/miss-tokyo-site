@@ -58,6 +58,9 @@ self.addEventListener("fetch", (event) => {
         return;
     }
 
+    // Only handle http/https — chrome-extension:// and others throw on cache.put
+    if (url.protocol !== "http:" && url.protocol !== "https:") return;
+
     // ── NEVER cache: financial & auth endpoints ──
     const isPaystack =
         url.hostname.includes("paystack.co") ||
@@ -118,7 +121,7 @@ async function cacheFirst(cacheName, request, maxAgeSeconds) {
 
     try {
         const response = await fetch(request);
-        if (response.ok) cache.put(request, response.clone());
+        if (response.ok) safePut(cache, request, response.clone());
         return response;
     } catch {
         const fallback = await caches.match("/offline.html");
@@ -131,7 +134,7 @@ async function networkFirst(cacheName, request, timeoutMs) {
     const cache = await caches.open(cacheName);
 
     const networkPromise = fetch(request).then((response) => {
-        if (response.ok) cache.put(request, response.clone());
+        if (response.ok) safePut(cache, request, response.clone());
         return response;
     });
 
@@ -156,7 +159,7 @@ async function staleWhileRevalidate(cacheName, request) {
 
     const networkFetch = fetch(request)
         .then((response) => {
-            if (response.ok) cache.put(request, response.clone());
+            if (response.ok) safePut(cache, request, response.clone());
             return response;
         })
         .catch(() => null);
@@ -180,8 +183,19 @@ async function staleWhileRevalidate(cacheName, request) {
 // ─── Helper: fire-and-forget background fetch ────────────────────────────────
 function fetchAndCache(cache, request) {
     fetch(request)
-        .then((res) => { if (res.ok) cache.put(request, res); })
+        .then((res) => { if (res.ok) safePut(cache, request, res); })
         .catch(() => {});
+}
+
+// ─── Helper: safe cache.put (skips chrome-extension and opaque schemes) ──────
+function safePut(cache, request, response) {
+    try {
+        const u = new URL(request.url);
+        if (u.protocol !== "http:" && u.protocol !== "https:") return;
+        cache.put(request, response).catch(() => {});
+    } catch {
+        // ignore unparseable URLs
+    }
 }
 
 // ─── Web Push: show notification ──────────────────────────────────────────────
