@@ -5,15 +5,14 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
-    User, ShoppingBag, Heart, MapPin, Settings, ChevronRight, LogOut,
+    User, ShoppingBag, Heart, Settings, ChevronRight, LogOut,
 } from "lucide-react";
 
 const TABS = [
-    { key: "overview",   label: "Overview",   href: "/account/overview",   Icon: User },
-    { key: "orders",     label: "Orders",     href: "/account/orders",     Icon: ShoppingBag, countKey: "orders" as const },
-    { key: "saved",      label: "Saved",      href: "/account/saved",      Icon: Heart,        countKey: "saved" as const },
-    { key: "addresses",  label: "Addresses",  href: "/account/addresses",  Icon: MapPin },
-    { key: "settings",   label: "Settings",   href: "/account/settings",   Icon: Settings },
+    { key: "overview",  label: "Overview", href: "/account/overview",  Icon: User },
+    { key: "orders",    label: "Orders",   href: "/account/orders",    Icon: ShoppingBag, countKey: "orders" as const },
+    { key: "saved",     label: "Saved",    href: "/account/saved",     Icon: Heart,       countKey: "saved" as const },
+    { key: "settings",  label: "Profile",  href: "/account/settings",  Icon: Settings },
 ] as const;
 
 interface Props {
@@ -39,7 +38,9 @@ export function AccountShell({ userId, userEmail, onSignOut, children }: Props) 
 
         supabase.from("wishlists").select("id", { count: "exact", head: true })
             .eq("user_id", userId)
-            .then(({ count }: { count: number | null }) => setSavedCount(count ?? 0));
+            .then(({ count, error }: { count: number | null; error: any }) => {
+                if (!error) setSavedCount(count ?? 0);
+            });
     }, [userId, userEmail]);
 
     const initial = (name || userEmail || "?")[0].toUpperCase();
@@ -73,7 +74,7 @@ export function AccountShell({ userId, userEmail, onSignOut, children }: Props) 
             </div>
 
             {/* Mobile tab strip */}
-            <nav className="md:hidden flex overflow-x-auto scrollbar-none border-b border-[#e0d5c0] bg-[#fdf9f3]">
+            <nav className="md:hidden flex border-b border-[#e0d5c0] bg-[#fdf9f3]">
                 {TABS.map((tab) => {
                     const { key, label, href } = tab;
                     const countKey = "countKey" in tab ? tab.countKey : undefined;
@@ -83,7 +84,7 @@ export function AccountShell({ userId, userEmail, onSignOut, children }: Props) 
                         <Link
                             key={key}
                             href={href}
-                            className={`flex-none px-4 py-3 text-[11px] font-semibold uppercase tracking-widest whitespace-nowrap border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${
+                            className={`flex-1 py-3 text-[10px] font-semibold uppercase tracking-widest border-b-2 -mb-px transition-colors flex items-center justify-center gap-1 ${
                                 active
                                     ? "border-[#8b2f30] text-[#8b2f30]"
                                     : "border-transparent text-[#8c7e6a] hover:text-[#1a1714]"
@@ -91,7 +92,7 @@ export function AccountShell({ userId, userEmail, onSignOut, children }: Props) 
                         >
                             {label}
                             {count > 0 && (
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono ${
+                                <span className={`text-[9px] px-1 py-0.5 rounded-full font-mono leading-none ${
                                     active ? "bg-[#8b2f30] text-white" : "bg-[#e0d5c0] text-[#4a3f33]"
                                 }`}>
                                     {count}

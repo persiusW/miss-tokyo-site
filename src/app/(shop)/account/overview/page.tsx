@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Check, ShoppingBag, Heart, MapPin, Settings, ChevronRight } from "lucide-react";
+import { Check, ShoppingBag, Heart, Settings, ChevronRight } from "lucide-react";
 
 type OrderItem = { imageUrl?: string; quantity?: number; qty?: number };
 
@@ -238,10 +238,9 @@ export default function OverviewPage() {
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                     {[
-                        { href: "/account/orders",    label: "Orders",    sub: `${orderCount} total`,   Icon: ShoppingBag },
-                        { href: "/account/saved",     label: "Saved",     sub: `${savedCount} pieces`,  Icon: Heart },
-                        { href: "/account/addresses", label: "Addresses", sub: "Manage",                Icon: MapPin },
-                        { href: "/account/settings",  label: "Settings",  sub: "Profile & preferences", Icon: Settings },
+                        { href: "/account/orders",   label: "Orders",  sub: `${orderCount} total`,   Icon: ShoppingBag },
+                        { href: "/account/saved",    label: "Saved",   sub: `${savedCount} pieces`,  Icon: Heart },
+                        { href: "/account/settings", label: "Profile", sub: "Profile & addresses",   Icon: Settings },
                     ].map(({ href, label, sub, Icon }) => (
                         <Link
                             key={href}
