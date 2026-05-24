@@ -63,7 +63,7 @@ export default async function ShopLayout({
               * from being called, which restores ISR for every page under (shop).
               */}
             <NavBar initialUser={null} />
-            <main className="flex-1 flex flex-col pt-20 pb-safe-tab">
+            <main className="flex-1 flex flex-col pt-20 pb-safe-tab bg-[#f5f0e8]">
                 {children}
             </main>
             <Footer />

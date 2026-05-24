@@ -5,8 +5,9 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { Pencil, X } from "lucide-react";
 
-type Profile = { full_name: string; phone: string; notif_email: boolean; notif_sms: boolean; notif_whatsapp: boolean };
-const DEFAULT: Profile = { full_name: "", phone: "", notif_email: true, notif_sms: true, notif_whatsapp: false };
+// Real columns: full_name, phone, email_subscribed, sms_subscribed
+type Profile = { full_name: string; phone: string; email_subscribed: boolean; sms_subscribed: boolean };
+const DEFAULT: Profile = { full_name: "", phone: "", email_subscribed: true, sms_subscribed: true };
 
 type StoreContact = { store_email: string | null; store_phone: string | null };
 
@@ -49,17 +50,16 @@ export default function SettingsPage() {
             setEmail(user.email ?? "");
 
             const [profileRes, settingsRes] = await Promise.all([
-                supabase.from("profiles").select("full_name, phone, notif_email, notif_sms, notif_whatsapp").eq("id", user.id).maybeSingle(),
+                supabase.from("profiles").select("full_name, phone, email_subscribed, sms_subscribed").eq("id", user.id).maybeSingle(),
                 supabase.from("site_settings").select("store_email, store_phone").eq("id", "singleton").maybeSingle(),
             ]);
 
             if (profileRes.data) {
                 setForm({
-                    full_name: profileRes.data.full_name ?? "",
-                    phone: profileRes.data.phone ?? "",
-                    notif_email: profileRes.data.notif_email ?? true,
-                    notif_sms: profileRes.data.notif_sms ?? true,
-                    notif_whatsapp: profileRes.data.notif_whatsapp ?? false,
+                    full_name: (profileRes.data as any).full_name ?? "",
+                    phone: (profileRes.data as any).phone ?? "",
+                    email_subscribed: (profileRes.data as any).email_subscribed ?? true,
+                    sms_subscribed: (profileRes.data as any).sms_subscribed ?? true,
                 });
             }
 
@@ -78,28 +78,34 @@ export default function SettingsPage() {
         e.preventDefault();
         if (!userId) return;
         setSaving(true);
-        const payload = { full_name: form.full_name, phone: form.phone, notif_email: form.notif_email, notif_sms: form.notif_sms, notif_whatsapp: form.notif_whatsapp };
-        const { data: updated, error: updateErr } = await supabase.from("profiles").update(payload).eq("id", userId).select("id");
-        if (!updateErr && updated && updated.length > 0) {
+        const payload = {
+            id: userId,
+            email,
+            full_name: form.full_name,
+            phone: form.phone,
+        };
+        const { error } = await supabase
+            .from("profiles")
+            .upsert(payload, { onConflict: "id" });
+
+        if (error) {
+            toast.error("Failed to save.");
+        } else {
             toast.success("Profile saved.");
             setEditing(false);
-        } else if (!updateErr) {
-            const { error: insertErr } = await supabase.from("profiles").insert({ id: userId, email, ...payload });
-            if (insertErr) toast.error("Failed to save.");
-            else { toast.success("Profile saved."); setEditing(false); }
-        } else {
-            toast.error("Failed to save.");
         }
         setSaving(false);
     };
 
-    const toggleComm = (key: keyof Pick<Profile, "notif_email" | "notif_sms" | "notif_whatsapp">) => {
+    const toggleComm = (key: keyof Pick<Profile, "email_subscribed" | "sms_subscribed">) => {
         setForm(p => {
             const next = { ...p, [key]: !p[key] };
             if (userId) {
-                supabase.from("profiles").update({ [key]: next[key] }).eq("id", userId).then(({ error }: { error: any }) => {
-                    if (error) toast.error("Failed to update preference.");
-                });
+                supabase.from("profiles")
+                    .upsert({ id: userId, email, [key]: next[key] }, { onConflict: "id" })
+                    .then(({ error }: { error: any }) => {
+                        if (error) toast.error("Failed to update preference.");
+                    });
             }
             return next;
         });
@@ -114,7 +120,7 @@ export default function SettingsPage() {
         if (error) {
             toast.error("Failed to send reset email.");
         } else {
-            toast.success("Password reset email sent. Check your inbox.");
+            toast.success("Reset link sent. Check your inbox.");
         }
         setResetSending(false);
     };
@@ -214,21 +220,14 @@ export default function SettingsPage() {
                             <p className="text-sm font-medium text-[#1a1714]">Order updates · Email</p>
                             <p className="text-[11px] text-[#8c7e6a] mt-0.5">Receipts, dispatch &amp; delivery</p>
                         </div>
-                        <Toggle on={form.notif_email} onToggle={() => toggleComm("notif_email")} />
+                        <Toggle on={form.email_subscribed} onToggle={() => toggleComm("email_subscribed")} />
                     </div>
                     <div className="flex items-center justify-between px-5 py-4">
                         <div>
                             <p className="text-sm font-medium text-[#1a1714]">Order updates · SMS</p>
                             <p className="text-[11px] text-[#8c7e6a] mt-0.5">Carrier handoff &amp; delivery</p>
                         </div>
-                        <Toggle on={form.notif_sms} onToggle={() => toggleComm("notif_sms")} />
-                    </div>
-                    <div className="flex items-center justify-between px-5 py-4">
-                        <div>
-                            <p className="text-sm font-medium text-[#1a1714]">WhatsApp</p>
-                            <p className="text-[11px] text-[#8c7e6a] mt-0.5">Order disputes &amp; atelier enquiries</p>
-                        </div>
-                        <Toggle on={form.notif_whatsapp} onToggle={() => toggleComm("notif_whatsapp")} />
+                        <Toggle on={form.sms_subscribed} onToggle={() => toggleComm("sms_subscribed")} />
                     </div>
                 </div>
             </section>
@@ -237,7 +236,6 @@ export default function SettingsPage() {
             <section>
                 <h2 className="font-serif text-sm tracking-widest uppercase text-[#4a3f33] mb-2 pb-2 border-b border-[#e0d5c0]">Security &amp; support</h2>
                 <div className="bg-[#fdf9f3] border border-[#e0d5c0] rounded-xl divide-y divide-[#e0d5c0]">
-                    {/* Password reset */}
                     <div className="flex items-center justify-between px-5 py-4">
                         <div>
                             <p className="text-sm font-medium text-[#1a1714]">Password</p>
@@ -252,23 +250,16 @@ export default function SettingsPage() {
                         </button>
                     </div>
 
-                    {/* Contact support */}
                     {(storeContact.store_email || storeContact.store_phone) && (
                         <div className="px-5 py-4">
                             <p className="text-sm font-medium text-[#1a1714] mb-2">Contact Support</p>
                             {storeContact.store_email && (
-                                <a
-                                    href={`mailto:${storeContact.store_email}`}
-                                    className="block text-[11px] text-[#8c7e6a] hover:text-[#8b2f30] transition-colors mb-1"
-                                >
+                                <a href={`mailto:${storeContact.store_email}`} className="block text-[11px] text-[#8c7e6a] hover:text-[#8b2f30] transition-colors mb-1">
                                     {storeContact.store_email}
                                 </a>
                             )}
                             {storeContact.store_phone && (
-                                <a
-                                    href={`tel:${storeContact.store_phone}`}
-                                    className="block text-[11px] text-[#8c7e6a] hover:text-[#8b2f30] transition-colors"
-                                >
+                                <a href={`tel:${storeContact.store_phone}`} className="block text-[11px] text-[#8c7e6a] hover:text-[#8b2f30] transition-colors">
                                     {storeContact.store_phone}
                                 </a>
                             )}

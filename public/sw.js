@@ -2,9 +2,9 @@
 // Handles: Web Push Notifications + PWA Caching
 
 // ─── Cache Names (bump version suffix to force cache invalidation) ────────────
-const SHELL_CACHE  = "mt-shell-v1";
-const IMAGE_CACHE  = "mt-images-v1";
-const DATA_CACHE   = "mt-data-v1";
+const SHELL_CACHE  = "mt-shell-v2";
+const IMAGE_CACHE  = "mt-images-v2";
+const DATA_CACHE   = "mt-data-v2";
 
 // ─── App Shell URLs to precache on install ────────────────────────────────────
 const SHELL_URLS = [

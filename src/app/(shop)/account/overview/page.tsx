@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Check } from "lucide-react";
+import { Check, ShoppingBag, Heart, MapPin, Settings, ChevronRight } from "lucide-react";
 
 type OrderItem = { imageUrl?: string; quantity?: number; qty?: number };
 
@@ -230,6 +230,36 @@ export default function OverviewPage() {
                     <InMotionCard order={displayOrder} />
                 </div>
             )}
+
+            {/* Quick navigation */}
+            <div>
+                <h2 className="font-serif text-base tracking-widest uppercase mb-3">
+                    Your <em className="italic">account</em>
+                </h2>
+                <div className="grid grid-cols-2 gap-3">
+                    {[
+                        { href: "/account/orders",    label: "Orders",    sub: `${orderCount} total`,   Icon: ShoppingBag },
+                        { href: "/account/saved",     label: "Saved",     sub: `${savedCount} pieces`,  Icon: Heart },
+                        { href: "/account/addresses", label: "Addresses", sub: "Manage",                Icon: MapPin },
+                        { href: "/account/settings",  label: "Settings",  sub: "Profile & preferences", Icon: Settings },
+                    ].map(({ href, label, sub, Icon }) => (
+                        <Link
+                            key={href}
+                            href={href}
+                            className="bg-[#fdf9f3] border border-[#e0d5c0] rounded-xl p-4 flex items-center gap-3 hover:border-[#8b2f30]/40 hover:bg-white transition-colors group"
+                        >
+                            <span className="w-9 h-9 rounded-full bg-[#1a1714]/5 flex items-center justify-center shrink-0 group-hover:bg-[#8b2f30]/10 transition-colors">
+                                <Icon size={16} className="text-[#4a3f33] group-hover:text-[#8b2f30] transition-colors" strokeWidth={1.5} />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block text-xs font-semibold uppercase tracking-widest text-[#1a1714] truncate">{label}</span>
+                                <span className="block text-[10px] text-[#8c7e6a] truncate">{sub}</span>
+                            </span>
+                            <ChevronRight size={13} className="ml-auto text-[#c8bb98] shrink-0" />
+                        </Link>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
