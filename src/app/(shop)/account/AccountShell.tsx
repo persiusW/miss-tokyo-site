@@ -54,7 +54,7 @@ export function AccountShell({ userId, userEmail, onSignOut, children }: Props) 
     const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
     return (
-        <div className="acct-root min-h-[100dvh] bg-[#f5f0e8]">
+        <div className="acct-root flex-1 bg-[#f5f0e8]">
 
             {/* Mobile compact header */}
             <div className="md:hidden px-5 pt-5 pb-3 flex items-center gap-3 border-b border-[#e0d5c0]">
