@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Check } from "lucide-react";
@@ -153,57 +153,97 @@ export default function AccountOrdersPage() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [riders, setRiders] = useState<Record<string, Rider>>({});
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        supabase.auth.getUser().then(async ({ data: { user } }: { data: any }) => {
-            if (!user) return;
+    const fetchOrders = useCallback(async () => {
+        const { data: { user } } = await supabase.auth.getUser() as { data: any };
+        if (!user) return;
 
-            const SELECT = "id, created_at, total_amount, status, assigned_rider_id, paystack_reference, delivery_method";
+        const SELECT = "id, created_at, total_amount, status, assigned_rider_id, paystack_reference, delivery_method";
 
-            const [{ data: byId }, { data: byEmail }] = await Promise.all([
-                supabase
-                    .from("orders")
-                    .select(SELECT)
-                    .eq("customer_id", user.id)
-                    .order("created_at", { ascending: false }),
-                user.email
-                    ? supabase
-                        .from("orders")
-                        .select(SELECT)
-                        .eq("customer_email", user.email)
-                        .order("created_at", { ascending: false })
-                    : Promise.resolve({ data: [] }),
-            ]);
+        const [{ data: byId }, { data: byEmail }] = await Promise.all([
+            supabase.from("orders").select(SELECT).eq("customer_id", user.id).order("created_at", { ascending: false }),
+            user.email
+                ? supabase.from("orders").select(SELECT).eq("customer_email", user.email).order("created_at", { ascending: false })
+                : Promise.resolve({ data: [] }),
+        ]);
 
-            const seen = new Set<string>();
-            const allOrders = [...(byId ?? []), ...(byEmail ?? [])]
-                .filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; })
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            setOrders(allOrders);
+        const seen = new Set<string>();
+        const allOrders = [...(byId ?? []), ...(byEmail ?? [])]
+            .filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; })
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setOrders(allOrders);
 
-            const riderIds = [...new Set(allOrders.map(o => o.assigned_rider_id).filter(Boolean))] as string[];
-            if (riderIds.length > 0) {
-                const { data: riderData } = await supabase
-                    .from("riders")
-                    .select("id, full_name, phone_number")
-                    .in("id", riderIds);
-                const map: Record<string, Rider> = {};
-                (riderData ?? []).forEach((r: any) => { map[r.id] = r; });
-                setRiders(map);
-            }
+        const riderIds = [...new Set(allOrders.map(o => o.assigned_rider_id).filter(Boolean))] as string[];
+        if (riderIds.length > 0) {
+            const { data: riderData } = await supabase.from("riders").select("id, full_name, phone_number").in("id", riderIds);
+            const map: Record<string, Rider> = {};
+            (riderData ?? []).forEach((r: any) => { map[r.id] = r; });
+            setRiders(map);
+        }
 
-            setLoading(false);
-        });
+        setLoading(false);
+        setRefreshing(false);
     }, []);
 
-    if (loading) return <p className="text-neutral-400 italic font-serif">Loading...</p>;
+    useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+    // Pull-to-refresh on mobile
+    useEffect(() => {
+        let startY = 0;
+        const onTouchStart = (e: TouchEvent) => { startY = e.touches[0].clientY; };
+        const onTouchEnd = (e: TouchEvent) => {
+            const dy = e.changedTouches[0].clientY - startY;
+            if (dy > 90 && window.scrollY === 0) {
+                setRefreshing(true);
+                fetchOrders();
+            }
+        };
+        window.addEventListener("touchstart", onTouchStart, { passive: true });
+        window.addEventListener("touchend", onTouchEnd, { passive: true });
+        return () => {
+            window.removeEventListener("touchstart", onTouchStart);
+            window.removeEventListener("touchend", onTouchEnd);
+        };
+    }, [fetchOrders]);
+
+    if (loading) return (
+        <div className="space-y-4 animate-pulse max-w-2xl">
+            {[1, 2, 3].map(i => (
+                <div key={i} className="border border-[#e0d5c0] rounded-xl p-6 bg-[#fdf9f3]">
+                    <div className="flex justify-between mb-4">
+                        <div className="space-y-2">
+                            <div className="h-3 w-28 bg-[#e0d5c0] rounded" />
+                            <div className="h-3 w-20 bg-[#ede6d4] rounded" />
+                        </div>
+                        <div className="h-6 w-16 bg-[#e0d5c0] rounded-full" />
+                    </div>
+                    <div className="flex items-center gap-2 mt-4">
+                        {[1,2,3,4,5].map(j => <div key={j} className="h-6 w-6 rounded-full bg-[#e0d5c0]" />)}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
 
     return (
-        <div>
-            <h2 className="font-serif text-xl tracking-widest uppercase mb-8">Order History</h2>
+        <div className="max-w-2xl">
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-[#8c7e6a] mb-1">Account</p>
+                    <h1 className="font-serif text-2xl md:text-3xl tracking-widest uppercase">Orders <em className="italic">· archive</em></h1>
+                </div>
+                {refreshing && <span className="text-[10px] uppercase tracking-widest text-[#8c7e6a] animate-pulse">Refreshing…</span>}
+            </div>
 
             {orders.length === 0 ? (
-                <p className="text-neutral-500 italic font-serif text-center py-16">You have no orders yet.</p>
+                <div className="text-center py-20">
+                    <p className="text-3xl mb-4">🛍️</p>
+                    <p className="font-serif text-[#8c7e6a] italic mb-8">No orders yet.</p>
+                    <Link href="/shop" className="text-xs uppercase tracking-widest font-semibold border-b border-[#8b2f30] text-[#8b2f30] pb-0.5 hover:opacity-70 transition-opacity">
+                        Browse Shop →
+                    </Link>
+                </div>
             ) : (
                 <div className="space-y-4">
                     {orders.map(order => {
@@ -213,30 +253,29 @@ export default function AccountOrdersPage() {
                         const pickup = isPickupOrder(order.delivery_method);
 
                         return (
-                            <div key={order.id} className="border border-neutral-200 bg-white p-6">
+                            <div key={order.id} className="border border-[#e0d5c0] bg-[#fdf9f3] rounded-xl p-5 md:p-6">
                                 {/* Header row */}
-                                <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                                     <div>
-                                        <p className="font-mono text-xs text-neutral-500 mb-1">
-                                            ORDER #{order.id.substring(0, 8).toUpperCase()}
+                                        <p className="font-mono text-[10px] tracking-[0.15em] text-[#8c7e6a] uppercase mb-1">
+                                            #{order.id.substring(0, 8).toUpperCase()}
                                         </p>
-                                        <p className="text-xs text-neutral-400">
+                                        <p className="text-xs text-[#8c7e6a]">
                                             {new Date(order.created_at).toLocaleDateString("en-GH", {
                                                 year: "numeric", month: "long", day: "numeric",
                                             })}
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                        {/* Order type badge */}
-                                        <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded-sm ${
-                                            pickup ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded-full ${
+                                            pickup ? "bg-[#1a1714] text-white" : "bg-[#e0d5c0] text-[#4a3f33]"
                                         }`}>
                                             {pickup ? "Pickup" : "Delivery"}
                                         </span>
-                                        <span className="font-medium text-sm">
+                                        <span className="font-serif text-sm text-[#1a1714]">
                                             GH₵ {Number(order.total_amount ?? 0).toFixed(2)}
                                         </span>
-                                        <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
+                                        <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest rounded-full ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
                                             {statusLabel(order.status)}
                                         </span>
                                     </div>
@@ -247,17 +286,17 @@ export default function AccountOrdersPage() {
 
                                 {/* Ready for pickup callout */}
                                 {isReadyPickup && (
-                                    <div className="bg-neutral-900 text-white px-4 py-3 mt-4 text-xs">
+                                    <div className="bg-[#1a1714] text-white px-4 py-3 mt-4 text-xs rounded-lg">
                                         <p className="font-semibold uppercase tracking-widest mb-1">Ready for Collection</p>
-                                        <p className="text-neutral-300">Your order is packed and waiting at our store. Please bring your order number when you arrive.</p>
+                                        <p className="text-[#c8bb98]">Your order is packed and waiting at our store. Please bring your order number when you arrive.</p>
                                     </div>
                                 )}
 
                                 {/* Rider info (when shipped) */}
                                 {isShipped && rider && (
-                                    <div className="bg-indigo-50 border border-indigo-100 px-4 py-3 mt-4 text-xs">
-                                        <p className="font-semibold uppercase tracking-widest text-indigo-700 mb-1">Dispatch Rider</p>
-                                        <p className="text-indigo-600">{rider.full_name} · {rider.phone_number}</p>
+                                    <div className="bg-[#f0ede6] border border-[#e0d5c0] px-4 py-3 mt-4 text-xs rounded-lg">
+                                        <p className="font-semibold uppercase tracking-widest text-[#4a3f33] mb-1">Dispatch Rider</p>
+                                        <p className="text-[#8c7e6a]">{rider.full_name} · {rider.phone_number}</p>
                                     </div>
                                 )}
 
@@ -265,7 +304,7 @@ export default function AccountOrdersPage() {
                                 <div className="mt-4 flex justify-end">
                                     <Link
                                         href={`/account/orders/${order.id}`}
-                                        className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500 hover:text-black transition-colors border-b border-neutral-300 hover:border-black pb-0.5"
+                                        className="text-[10px] uppercase tracking-widest font-semibold text-[#8b2f30] hover:underline transition-colors"
                                     >
                                         View Details →
                                     </Link>
