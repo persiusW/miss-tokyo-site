@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { Heart, ShoppingBag } from "lucide-react";
+import { Heart, ShoppingBag, Trash2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { haptic } from "@/lib/haptic";
 
@@ -20,11 +20,16 @@ type WishlistItem = {
     category_name: string | null;
 };
 
+const SWIPE_THRESHOLD = 80; // px to trigger remove
+const SWIPE_MAX      = 90; // max reveal distance
+
 export default function SavedPage() {
     const [items, setItems] = useState<WishlistItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState<string>("ALL");
+    const [swipeOffsets, setSwipeOffsets] = useState<Record<string, number>>({});
+    const touchStartX = useRef<Record<string, number>>({});
 
     const fetchSaved = useCallback(async () => {
         const { data: { user } } = await supabase.auth.getUser() as any;
@@ -159,8 +164,47 @@ export default function SavedPage() {
                             const canPreorder = outOfStock && item.preorder_enabled;
                             const badgeLabel = item.badge || null;
 
+                            const swipeOffset = swipeOffsets[item.wishlist_id] ?? 0;
+                            const isRevealed  = swipeOffset < -SWIPE_THRESHOLD / 2;
+
                             return (
-                                <article key={item.wishlist_id} className="relative bg-[#fdf9f3] border border-[#e0d5c0] rounded-xl overflow-hidden">
+                                <div
+                                    key={item.wishlist_id}
+                                    className="relative rounded-xl overflow-hidden"
+                                    onTouchStart={e => {
+                                        touchStartX.current[item.wishlist_id] = e.touches[0].clientX;
+                                    }}
+                                    onTouchMove={e => {
+                                        const dx = e.touches[0].clientX - (touchStartX.current[item.wishlist_id] ?? e.touches[0].clientX);
+                                        if (dx > 0) return; // only left swipe
+                                        setSwipeOffsets(prev => ({
+                                            ...prev,
+                                            [item.wishlist_id]: Math.max(-SWIPE_MAX, dx),
+                                        }));
+                                    }}
+                                    onTouchEnd={() => {
+                                        const offset = swipeOffsets[item.wishlist_id] ?? 0;
+                                        if (offset < -SWIPE_THRESHOLD) {
+                                            // commit remove
+                                            remove(item.wishlist_id);
+                                        } else {
+                                            // snap back
+                                            setSwipeOffsets(prev => ({ ...prev, [item.wishlist_id]: 0 }));
+                                        }
+                                    }}
+                                >
+                                    {/* Swipe backdrop — red remove button */}
+                                    <div className={`absolute inset-y-0 right-0 w-[90px] flex items-center justify-center bg-[#8b2f30] rounded-xl transition-opacity duration-150 ${isRevealed ? "opacity-100" : "opacity-0"}`}>
+                                        <span className="flex flex-col items-center gap-1">
+                                            <Trash2 size={16} className="text-white" />
+                                            <span className="text-[8px] uppercase tracking-widest text-white font-semibold">Remove</span>
+                                        </span>
+                                    </div>
+
+                                <article
+                                    className="relative bg-[#fdf9f3] border border-[#e0d5c0] rounded-xl overflow-hidden"
+                                    style={{ transform: `translateX(${swipeOffset}px)`, transition: swipeOffset === 0 ? "transform 0.25s ease" : "none" }}
+                                >
                                     {/* Image */}
                                     <div className="relative aspect-[3/4] bg-[#e8e0cc] overflow-hidden">
                                         <Link href={`/products/${item.slug}`} className="block w-full h-full">
@@ -236,6 +280,7 @@ export default function SavedPage() {
                                         )}
                                     </div>
                                 </article>
+                                </div>
                             );
                         })}
                     </div>
