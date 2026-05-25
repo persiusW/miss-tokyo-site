@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendSMS } from "@/lib/sms";
 import { logActivity } from "@/lib/utils/logActivity";
+import { sendCustomerPush } from "@/lib/customerPush";
 
 /**
  * POST /api/dispatch
@@ -177,6 +178,21 @@ export async function POST(req: NextRequest) {
             });
 
         await Promise.allSettled(customerSmsPromises);
+
+        // ── Push: notify customers ─────────────────────────────────────────────
+        const customerPushPromises = orders
+            .filter(o => !!o.customer_email)
+            .map(o => {
+                const ref = o.id.substring(0, 8).toUpperCase();
+                return sendCustomerPush({
+                    email: o.customer_email!,
+                    title: "Your order is on the way 🚚",
+                    body:  `Order #${ref} has been dispatched. Rider: ${rider.full_name}`,
+                    url:   `/account/orders/${o.id}`,
+                    tag:   `order-shipped-${o.id}`,
+                });
+            });
+        await Promise.allSettled(customerPushPromises);
 
         // ── Log Activity ────────────────────────────────────────────────────────
         const logPromises = orders.map(order => {
