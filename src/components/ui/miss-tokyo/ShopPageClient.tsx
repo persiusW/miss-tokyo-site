@@ -12,6 +12,9 @@ import { getApplicableRule } from "@/lib/autoDiscount";
 import type { AutoDiscountRule } from "@/lib/autoDiscount";
 import { haptic } from "@/lib/haptic";
 
+// ── Brand-color blur placeholder (1×1 beige SVG) ─────────────────────────────
+const BLUR_PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IGZpbGw9IiNFOEQ1QzQiLz48L3N2Zz4=";
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 const COLOR_HEX: Record<string, string> = {
     Black:"#0f0f0f", White:"#f5f5f5", Red:"#e8485a", Pink:"#f4a0b5",
@@ -132,6 +135,8 @@ function ShopProductCard({
                             quality={90}
                             priority={priority}
                             sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
+                            placeholder="blur"
+                            blurDataURL={BLUR_PLACEHOLDER}
                             className={`object-cover transition-all duration-700 ease-in-out ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.04]"}`}
                             onError={() => setImgSrc(FALLBACK_IMG)}
                         />
@@ -143,6 +148,8 @@ function ShopProductCard({
                             fill
                             quality={90}
                             sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
+                            placeholder="blur"
+                            blurDataURL={BLUR_PLACEHOLDER}
                             className="object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-in-out"
                             onError={() => setHoverSrc(undefined)}
                         />

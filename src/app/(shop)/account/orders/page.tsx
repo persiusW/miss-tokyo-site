@@ -318,7 +318,7 @@ export default function AccountOrdersPage() {
                                     <div className="flex gap-2 mt-4">
                                         {thumbs.map((url, i) => (
                                             <div key={i} className="w-[70px] h-[70px] rounded-lg bg-[#e8e0cc] overflow-hidden shrink-0">
-                                                <img src={url} alt="" className="w-full h-full object-cover" />
+                                                <img src={url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                             </div>
                                         ))}
                                     </div>
