@@ -76,6 +76,10 @@ export default function RootLayout({
           title="Miss Tokyo — New Arrivals"
           href={`${siteUrl}/rss.xml`}
         />
+        {/* ── Favicon ── */}
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+        <link rel="shortcut icon" href="/icons/icon-192.png" />
         {/* ── PWA ── */}
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#C9963A" />

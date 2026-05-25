@@ -218,15 +218,15 @@ function ShopProductCard({
                                 setAddState("added");
                                 setTimeout(() => setAddState("idle"), 1500);
                             }}
-                            className="flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-80"
-                            style={{
-                                background: isOutOfStock && !isPreorderMode ? "#E8D5C4" : isPreorderMode ? "#C9963A" : addState === "added" ? "#22c55e" : "#fff",
-                                color: isOutOfStock && !isPreorderMode ? "#7A7167" : isPreorderMode ? "#fff" : addState === "added" ? "#fff" : "#141210",
-                                borderRadius: 2,
-                                border: "none",
-                            }}
-                            onMouseEnter={e => { if (addState === "idle" && !isOutOfStock) { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
-                            onMouseLeave={e => { if (addState === "idle" && !isOutOfStock) { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; } }}
+                            className={`flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] rounded-[2px] border-0 transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-80 ${
+                                isOutOfStock && !isPreorderMode
+                                    ? "bg-[#E8D5C4] text-[#7A7167]"
+                                    : isPreorderMode
+                                        ? "bg-[#C9963A] text-white"
+                                        : addState === "added"
+                                            ? "bg-[#22c55e] text-white"
+                                            : "bg-white text-[#141210] hover:bg-[#141210] hover:text-white"
+                            }`}
                         >
                             {isOutOfStock && !isPreorderMode
                                 ? "OUT OF STOCK"
