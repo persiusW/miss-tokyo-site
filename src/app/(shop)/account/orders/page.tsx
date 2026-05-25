@@ -56,7 +56,7 @@ function isDelivered(s: string) { return s === "delivered" || s === "fulfilled";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type OrderItem = { imageUrl?: string; name?: string; quantity?: number; qty?: number };
+type OrderItem = { imageUrl?: string; image_url?: string; name?: string; quantity?: number; qty?: number };
 
 type Order = {
     id: string;
@@ -210,7 +210,7 @@ export default function AccountOrdersPage() {
                         <div className="h-6 w-20 bg-[#e0d5c0] rounded-full" />
                     </div>
                     <div className="flex gap-2">
-                        {[1,2,3].map(j => <div key={j} className="w-14 h-14 rounded-lg bg-[#e0d5c0]" />)}
+                        {[1,2,3].map(j => <div key={j} className="w-[70px] h-[70px] rounded-lg bg-[#e0d5c0]" />)}
                     </div>
                 </div>
             ))}
@@ -221,6 +221,16 @@ export default function AccountOrdersPage() {
 
     return (
         <div className="max-w-2xl">
+            {/* Pull-to-refresh indicator */}
+            {refreshing && (
+                <div className="flex items-center justify-center gap-2 py-3 mb-2 -mt-2">
+                    <svg className="w-4 h-4 animate-spin text-[#8b2f30]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
+                    </svg>
+                    <span className="text-[10px] uppercase tracking-widest text-[#8c7e6a]">Refreshing</span>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
@@ -230,7 +240,6 @@ export default function AccountOrdersPage() {
                     </h1>
                     <p className="text-sm text-[#8c7e6a] mt-1">Track shipments. Re-order favourites. Download invoices.</p>
                 </div>
-                {refreshing && <span className="text-[10px] uppercase tracking-widest text-[#8c7e6a] animate-pulse">Refreshing…</span>}
             </div>
 
             {/* Filter tabs */}
@@ -276,7 +285,7 @@ export default function AccountOrdersPage() {
                         const pickup = isPickupOrder(order.delivery_method);
                         const delivered = isDelivered(order.status);
                         const cancelled = isCancelled(order.status);
-                        const thumbs = (order.items ?? []).slice(0, 4).map(i => i.imageUrl).filter(Boolean) as string[];
+                        const thumbs = (order.items ?? []).slice(0, 4).map(i => i.imageUrl || i.image_url).filter(Boolean) as string[];
 
                         return (
                             <div key={order.id} className="border border-[#e0d5c0] bg-[#fdf9f3] rounded-xl p-5 md:p-6">
@@ -308,7 +317,7 @@ export default function AccountOrdersPage() {
                                 {thumbs.length > 0 && (
                                     <div className="flex gap-2 mt-4">
                                         {thumbs.map((url, i) => (
-                                            <div key={i} className="w-14 h-14 rounded-lg bg-[#e8e0cc] overflow-hidden shrink-0">
+                                            <div key={i} className="w-[70px] h-[70px] rounded-lg bg-[#e8e0cc] overflow-hidden shrink-0">
                                                 <img src={url} alt="" className="w-full h-full object-cover" />
                                             </div>
                                         ))}
