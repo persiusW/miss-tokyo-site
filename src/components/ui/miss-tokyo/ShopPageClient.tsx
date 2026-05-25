@@ -10,6 +10,7 @@ import type { ShopProduct, ShopCategory } from "@/lib/products";
 import { QuickAddModal } from "@/components/ui/miss-tokyo/QuickAddModal";
 import { getApplicableRule } from "@/lib/autoDiscount";
 import type { AutoDiscountRule } from "@/lib/autoDiscount";
+import { haptic } from "@/lib/haptic";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const COLOR_HEX: Record<string, string> = {
@@ -98,6 +99,7 @@ function ShopProductCard({
     const toggleWishlist = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        haptic("light");
         try {
             const wl = JSON.parse(localStorage.getItem("mt_wishlist") || "[]") as string[];
             const next = wl.includes(product.id) ? wl.filter(id => id !== product.id) : [...wl, product.id];

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Heart, ShoppingBag } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { haptic } from "@/lib/haptic";
 
 type WishlistItem = {
     wishlist_id: string;
@@ -15,6 +16,7 @@ type WishlistItem = {
     image_urls: string[] | null;
     badge: string | null;
     inventory_count: number | null;
+    preorder_enabled: boolean;
     category_name: string | null;
 };
 
@@ -43,7 +45,7 @@ export default function SavedPage() {
         // Step 2: fetch products separately (avoids PostgREST join cache timing issues)
         const { data: pRows } = await supabase
             .from("products")
-            .select("id, name, slug, price_ghs, image_urls, badge, inventory_count, category_id")
+            .select("id, name, slug, price_ghs, image_urls, badge, inventory_count, preorder_enabled, category_id")
             .in("id", productIds);
 
         // Step 3: fetch category names for any category_ids present
@@ -66,6 +68,7 @@ export default function SavedPage() {
                 image_urls: p.image_urls ?? null,
                 badge: p.badge ?? null,
                 inventory_count: p.inventory_count ?? null,
+                preorder_enabled: p.preorder_enabled ?? false,
                 category_name: catMap[p.category_id] ?? null,
             };
         }));
@@ -76,6 +79,7 @@ export default function SavedPage() {
 
     const remove = async (wishlist_id: string) => {
         if (!userId) return;
+        haptic("medium");
         const { error } = await supabase.from("wishlists").delete().eq("id", wishlist_id);
         if (error) { toast.error("Failed to remove."); return; }
         setItems(prev => prev.filter(i => i.wishlist_id !== wishlist_id));
@@ -152,6 +156,7 @@ export default function SavedPage() {
                         {visible.map(item => {
                             const img = item.image_urls?.[0];
                             const outOfStock = item.inventory_count !== null && item.inventory_count <= 0;
+                            const canPreorder = outOfStock && item.preorder_enabled;
                             const badgeLabel = item.badge || null;
 
                             return (
@@ -210,9 +215,16 @@ export default function SavedPage() {
                                             <span className="text-[11px] font-sans text-[#8c7e6a] mr-1">GH₵</span>
                                             {Number(item.price_ghs).toLocaleString("en-GH", { minimumFractionDigits: 2 })}
                                         </p>
-                                        {outOfStock ? (
+                                        {canPreorder ? (
+                                            <Link
+                                                href={`/products/${item.slug}`}
+                                                className="block w-full text-center text-[10px] uppercase tracking-widest font-semibold py-2.5 border border-[#8b2f30] text-[#8b2f30] rounded hover:bg-[#8b2f30] hover:text-white transition-colors"
+                                            >
+                                                Pre-order
+                                            </Link>
+                                        ) : outOfStock ? (
                                             <span className="block w-full text-center text-[10px] uppercase tracking-widest font-semibold py-2.5 border border-[#e0d5c0] text-[#c8bb98] rounded cursor-not-allowed">
-                                                Add to Bag
+                                                Out of Stock
                                             </span>
                                         ) : (
                                             <Link
