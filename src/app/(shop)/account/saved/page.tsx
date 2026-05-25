@@ -29,25 +29,39 @@ export default function SavedPage() {
         if (!user) return;
         setUserId(user.id);
 
-        const { data, error } = await supabase
+        // Step 1: fetch wishlist rows
+        const { data: wRows, error: wErr } = await supabase
             .from("wishlists")
-            .select("id, product_id, products(name, slug, price_ghs, image_urls, badge, inventory_count, categories(name))")
+            .select("id, product_id")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false });
 
-        if (!error && data) {
-            setItems(data.map((row: any) => ({
+        if (wErr || !wRows || wRows.length === 0) { setLoading(false); return; }
+
+        const productIds = wRows.map((r: any) => r.product_id);
+
+        // Step 2: fetch products separately (avoids PostgREST join cache timing issues)
+        const { data: pRows } = await supabase
+            .from("products")
+            .select("id, name, slug, price_ghs, image_urls, badge, inventory_count, categories(name)")
+            .in("id", productIds);
+
+        const productMap = Object.fromEntries((pRows ?? []).map((p: any) => [p.id, p]));
+
+        setItems(wRows.map((row: any) => {
+            const p = productMap[row.product_id] ?? {};
+            return {
                 wishlist_id: row.id,
                 product_id: row.product_id,
-                name: row.products?.name ?? "",
-                slug: row.products?.slug ?? "",
-                price_ghs: row.products?.price_ghs ?? 0,
-                image_urls: row.products?.image_urls ?? null,
-                badge: row.products?.badge ?? null,
-                inventory_count: row.products?.inventory_count ?? null,
-                category_name: row.products?.categories?.name ?? null,
-            })));
-        }
+                name: p.name ?? "",
+                slug: p.slug ?? "",
+                price_ghs: p.price_ghs ?? 0,
+                image_urls: p.image_urls ?? null,
+                badge: p.badge ?? null,
+                inventory_count: p.inventory_count ?? null,
+                category_name: p.categories?.name ?? null,
+            };
+        }));
         setLoading(false);
     }, []);
 
