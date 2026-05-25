@@ -43,8 +43,15 @@ export default function SavedPage() {
         // Step 2: fetch products separately (avoids PostgREST join cache timing issues)
         const { data: pRows } = await supabase
             .from("products")
-            .select("id, name, slug, price_ghs, image_urls, badge, inventory_count, categories(name)")
+            .select("id, name, slug, price_ghs, image_urls, badge, inventory_count, category_id")
             .in("id", productIds);
+
+        // Step 3: fetch category names for any category_ids present
+        const catIds = [...new Set((pRows ?? []).map((p: any) => p.category_id).filter(Boolean))];
+        const { data: catRows } = catIds.length
+            ? await supabase.from("categories").select("id, name").in("id", catIds)
+            : { data: [] };
+        const catMap = Object.fromEntries((catRows ?? []).map((c: any) => [c.id, c.name]));
 
         const productMap = Object.fromEntries((pRows ?? []).map((p: any) => [p.id, p]));
 
@@ -59,7 +66,7 @@ export default function SavedPage() {
                 image_urls: p.image_urls ?? null,
                 badge: p.badge ?? null,
                 inventory_count: p.inventory_count ?? null,
-                category_name: p.categories?.name ?? null,
+                category_name: catMap[p.category_id] ?? null,
             };
         }));
         setLoading(false);
