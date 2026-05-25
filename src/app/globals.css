@@ -251,8 +251,19 @@ html, body { overflow-x: clip; }
   user-select: none;
 }
 
+@keyframes tab-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.28); }
+  70%  { transform: scale(0.94); }
+  100% { transform: scale(1); }
+}
+
 .tab-item.active {
   color: #F7F2EC;
+}
+
+.tab-item.active svg {
+  animation: tab-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .tab-item:not(.active):hover {
