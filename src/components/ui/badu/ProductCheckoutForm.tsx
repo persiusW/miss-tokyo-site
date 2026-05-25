@@ -101,7 +101,7 @@ export function ProductCheckoutForm({
             imageUrl: productImageUrl,
             inventoryCount: effectiveInventory,
             ...(isWholesale ? { isWholesale: true } : {}),
-        }, openDrawerOnAdd ?? true);
+        }, openDrawerOnAdd ?? false);
 
         onAddedToCart?.();
     };

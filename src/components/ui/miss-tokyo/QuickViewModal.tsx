@@ -48,7 +48,7 @@ export function QuickViewModal({
     product: productProp,
     slug,
     onClose,
-    openDrawerOnAdd = true,
+    openDrawerOnAdd = false,
 }: QuickViewModalProps) {
     const [fetched, setFetched] = useState<QuickViewProduct | null>(null);
     const [loading, setLoading] = useState(!productProp);

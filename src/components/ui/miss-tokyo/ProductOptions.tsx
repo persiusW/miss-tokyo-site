@@ -434,7 +434,7 @@ export function ProductOptions(props: Props) {
         if (addedToBag) return;
         if (doAddToCart({ isPreOrder: true })) {
             setAddedToBag(true);
-            setCartOpen(true);
+            // Cart stays closed — user opens manually
             if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current);
             addedToBagTimer.current = setTimeout(() => setAddedToBag(false), 2000);
         }
