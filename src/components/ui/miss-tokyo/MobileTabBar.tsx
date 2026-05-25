@@ -70,11 +70,16 @@ export function MobileTabBar() {
                         className={`tab-item${isActive ? " active" : ""}`}
                         aria-current={isActive ? "page" : undefined}
                     >
-                        <Icon
-                            size={22}
-                            strokeWidth={isActive ? 2 : 1.5}
-                            aria-hidden="true"
-                        />
+                        <span className="relative flex items-center justify-center">
+                            {isActive && (
+                                <span className="tab-active-dot" aria-hidden="true" />
+                            )}
+                            <Icon
+                                size={22}
+                                strokeWidth={isActive ? 2 : 1.5}
+                                aria-hidden="true"
+                            />
+                        </span>
                         <span>{label}</span>
                     </Link>
                 );

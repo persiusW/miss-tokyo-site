@@ -275,3 +275,18 @@ html, body { overflow-x: clip; }
   border-bottom: 1px solid #C9963A;
   padding-bottom: 1px;
 }
+
+/* Animated dot that slides up behind active icon */
+@keyframes dot-rise {
+  from { opacity: 0; transform: translateY(6px) scale(0.4); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.tab-active-dot {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: rgba(201, 150, 58, 0.12);
+  animation: dot-rise 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  pointer-events: none;
+}
