@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Check, ShoppingBag, Heart, Settings, ChevronRight } from "lucide-react";
+import { OrderNotificationsToggle } from "@/components/ui/miss-tokyo/OrderNotificationsToggle";
 
 type OrderItem = { imageUrl?: string; quantity?: number; qty?: number };
 
@@ -237,6 +238,9 @@ export default function OverviewPage() {
                     Your <em className="italic">account</em>
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                        <OrderNotificationsToggle />
+                    </div>
                     {[
                         { href: "/account/orders",   label: "Orders",  sub: `${orderCount} total`,   Icon: ShoppingBag },
                         { href: "/account/saved",    label: "Saved",   sub: `${savedCount} pieces`,  Icon: Heart },
