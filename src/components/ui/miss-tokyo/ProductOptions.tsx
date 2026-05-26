@@ -7,6 +7,7 @@ import { useCart } from "@/store/useCart";
 import { toast } from "@/lib/toast";
 import { resolveWholesalePrice, WholesaleTiers } from "@/lib/wholesale";
 import type { AutoDiscountRule } from "@/lib/autoDiscount";
+import { supabase } from "@/lib/supabase";
 
 export interface ColorVariant { name: string; hex: string; in_stock: boolean; }
 export interface SizeVariant { label: string; in_stock: boolean; }
@@ -314,21 +315,43 @@ export function ProductOptions(props: Props) {
     const setCartOpen = useCart(s => s.setIsOpen);
 
     useEffect(() => {
-        try {
-            const wl: string[] = JSON.parse(localStorage.getItem("mt_wishlist") || "[]");
-            setWishlisted(wl.includes(productId));
-        } catch { /* noop */ }
+        (async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data } = await supabase
+                        .from("wishlists")
+                        .select("id")
+                        .eq("user_id", user.id)
+                        .eq("product_id", productId)
+                        .maybeSingle();
+                    setWishlisted(!!data);
+                } else {
+                    const wl: string[] = JSON.parse(localStorage.getItem("mt_wishlist") || "[]");
+                    setWishlisted(wl.includes(productId));
+                }
+            } catch { /* noop */ }
+        })();
     }, [productId]);
 
     useEffect(() => {
         return () => { if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current); };
     }, []);
 
-    const toggleWishlist = () => {
+    const toggleWishlist = async () => {
         try {
-            const wl: string[] = JSON.parse(localStorage.getItem("mt_wishlist") || "[]");
-            const next = wishlisted ? wl.filter(id => id !== productId) : [...wl, productId];
-            localStorage.setItem("mt_wishlist", JSON.stringify(next));
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                if (wishlisted) {
+                    await supabase.from("wishlists").delete().eq("user_id", user.id).eq("product_id", productId);
+                } else {
+                    await supabase.from("wishlists").insert({ user_id: user.id, product_id: productId });
+                }
+            } else {
+                const wl: string[] = JSON.parse(localStorage.getItem("mt_wishlist") || "[]");
+                const next = wishlisted ? wl.filter(id => id !== productId) : [...wl, productId];
+                localStorage.setItem("mt_wishlist", JSON.stringify(next));
+            }
             setWishlisted(!wishlisted);
             toast.success(wishlisted ? "Removed from wishlist" : "♥ Saved to wishlist");
         } catch { /* noop */ }
@@ -411,7 +434,7 @@ export function ProductOptions(props: Props) {
         if (addedToBag) return;
         if (doAddToCart({ isPreOrder: true })) {
             setAddedToBag(true);
-            setCartOpen(true);
+            // Cart stays closed — user opens manually
             if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current);
             addedToBagTimer.current = setTimeout(() => setAddedToBag(false), 2000);
         }

@@ -2,6 +2,8 @@ import { NavBar } from "@/components/ui/miss-tokyo/NavBar";
 import { Footer } from "@/components/ui/miss-tokyo/Footer";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
 import { CartDrawer } from "@/components/ui/miss-tokyo/CartDrawer";
+import { MobileTabBar } from "@/components/ui/miss-tokyo/MobileTabBar";
+import { PWAInstallBanner } from "@/components/ui/miss-tokyo/PWAInstallBanner";
 import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -61,12 +63,14 @@ export default async function ShopLayout({
               * from being called, which restores ISR for every page under (shop).
               */}
             <NavBar initialUser={null} />
-            <main className="flex-1 pt-20">
+            <main className="flex-1 flex flex-col pt-20 pb-safe-tab bg-[#f5f0e8]">
                 {children}
             </main>
             <Footer />
             <Toaster />
             <CartDrawer />
+            <MobileTabBar />
+            <PWAInstallBanner />
         </div>
     );
 }

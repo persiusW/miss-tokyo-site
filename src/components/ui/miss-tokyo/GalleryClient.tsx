@@ -50,6 +50,7 @@ function VideoCard({
         product.size_variants.length > 0 &&
         product.size_variants.every((v: { label: string; in_stock: boolean }) => v.in_stock === false);
     const isOutOfStock = masterOOS || allSizesOOS;
+    const isPreorderMode = isOutOfStock && product.preorder_enabled;
 
     // Price + ribbon calculations
     const hasSaleFromCompare = !!(product.compare_at_price_ghs && product.compare_at_price_ghs > product.price_ghs);
@@ -96,7 +97,7 @@ function VideoCard({
     useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
 
     const handleQuickAdd = () => {
-        if (isOutOfStock) return;
+        if (isOutOfStock && !isPreorderMode) return;
         if ((product.available_sizes?.length || 0) > 0 || (product.available_colors?.length || 0) > 0) {
             onOpenModal(product);
             return;
@@ -112,6 +113,7 @@ function VideoCard({
             quantity: 1,
             imageUrl: product.image_urls?.[0] || "",
             inventoryCount: product.inventory_count,
+            isPreOrder: isPreorderMode,
         }, false);
 
         setAddState("success");
@@ -152,7 +154,7 @@ function VideoCard({
                 />
 
                 {/* Mobile Overlay */}
-                <div className="lg:hidden absolute bottom-0 left-0 w-full p-6 pb-28 md:pb-12 z-10 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white">
+                <div className="lg:hidden absolute bottom-0 left-0 w-full p-6 pb-[160px] md:pb-12 z-10 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-white">
                     <div className="flex flex-col gap-2 mb-6 text-left">
                         <div className="flex items-center gap-2">
                             <span className="text-[9px] uppercase tracking-[0.2em] text-white/60 font-medium">
@@ -183,17 +185,19 @@ function VideoCard({
                     <div className="flex items-center gap-4">
                         <button
                             onClick={handleQuickAdd}
-                            disabled={addState !== "idle" || isOutOfStock}
+                            disabled={addState !== "idle" || (isOutOfStock && !isPreorderMode)}
                             className={`flex-1 text-[10px] font-bold uppercase tracking-[0.2em] py-4 rounded-none transition-all duration-300 flex items-center justify-center gap-2 ${
                                 addState === "success"
                                     ? "bg-emerald-600 text-white scale-[1.05]"
-                                    : isOutOfStock
+                                    : isOutOfStock && !isPreorderMode
                                         ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
-                                        : "bg-white text-black hover:bg-neutral-100 disabled:opacity-80"
+                                        : isPreorderMode
+                                            ? "bg-[#C9963A] text-white hover:bg-amber-600 disabled:opacity-80"
+                                            : "bg-white text-black hover:bg-neutral-100 disabled:opacity-80"
                             }`}
                         >
-                            {addState === "loading" ? <Loader2 size={14} className="animate-spin" /> : addState === "success" ? <Check size={14} /> : isOutOfStock ? null : <Plus size={14} />}
-                            {addState === "loading" ? "Adding..." : addState === "success" ? "Added!" : isOutOfStock ? "OUT OF STOCK" : "Add to Cart"}
+                            {addState === "loading" ? <Loader2 size={14} className="animate-spin" /> : addState === "success" ? <Check size={14} /> : (isOutOfStock && !isPreorderMode) ? null : <Plus size={14} />}
+                            {addState === "loading" ? "Adding..." : addState === "success" ? "Added!" : (isOutOfStock && !isPreorderMode) ? "OUT OF STOCK" : isPreorderMode ? "Pre-order" : "Add to Cart"}
                         </button>
                         <Link
                             href={`/products/${product.slug}`}
@@ -244,17 +248,19 @@ function VideoCard({
                     <div className="flex flex-col gap-4">
                         <button
                             onClick={handleQuickAdd}
-                            disabled={addState !== "idle" || isOutOfStock}
+                            disabled={addState !== "idle" || (isOutOfStock && !isPreorderMode)}
                             className={`w-full text-[11px] font-bold uppercase tracking-[0.3em] py-5 rounded-none transition-all duration-300 flex items-center justify-center gap-3 border shadow-sm ${
                                 addState === "success"
                                     ? "bg-emerald-600 text-white border-emerald-600 scale-105"
-                                    : isOutOfStock
+                                    : isOutOfStock && !isPreorderMode
                                         ? "bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed"
-                                        : "bg-black text-white border-black hover:bg-neutral-800 disabled:opacity-80"
+                                        : isPreorderMode
+                                            ? "bg-[#C9963A] text-white border-[#C9963A] hover:bg-amber-600 disabled:opacity-80"
+                                            : "bg-black text-white border-black hover:bg-neutral-800 disabled:opacity-80"
                             }`}
                         >
-                            {addState === "loading" ? <Loader2 size={16} className="animate-spin" /> : addState === "success" ? <Check size={16} /> : isOutOfStock ? null : <Plus size={16} />}
-                            {addState === "loading" ? "Syncing..." : addState === "success" ? "Included in Bag" : isOutOfStock ? "OUT OF STOCK" : "Buy this Piece"}
+                            {addState === "loading" ? <Loader2 size={16} className="animate-spin" /> : addState === "success" ? <Check size={16} /> : (isOutOfStock && !isPreorderMode) ? null : <Plus size={16} />}
+                            {addState === "loading" ? "Syncing..." : addState === "success" ? "Included in Bag" : (isOutOfStock && !isPreorderMode) ? "OUT OF STOCK" : isPreorderMode ? "Pre-order" : "Buy this Piece"}
                         </button>
 
                         <Link
@@ -349,58 +355,60 @@ export function GalleryClient({
     }
 
     return (
-        <div className="relative bg-black h-[100dvh] overflow-hidden overscroll-none translate-z-0">
-            {/* Header */}
-            <div className="absolute top-0 left-0 w-full z-30 p-6 flex items-center justify-between pointer-events-none">
-                <Link
-                    href="/shop"
-                    className="text-white p-2 pointer-events-auto bg-black/20 backdrop-blur-lg rounded-full border border-white/10 hover:bg-white hover:text-black transition-all"
-                >
-                    <ChevronLeft size={20} />
-                </Link>
-
-                <div className="flex items-center gap-4 pointer-events-auto">
+        <>
+            <div className="relative bg-black h-[100dvh] overflow-hidden overscroll-none translate-z-0">
+                {/* Header */}
+                <div className="absolute top-0 left-0 w-full z-30 p-6 flex items-center justify-between pointer-events-none">
                     <Link
                         href="/shop"
-                        className="text-white bg-black/20 backdrop-blur-lg px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 hover:bg-white hover:text-black transition-all"
+                        className="text-white p-2 pointer-events-auto bg-black/20 backdrop-blur-lg rounded-full border border-white/10 hover:bg-white hover:text-black transition-all"
                     >
-                        <span className="text-[10px] font-bold tracking-widest uppercase">Cart</span>
-                        {hasMounted && (
-                            <span
-                                className="w-5 h-5 bg-white text-black text-[9px] font-black rounded-full flex items-center justify-center animate-in zoom-in-50 duration-300"
-                                key={totalItems}
-                            >
-                                {totalItems}
-                            </span>
-                        )}
+                        <ChevronLeft size={20} />
                     </Link>
+
+                    <div className="flex items-center gap-4 pointer-events-auto">
+                        <Link
+                            href="/shop"
+                            className="text-white bg-black/20 backdrop-blur-lg px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 hover:bg-white hover:text-black transition-all"
+                        >
+                            <span className="text-[10px] font-bold tracking-widest uppercase">Cart</span>
+                            {hasMounted && (
+                                <span
+                                    className="w-5 h-5 bg-white text-black text-[9px] font-black rounded-full flex items-center justify-center animate-in zoom-in-50 duration-300"
+                                    key={totalItems}
+                                >
+                                    {totalItems}
+                                </span>
+                            )}
+                        </Link>
+                    </div>
+                </div>
+
+                {/* Snapping Container */}
+                <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth hide-scrollbar">
+                    {videos.map((product, index) => (
+                        <div key={product.id} className="h-[100dvh] w-full">
+                            <VideoCard
+                                product={product}
+                                index={index}
+                                priority={index < 2}
+                                onOpenModal={setSelectedProduct}
+                                onVisible={handleVisible}
+                                autoDiscountRules={autoDiscountRules}
+                            />
+                        </div>
+                    ))}
+
+                    {/* Loading indicator — visible only while fetching */}
+                    {loadingMore && (
+                        <div className="h-16 w-full snap-start flex items-center justify-center bg-black">
+                            <Loader2 className="w-5 h-5 text-white/30 animate-spin" />
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Snapping Container */}
-            <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory scroll-smooth hide-scrollbar">
-                {videos.map((product, index) => (
-                    <div key={product.id} className="h-[100dvh] w-full">
-                        <VideoCard
-                            product={product}
-                            index={index}
-                            priority={index < 2}
-                            onOpenModal={setSelectedProduct}
-                            onVisible={handleVisible}
-                            autoDiscountRules={autoDiscountRules}
-                        />
-                    </div>
-                ))}
-
-                {/* Loading indicator — visible only while fetching */}
-                {loadingMore && (
-                    <div className="h-16 w-full snap-start flex items-center justify-center bg-black">
-                        <Loader2 className="w-5 h-5 text-white/30 animate-spin" />
-                    </div>
-                )}
-            </div>
-
-            {/* Quick Add Modal */}
+            {/* Quick Add Modal — outside translated container so fixed positioning is viewport-relative */}
             {selectedProduct && (
                 <QuickAddModal
                     product={selectedProduct}
@@ -408,6 +416,6 @@ export function GalleryClient({
                     autoDiscountRule={getApplicableRule(selectedProduct.id, selectedProduct.category_ids ?? null, autoDiscountRules)}
                 />
             )}
-        </div>
+        </>
     );
 }

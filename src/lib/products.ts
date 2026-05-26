@@ -484,10 +484,11 @@ export async function getVideoProducts(offset = 0): Promise<{
         .select(`id, name, slug, description, price_ghs, compare_at_price_ghs,
              image_urls, is_featured, category_type, category_ids,
              available_colors, available_sizes, available_brands, color_variants, size_variants, brand_variants,
-             bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, created_at`)
+             bundle_label, badge, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory,
+             preorder_enabled, preorder_estimated_date, created_at`)
         .eq("is_active", true)
-        // Exclude products that track inventory and have none left
-        .or("track_inventory.eq.false,inventory_count.gt.0")
+        // Include: untracked inventory, in-stock, OR pre-order enabled
+        .or("track_inventory.eq.false,inventory_count.gt.0,preorder_enabled.eq.true")
         .order("created_at", { ascending: false })
         .range(offset, offset + VIDEO_BATCH_SIZE - 1);
 
@@ -514,6 +515,8 @@ export async function getVideoProducts(offset = 0): Promise<{
                 brand_variants: p.brand_variants ?? null,
                 category_name: p.category_type ?? null,
                 category_slug: null,
+                preorder_enabled: p.preorder_enabled ?? false,
+                preorder_estimated_date: p.preorder_estimated_date ?? null,
                 video_url,
             };
         })

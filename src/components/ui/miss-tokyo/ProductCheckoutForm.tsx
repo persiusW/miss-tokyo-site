@@ -5,6 +5,7 @@ import { useCart } from "@/store/useCart";
 import { SizeGuideModal } from "@/components/ui/miss-tokyo/SizeGuideModal";
 import { getActiveTier, WholesaleData } from "@/lib/wholesale";
 import { Minus, Plus } from "lucide-react";
+import { haptic } from "@/lib/haptic";
 
 interface ProductCheckoutFormProps {
     productId: string;
@@ -117,6 +118,7 @@ export function ProductCheckoutForm({
             return;
         }
 
+        haptic("medium");
         addItem({
             id: `${productId}-${selectedSize}-${selectedColor}-${selectedBrand}`,
             productId,
@@ -130,7 +132,7 @@ export function ProductCheckoutForm({
             imageUrl: productImageUrl,
             inventoryCount: effectiveInventory,
             ...(isWholesale ? { isWholesale: true } : {}),
-        }, openDrawerOnAdd ?? true);
+        }, openDrawerOnAdd ?? false);
 
         onAddedToCart?.();
     };

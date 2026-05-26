@@ -191,9 +191,38 @@ export default function OrderDetailPage() {
     const handlePrint = () => window.print();
 
     if (loading) return (
-        <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-neutral-100 w-48 rounded" />
-            <div className="h-32 bg-neutral-100 rounded" />
+        <div className="animate-pulse space-y-5 max-w-2xl">
+            {/* Back link placeholder */}
+            <div className="h-3 w-24 bg-[#e0d5c0] rounded" />
+            {/* Order ID + status bar */}
+            <div className="flex justify-between items-center">
+                <div className="h-5 w-40 bg-[#e0d5c0] rounded" />
+                <div className="h-6 w-24 bg-[#e0d5c0] rounded-full" />
+            </div>
+            {/* Timeline strip */}
+            <div className="flex items-center gap-2">
+                {[1,2,3,4,5].map(i => (
+                    <div key={i} className="flex items-center gap-1">
+                        <div className="w-5 h-5 rounded-full bg-[#e0d5c0]" />
+                        {i < 5 && <div className="w-6 h-0.5 bg-[#e0d5c0]" />}
+                    </div>
+                ))}
+            </div>
+            {/* Thumbnails row */}
+            <div className="flex gap-2">
+                {[1,2,3].map(i => <div key={i} className="w-[70px] h-[70px] rounded-lg bg-[#e0d5c0]" />)}
+            </div>
+            {/* Summary block */}
+            <div className="border border-[#e0d5c0] rounded-xl p-5 space-y-3 bg-[#fdf9f3]">
+                {[1,2,3,4].map(i => (
+                    <div key={i} className="flex justify-between">
+                        <div className="h-3 w-28 bg-[#e0d5c0] rounded" />
+                        <div className="h-3 w-20 bg-[#e0d5c0] rounded" />
+                    </div>
+                ))}
+            </div>
+            {/* Total */}
+            <div className="h-6 w-32 bg-[#e0d5c0] rounded" />
         </div>
     );
 
