@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Download, Share2 } from "lucide-react";
+import { X, Download } from "lucide-react";
 import { haptic } from "@/lib/haptic";
 
 const DISMISSED_KEY = "pwa-install-dismissed-v2";
@@ -57,18 +57,6 @@ export function PWAInstallBanner() {
         if (outcome === "accepted") dismiss();
     };
 
-    const share = async () => {
-        haptic("medium");
-        try {
-            await navigator.share({
-                title: "Miss Tokyo",
-                url: window.location.href,
-            });
-        } catch {
-            // cancelled or unsupported — no-op
-        }
-    };
-
     if (!show) return null;
 
     return (
@@ -88,20 +76,12 @@ export function PWAInstallBanner() {
                         Add to Home Screen
                     </p>
                     <p className="text-[10px] text-neutral-400">
-                        {isIOS ? "Open share sheet to install." : "Install Miss Tokyo for faster access."}
+                        {isIOS ? "Tap Share → Add to Home Screen" : "Install Miss Tokyo for faster access."}
                     </p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                    {isIOS ? (
-                        <button
-                            onClick={share}
-                            className="text-[10px] uppercase tracking-widest font-bold text-[#C9963A] hover:text-amber-300 transition-colors whitespace-nowrap px-3 py-1.5 border border-[#C9963A]/30 rounded-lg hover:border-[#C9963A]/60 flex items-center gap-1.5"
-                        >
-                            <Share2 size={11} />
-                            Share
-                        </button>
-                    ) : (
+                    {!isIOS && (
                         <button
                             onClick={install}
                             className="text-[10px] uppercase tracking-widest font-bold text-[#C9963A] hover:text-amber-300 transition-colors whitespace-nowrap px-3 py-1.5 border border-[#C9963A]/30 rounded-lg hover:border-[#C9963A]/60"
