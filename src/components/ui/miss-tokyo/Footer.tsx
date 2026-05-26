@@ -91,7 +91,7 @@ export function Footer() {
     ] as const;
 
     return (
-        <footer className="w-full bg-black text-white px-6 py-16 md:px-12 md:py-24 mt-16 md:mt-24 rounded-none">
+        <footer className="w-full bg-black text-white px-6 py-16 md:px-12 md:py-24 rounded-none">
             <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-5 gap-12">
                 <div className="col-span-1 md:col-span-2 lg:col-span-2">
                     <h3 className="font-serif text-3xl tracking-[0.2em] uppercase mb-6">Miss Tokyo</h3>
