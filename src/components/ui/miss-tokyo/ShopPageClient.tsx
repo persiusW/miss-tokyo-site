@@ -221,19 +221,19 @@ function ShopProductCard({
                             className={`flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] rounded-[2px] border-0 transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-80 ${
                                 isOutOfStock && !isPreorderMode
                                     ? "bg-[#E8D5C4] text-[#7A7167]"
-                                    : isPreorderMode
-                                        ? "bg-[#C9963A] text-white"
-                                        : addState === "added"
-                                            ? "bg-[#22c55e] text-white"
+                                    : addState === "added"
+                                        ? "bg-[#22c55e] text-white"
+                                        : isPreorderMode
+                                            ? "bg-[#C9963A] text-white hover:bg-amber-600"
                                             : "bg-white text-[#141210] hover:bg-[#141210] hover:text-white"
                             }`}
                         >
                             {isOutOfStock && !isPreorderMode
                                 ? "OUT OF STOCK"
-                                : isPreorderMode
-                                    ? "Pre-Order"
-                                    : addState === "added"
-                                        ? <><Check size={12} strokeWidth={2.5} /> Added</>
+                                : addState === "added"
+                                    ? <><Check size={12} strokeWidth={2.5} /> Added</>
+                                    : isPreorderMode
+                                        ? "Pre-Order"
                                         : <><ShoppingBag size={12} strokeWidth={1.8} /> Add to Cart</>
                             }
                         </button>
