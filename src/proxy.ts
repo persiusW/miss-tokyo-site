@@ -64,7 +64,21 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         }
     );
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    // Stale/revoked refresh token — clear session and redirect to login
+    if (authError && (authError as { code?: string }).code === 'refresh_token_not_found') {
+        const loginUrl = request.nextUrl.clone();
+        loginUrl.pathname = '/login';
+        const clearResponse = NextResponse.redirect(loginUrl);
+        // Wipe all Supabase auth cookies
+        request.cookies.getAll().forEach(({ name }) => {
+            if (name.startsWith('sb-')) {
+                clearResponse.cookies.set(name, '', { maxAge: 0, path: '/' });
+            }
+        });
+        return applySecurityHeaders(clearResponse);
+    }
 
     // ── Route protection ──────────────────────────────────────────────────────
 
