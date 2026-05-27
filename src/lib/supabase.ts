@@ -17,7 +17,14 @@ export function createClient() {
         return createSupabaseClient(supabaseUrl, supabaseAnonKey);
     }
     if (!_browserClient) {
-        _browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey);
+        _browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: true,
+                storageKey: 'miss-tokyo-auth',
+            },
+        });
     }
     return _browserClient;
 }
