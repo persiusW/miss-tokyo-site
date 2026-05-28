@@ -22,7 +22,6 @@ export function createClient() {
                 persistSession: true,
                 autoRefreshToken: true,
                 detectSessionInUrl: true,
-                storageKey: 'miss-tokyo-auth',
             },
         });
     }
