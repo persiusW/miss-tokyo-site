@@ -84,7 +84,7 @@ export function NavBar({ initialUser }: { initialUser?: { id: string } | null })
 
     return (
         <>
-            <header className="h-20 w-full flex items-center justify-between px-6 md:px-12 bg-black text-white fixed top-0 left-0 z-[150] border-b border-gray-900 shadow-sm">
+            <header suppressHydrationWarning className="h-20 w-full flex items-center justify-between px-6 md:px-12 bg-black text-white fixed top-0 left-0 z-[150] border-b border-gray-900 shadow-sm">
                 <Link href="/" className="font-serif text-2xl md:text-3xl tracking-[0.15em] uppercase hover:opacity-80 transition-opacity">
                     MISS TOKYO
                 </Link>

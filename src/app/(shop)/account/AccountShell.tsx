@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
@@ -18,12 +18,12 @@ const TABS = [
 interface Props {
     userId: string;
     userEmail: string;
-    onSignOut: () => Promise<void>;
     children: React.ReactNode;
 }
 
-export function AccountShell({ userId, userEmail, onSignOut, children }: Props) {
+export function AccountShell({ userId, userEmail, children }: Props) {
     const pathname = usePathname();
+    const router = useRouter();
     const [name, setName] = useState("");
     const [orderCount, setOrderCount] = useState(0);
     const [savedCount, setSavedCount] = useState(0);
@@ -54,6 +54,11 @@ export function AccountShell({ userId, userEmail, onSignOut, children }: Props) 
 
     const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        router.push("/");
+    };
+
     return (
         <div className="acct-root flex-1 bg-[#f5f0e8]">
 
@@ -66,11 +71,9 @@ export function AccountShell({ userId, userEmail, onSignOut, children }: Props) 
                     <p className="font-serif text-sm tracking-widest uppercase truncate leading-tight">{displayName}</p>
                     <p className="text-[11px] text-[#8c7e6a] truncate">{userEmail}</p>
                 </div>
-                <form action={onSignOut} className="ml-auto shrink-0">
-                    <button type="submit" title="Sign out" className="p-2 text-[#8c7e6a] hover:text-[#8b2f30] transition-colors">
-                        <LogOut size={16} />
-                    </button>
-                </form>
+                <button onClick={handleSignOut} title="Sign out" className="ml-auto shrink-0 p-2 text-[#8c7e6a] hover:text-[#8b2f30] transition-colors">
+                    <LogOut size={16} />
+                </button>
             </div>
 
             {/* Mobile tab strip */}
@@ -150,14 +153,14 @@ export function AccountShell({ userId, userEmail, onSignOut, children }: Props) 
                     </nav>
 
                     {/* Sign out */}
-                    <form action={onSignOut} className="mt-auto pt-6 border-t border-[#e0d5c0]">
+                    <div className="mt-auto pt-6 border-t border-[#e0d5c0]">
                         <button
-                            type="submit"
+                            onClick={handleSignOut}
                             className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-[#8c7e6a] hover:text-[#8b2f30] transition-colors"
                         >
                             <LogOut size={14} /> Sign out
                         </button>
-                    </form>
+                    </div>
                 </aside>
 
                 {/* Content */}

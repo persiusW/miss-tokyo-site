@@ -8,18 +8,10 @@ export default async function AccountLayout({ children }: { children: React.Reac
 
     if (!user) redirect("/login?next=/account");
 
-    async function signOut() {
-        "use server";
-        const serverClient = await createClient();
-        await serverClient.auth.signOut();
-        redirect("/");
-    }
-
     return (
         <AccountShell
             userId={user.id}
             userEmail={user.email ?? ""}
-            onSignOut={signOut}
         >
             {children}
         </AccountShell>
