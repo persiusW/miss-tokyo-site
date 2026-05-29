@@ -159,7 +159,7 @@ export default function EditProductPage() {
         if (storeData) {
             if (storeData.global_sizes) {
                 setGlobalSizes(storeData.global_sizes);
-                const sizes = product.available_sizes?.length ? product.available_sizes : storeData.global_sizes;
+                const sizes = product.available_sizes?.length ? product.available_sizes : [];
                 setSelectedSizes(sizes);
                 setSizeEnabled(sizes.length > 0);
             }

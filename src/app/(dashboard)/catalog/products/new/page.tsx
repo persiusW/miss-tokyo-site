@@ -22,8 +22,8 @@ export default function NewProductPage() {
     const [selectedColors, setSelectedColors] = useState<string[]>([]);
     const [globalBrands, setGlobalBrands] = useState<string[]>([]);
     const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
-    const [sizeEnabled, setSizeEnabled] = useState(true);
-    const [colorEnabled, setColorEnabled] = useState(true);
+    const [sizeEnabled, setSizeEnabled] = useState(false);
+    const [colorEnabled, setColorEnabled] = useState(false);
     const [brandEnabled, setBrandEnabled] = useState(false);
     const [trackInventory, setTrackInventory] = useState(true);
     const [wholesaleTierConfig, setWholesaleTierConfig] = useState<{ enabled: boolean; tier1Min: number; tier1Max: number; tier2Min: number; tier2Max: number; tier3Min: number; tier3Max: number } | null>(null);
@@ -50,7 +50,6 @@ export default function NewProductPage() {
             if (storeData) {
                 if (storeData.global_sizes) {
                     setGlobalSizes(storeData.global_sizes);
-                    setSelectedSizes(storeData.global_sizes);
                 }
                 if (storeData.global_colors) {
                     setGlobalColors(storeData.global_colors);
