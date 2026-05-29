@@ -195,8 +195,11 @@ export default function AccountOrdersPage() {
             const clamped = Math.min(dy, THRESHOLD * 1.5);
             const progress = Math.min(clamped / THRESHOLD, 1);
             const ready = clamped >= THRESHOLD;
-            el.style.height = `${Math.min(clamped * 0.55, 48)}px`;
-            el.style.opacity = `${Math.min(progress * 1.4, 1)}`;
+            // Pill drops from above navbar: translateX keeps it centred, translateY slides it in
+            const translateY = Math.round((progress - 1) * 100);
+            el.style.transform = `translateX(-50%) translateY(${translateY}%)`;
+            el.style.opacity = `${Math.min(progress * 1.5, 1)}`;
+            el.style.display = "flex";
             const arrow = el.querySelector<SVGElement>(".ptr-arrow");
             const label = el.querySelector<HTMLSpanElement>(".ptr-label");
             if (arrow) arrow.style.transform = `rotate(${ready ? 180 : progress * 160}deg)`;
@@ -207,8 +210,7 @@ export default function AccountOrdersPage() {
             pulling = false;
             const el = ptrRef.current;
             if (!el) return;
-            el.style.height = "0px";
-            el.style.opacity = "0";
+            el.style.display = "none";
         };
 
         const onTouchStart = (e: TouchEvent) => {
@@ -264,26 +266,56 @@ export default function AccountOrdersPage() {
 
     return (
         <div className="max-w-2xl">
-            {/* Pull-to-refresh: drag indicator (ref-driven, no React renders) */}
+            {/* Pull-to-refresh: fixed pill at top, ref-driven, immune to parent overflow */}
             <div
                 ref={ptrRef}
-                className="flex items-center justify-center gap-2 overflow-hidden"
-                style={{ height: 0, opacity: 0, transition: "height 0.1s, opacity 0.1s" }}
                 aria-hidden="true"
+                style={{
+                    display: "none",
+                    position: "fixed",
+                    top: 72,
+                    left: "50%",
+                    transform: "translateX(-50%) translateY(-100%)",
+                    zIndex: 9999,
+                    alignItems: "center",
+                    gap: 8,
+                    background: "#8b2f30",
+                    color: "#fff",
+                    padding: "8px 18px",
+                    borderRadius: 99,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+                    pointerEvents: "none",
+                    userSelect: "none",
+                    willChange: "transform, opacity",
+                }}
             >
-                <svg className="ptr-arrow w-4 h-4 text-[#8b2f30]" style={{ transition: "transform 0.15s" }}
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg className="ptr-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5"
+                    style={{ flexShrink: 0, transition: "transform 0.15s" }}>
                     <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                <span className="ptr-label text-[10px] uppercase tracking-widest text-[#8c7e6a]">Pull to refresh</span>
+                <span className="ptr-label" style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700, whiteSpace: "nowrap" }}>
+                    Pull to refresh
+                </span>
             </div>
+
             {/* Spinner shown after release while fetching */}
             {refreshing && (
-                <div className="flex items-center justify-center gap-2 py-3">
-                    <svg className="w-4 h-4 animate-spin text-[#8b2f30]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <div style={{
+                    position: "fixed", top: 72, left: "50%", transform: "translateX(-50%)",
+                    zIndex: 9999, display: "flex", alignItems: "center", gap: 8,
+                    background: "#8b2f30", color: "#fff",
+                    padding: "8px 18px", borderRadius: 99,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+                    pointerEvents: "none",
+                }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                        style={{ animation: "spin 0.8s linear infinite", flexShrink: 0 }}>
                         <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
                     </svg>
-                    <span className="text-[10px] uppercase tracking-widest text-[#8c7e6a]">Refreshing</span>
+                    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700, whiteSpace: "nowrap" }}>
+                        Refreshing
+                    </span>
                 </div>
             )}
 
