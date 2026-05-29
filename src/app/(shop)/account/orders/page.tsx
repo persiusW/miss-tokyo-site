@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Check } from "lucide-react";
@@ -148,8 +148,8 @@ export default function AccountOrdersPage() {
     const [riders, setRiders] = useState<Record<string, Rider>>({});
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [pullY, setPullY] = useState(0);
     const [filter, setFilter] = useState<Filter>("all");
+    const ptrRef = useRef<HTMLDivElement>(null);
 
     const fetchOrders = useCallback(async () => {
         const { data: { user } } = await supabase.auth.getUser() as { data: any };
@@ -185,19 +185,52 @@ export default function AccountOrdersPage() {
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
     useEffect(() => {
-        const THRESHOLD = 90;
+        const THRESHOLD = 80;
         let startY = 0;
-        const onTouchStart = (e: TouchEvent) => { startY = e.touches[0].clientY; };
+        let pulling = false;
+
+        const setIndicator = (dy: number) => {
+            const el = ptrRef.current;
+            if (!el) return;
+            const clamped = Math.min(dy, THRESHOLD * 1.5);
+            const progress = Math.min(clamped / THRESHOLD, 1);
+            const ready = clamped >= THRESHOLD;
+            el.style.height = `${Math.min(clamped * 0.55, 48)}px`;
+            el.style.opacity = `${Math.min(progress * 1.4, 1)}`;
+            const arrow = el.querySelector<SVGElement>(".ptr-arrow");
+            const label = el.querySelector<HTMLSpanElement>(".ptr-label");
+            if (arrow) arrow.style.transform = `rotate(${ready ? 180 : progress * 160}deg)`;
+            if (label) label.textContent = ready ? "Release to refresh" : "Pull to refresh";
+        };
+
+        const reset = () => {
+            pulling = false;
+            const el = ptrRef.current;
+            if (!el) return;
+            el.style.height = "0px";
+            el.style.opacity = "0";
+        };
+
+        const onTouchStart = (e: TouchEvent) => {
+            if (window.scrollY > 2) return;
+            startY = e.touches[0].clientY;
+            pulling = true;
+        };
         const onTouchMove = (e: TouchEvent) => {
-            if (window.scrollY !== 0) return;
+            if (!pulling || window.scrollY > 2) return;
             const dy = e.touches[0].clientY - startY;
-            if (dy > 0) setPullY(Math.min(dy, THRESHOLD * 1.3));
+            if (dy > 0) setIndicator(dy);
         };
         const onTouchEnd = (e: TouchEvent) => {
+            if (!pulling) return;
             const dy = e.changedTouches[0].clientY - startY;
-            setPullY(0);
-            if (dy > THRESHOLD && window.scrollY === 0) { setRefreshing(true); fetchOrders(); }
+            reset();
+            if (dy >= THRESHOLD && window.scrollY <= 2) {
+                setRefreshing(true);
+                fetchOrders();
+            }
         };
+
         window.addEventListener("touchstart", onTouchStart, { passive: true });
         window.addEventListener("touchmove", onTouchMove, { passive: true });
         window.addEventListener("touchend", onTouchEnd, { passive: true });
@@ -231,28 +264,26 @@ export default function AccountOrdersPage() {
 
     return (
         <div className="max-w-2xl">
-            {/* Pull-to-refresh indicator */}
-            {(pullY > 0 || refreshing) && (
-                <div
-                    className="flex items-center justify-center gap-2 overflow-hidden transition-all duration-150"
-                    style={{ height: refreshing ? 44 : Math.min(pullY * 0.5, 44), opacity: refreshing ? 1 : Math.min(pullY / 90, 1) }}
-                >
-                    {refreshing ? (
-                        <svg className="w-4 h-4 animate-spin text-[#8b2f30]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
-                        </svg>
-                    ) : (
-                        <svg
-                            className="w-4 h-4 text-[#8b2f30] transition-transform duration-200"
-                            style={{ transform: pullY >= 90 ? "rotate(180deg)" : `rotate(${(pullY / 90) * 180}deg)` }}
-                            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                        >
-                            <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    )}
-                    <span className="text-[10px] uppercase tracking-widest text-[#8c7e6a]">
-                        {refreshing ? "Refreshing" : pullY >= 90 ? "Release to refresh" : "Pull to refresh"}
-                    </span>
+            {/* Pull-to-refresh: drag indicator (ref-driven, no React renders) */}
+            <div
+                ref={ptrRef}
+                className="flex items-center justify-center gap-2 overflow-hidden"
+                style={{ height: 0, opacity: 0, transition: "height 0.1s, opacity 0.1s" }}
+                aria-hidden="true"
+            >
+                <svg className="ptr-arrow w-4 h-4 text-[#8b2f30]" style={{ transition: "transform 0.15s" }}
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="ptr-label text-[10px] uppercase tracking-widest text-[#8c7e6a]">Pull to refresh</span>
+            </div>
+            {/* Spinner shown after release while fetching */}
+            {refreshing && (
+                <div className="flex items-center justify-center gap-2 py-3">
+                    <svg className="w-4 h-4 animate-spin text-[#8b2f30]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
+                    </svg>
+                    <span className="text-[10px] uppercase tracking-widest text-[#8c7e6a]">Refreshing</span>
                 </div>
             )}
 

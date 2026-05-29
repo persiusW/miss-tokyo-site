@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 // ── Static SVG icon map — no dangerouslySetInnerHTML (SEC-13) ────────────────
@@ -37,6 +38,10 @@ function SocialIcon({ label }: { label: string }) {
 }
 
 export function Footer() {
+    const pathname = usePathname();
+    const [isPwa, setIsPwa] = useState(false);
+    const [footerRevealed, setFooterRevealed] = useState(false);
+    const separatorRef = useRef<HTMLDivElement>(null);
     const [email, setEmail] = useState("");
     const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
     const [settings, setSettings] = useState({
@@ -50,6 +55,25 @@ export function Footer() {
         social_snapchat: null as string | null,
         social_threads: null as string | null,
     });
+
+    useEffect(() => {
+        const mq = window.matchMedia("(display-mode: standalone)");
+        const standalone = (navigator as any).standalone === true;
+        setIsPwa(mq.matches || standalone);
+    }, []);
+
+    // Auto-reveal footer when separator scrolls into view
+    useEffect(() => {
+        if (!isPwa || !pathname.startsWith("/account")) return;
+        const el = separatorRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) setFooterRevealed(true); },
+            { threshold: 0.5 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [isPwa, pathname]);
 
     useEffect(() => {
         supabase
@@ -90,7 +114,12 @@ export function Footer() {
         { key: "social_threads", label: "Threads" },
     ] as const;
 
-    return (
+    // PWA: hide footer on non-account pages entirely
+    if (isPwa && !pathname.startsWith("/account")) return null;
+
+    const isPwaAccount = isPwa && pathname.startsWith("/account");
+
+    const footerInner = (
         <footer className="w-full bg-black text-white px-6 py-16 md:px-12 md:py-24 rounded-none">
             <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-5 gap-12">
                 <div className="col-span-1 md:col-span-2 lg:col-span-2">
@@ -200,4 +229,32 @@ export function Footer() {
             </div>
         </footer>
     );
+
+    if (isPwaAccount) {
+        return (
+            <>
+                <div
+                    ref={separatorRef}
+                    onClick={() => setFooterRevealed(v => !v)}
+                    className="flex items-center gap-3 px-6 py-4 cursor-pointer select-none bg-[#f5f0e8]"
+                    role="button"
+                    aria-expanded={footerRevealed}
+                >
+                    <div className="flex-1 h-px bg-[#e0d5c0]" />
+                    <span className="text-[9px] uppercase tracking-[0.2em] text-[#8c7e6a] font-semibold whitespace-nowrap">
+                        {footerRevealed ? "Hide site info ↑" : "Site info ↓"}
+                    </span>
+                    <div className="flex-1 h-px bg-[#e0d5c0]" />
+                </div>
+                <div
+                    className="overflow-hidden transition-[max-height] duration-500 ease-in-out"
+                    style={{ maxHeight: footerRevealed ? "2000px" : "0px" }}
+                >
+                    {footerInner}
+                </div>
+            </>
+        );
+    }
+
+    return footerInner;
 }
