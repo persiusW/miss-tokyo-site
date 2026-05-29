@@ -148,6 +148,7 @@ export default function AccountOrdersPage() {
     const [riders, setRiders] = useState<Record<string, Rider>>({});
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [pullY, setPullY] = useState(0);
     const [filter, setFilter] = useState<Filter>("all");
 
     const fetchOrders = useCallback(async () => {
@@ -184,16 +185,25 @@ export default function AccountOrdersPage() {
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
     useEffect(() => {
+        const THRESHOLD = 90;
         let startY = 0;
         const onTouchStart = (e: TouchEvent) => { startY = e.touches[0].clientY; };
+        const onTouchMove = (e: TouchEvent) => {
+            if (window.scrollY !== 0) return;
+            const dy = e.touches[0].clientY - startY;
+            if (dy > 0) setPullY(Math.min(dy, THRESHOLD * 1.3));
+        };
         const onTouchEnd = (e: TouchEvent) => {
             const dy = e.changedTouches[0].clientY - startY;
-            if (dy > 90 && window.scrollY === 0) { setRefreshing(true); fetchOrders(); }
+            setPullY(0);
+            if (dy > THRESHOLD && window.scrollY === 0) { setRefreshing(true); fetchOrders(); }
         };
         window.addEventListener("touchstart", onTouchStart, { passive: true });
+        window.addEventListener("touchmove", onTouchMove, { passive: true });
         window.addEventListener("touchend", onTouchEnd, { passive: true });
         return () => {
             window.removeEventListener("touchstart", onTouchStart);
+            window.removeEventListener("touchmove", onTouchMove);
             window.removeEventListener("touchend", onTouchEnd);
         };
     }, [fetchOrders]);
@@ -222,12 +232,27 @@ export default function AccountOrdersPage() {
     return (
         <div className="max-w-2xl">
             {/* Pull-to-refresh indicator */}
-            {refreshing && (
-                <div className="flex items-center justify-center gap-2 py-3 mb-2 -mt-2">
-                    <svg className="w-4 h-4 animate-spin text-[#8b2f30]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
-                    </svg>
-                    <span className="text-[10px] uppercase tracking-widest text-[#8c7e6a]">Refreshing</span>
+            {(pullY > 0 || refreshing) && (
+                <div
+                    className="flex items-center justify-center gap-2 overflow-hidden transition-all duration-150"
+                    style={{ height: refreshing ? 44 : Math.min(pullY * 0.5, 44), opacity: refreshing ? 1 : Math.min(pullY / 90, 1) }}
+                >
+                    {refreshing ? (
+                        <svg className="w-4 h-4 animate-spin text-[#8b2f30]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
+                        </svg>
+                    ) : (
+                        <svg
+                            className="w-4 h-4 text-[#8b2f30] transition-transform duration-200"
+                            style={{ transform: pullY >= 90 ? "rotate(180deg)" : `rotate(${(pullY / 90) * 180}deg)` }}
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                        >
+                            <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    )}
+                    <span className="text-[10px] uppercase tracking-widest text-[#8c7e6a]">
+                        {refreshing ? "Refreshing" : pullY >= 90 ? "Release to refresh" : "Pull to refresh"}
+                    </span>
                 </div>
             )}
 

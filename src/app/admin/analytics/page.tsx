@@ -35,7 +35,7 @@ export default function AnalyticsPage() {
                 if (orders) {
                     const rev = orders.filter((o: any) => o.status === "paid");
                     const grouped = rev.reduce((acc: any, order: any) => {
-                        const date = new Date(order.created_at).toLocaleDateString();
+                        const date = new Date(order.created_at).toLocaleDateString("en-GB");
                         acc[date] = (acc[date] || 0) + order.total_amount;
                         return acc;
                     }, {});

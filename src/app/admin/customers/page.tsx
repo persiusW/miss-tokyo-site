@@ -207,7 +207,7 @@ export default function AdminCustomers() {
         `"${c.address_region || ""}"`,
         `"${c.country || ""}"`,
         `"${c.acquisition_source || "Order"}"`,
-        `"${new Date(c.created_at).toLocaleDateString()}"`
+        `"${new Date(c.created_at).toLocaleDateString("en-GB")}"`
       ].join(","))
     ].join("\n");
 
@@ -299,7 +299,7 @@ export default function AdminCustomers() {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-xs text-gray-400" style={{ fontFamily: "Arial, sans-serif" }}>
-                      {new Date(c.created_at).toLocaleDateString()}
+                      {new Date(c.created_at).toLocaleDateString("en-GB")}
                     </td>
                   </tr>
                 ))
