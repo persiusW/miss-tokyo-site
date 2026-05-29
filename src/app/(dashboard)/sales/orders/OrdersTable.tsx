@@ -202,7 +202,7 @@ export function OrdersTable({ orders: initialOrders }: Props) {
                                         </span>
                                     </td>
                                     <td className="px-4 py-4 text-right text-neutral-500 text-xs">
-                                        {new Date(order.created_at).toLocaleDateString()}
+                                        {new Date(order.created_at).toLocaleDateString("en-GB")}
                                     </td>
                                     <td className="px-4 py-4 text-right relative" onClick={e => e.stopPropagation()}>
                                         <button

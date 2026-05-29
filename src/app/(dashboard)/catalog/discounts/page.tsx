@@ -345,7 +345,7 @@ export default function DiscountsPage() {
                                     {c.used_count}{c.usage_limit ? ` / ${c.usage_limit}` : ""}
                                 </td>
                                 <td className="px-6 py-4 text-neutral-400 text-xs">
-                                    {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "—"}
+                                    {c.expires_at ? new Date(c.expires_at).toLocaleDateString("en-GB") : "—"}
                                 </td>
                                 <td className="px-6 py-4">
                                     <button onClick={() => toggleActive(c.id, c.is_active)}

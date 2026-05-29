@@ -266,7 +266,7 @@ export default function GiftCardsPage() {
                                     </span>
                                 </td>
                                 <td className="px-5 py-4 text-[11px] text-neutral-500">
-                                    {new Date(g.created_at).toLocaleDateString()}
+                                    {new Date(g.created_at).toLocaleDateString("en-GB")}
                                 </td>
                                 <td className="px-5 py-4">
                                     <button
@@ -398,7 +398,7 @@ export default function GiftCardsPage() {
                                     { label: "Sender Email", val: viewCard.purchased_by_email || "—" },
                                     { label: "Delivery", val: viewCard.delivery_mode === "email" ? "Email" : "Self" },
                                     { label: "Sent At", val: viewCard.sent_at ? new Date(viewCard.sent_at).toLocaleString() : "—" },
-                                    { label: "Expires", val: viewCard.expires_at ? new Date(viewCard.expires_at).toLocaleDateString() : "Never" },
+                                    { label: "Expires", val: viewCard.expires_at ? new Date(viewCard.expires_at).toLocaleDateString("en-GB") : "Never" },
                                     { label: "Issued", val: new Date(viewCard.created_at).toLocaleString() },
                                 ].map(({ label, val }) => (
                                     <div key={label} className="flex justify-between border-b border-neutral-50 pb-3">
@@ -427,7 +427,7 @@ export default function GiftCardsPage() {
                                             <div key={r.id} className="bg-neutral-50 rounded-lg p-3 text-xs">
                                                 <div className="flex justify-between mb-1">
                                                     <span className="font-semibold text-rose-600">-{fmt(r.amount_used)}</span>
-                                                    <span className="text-neutral-400">{new Date(r.redeemed_at).toLocaleDateString()}</span>
+                                                    <span className="text-neutral-400">{new Date(r.redeemed_at).toLocaleDateString("en-GB")}</span>
                                                 </div>
                                                 <div className="text-neutral-500">
                                                     {fmt(r.balance_before)} → {fmt(r.balance_after)}

@@ -152,7 +152,7 @@ export default function TeamPage() {
                                         </span>
                                     </td>
                                     <td className="px-4 py-4 text-[11px] text-neutral-500">
-                                        {new Date(member.created_at).toLocaleDateString()}
+                                        {new Date(member.created_at).toLocaleDateString("en-GB")}
                                     </td>
                                     <td className="px-8 py-4 text-right">
                                         {member.role !== "owner" && (

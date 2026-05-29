@@ -177,7 +177,7 @@ export default function FinancePage() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-neutral-500 text-xs">
-                                        {new Date(doc.created_at).toLocaleDateString()}
+                                        {new Date(doc.created_at).toLocaleDateString("en-GB")}
                                     </td>
                                     <td className="px-6 py-4 text-right space-x-4">
                                         <button

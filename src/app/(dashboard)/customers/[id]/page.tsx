@@ -172,7 +172,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-neutral-400 text-xs text-right whitespace-nowrap">
-                                            {new Date(order.created_at).toLocaleDateString()}
+                                            {new Date(order.created_at).toLocaleDateString("en-GB")}
                                         </td>
                                     </tr>
                                 ))}
@@ -195,7 +195,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                             {inquiries.map(inq => (
                                 <div key={inq.id} className="px-6 py-4">
                                     <p className="text-xs text-neutral-400 mb-1 uppercase tracking-widest">
-                                        {new Date(inq.created_at).toLocaleDateString()}
+                                        {new Date(inq.created_at).toLocaleDateString("en-GB")}
                                     </p>
                                     <p className="text-sm text-neutral-700 leading-relaxed">{inq.message}</p>
                                 </div>
@@ -243,7 +243,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-neutral-400 text-xs text-right whitespace-nowrap">
-                                            {new Date(doc.created_at).toLocaleDateString()}
+                                            {new Date(doc.created_at).toLocaleDateString("en-GB")}
                                         </td>
                                     </tr>
                                 ))}

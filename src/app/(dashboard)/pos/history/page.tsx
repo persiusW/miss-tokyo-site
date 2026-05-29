@@ -193,7 +193,7 @@ export default function POSHistoryPage() {
                                             {s.status.replace('_', ' ')}
                                         </span>
                                     </td>
-                                    <td className="py-3 pr-6 text-neutral-500">{new Date(s.created_at).toLocaleDateString()}</td>
+                                    <td className="py-3 pr-6 text-neutral-500">{new Date(s.created_at).toLocaleDateString("en-GB")}</td>
                                     <td className="py-3 text-neutral-500 text-[10px]">
                                         {s.status === 'paid' && s.paid_at ? new Date(s.paid_at).toLocaleString() : s.expires_at ? new Date(s.expires_at).toLocaleString() : '—'}
                                     </td>

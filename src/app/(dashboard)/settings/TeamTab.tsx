@@ -389,7 +389,7 @@ export function TeamTab() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-neutral-500 text-[11px]">
-                                                {new Date(member.created_at).toLocaleDateString()}
+                                                {new Date(member.created_at).toLocaleDateString("en-GB")}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-3">

@@ -346,7 +346,7 @@ export default function OrderDetailPage() {
             `Email: ${order.customer_email}`,
             `Amount: GH₵ ${Number(order.total_amount).toFixed(2)}`,
             `Reference: ${order.paystack_reference || "—"}`,
-            `Date: ${new Date(order.created_at).toLocaleDateString()}`,
+            `Date: ${new Date(order.created_at).toLocaleDateString("en-GB")}`,
         ].join("\n");
         navigator.clipboard.writeText(text);
         toast.success("Customer details copied.");

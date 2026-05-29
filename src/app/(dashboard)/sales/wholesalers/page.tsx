@@ -148,7 +148,7 @@ export default function WholesalersPage() {
                                         <p className="text-[10px] text-neutral-400 tracking-wide">{w.email}</p>
                                     </td>
                                     <td className="px-4 py-4 text-[11px] text-neutral-500">
-                                        {new Date(w.created_at).toLocaleDateString()}
+                                        {new Date(w.created_at).toLocaleDateString("en-GB")}
                                     </td>
                                     <td className="px-8 py-4 text-right">
                                         <button

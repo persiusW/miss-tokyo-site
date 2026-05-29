@@ -225,7 +225,7 @@ export default function PayLinksPage() {
                                 </td>
                                 <td className="px-6 py-4 text-neutral-500 max-w-[200px] truncate">{link.description || "—"}</td>
                                 <td className="px-6 py-4 text-right font-medium">GH₵ {Number(link.amount).toFixed(2)}</td>
-                                <td className="px-6 py-4 text-neutral-500 text-xs">{new Date(link.created_at).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 text-neutral-500 text-xs">{new Date(link.created_at).toLocaleDateString("en-GB")}</td>
                                 <td className="px-6 py-4 text-right">
                                     {link.paystack_url ? (
                                         <button

@@ -211,7 +211,7 @@ export default async function DashboardOverviewPage() {
                                         );
                                     })()}
                                     <p className="text-[10px] text-neutral-400 mt-2">
-                                        {new Date(item.created_at).toLocaleDateString()}
+                                        {new Date(item.created_at).toLocaleDateString("en-GB")}
                                     </p>
                                 </div>
                             </li>

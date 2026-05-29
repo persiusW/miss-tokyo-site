@@ -147,7 +147,7 @@ export default function AbandonedCartsPage() {
                                 </td>
                                 <td className="px-6 py-4 text-neutral-500 text-xs">{itemCount(order.items)}</td>
                                 <td className="px-6 py-4 text-right text-neutral-400 text-xs">
-                                    {new Date(order.created_at).toLocaleDateString()}
+                                    {new Date(order.created_at).toLocaleDateString("en-GB")}
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     {remindedIds.has(order.id) ? (

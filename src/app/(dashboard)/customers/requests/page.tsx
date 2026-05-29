@@ -111,7 +111,7 @@ export default function CustomRequestsPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-neutral-600">
-                                        {new Date(req.created_at).toLocaleDateString()}
+                                        {new Date(req.created_at).toLocaleDateString("en-GB")}
                                     </td>
                                     <td className="px-6 py-4">
                                         <select

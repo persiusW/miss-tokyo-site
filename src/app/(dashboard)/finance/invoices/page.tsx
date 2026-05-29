@@ -444,7 +444,7 @@ export default function InvoicesPage() {
                                     </select>
                                 </td>
                                 <td className="px-6 py-4 text-neutral-500 text-xs">
-                                    {new Date(doc.created_at).toLocaleDateString()}
+                                    {new Date(doc.created_at).toLocaleDateString("en-GB")}
                                 </td>
                                 <td className="px-6 py-4 text-right flex items-center justify-end gap-4">
                                     <Link
