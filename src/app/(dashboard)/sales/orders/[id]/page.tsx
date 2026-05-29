@@ -563,6 +563,7 @@ export default function OrderDetailPage() {
                                             <div className="flex flex-wrap gap-x-3 gap-y-0.5">
                                                 {item.size && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Size: <span className="text-neutral-900 font-semibold">{item.size}</span></span>}
                                                 {item.color && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Color: <span className="text-neutral-900 font-semibold">{item.color}</span></span>}
+                                                {item.brand && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Brand: <span className="text-neutral-900 font-semibold">{item.brand}</span></span>}
                                                 {(item.sku || (item.productId && productSkus[item.productId])) && (
                                                     <span className="text-[10px] uppercase tracking-widest text-neutral-500">
                                                         SKU: <span className="text-neutral-900 font-semibold font-mono">{item.sku || productSkus[item.productId]}</span>
@@ -820,9 +821,9 @@ export default function OrderDetailPage() {
                                                 )}
                                                 <div>
                                                     <p className="font-medium text-neutral-800">{name}</p>
-                                                    {(item.size || item.color) && (
+                                                    {(item.size || item.color || item.brand) && (
                                                         <p className="text-[10px] uppercase tracking-wider text-neutral-400 mt-0.5">
-                                                            {[item.size, item.color].filter(Boolean).join(" · ")}
+                                                            {[item.size, item.color, item.brand].filter(Boolean).join(" · ")}
                                                         </p>
                                                     )}
                                                 </div>
