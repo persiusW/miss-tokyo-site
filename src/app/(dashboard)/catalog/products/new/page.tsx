@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -8,6 +8,7 @@ import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { toast } from "@/lib/toast";
 
 type Category = { id: string; name: string; slug: string; is_wholesale: boolean };
+type VariantStore = Record<string, { sku: string; inventory_count: number }>;
 
 export default function NewProductPage() {
     const router = useRouter();
@@ -26,6 +27,8 @@ export default function NewProductPage() {
     const [colorEnabled, setColorEnabled] = useState(false);
     const [brandEnabled, setBrandEnabled] = useState(false);
     const [trackInventory, setTrackInventory] = useState(true);
+    const [trackVariantInventory, setTrackVariantInventory] = useState(false);
+    const [variantData, setVariantData] = useState<VariantStore>({});
     const [wholesaleTierConfig, setWholesaleTierConfig] = useState<{ enabled: boolean; tier1Min: number; tier1Max: number; tier2Min: number; tier2Max: number; tier3Min: number; tier3Max: number } | null>(null);
     const [wholesalePrices, setWholesalePrices] = useState({ tier1: "", tier2: "", tier3: "" });
     const [wholesaleOverride, setWholesaleOverride] = useState(false);
@@ -100,6 +103,24 @@ export default function NewProductPage() {
         setSelectedBrands(prev => prev.includes(b) ? prev.filter(s => s !== b) : [...prev, b]);
     };
 
+    const variantCombos = useMemo(() => {
+        const ss = selectedSizes.length > 0 ? selectedSizes : [""];
+        const cc = selectedColors.length > 0 ? selectedColors : [""];
+        const bb = selectedBrands.length > 0 ? selectedBrands : [""];
+        const combos: Array<{ size: string; color: string; brand: string; key: string }> = [];
+        for (const s of ss) for (const c of cc) for (const b of bb) {
+            combos.push({ size: s, color: c, brand: b, key: `${s}||${c}||${b}` });
+        }
+        return combos;
+    }, [selectedSizes, selectedColors, selectedBrands]);
+
+    const updateVariantCell = (key: string, field: "sku" | "inventory_count", value: string | number) => {
+        setVariantData(prev => ({
+            ...prev,
+            [key]: { sku: prev[key]?.sku ?? "", inventory_count: prev[key]?.inventory_count ?? 0, [field]: value },
+        }));
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -113,8 +134,9 @@ export default function NewProductPage() {
                     slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
                     sku: formData.sku || null,
                     price_ghs: Number(formData.price_ghs),
-                    inventory_count: trackInventory ? Number(formData.inventory_count) : 9999,
+                    inventory_count: trackInventory && !trackVariantInventory ? Number(formData.inventory_count) : 9999,
                     track_inventory: trackInventory,
+                    track_variant_inventory: trackVariantInventory,
                     description: formData.description,
                     category_type: formData.category_type,
                     category_ids: selectedCategoryIds,
@@ -126,6 +148,15 @@ export default function NewProductPage() {
                     wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
                     wholesale_price_tier_2: wholesaleOverride && wholesalePrices.tier2 ? Number(wholesalePrices.tier2) : null,
                     wholesale_price_tier_3: wholesaleOverride && wholesalePrices.tier3 ? Number(wholesalePrices.tier3) : null,
+                    variants: (trackInventory && trackVariantInventory && variantCombos.length > 0)
+                        ? variantCombos.map(c => ({
+                            size: c.size || null,
+                            color: c.color || null,
+                            brand: c.brand || null,
+                            sku: variantData[c.key]?.sku || null,
+                            inventory_count: variantData[c.key]?.inventory_count ?? 0,
+                        }))
+                        : undefined,
                 }),
             });
 
@@ -330,6 +361,60 @@ export default function NewProductPage() {
                                     : <div className="flex flex-wrap gap-4">{globalBrands.map(b => (<label key={b} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedBrands.includes(b)} onChange={() => toggleBrand(b)} className="w-4 h-4 accent-black" /><span className="text-sm font-medium">{b}</span></label>))}</div>
                                 )}
                             </div>
+
+                            {/* Variant Inventory Matrix */}
+                            {trackInventory && trackVariantInventory && (
+                                <div className="pt-6 border-t border-neutral-100">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-xs font-semibold uppercase tracking-widest">Inventory by Variant</h3>
+                                        <span className="text-[10px] text-neutral-400 uppercase tracking-wider">
+                                            {variantCombos.length} combination{variantCombos.length !== 1 ? "s" : ""}
+                                        </span>
+                                    </div>
+                                    <div className="border border-neutral-200 rounded-lg overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="bg-neutral-50 border-b border-neutral-200">
+                                                    {selectedSizes.length > 0 && <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Size</th>}
+                                                    {selectedColors.length > 0 && <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Color</th>}
+                                                    {selectedBrands.length > 0 && <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Brand</th>}
+                                                    <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">SKU</th>
+                                                    <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stock</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-neutral-100">
+                                                {variantCombos.map((combo, idx) => (
+                                                    <tr key={combo.key} className={idx % 2 === 1 ? "bg-neutral-50/50" : ""}>
+                                                        {selectedSizes.length > 0 && <td className="px-3 py-2 font-medium">{combo.size}</td>}
+                                                        {selectedColors.length > 0 && <td className="px-3 py-2 text-neutral-600">{combo.color}</td>}
+                                                        {selectedBrands.length > 0 && <td className="px-3 py-2 text-neutral-600">{combo.brand}</td>}
+                                                        <td className="px-3 py-2">
+                                                            <input
+                                                                type="text"
+                                                                value={variantData[combo.key]?.sku ?? ""}
+                                                                onChange={e => updateVariantCell(combo.key, "sku", e.target.value)}
+                                                                placeholder="e.g. SKU-001"
+                                                                className="w-full border-b border-neutral-200 bg-transparent py-1 text-sm outline-none focus:border-black transition-colors"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <input
+                                                                type="number" min="0"
+                                                                value={variantData[combo.key]?.inventory_count ?? 0}
+                                                                onChange={e => updateVariantCell(combo.key, "inventory_count", Number(e.target.value))}
+                                                                className="w-20 border-b border-neutral-200 bg-transparent py-1 text-sm outline-none focus:border-black transition-colors"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p className="text-[10px] text-neutral-400 mt-2 uppercase tracking-wider">
+                                        Toggle options above to add or remove rows. Values are preserved when you deselect and re-select an option.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -371,6 +456,24 @@ export default function NewProductPage() {
                             </div>
 
                             {trackInventory && (
+                                <div className="flex items-start gap-3 p-4 bg-neutral-50 border border-neutral-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTrackVariantInventory(v => !v)}
+                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none mt-0.5 ${trackVariantInventory ? "bg-black" : "bg-neutral-300"}`}
+                                    >
+                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${trackVariantInventory ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                    <div>
+                                        <p className="text-xs uppercase tracking-widest font-semibold">Track Inventory by Variant</p>
+                                        <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">
+                                            {trackVariantInventory ? "Each size/colour combination has its own stock count." : "All variants share one global stock count."}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {trackInventory && !trackVariantInventory && (
                                 <div>
                                     <label htmlFor="inventory_count" className="block text-xs uppercase tracking-widest font-semibold mb-3">Inventory Count</label>
                                     <input
@@ -383,6 +486,12 @@ export default function NewProductPage() {
                                         className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
                                     />
                                 </div>
+                            )}
+
+                            {trackInventory && trackVariantInventory && (
+                                <p className="text-[10px] text-emerald-600 uppercase tracking-widest font-semibold">
+                                    ✓ Stock is managed per variant in the matrix under Variants.
+                                </p>
                             )}
                         </div>
 

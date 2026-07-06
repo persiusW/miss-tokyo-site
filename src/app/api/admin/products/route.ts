@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
         price_ghs,
         inventory_count,
         track_inventory,
+        track_variant_inventory,
         description,
         category_type,
         category_ids,
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
         wholesale_price_tier_1,
         wholesale_price_tier_2,
         wholesale_price_tier_3,
+        variants,
     } = body;
 
     if (!name || !slug || price_ghs == null) {
@@ -54,8 +56,9 @@ export async function POST(req: NextRequest) {
             slug,
             sku: sku ?? null,
             price_ghs: Number(price_ghs),
-            inventory_count: track_inventory ? Number(inventory_count) : 9999,
+            inventory_count: track_inventory && !track_variant_inventory ? Number(inventory_count) : 9999,
             track_inventory: track_inventory ?? true,
+            track_variant_inventory: track_variant_inventory ?? false,
             description,
             category_type,
             category_ids: category_ids ?? [],
@@ -76,6 +79,37 @@ export async function POST(req: NextRequest) {
     if (error) {
         console.error("[admin/products POST]", error);
         return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
+    }
+
+    // Insert per-variant inventory rows when tracking by variant
+    if (track_inventory && track_variant_inventory && variants && variants.length > 0) {
+        const toInsert = variants.map((v: any) => ({
+            product_id: data.id,
+            size: v.size || null,
+            color: v.color || null,
+            brand: v.brand || null,
+            sku: v.sku || null,
+            inventory_count: v.inventory_count ?? 0,
+        }));
+
+        const { error: insertErr } = await supabaseAdmin
+            .from("product_variants")
+            .insert(toInsert);
+
+        if (insertErr) {
+            console.error("[admin/products POST] variant insert failed:", insertErr.message);
+            return NextResponse.json({ error: `Variant insert failed: ${insertErr.message}` }, { status: 500 });
+        }
+
+        // Sync product-level inventory_count to variant sum
+        const variantSum = toInsert.reduce((sum: number, v: { inventory_count: number }) => sum + (v.inventory_count ?? 0), 0);
+        const { error: syncErr } = await supabaseAdmin
+            .from("products")
+            .update({ inventory_count: variantSum })
+            .eq("id", data.id);
+        if (syncErr) {
+            console.error("[admin/products POST] inventory_count sync failed:", syncErr.message);
+        }
     }
 
     // LOG ACTIVITY
