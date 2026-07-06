@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { logActivity } from "@/lib/utils/logActivity";
@@ -32,11 +33,12 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: "Unauthorized" };
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    // Role check and old-record fetch (for diffing) are independent reads — run in parallel
+    const [{ data: profile }, { data: oldData }] = await Promise.all([
+        supabase.from("profiles").select("role").eq("id", user.id).single(),
+        supabaseAdmin.from("orders").select("*, riders(full_name)").eq("id", orderId).single(),
+    ]);
     if (!profile) return { success: false, error: "Profile not found" };
-
-    // Fetch old record for diffing and info
-    const { data: oldData } = await supabaseAdmin.from("orders").select("*, riders(full_name)").eq("id", orderId).single();
     if (!oldData) return { success: false, error: "Order not found" };
 
     const syncedFulfillment = STATUS_TO_FULFILLMENT[newStatus];
@@ -68,34 +70,35 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
         return { success: false, error: error.message };
     }
 
-    // Fetch rider name if assigned
-    let riderName = oldData.riders?.full_name;
-    if (updateData.assigned_rider_id && updateData.assigned_rider_id !== oldData.assigned_rider_id) {
-        const { data: rider } = await supabase.from("riders").select("full_name").eq("id", updateData.assigned_rider_id).single();
-        riderName = rider?.full_name;
-    }
-
-    // LOG ACTIVITY
-    await logActivity({
-        userId: user.id,
-        userRole: profile.role,
-        actionType,
-        resource: "order",
-        resourceId: orderId,
-        oldData,
-        newData: updateData,
-        details: { 
-            order_number: orderId.slice(0, 8),
-            resource_name: `Order #${orderId.slice(0, 8)}`,
-            rider_name: riderName,
-            previous_status: oldData.status,
-            new_status: newStatus,
-            ...extraData
-        }
-    });
-
     revalidatePath(`/sales/orders/${orderId}`, "page");
     revalidatePath("/sales/orders", "page");
+
+    // Rider-name lookup + activity logging are telemetry — run after the response
+    after(async () => {
+        let riderName = oldData.riders?.full_name;
+        if (updateData.assigned_rider_id && updateData.assigned_rider_id !== oldData.assigned_rider_id) {
+            const { data: rider } = await supabaseAdmin.from("riders").select("full_name").eq("id", updateData.assigned_rider_id).single();
+            riderName = rider?.full_name;
+        }
+
+        await logActivity({
+            userId: user.id,
+            userRole: profile.role,
+            actionType,
+            resource: "order",
+            resourceId: orderId,
+            oldData,
+            newData: updateData,
+            details: {
+                order_number: orderId.slice(0, 8),
+                resource_name: `Order #${orderId.slice(0, 8)}`,
+                rider_name: riderName,
+                previous_status: oldData.status,
+                new_status: newStatus,
+                ...extraData
+            }
+        });
+    });
 
     return { success: true };
 }
@@ -120,24 +123,26 @@ export async function updateFulfillmentStatus(orderId: string, fulfillment_statu
         return { success: false, error: error.message };
     }
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-    if (profile) {
-        await logActivity({
-            userId: user.id,
-            userRole: profile.role,
-            actionType: "UPDATE_STATUS",
-            resource: "order",
-            resourceId: orderId,
-            details: {
-                order_number: orderId.slice(0, 8),
-                new_fulfillment_status: fulfillment_status,
-                new_status: syncedStatus ?? fulfillment_status,
-            },
-        });
-    }
-
     revalidatePath(`/sales/orders/${orderId}`, "page");
     revalidatePath("/sales/orders", "page");
+
+    after(async () => {
+        const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+        if (profile) {
+            await logActivity({
+                userId: user.id,
+                userRole: profile.role,
+                actionType: "UPDATE_STATUS",
+                resource: "order",
+                resourceId: orderId,
+                details: {
+                    order_number: orderId.slice(0, 8),
+                    new_fulfillment_status: fulfillment_status,
+                    new_status: syncedStatus ?? fulfillment_status,
+                },
+            });
+        }
+    });
 
     return { success: true };
 }
@@ -167,7 +172,9 @@ export async function bulkUpdateOrderStatus(orderIds: string[], newStatus: strin
         : (newStatus === "delivered" || newStatus === "fulfilled") ? "DELIVERED_ORDER"
         : "UPDATE_STATUS";
 
-    await Promise.allSettled(
+    revalidatePath("/sales/orders", "page");
+
+    after(() => Promise.allSettled(
         orderIds.map(orderId =>
             logActivity({
                 userId: user.id,
@@ -182,8 +189,7 @@ export async function bulkUpdateOrderStatus(orderIds: string[], newStatus: strin
                 },
             })
         )
-    );
+    ));
 
-    revalidatePath("/sales/orders", "page");
     return { success: true };
 }
