@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
+import { unstable_cache } from "next/cache";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
 import { RealtimeStockMonitor } from "@/components/ui/miss-tokyo/RealtimeStockMonitor";
 import { AdminSidebar } from "@/components/ui/miss-tokyo/AdminSidebar";
@@ -21,12 +22,25 @@ async function safeQuery<T>(fn: () => PromiseLike<{ data: T | null }>, ms = 8000
     }
 }
 
+// Sidebar settings rarely change — cache for 60 s so every dashboard render
+// doesn't pay two extra DB round trips.
+const getLayoutSettings = unstable_cache(
+    async () => {
+        const [storeData, bizData] = await Promise.all([
+            safeQuery(() => supabaseAdmin.from("store_settings").select("enable_custom_requests").eq("id", "default").single()),
+            safeQuery(() => supabaseAdmin.from("business_settings").select("business_name").eq("id", "default").single()),
+        ]);
+        return { storeData, bizData };
+    },
+    ["dashboard-layout-settings"],
+    { revalidate: 60 }
+);
+
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
     const serverClient = await createClient();
-    const [{ data: { user } }, storeData, bizData] = await Promise.all([
+    const [{ data: { user } }, { storeData, bizData }] = await Promise.all([
         serverClient.auth.getUser(),
-        safeQuery(() => supabaseAdmin.from("store_settings").select("enable_custom_requests").eq("id", "default").single()),
-        safeQuery(() => supabaseAdmin.from("business_settings").select("business_name").eq("id", "default").single()),
+        getLayoutSettings(),
     ]);
     const storeSettings = storeData as { enable_custom_requests: boolean } | null;
     const businessSettings = bizData as { business_name: string } | null;
