@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { reserveStock, type ReserveItem } from "@/lib/inventory";
 import { normAttr } from "@/lib/utils/normAttr";
+import { validateDiscountCode, type ValidatedDiscount } from "@/lib/discountValidation";
 
 export async function POST(request: Request) {
     try {
@@ -190,6 +191,8 @@ export async function POST(request: Request) {
         let autoDiscountAmount = 0;
         let autoDiscountLabel = "";
         let appliedAutoDiscountIds: string[] = [];
+        // When every cart item is covered by auto discounts, manual coupons are blocked
+        let couponBlocked = false;
         if (cartArr.length > 0) {
             const { evaluateAutoDiscounts } = await import("@/lib/autoDiscount");
 
@@ -227,29 +230,28 @@ export async function POST(request: Request) {
                 }
 
                 // Coupon only applies to items NOT covered by auto discounts
-                const allCovered = cartArr.every(i => autoResult.coveredProductIds.has(i.productId));
-                if (allCovered) {
-                    // Block coupon when everything is auto-discounted
-                } else {
-                    const discountAmount = Number(clientMetadata?.discount_amount) || 0;
-                    if (discountAmount > 0) {
-                        amountInGHS = Math.max(0, parseFloat((amountInGHS - discountAmount).toFixed(2)));
-                    }
-                }
-            } else {
-                // No auto discount rules — apply manual coupon normally
-                const discountAmount = Number(clientMetadata?.discount_amount) || 0;
-                if (discountAmount > 0) {
-                    amountInGHS = Math.max(0, parseFloat((amountInGHS - discountAmount).toFixed(2)));
-                }
-            }
-        } else {
-            // Single product flow — apply manual discount normally
-            const discountAmount = Number(clientMetadata?.discount_amount) || 0;
-            if (discountAmount > 0) {
-                amountInGHS = Math.max(0, parseFloat((amountInGHS - discountAmount).toFixed(2)));
+                couponBlocked = cartArr.every(i => autoResult.coveredProductIds.has(i.productId));
             }
         }
+
+        // Validate the discount code server-side — the client's discount_amount is
+        // NEVER trusted; the code is re-checked against the DB and its value
+        // recomputed against the server-calculated total.
+        let validatedDiscount: ValidatedDiscount | null = null;
+        if (clientMetadata?.discount_code && !couponBlocked) {
+            validatedDiscount = await validateDiscountCode(clientMetadata.discount_code, amountInGHS);
+            const claimedAmount = Number(clientMetadata?.discount_amount) || 0;
+            const serverAmount = validatedDiscount?.amount ?? 0;
+            if (Math.abs(claimedAmount - serverAmount) > 0.02) {
+                console.warn(`[Paystack init] discount mismatch for code "${clientMetadata.discount_code}": client claimed ${claimedAmount}, server computed ${serverAmount}. Using server value.`);
+            }
+            if (serverAmount > 0) {
+                amountInGHS = Math.max(0, parseFloat((amountInGHS - serverAmount).toFixed(2)));
+            }
+        }
+        const discountCode = validatedDiscount?.code ?? null;
+        const discountAmount = validatedDiscount?.amount ?? 0;
+        const discountTag = validatedDiscount?.type ?? null;
 
         if (amountInGHS <= 0) {
             return NextResponse.json({ error: "Invalid amount calculation" }, { status: 400 });
@@ -301,8 +303,8 @@ export async function POST(request: Request) {
                 has_preorder: hasPreorder,
                 is_mixed_order: isMixedOrder,
                 items: cartArr,
-                discount_code: clientMetadata?.discount_code || null,
-                discount_amount: Number(clientMetadata?.discount_amount) || 0,
+                discount_code: discountCode,
+                discount_amount: discountAmount,
                 auto_discount_title: autoDiscountLabel || null,
                 auto_discount_amount: autoDiscountAmount,
                 customer_metadata: {
@@ -464,6 +466,11 @@ export async function POST(request: Request) {
                     // Override client-supplied fee values with server-calculated ones
                     platform_fee_amount: platformFeeAmount > 0 ? platformFeeAmount : undefined,
                     platform_fee_label: platformFeeLabel,
+                    // Override client-supplied discount fields with server-validated values —
+                    // the webhook settles gift cards/coupons from these
+                    discount_code: discountCode ?? undefined,
+                    discount_amount: discountAmount > 0 ? discountAmount : undefined,
+                    discount_tag: discountTag ?? undefined,
                     // Auto discount IDs for usage tracking in webhook
                     ...(appliedAutoDiscountIds.length > 0 ? {
                         auto_discount_ids: appliedAutoDiscountIds,
