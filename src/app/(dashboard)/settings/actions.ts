@@ -7,6 +7,7 @@ import { Resend } from "resend";
 import { sendSMS } from "@/lib/sms";
 import crypto from "crypto";
 import { logActivity } from "@/lib/utils/logActivity";
+import { after } from "next/server";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -51,13 +52,13 @@ export async function inviteTeamMember(data: InviteData) {
     }
 
     // LOG ACTIVITY
-    await logActivity({
+    after(() => logActivity({
         userId: userData.user.id,
         userRole: callerProfile?.role ?? '',
         actionType: "INVITE",
         resource: "team",
         details: { email: data.email, role: data.role }
-    });
+    }));
 
     const message = `You have been invited to collaborate on Miss Tokyo as a ${data.role}. Join here: ${inviteLink}`;
 
@@ -133,13 +134,13 @@ export async function removeTeamMember(userId: string) {
     await supabaseAdmin.auth.admin.signOut(userId, "global");
 
     // LOG ACTIVITY
-    await logActivity({
+    after(() => logActivity({
         userId: userData.user.id,
         userRole: callerData.role,
         actionType: "REMOVE_MEMBER",
         resource: "team",
         resourceId: userId
-    });
+    }));
 
     return { success: true };
 }
@@ -232,13 +233,13 @@ export async function sendPasswordResetLink(targetEmail: string) {
         return { success: false, error: "Reset link generated but email failed to send." };
     }
 
-    await logActivity({
+    after(() => logActivity({
         userId: userData.user.id,
         userRole: callerData.role,
         actionType: "RESET_PASSWORD",
         resource: "team",
         details: { target_email: targetEmail },
-    });
+    }));
 
     return { success: true };
 }

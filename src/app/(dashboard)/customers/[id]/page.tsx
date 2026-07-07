@@ -161,7 +161,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                                             </span>
                                         </td>
                                         <td className="r" style={{ fontSize: 11, color: "var(--ac-ink-4)", whiteSpace: "nowrap" }}>
-                                            {new Date(order.created_at).toLocaleDateString()}
+                                            {new Date(order.created_at).toLocaleDateString("en-GB")}
                                         </td>
                                     </tr>
                                 ))}
@@ -184,7 +184,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                             {inquiries.map(inq => (
                                 <div key={inq.id} style={{ padding: "14px 20px", borderBottom: "1px solid var(--ac-line)" }}>
                                     <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginBottom: 4 }}>
-                                        {new Date(inq.created_at).toLocaleDateString()}
+                                        {new Date(inq.created_at).toLocaleDateString("en-GB")}
                                     </p>
                                     <p style={{ fontSize: 13, color: "var(--ac-ink-2)", lineHeight: 1.6 }}>{inq.message}</p>
                                 </div>
@@ -229,7 +229,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                                             </span>
                                         </td>
                                         <td className="r" style={{ fontSize: 11, color: "var(--ac-ink-4)", whiteSpace: "nowrap" }}>
-                                            {new Date(doc.created_at).toLocaleDateString()}
+                                            {new Date(doc.created_at).toLocaleDateString("en-GB")}
                                         </td>
                                     </tr>
                                 ))}

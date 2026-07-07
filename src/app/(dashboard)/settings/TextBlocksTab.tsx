@@ -112,7 +112,7 @@ export function TextBlocksTab() {
                                         <div className="flex items-center justify-between mt-3">
                                             <span className="text-[10px] text-neutral-300 tracking-wider">
                                                 {row.updated_at
-                                                    ? `Updated ${new Date(row.updated_at).toLocaleDateString()}`
+                                                    ? `Updated ${new Date(row.updated_at).toLocaleDateString("en-GB")}`
                                                     : ""}
                                             </span>
                                             <button

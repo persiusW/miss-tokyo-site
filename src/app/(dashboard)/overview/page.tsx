@@ -239,7 +239,7 @@ export default async function DashboardOverviewPage() {
                                         {item.status}
                                     </span>
                                     <span style={{ fontSize: 10, color: "var(--ac-ink-4)", fontFamily: "var(--f-mono)" }}>
-                                        {new Date(item.created_at).toLocaleDateString()}
+                                        {new Date(item.created_at).toLocaleDateString("en-GB")}
                                     </span>
                                 </div>
                             </div>

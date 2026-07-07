@@ -1,0 +1,18 @@
+{
+  "status": 307,
+  "headers": {
+    "location": "/gift-cards",
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(shop)/layout,_N_T_/(shop)/gift-card/layout,_N_T_/(shop)/gift-card/page,_N_T_/gift-card"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHNob3Ap/gift-card/__PAGE__",
+    "/!KHNob3Ap/gift-card",
+    "/!KHNob3Ap",
+    "/_index",
+    "/_head"
+  ]
+}

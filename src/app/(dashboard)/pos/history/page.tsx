@@ -175,7 +175,7 @@ export default function POSHistoryPage() {
                                         <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500 }}>GH₵{Number(s.total_amount).toFixed(2)}</td>
                                         <td style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>{s.staff_name ?? '—'}</td>
                                         <td><span className={STATUS_BADGE[s.status]}>{s.status.replace('_', ' ')}</span></td>
-                                        <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(s.created_at).toLocaleDateString()}</td>
+                                        <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(s.created_at).toLocaleDateString("en-GB")}</td>
                                         <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>
                                             {s.status === 'paid' && s.paid_at ? new Date(s.paid_at).toLocaleString() : s.expires_at ? new Date(s.expires_at).toLocaleString() : '—'}
                                         </td>

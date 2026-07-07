@@ -10,6 +10,10 @@ import type { ShopProduct, ShopCategory } from "@/lib/products";
 import { QuickAddModal } from "@/components/ui/miss-tokyo/QuickAddModal";
 import { getApplicableRule } from "@/lib/autoDiscount";
 import type { AutoDiscountRule } from "@/lib/autoDiscount";
+import { haptic } from "@/lib/haptic";
+
+// ── Brand-color blur placeholder (1×1 beige SVG) ─────────────────────────────
+const BLUR_PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IGZpbGw9IiNFOEQ1QzQiLz48L3N2Zz4=";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const COLOR_HEX: Record<string, string> = {
@@ -98,6 +102,7 @@ function ShopProductCard({
     const toggleWishlist = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        haptic("light");
         try {
             const wl = JSON.parse(localStorage.getItem("mt_wishlist") || "[]") as string[];
             const next = wl.includes(product.id) ? wl.filter(id => id !== product.id) : [...wl, product.id];
@@ -130,6 +135,8 @@ function ShopProductCard({
                             quality={90}
                             priority={priority}
                             sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
+                            placeholder="blur"
+                            blurDataURL={BLUR_PLACEHOLDER}
                             className={`object-cover transition-all duration-700 ease-in-out ${hoverSrc ? "group-hover:opacity-0" : "group-hover:scale-[1.04]"}`}
                             onError={() => setImgSrc(FALLBACK_IMG)}
                         />
@@ -141,6 +148,8 @@ function ShopProductCard({
                             fill
                             quality={90}
                             sizes="(max-width: 768px) 50vw, (max-width: 1100px) 33vw, 25vw"
+                            placeholder="blur"
+                            blurDataURL={BLUR_PLACEHOLDER}
                             className="object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-in-out"
                             onError={() => setHoverSrc(undefined)}
                         />
@@ -209,22 +218,22 @@ function ShopProductCard({
                                 setAddState("added");
                                 setTimeout(() => setAddState("idle"), 1500);
                             }}
-                            className="flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-80"
-                            style={{
-                                background: isOutOfStock && !isPreorderMode ? "#E8D5C4" : isPreorderMode ? "#C9963A" : addState === "added" ? "#22c55e" : "#fff",
-                                color: isOutOfStock && !isPreorderMode ? "#7A7167" : isPreorderMode ? "#fff" : addState === "added" ? "#fff" : "#141210",
-                                borderRadius: 2,
-                                border: "none",
-                            }}
-                            onMouseEnter={e => { if (addState === "idle" && !isOutOfStock) { (e.currentTarget as HTMLElement).style.background = "#141210"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
-                            onMouseLeave={e => { if (addState === "idle" && !isOutOfStock) { (e.currentTarget as HTMLElement).style.background = "#fff"; (e.currentTarget as HTMLElement).style.color = "#141210"; } }}
+                            className={`flex-1 flex items-center justify-center gap-[5px] text-[11px] font-medium tracking-[0.06em] uppercase py-[9px] rounded-[2px] border-0 transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-80 ${
+                                isOutOfStock && !isPreorderMode
+                                    ? "bg-[#E8D5C4] text-[#7A7167]"
+                                    : addState === "added"
+                                        ? "bg-[#22c55e] text-white"
+                                        : isPreorderMode
+                                            ? "bg-[#C9963A] text-white hover:bg-amber-600"
+                                            : "bg-white text-[#141210] hover:bg-[#141210] hover:text-white"
+                            }`}
                         >
                             {isOutOfStock && !isPreorderMode
                                 ? "OUT OF STOCK"
-                                : isPreorderMode
-                                    ? "Pre-Order"
-                                    : addState === "added"
-                                        ? <><Check size={12} strokeWidth={2.5} /> Added</>
+                                : addState === "added"
+                                    ? <><Check size={12} strokeWidth={2.5} /> Added</>
+                                    : isPreorderMode
+                                        ? "Pre-Order"
                                         : <><ShoppingBag size={12} strokeWidth={1.8} /> Add to Cart</>
                             }
                         </button>

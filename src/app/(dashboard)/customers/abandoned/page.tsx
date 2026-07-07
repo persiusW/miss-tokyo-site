@@ -143,7 +143,7 @@ export default function AbandonedCartsPage() {
                                     </td>
                                     <td style={{ fontSize: 12, color: "var(--ac-ink-4)" }}>{itemCount(order.items)}</td>
                                     <td className="r" style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>
-                                        {new Date(order.created_at).toLocaleDateString()}
+                                        {new Date(order.created_at).toLocaleDateString("en-GB")}
                                     </td>
                                     <td className="r">
                                         {remindedIds.has(order.id) ? (

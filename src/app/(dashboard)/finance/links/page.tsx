@@ -200,7 +200,7 @@ export default function PayLinksPage() {
                                         {link.description || "—"}
                                     </td>
                                     <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500 }}>GH₵ {Number(link.amount).toFixed(2)}</td>
-                                    <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(link.created_at).toLocaleDateString()}</td>
+                                    <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(link.created_at).toLocaleDateString("en-GB")}</td>
                                     <td className="r">
                                         {link.paystack_url ? (
                                             <button onClick={() => copyToClipboard(link.paystack_url!)}

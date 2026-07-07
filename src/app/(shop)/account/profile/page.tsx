@@ -59,7 +59,23 @@ export default function AccountProfilePage() {
         setSaving(false);
     };
 
-    if (loading) return <p className="text-neutral-400 italic font-serif">Loading...</p>;
+    if (loading) return (
+        <div className="max-w-lg space-y-8 animate-pulse">
+            <div className="h-4 w-24 bg-neutral-200 rounded" />
+            <div className="space-y-3">
+                <div className="h-3 w-16 bg-neutral-100 rounded" />
+                <div className="h-8 w-full bg-neutral-100 rounded" />
+            </div>
+            <div className="space-y-3">
+                <div className="h-3 w-20 bg-neutral-100 rounded" />
+                <div className="h-8 w-full bg-neutral-100 rounded" />
+            </div>
+            <div className="space-y-3">
+                <div className="h-3 w-14 bg-neutral-100 rounded" />
+                <div className="h-8 w-full bg-neutral-100 rounded" />
+            </div>
+        </div>
+    );
 
     return (
         <div className="max-w-lg">

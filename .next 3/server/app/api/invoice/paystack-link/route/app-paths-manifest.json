@@ -1,0 +1,3 @@
+{
+  "/api/invoice/paystack-link/route": "app/api/invoice/paystack-link/route.js"
+}

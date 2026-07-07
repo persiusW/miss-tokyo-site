@@ -1,0 +1,20 @@
+{
+  "node": {
+    "60f9fcda735f889a95087b247b05c308fd9d9eea97": {
+      "workers": {
+        "app/(dashboard)/customers/[id]/page": {
+          "moduleId": 60580,
+          "async": false,
+          "exportedName": "logSignIn",
+          "filename": "src/lib/utils/logSignIn.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/customers/[id]/page": "rsc"
+      },
+      "exportedName": "logSignIn",
+      "filename": "src/lib/utils/logSignIn.ts"
+    }
+  },
+  "edge": {}
+}

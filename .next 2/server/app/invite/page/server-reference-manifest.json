@@ -1,0 +1,20 @@
+{
+  "node": {
+    "408d55cc61d2c91f78b36971ea3f2322ce32281e64": {
+      "workers": {
+        "app/invite/page": {
+          "moduleId": 23346,
+          "async": false,
+          "exportedName": "acceptInvite",
+          "filename": "src/app/invite/actions.ts"
+        }
+      },
+      "layer": {
+        "app/invite/page": "action-browser"
+      },
+      "exportedName": "acceptInvite",
+      "filename": "src/app/invite/actions.ts"
+    }
+  },
+  "edge": {}
+}

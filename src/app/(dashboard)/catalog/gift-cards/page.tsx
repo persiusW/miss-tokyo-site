@@ -261,7 +261,7 @@ export default function GiftCardsPage() {
                                         </span>
                                     </td>
                                     <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>
-                                        {new Date(g.created_at).toLocaleDateString()}
+                                        {new Date(g.created_at).toLocaleDateString("en-GB")}
                                     </td>
                                     <td>
                                         <button onClick={() => openView(g)}
@@ -400,7 +400,7 @@ export default function GiftCardsPage() {
                                     { label: "Sender Email", val: viewCard.purchased_by_email || "—" },
                                     { label: "Delivery", val: viewCard.delivery_mode === "email" ? "Email" : "Self" },
                                     { label: "Sent At", val: viewCard.sent_at ? new Date(viewCard.sent_at).toLocaleString() : "—" },
-                                    { label: "Expires", val: viewCard.expires_at ? new Date(viewCard.expires_at).toLocaleDateString() : "Never" },
+                                    { label: "Expires", val: viewCard.expires_at ? new Date(viewCard.expires_at).toLocaleDateString("en-GB") : "Never" },
                                     { label: "Issued", val: new Date(viewCard.created_at).toLocaleString() },
                                 ].map(({ label, val }) => (
                                     <div key={label} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--ac-line)", paddingBottom: 10 }}>
@@ -429,7 +429,7 @@ export default function GiftCardsPage() {
                                             <div key={r.id} style={{ background: "var(--ac-panel-2)", borderRadius: "var(--r-sm)", padding: "10px 12px" }}>
                                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                                                     <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 600, color: "var(--ac-danger)" }}>-{fmt(r.amount_used)}</span>
-                                                    <span style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(r.redeemed_at).toLocaleDateString()}</span>
+                                                    <span style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(r.redeemed_at).toLocaleDateString("en-GB")}</span>
                                                 </div>
                                                 <div style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>
                                                     {fmt(r.balance_before)} → {fmt(r.balance_after)}

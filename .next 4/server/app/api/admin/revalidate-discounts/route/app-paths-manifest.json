@@ -1,0 +1,3 @@
+{
+  "/api/admin/revalidate-discounts/route": "app/api/admin/revalidate-discounts/route.js"
+}

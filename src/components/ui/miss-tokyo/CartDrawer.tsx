@@ -66,7 +66,7 @@ export function CartDrawer() {
             variantId: null,
             size: i.size,
             color: i.color,
-            stitching: i.stitching,
+            brand: i.brand,
             quantity: i.quantity,
         }));
 

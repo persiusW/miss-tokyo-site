@@ -33,7 +33,7 @@ type BusinessSettings = {
 type StoreSettings = {
     global_sizes: string[];
     global_colors: string[];
-    global_stitching: string[];
+    global_brands: string[];
     enable_store_pickup: boolean;
     maintenance_mode: boolean;
     home_grid_cols: 2 | 3 | 4 | 5;
@@ -74,7 +74,7 @@ const DEFAULT_BUSINESS: BusinessSettings = {
 const DEFAULT_STORE: StoreSettings = {
     global_sizes: ["39", "40", "41", "42", "43", "44", "45"],
     global_colors: ["Noir", "Cognac", "Sand"],
-    global_stitching: ["Tonal", "Contrast White"],
+    global_brands: [],
     enable_store_pickup: false,
     maintenance_mode: false,
     home_grid_cols: 4,
@@ -320,7 +320,7 @@ function StoreTab() {
                     setForm({
                         global_sizes: sData.global_sizes || DEFAULT_STORE.global_sizes,
                         global_colors: sData.global_colors || DEFAULT_STORE.global_colors,
-                        global_stitching: sData.global_stitching || DEFAULT_STORE.global_stitching,
+                        global_brands: sData.global_brands || DEFAULT_STORE.global_brands,
                         enable_store_pickup: sData.enable_store_pickup || false,
                         maintenance_mode: sData.maintenance_mode || false,
                         home_grid_cols: (sData.home_grid_cols as 2 | 3 | 4 | 5) || 4,
@@ -453,6 +453,13 @@ function StoreTab() {
                                         <TagInput value={form.global_colors} onChange={(tags) => setForm(p => ({ ...p, global_colors: tags }))} placeholder="Type a color and press Enter…" />
                                     </div>
                                     {subLabel("Press Enter or , to add each color.")}
+                                </div>
+                                <div>
+                                    <label className="ac-label">Global Brands</label>
+                                    <div style={{ marginTop: 6 }}>
+                                        <TagInput value={form.global_brands} onChange={(tags) => setForm(p => ({ ...p, global_brands: tags }))} placeholder="Type a brand and press Enter…" />
+                                    </div>
+                                    {subLabel("Press Enter or , to add each brand.")}
                                 </div>
                             </div>
                         </div>

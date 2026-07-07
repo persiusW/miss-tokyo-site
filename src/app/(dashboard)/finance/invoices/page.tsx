@@ -395,7 +395,7 @@ export default function InvoicesPage() {
                                             ))}
                                         </select>
                                     </td>
-                                    <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(doc.created_at).toLocaleDateString()}</td>
+                                    <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(doc.created_at).toLocaleDateString("en-GB")}</td>
                                     <td className="r">
                                         <div style={{ display: "flex", alignItems: "center", gap: 14, justifyContent: "flex-end" }}>
                                             <Link href={`/finance/invoices/${doc.id}`} className="ac-text-link" style={{ fontSize: 11 }}>View</Link>

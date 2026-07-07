@@ -1,0 +1,3 @@
+{
+  "/api/pos/expire/route": "app/api/pos/expire/route.js"
+}

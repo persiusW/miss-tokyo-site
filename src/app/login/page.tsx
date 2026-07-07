@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { NavBar } from "@/components/ui/miss-tokyo/NavBar";
+import { MobileTabBar } from "@/components/ui/miss-tokyo/MobileTabBar";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -58,7 +60,9 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-white px-6">
+        <div className="min-h-screen flex flex-col bg-white">
+            <NavBar initialUser={null} />
+            <div className="flex-1 flex items-center justify-center px-6 pt-20 pb-safe-tab">
             <style jsx global>{`
                 input:-webkit-autofill {
                     -webkit-box-shadow: 0 0 0 100px white inset !important;
@@ -201,6 +205,8 @@ export default function LoginPage() {
                     </form>
                 )}
             </div>
+            </div>
+            <MobileTabBar />
         </div>
     );
 }

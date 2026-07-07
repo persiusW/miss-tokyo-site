@@ -1,0 +1,17 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(shop)/layout,_N_T_/(shop)/products/layout,_N_T_/(shop)/products/[slug]/layout,_N_T_/(shop)/products/[slug]/page,_N_T_/products/asey-slippers"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHNob3Ap/products/$d$slug/__PAGE__",
+    "/!KHNob3Ap/products/$d$slug",
+    "/!KHNob3Ap/products",
+    "/!KHNob3Ap",
+    "/_index",
+    "/_head"
+  ]
+}

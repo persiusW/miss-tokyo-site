@@ -139,7 +139,7 @@ export default function WholesalersPage() {
                                             <div style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{w.full_name || "—"}</div>
                                             <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{w.email}</div>
                                         </td>
-                                        <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(w.created_at).toLocaleDateString()}</td>
+                                        <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(w.created_at).toLocaleDateString("en-GB")}</td>
                                         <td style={{ textAlign: "right" }}>
                                             <button onClick={() => handleRevoke(w)}
                                                 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}

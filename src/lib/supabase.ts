@@ -22,7 +22,8 @@ export function createClient() {
                 persistSession: true,
                 autoRefreshToken: true,
                 detectSessionInUrl: true,
-                storageKey: 'miss-tokyo-auth',
+                // NOTE: never set storageKey here — it renames the sb-* auth cookie
+                // and breaks middleware session detection (silent login loop).
             },
         });
     }

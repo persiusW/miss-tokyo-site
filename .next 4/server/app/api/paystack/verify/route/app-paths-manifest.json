@@ -1,0 +1,3 @@
+{
+  "/api/paystack/verify/route": "app/api/paystack/verify/route.js"
+}

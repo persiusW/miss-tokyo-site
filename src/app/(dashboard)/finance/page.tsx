@@ -134,7 +134,7 @@ export default function FinancePage() {
                                     <td>
                                         <span className={`ac-badge ${STATUS_BADGE[doc.status] || "ac-badge-inactive"}`}>{doc.status}</span>
                                     </td>
-                                    <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(doc.created_at).toLocaleDateString()}</td>
+                                    <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(doc.created_at).toLocaleDateString("en-GB")}</td>
                                     <td className="r">
                                         <div style={{ display: "flex", alignItems: "center", gap: 16, justifyContent: "flex-end" }}>
                                             <button onClick={() => copyPayLink(doc.id, doc.amount)}

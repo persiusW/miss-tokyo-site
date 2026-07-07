@@ -1,0 +1,3 @@
+{
+  "/(shop)/checkout/cancel/page": "app/(shop)/checkout/cancel/page.js"
+}

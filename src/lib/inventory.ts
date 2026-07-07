@@ -11,7 +11,7 @@ export type ReserveItem = {
     variantId?: string | null;
     size?: string;
     color?: string;
-    stitching?: string;
+    brand?: string;
     quantity: number;
 };
 
@@ -58,11 +58,11 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
         if (variantItems.length > 0) {
             const { data: variants } = await supabaseAdmin
                 .from("product_variants")
-                .select("product_id, size, color, stitching, inventory_count")
+                .select("product_id, size, color, brand, inventory_count")
                 .in("product_id", variantTrackedIds);
 
             for (const v of variants ?? []) {
-                const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+                const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
                 variantStockMap[key] = (v as any).inventory_count ?? 0;
             }
         }
@@ -77,7 +77,7 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
 
         let stock: number;
         if (product.track_variant_inventory && item.size) {
-            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
             stock = variantStockMap[key] ?? 0;
         } else {
             stock = product.inventory_count ?? 0;
@@ -115,11 +115,11 @@ export async function getStockStatus(items: ReserveItem[]): Promise<StockStatus[
     if (variantTrackedIds.length > 0) {
         const { data: variants } = await supabaseAdmin
             .from("product_variants")
-            .select("product_id, size, color, stitching, inventory_count")
+            .select("product_id, size, color, brand, inventory_count")
             .in("product_id", variantTrackedIds);
 
         for (const v of variants ?? []) {
-            const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.stitching)}`;
+            const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
             variantStockMap[key] = (v as any).inventory_count ?? 0;
         }
     }
@@ -132,7 +132,7 @@ export async function getStockStatus(items: ReserveItem[]): Promise<StockStatus[
 
         let available: number;
         if (product.track_variant_inventory && item.size) {
-            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.stitching)}`;
+            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
             available = variantStockMap[key] ?? 0;
         } else {
             available = product.inventory_count ?? 0;
@@ -256,6 +256,74 @@ export async function releaseReservation(orderId: string): Promise<void> {
         .from("online_reservations")
         .delete()
         .eq("order_id", orderId);
+}
+
+/**
+ * Fallback decrement from an order's stored items, used when no reservation row
+ * exists (order predates the reservation system, or the row was never created).
+ * Resolves current variant IDs by (size, color, brand) and decrements variant +
+ * product-level stock. This is the ONLY sanctioned direct-decrement path for the
+ * online checkout fallbacks — keeps inventory writes inside this file.
+ */
+export async function fallbackDecrementFromItems(
+    items: Array<{ productId: string; size?: string; color?: string; brand?: string; variantId?: string | null; quantity?: number }>,
+): Promise<void> {
+    if (!items?.length) return;
+
+    const pIds = [...new Set(items.map(i => i.productId).filter(Boolean))];
+    if (pIds.length === 0) return;
+
+    const { data: products } = await supabaseAdmin
+        .from("products")
+        .select("id, inventory_count, track_inventory, track_variant_inventory")
+        .in("id", pIds);
+    const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
+
+    const variantTrackedPIds = new Set<string>(
+        (products ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
+    );
+
+    const variantIdLookup: Record<string, string> = {};
+    if (variantTrackedPIds.size > 0) {
+        const { data: variants } = await supabaseAdmin
+            .from("product_variants")
+            .select("id, product_id, size, color, brand")
+            .in("product_id", [...variantTrackedPIds]);
+        for (const v of variants ?? []) {
+            const k = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+            variantIdLookup[k] = v.id;
+        }
+    }
+
+    await Promise.allSettled(items.map(async (item) => {
+        const product = productMap.get(item.productId) as any;
+        if (!product || product.track_inventory === false) return;
+        const qty = item.quantity ?? 1;
+
+        if (product.track_variant_inventory) {
+            const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
+            const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
+            if (resolvedVariantId) {
+                const { data: variant } = await supabaseAdmin
+                    .from("product_variants")
+                    .select("inventory_count")
+                    .eq("id", resolvedVariantId)
+                    .single();
+                if (variant) {
+                    await supabaseAdmin.from("product_variants")
+                        .update({ inventory_count: Math.max(0, (variant.inventory_count ?? 0) - qty) })
+                        .eq("id", resolvedVariantId);
+                }
+            }
+            await supabaseAdmin.from("products")
+                .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
+                .eq("id", item.productId);
+        } else {
+            await supabaseAdmin.from("products")
+                .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
+                .eq("id", item.productId);
+        }
+    }));
 }
 
 /**

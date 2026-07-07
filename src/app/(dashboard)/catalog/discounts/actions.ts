@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { logActivity } from "@/lib/utils/logActivity";
@@ -28,14 +29,14 @@ export async function createCoupon(payload: Record<string, unknown>) {
         .single();
     if (error) return { error: error.message };
 
-    await logActivity({
+    after(() => logActivity({
         userId: caller.userId,
         userRole: caller.userRole,
         actionType: "CREATE_DISCOUNT",
         resource: "discount",
         resourceId: data.id,
         details: { code: payload.code, discount_type: payload.discount_type, discount_value: payload.discount_value },
-    });
+    }));
     return { success: true, data };
 }
 
@@ -49,14 +50,14 @@ export async function toggleCoupon(id: string, currentIsActive: boolean, code: s
         .eq("id", id);
     if (error) return { error: error.message };
 
-    await logActivity({
+    after(() => logActivity({
         userId: caller.userId,
         userRole: caller.userRole,
         actionType: "TOGGLE_DISCOUNT",
         resource: "discount",
         resourceId: id,
         details: { code, is_active: !currentIsActive },
-    });
+    }));
     return { success: true };
 }
 
@@ -70,13 +71,13 @@ export async function deleteCoupon(id: string, code: string) {
         .eq("id", id);
     if (error) return { error: error.message };
 
-    await logActivity({
+    after(() => logActivity({
         userId: caller.userId,
         userRole: caller.userRole,
         actionType: "DELETE_DISCOUNT",
         resource: "discount",
         resourceId: id,
         details: { code },
-    });
+    }));
     return { success: true };
 }

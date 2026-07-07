@@ -1,0 +1,3 @@
+{
+  "/api/cron/expire-reservations/route": "app/api/cron/expire-reservations/route.js"
+}

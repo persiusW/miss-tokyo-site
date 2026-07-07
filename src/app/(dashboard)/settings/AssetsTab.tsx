@@ -144,7 +144,7 @@ function ImagesSubTab() {
                             <div className="flex justify-between items-center pt-1">
                                 <span className="text-[10px] text-neutral-400 tracking-wider">
                                     {asset?.updated_at
-                                        ? `Updated ${new Date(asset.updated_at).toLocaleDateString()}`
+                                        ? `Updated ${new Date(asset.updated_at).toLocaleDateString("en-GB")}`
                                         : "Not yet configured"}
                                 </span>
                                 <button

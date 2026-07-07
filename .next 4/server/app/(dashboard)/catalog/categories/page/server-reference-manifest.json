@@ -1,0 +1,65 @@
+{
+  "node": {
+    "60f9fcda735f889a95087b247b05c308fd9d9eea97": {
+      "workers": {
+        "app/(dashboard)/catalog/categories/page": {
+          "moduleId": 7078,
+          "async": false,
+          "exportedName": "logSignIn",
+          "filename": "src/lib/utils/logSignIn.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/catalog/categories/page": "rsc"
+      },
+      "exportedName": "logSignIn",
+      "filename": "src/lib/utils/logSignIn.ts"
+    },
+    "4029fc86f0c9e92a71fb9fa037099be7256618ed94": {
+      "workers": {
+        "app/(dashboard)/catalog/categories/page": {
+          "moduleId": 7078,
+          "async": false,
+          "exportedName": "createCategory",
+          "filename": "src/app/(dashboard)/catalog/categories/actions.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/catalog/categories/page": "action-browser"
+      },
+      "exportedName": "createCategory",
+      "filename": "src/app/(dashboard)/catalog/categories/actions.ts"
+    },
+    "6009e087dacc76c53fe32a875a8b86aa188d6aa14c": {
+      "workers": {
+        "app/(dashboard)/catalog/categories/page": {
+          "moduleId": 7078,
+          "async": false,
+          "exportedName": "updateCategory",
+          "filename": "src/app/(dashboard)/catalog/categories/actions.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/catalog/categories/page": "action-browser"
+      },
+      "exportedName": "updateCategory",
+      "filename": "src/app/(dashboard)/catalog/categories/actions.ts"
+    },
+    "608cde7a0867bda75eb745cf1d85542a78ba3dd6c3": {
+      "workers": {
+        "app/(dashboard)/catalog/categories/page": {
+          "moduleId": 7078,
+          "async": false,
+          "exportedName": "deleteCategory",
+          "filename": "src/app/(dashboard)/catalog/categories/actions.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/catalog/categories/page": "action-browser"
+      },
+      "exportedName": "deleteCategory",
+      "filename": "src/app/(dashboard)/catalog/categories/actions.ts"
+    }
+  },
+  "edge": {}
+}

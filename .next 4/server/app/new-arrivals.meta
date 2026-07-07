@@ -1,0 +1,18 @@
+{
+  "status": 308,
+  "headers": {
+    "location": "/shop",
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(shop)/layout,_N_T_/(shop)/new-arrivals/layout,_N_T_/(shop)/new-arrivals/page,_N_T_/new-arrivals"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KHNob3Ap/new-arrivals/__PAGE__",
+    "/!KHNob3Ap/new-arrivals",
+    "/!KHNob3Ap",
+    "/_index",
+    "/_head"
+  ]
+}

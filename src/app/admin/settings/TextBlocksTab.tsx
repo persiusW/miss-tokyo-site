@@ -80,7 +80,7 @@ export function TextBlocksTab() {
                                     />
                                     <div className="mt-4 flex justify-end">
                                         <span className="text-[9px] text-gray-200 uppercase tracking-widest">
-                                            {row.updated_at ? `Captured: ${new Date(row.updated_at).toLocaleDateString()}` : ""}
+                                            {row.updated_at ? `Captured: ${new Date(row.updated_at).toLocaleDateString("en-GB")}` : ""}
                                         </span>
                                     </div>
                                 </div>

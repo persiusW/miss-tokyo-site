@@ -249,8 +249,8 @@ export default function AutoDiscountsPage() {
     }
 
     function formatDates(rule: AutoDiscount) {
-        const from = rule.starts_at ? new Date(rule.starts_at).toLocaleDateString() : "—";
-        const to = rule.ends_at ? new Date(rule.ends_at).toLocaleDateString() : "No end";
+        const from = rule.starts_at ? new Date(rule.starts_at).toLocaleDateString("en-GB") : "—";
+        const to = rule.ends_at ? new Date(rule.ends_at).toLocaleDateString("en-GB") : "No end";
         return `${from} → ${to}`;
     }
 

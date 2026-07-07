@@ -21,7 +21,8 @@ export interface QuickViewProduct {
     discount_value?: number | null;
     image_urls: string[] | null;
     available_colors: string[] | null;
-    available_stitching?: string[] | null;
+    available_brands?: string[] | null;
+    brand_variants?: Array<{ name: string; in_stock: boolean }> | null;
     available_sizes: string[] | null;
     inventory_count?: number;
     track_inventory?: boolean;
@@ -47,7 +48,7 @@ export function QuickViewModal({
     product: productProp,
     slug,
     onClose,
-    openDrawerOnAdd = true,
+    openDrawerOnAdd = false,
 }: QuickViewModalProps) {
     const [fetched, setFetched] = useState<QuickViewProduct | null>(null);
     const [loading, setLoading] = useState(!productProp);
@@ -59,7 +60,7 @@ export function QuickViewModal({
         setLoading(true);
         supabase
             .from("products")
-            .select("id, name, slug, price_ghs, compare_at_price_ghs, is_sale, discount_value, image_urls, available_colors, available_stitching, available_sizes, inventory_count, track_inventory, track_variant_inventory")
+            .select("id, name, slug, price_ghs, compare_at_price_ghs, is_sale, discount_value, image_urls, available_colors, available_brands, brand_variants, available_sizes, inventory_count, track_inventory, track_variant_inventory")
             .eq("slug", slug)
             .single()
             .then(({ data }: { data: any }) => {
@@ -149,7 +150,7 @@ export function QuickViewModal({
                                             priceNum={effectivePrice}
                                             price={`GH₵${effectivePrice.toFixed(2)}`}
                                             colors={product.available_colors || ["Noir", "Cognac", "Sand"]}
-                                            // stitching={product.available_stitching || ["Tonal", "Contrast White"]}
+                                            brands={product.available_brands || []}
                                             availableSizes={product.available_sizes || null}
                                             inventoryCount={product.inventory_count ?? 0}
                                             trackInventory={product.track_inventory ?? true}

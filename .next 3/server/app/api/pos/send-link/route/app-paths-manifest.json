@@ -1,0 +1,3 @@
+{
+  "/api/pos/send-link/route": "app/api/pos/send-link/route.js"
+}

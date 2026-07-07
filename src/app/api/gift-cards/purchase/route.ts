@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
 
         if (!paystackData.status || !paystackData.data?.authorization_url) {
             // Paystack init failed — clean up the pending gift card
-            await supabaseAdmin.from("gift_cards").update({ status: "cancelled" }).eq("id", card.id);
+            await supabaseAdmin.from("gift_cards").update({ status: "cancelled", is_active: false }).eq("id", card.id);
             console.error("[gift-cards/purchase] Paystack init failed", paystackData);
             return NextResponse.json(
                 { success: false, message: paystackData.message || "Payment initialization failed. Please try again." },

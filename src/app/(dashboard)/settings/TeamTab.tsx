@@ -375,7 +375,7 @@ export function TeamTab() {
                                                 </span>
                                             </td>
                                             <td style={{ color: "var(--ac-ink-3)", fontSize: 12 }}>
-                                                {new Date(member.created_at).toLocaleDateString()}
+                                                {new Date(member.created_at).toLocaleDateString("en-GB")}
                                             </td>
                                             <td className="r">
                                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>

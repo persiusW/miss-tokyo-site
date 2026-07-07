@@ -17,6 +17,12 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "invalid items param" }, { status: 400 });
     }
 
+    // Cap request size — this endpoint is unauthenticated (used by the cart drawer);
+    // an unbounded array could be used to hammer the DB with a huge .in() query.
+    if (items.length > 100) {
+        return NextResponse.json({ error: "too many items (max 100)" }, { status: 400 });
+    }
+
     const results = await getStockStatus(items);
     return NextResponse.json({ results }, { headers: { "Cache-Control": "private, no-store" } });
 }

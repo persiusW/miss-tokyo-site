@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (card.expires_at && new Date(card.expires_at) < new Date()) {
-            await supabaseAdmin.from("gift_cards").update({ status: "expired" }).eq("id", card.id);
+            await supabaseAdmin.from("gift_cards").update({ status: "expired", is_active: false }).eq("id", card.id);
             return NextResponse.json({ success: false, message: "Gift card has expired." }, { status: 400 });
         }
 

@@ -1,0 +1,663 @@
+"use client";
+
+import React, { useState, useMemo, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
+import { toast } from "@/lib/toast";
+
+type Category = { id: string; name: string; slug: string; is_wholesale: boolean };
+type VariantStore = Record<string, { sku: string; inventory_count: number }>;
+
+type Props = {
+    id: string;
+    product: any;
+    categories: Category[];
+    storeData: any;
+    existingVariants: any[];
+};
+
+const DebouncedInput = React.memo(({ id, value, onChange, type = "text", placeholder, className, required, min, step }: any) => {
+    const [localVal, setLocalVal] = useState(value);
+
+    React.useEffect(() => { setLocalVal(value); }, [value]);
+
+    React.useEffect(() => {
+        const handler = setTimeout(() => {
+            if (localVal !== value) onChange({ target: { id, value: localVal, type } });
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [localVal, value, id, onChange, type]);
+
+    return (
+        <input
+            id={id}
+            type={type}
+            value={localVal}
+            onChange={(e) => setLocalVal(e.target.value)}
+            placeholder={placeholder}
+            className={className?.replace("transition-colors", "")}
+            required={required}
+            min={min}
+            step={step}
+        />
+    );
+});
+DebouncedInput.displayName = "DebouncedInput";
+
+const DebouncedTextarea = React.memo(({ id, value, onChange, rows, placeholder, className }: any) => {
+    const [localVal, setLocalVal] = useState(value);
+
+    React.useEffect(() => { setLocalVal(value); }, [value]);
+
+    React.useEffect(() => {
+        const handler = setTimeout(() => {
+            if (localVal !== value) onChange({ target: { id, value: localVal, type: "textarea" } });
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [localVal, value, id, onChange]);
+
+    return (
+        <textarea
+            id={id}
+            rows={rows}
+            value={localVal}
+            onChange={(e) => setLocalVal(e.target.value)}
+            placeholder={placeholder}
+            className={className?.replace("transition-colors", "")}
+        />
+    );
+});
+DebouncedTextarea.displayName = "DebouncedTextarea";
+
+function buildVariantStore(existingVariants: any[]): VariantStore {
+    const store: VariantStore = {};
+    for (const v of existingVariants) {
+        const key = `${v.size || ""}||${v.color || ""}||${v.brand || ""}`;
+        store[key] = { sku: v.sku || "", inventory_count: v.inventory_count ?? 0 };
+    }
+    return store;
+}
+
+export default function EditProductForm({ id, product, categories, storeData, existingVariants }: Props) {
+    const router = useRouter();
+    const [saving, setSaving] = useState(false);
+    const [uploadingMedia, setUploadingMedia] = useState(false);
+
+    // ── Variant options ───────────────────────────────────────────────────────
+    const globalSizes: string[] = storeData?.global_sizes ?? [];
+    const globalColors: string[] = storeData?.global_colors ?? [];
+    const globalBrands: string[] = storeData?.global_brands ?? [];
+
+    const initSizes: string[] = product.available_sizes?.length ? product.available_sizes : [];
+    const initColors: string[] = product.available_colors?.length ? product.available_colors : [];
+    const initBrands: string[] = product.available_brands?.length ? product.available_brands : [];
+
+    const [selectedSizes, setSelectedSizes] = useState<string[]>(initSizes);
+    const [selectedColors, setSelectedColors] = useState<string[]>(initColors);
+    const [selectedBrands, setSelectedBrands] = useState<string[]>(initBrands);
+    const [sizeEnabled, setSizeEnabled] = useState(initSizes.length > 0);
+    const [colorEnabled, setColorEnabled] = useState(initColors.length > 0);
+    const [brandEnabled, setBrandEnabled] = useState(initBrands.length > 0);
+
+    // ── Inventory ─────────────────────────────────────────────────────────────
+    const [trackInventory, setTrackInventory] = useState(product.track_inventory ?? true);
+    const [trackVariantInventory, setTrackVariantInventory] = useState(product.track_variant_inventory ?? false);
+    const [variantData, setVariantData] = useState<VariantStore>(() => buildVariantStore(existingVariants));
+
+    // ── Categories ────────────────────────────────────────────────────────────
+    const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(
+        Array.isArray(product.category_ids) ? product.category_ids : []
+    );
+
+    // ── Wholesale ─────────────────────────────────────────────────────────────
+    const wholesaleTierConfig = storeData?.wholesale_enabled ? {
+        enabled: true,
+        tier1Min: storeData.wholesale_tier_1_min ?? 3,
+        tier1Max: storeData.wholesale_tier_1_max ?? 5,
+        tier2Min: storeData.wholesale_tier_2_min ?? 8,
+        tier2Max: storeData.wholesale_tier_2_max ?? 10,
+        tier3Min: storeData.wholesale_tier_3_min ?? 12,
+        tier3Max: storeData.wholesale_tier_3_max ?? 24,
+    } : null;
+    const [wholesaleOverride, setWholesaleOverride] = useState(product.wholesale_override === true);
+    const [wholesalePrices, setWholesalePrices] = useState({
+        tier1: product.wholesale_price_tier_1 != null ? String(product.wholesale_price_tier_1) : "",
+        tier2: product.wholesale_price_tier_2 != null ? String(product.wholesale_price_tier_2) : "",
+        tier3: product.wholesale_price_tier_3 != null ? String(product.wholesale_price_tier_3) : "",
+    });
+
+    // ── Form data ─────────────────────────────────────────────────────────────
+    const [imageUrls, setImageUrls] = useState<string[]>(product.image_urls || []);
+    const [formData, setFormData] = useState({
+        name: product.name || "",
+        slug: product.slug || "",
+        sku: product.sku || "",
+        price_ghs: product.price_ghs || 0,
+        compare_at_price_ghs: product.compare_at_price_ghs ?? "" as string | number,
+        is_sale: product.is_sale ?? false,
+        discount_value: product.discount_value ?? 0,
+        inventory_count: product.inventory_count || 0,
+        description: product.description || "",
+        category_type: product.category_type || "",
+        is_active: product.is_active ?? true,
+    });
+
+    // ── Variant combos ────────────────────────────────────────────────────────
+    const variantCombos = useMemo(() => {
+        const ss = selectedSizes.length > 0 ? selectedSizes : [""];
+        const cc = selectedColors.length > 0 ? selectedColors : [""];
+        const bb = selectedBrands.length > 0 ? selectedBrands : [""];
+        const combos: Array<{ size: string; color: string; brand: string; key: string }> = [];
+        for (const s of ss) for (const c of cc) for (const b of bb) {
+            combos.push({ size: s, color: c, brand: b, key: `${s}||${c}||${b}` });
+        }
+        return combos;
+    }, [selectedSizes, selectedColors, selectedBrands]);
+
+    // ── Handlers ──────────────────────────────────────────────────────────────
+    const handleChange = useCallback((e: any) => {
+        const { id: fieldId, value, type } = e.target;
+        setFormData(prev => ({ ...prev, [fieldId]: type === "checkbox" ? e.target.checked : value }));
+    }, []);
+
+    const toggleSize = (size: string) =>
+        setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]);
+
+    const toggleColor = (col: string) =>
+        setSelectedColors(prev => prev.includes(col) ? prev.filter(s => s !== col) : [...prev, col]);
+
+    const toggleBrand = (b: string) =>
+        setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]);
+
+    const updateVariantCell = (key: string, field: "sku" | "inventory_count", value: string | number) => {
+        setVariantData(prev => ({
+            ...prev,
+            [key]: { sku: prev[key]?.sku ?? "", inventory_count: prev[key]?.inventory_count ?? 0, [field]: value },
+        }));
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            const res = await fetch("/api/admin/products", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id,
+                    name: formData.name,
+                    slug: formData.slug,
+                    sku: formData.sku || null,
+                    price_ghs: Number(formData.price_ghs),
+                    compare_at_price_ghs: formData.compare_at_price_ghs !== "" ? Number(formData.compare_at_price_ghs) : null,
+                    is_sale: formData.is_sale,
+                    discount_value: formData.is_sale ? Number(formData.discount_value) : 0,
+                    inventory_count: trackInventory && !trackVariantInventory ? Number(formData.inventory_count) : 9999,
+                    track_inventory: trackInventory,
+                    track_variant_inventory: trackVariantInventory,
+                    description: formData.description,
+                    category_type: formData.category_type,
+                    category_ids: selectedCategoryIds,
+                    image_urls: imageUrls,
+                    available_sizes: sizeEnabled ? selectedSizes : [],
+                    available_colors: colorEnabled ? selectedColors : [],
+                    available_brands: brandEnabled ? selectedBrands : [],
+                    is_active: formData.is_active,
+                    wholesale_override: wholesaleOverride,
+                    wholesale_price_tier_1: wholesaleOverride && wholesalePrices.tier1 ? Number(wholesalePrices.tier1) : null,
+                    wholesale_price_tier_2: wholesaleOverride && wholesalePrices.tier2 ? Number(wholesalePrices.tier2) : null,
+                    wholesale_price_tier_3: wholesaleOverride && wholesalePrices.tier3 ? Number(wholesalePrices.tier3) : null,
+                    variants: (trackInventory && trackVariantInventory && variantCombos.length > 0)
+                        ? variantCombos.map(c => ({
+                            product_id: id,
+                            size: c.size || null,
+                            color: c.color || null,
+                            brand: c.brand || null,
+                            sku: variantData[c.key]?.sku || null,
+                            inventory_count: variantData[c.key]?.inventory_count ?? 0,
+                        }))
+                        : undefined,
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Failed to update product");
+            toast.success("Product updated.");
+            router.push("/catalog/products");
+            router.refresh();
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to update product.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="space-y-8">
+            <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div>
+                    <div className="flex items-center gap-2 text-sm text-neutral-500 mb-4">
+                        <Link href="/catalog/products" className="hover:text-black">Products</Link>
+                        <span>/</span>
+                        <span className="text-black">Edit</span>
+                    </div>
+                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Edit Product</h1>
+                    <p className="text-neutral-500">{formData.name}</p>
+                </div>
+                <div className="flex items-center gap-3 md:mt-8 w-full md:w-auto">
+                    <Link
+                        href="/catalog/products"
+                        className="flex-1 md:flex-none text-center px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-100 transition-colors border border-neutral-200"
+                    >
+                        Cancel
+                    </Link>
+                    <button
+                        type="submit"
+                        form="product-form"
+                        disabled={saving || uploadingMedia}
+                        className="flex-1 md:flex-none px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
+                    >
+                        {saving ? "Saving..." : "Update Product"}
+                    </button>
+                </div>
+            </header>
+
+            <form id="product-form" onSubmit={handleSubmit}>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {/* Left column */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* Basic Info */}
+                        <div className="bg-white p-4 sm:p-8 border border-neutral-200 space-y-8">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Basic Information</h2>
+
+                            <div>
+                                <label htmlFor="name" className="block text-xs uppercase tracking-widest font-semibold mb-3">Product Name</label>
+                                <DebouncedInput
+                                    type="text" id="name" value={formData.name} onChange={handleChange} required
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <label htmlFor="slug" className="block text-xs uppercase tracking-widest font-semibold mb-3">URL Slug</label>
+                                    <DebouncedInput
+                                        type="text" id="slug" value={formData.slug} onChange={handleChange} required
+                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
+                                    />
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label htmlFor="category_type" className="block text-xs uppercase tracking-widest font-semibold mb-3">Primary Category</label>
+                                        {categories.length === 0 ? (
+                                            <div className="border-b border-neutral-200 py-2">
+                                                <span className="text-sm text-neutral-400 italic">No categories — </span>
+                                                <Link href="/catalog/categories" className="text-sm text-black underline">add one first</Link>
+                                            </div>
+                                        ) : (
+                                            <select
+                                                id="category_type" value={formData.category_type} onChange={handleChange} required
+                                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none appearance-none"
+                                            >
+                                                <option value="" disabled>Select Category</option>
+                                                {categories.filter(c => !c.is_wholesale).map(cat => (
+                                                    <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
+                                    {categories.length > 0 && (
+                                        <div>
+                                            <label className="block text-xs uppercase tracking-widest font-semibold mb-3">
+                                                Additional Categories
+                                                <span className="ml-2 text-[10px] font-normal text-neutral-400 normal-case tracking-normal">incl. wholesale</span>
+                                            </label>
+                                            <div className="border border-neutral-200 rounded-lg divide-y divide-neutral-100 max-h-44 overflow-y-auto">
+                                                {categories.map(cat => (
+                                                    <label key={cat.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-neutral-50 transition-colors">
+                                                        <input
+                                                            type="checkbox" className="w-4 h-4 accent-black flex-shrink-0"
+                                                            checked={selectedCategoryIds.includes(cat.id)}
+                                                            onChange={() => setSelectedCategoryIds(prev =>
+                                                                prev.includes(cat.id) ? prev.filter(cid => cid !== cat.id) : [...prev, cat.id]
+                                                            )}
+                                                        />
+                                                        <span className="text-sm flex-1">{cat.name}</span>
+                                                        {cat.is_wholesale && (
+                                                            <span className="text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full flex-shrink-0">B2B</span>
+                                                        )}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="description" className="block text-xs uppercase tracking-widest font-semibold mb-3">Description</label>
+                                <DebouncedTextarea
+                                    id="description" rows={4} value={formData.description} onChange={handleChange}
+                                    className="w-full border border-neutral-200 p-4 bg-transparent outline-none focus:border-black resize-y"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="sku" className="block text-xs uppercase tracking-widest font-semibold mb-3">SKU</label>
+                                <DebouncedInput
+                                    type="text" id="sku" value={formData.sku} onChange={handleChange}
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
+                                    placeholder="e.g. MT-001"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <input type="checkbox" id="is_active" checked={formData.is_active} onChange={handleChange} className="w-4 h-4 accent-black" />
+                                <label htmlFor="is_active" className="text-xs uppercase tracking-widest font-semibold">Active (visible in shop)</label>
+                            </div>
+                        </div>
+
+                        {/* Variants */}
+                        <div className="bg-white p-4 sm:p-8 border border-neutral-200 space-y-8">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Variants</h2>
+
+                            {/* Sizes */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="text-xs uppercase tracking-widest font-semibold">Sizes</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => { if (sizeEnabled) setSelectedSizes([]); setSizeEnabled(v => !v); }}
+                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${sizeEnabled ? "bg-black" : "bg-neutral-300"}`}
+                                    >
+                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${sizeEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                </div>
+                                {sizeEnabled && (
+                                    globalSizes.length === 0
+                                        ? <p className="text-[10px] uppercase tracking-widest text-neutral-400">No sizes in store settings.</p>
+                                        : <div className="flex flex-wrap gap-4">
+                                            {globalSizes.map(size => (
+                                                <label key={size} className="flex items-center gap-2 cursor-pointer">
+                                                    <input type="checkbox" checked={selectedSizes.includes(size)} onChange={() => toggleSize(size)} className="w-4 h-4 accent-black" />
+                                                    <span className="text-sm font-medium">{size}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                )}
+                            </div>
+
+                            {/* Colors */}
+                            <div className="pt-6 border-t border-neutral-100">
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="text-xs uppercase tracking-widest font-semibold">Colors</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => { if (colorEnabled) setSelectedColors([]); setColorEnabled(v => !v); }}
+                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${colorEnabled ? "bg-black" : "bg-neutral-300"}`}
+                                    >
+                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${colorEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                </div>
+                                {colorEnabled && (
+                                    globalColors.length === 0
+                                        ? <p className="text-[10px] uppercase tracking-widest text-neutral-400">No colors in store settings.</p>
+                                        : <div className="flex flex-wrap gap-4">
+                                            {globalColors.map(col => (
+                                                <label key={col} className="flex items-center gap-2 cursor-pointer">
+                                                    <input type="checkbox" checked={selectedColors.includes(col)} onChange={() => toggleColor(col)} className="w-4 h-4 accent-black" />
+                                                    <span className="text-sm font-medium">{col}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                )}
+                            </div>
+
+                            {/* Brands */}
+                            <div className="pt-6 border-t border-neutral-100">
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="text-xs uppercase tracking-widest font-semibold">Brands</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => { if (brandEnabled) setSelectedBrands([]); setBrandEnabled(v => !v); }}
+                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${brandEnabled ? "bg-black" : "bg-neutral-300"}`}
+                                    >
+                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${brandEnabled ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                </div>
+                                {brandEnabled && (
+                                    globalBrands.length === 0
+                                        ? <p className="text-[10px] uppercase tracking-widest text-neutral-400">No brands in store settings — add brands under Settings → Store.</p>
+                                        : <div className="flex flex-wrap gap-4">
+                                            {globalBrands.map(b => (
+                                                <label key={b} className="flex items-center gap-2 cursor-pointer">
+                                                    <input type="checkbox" checked={selectedBrands.includes(b)} onChange={() => toggleBrand(b)} className="w-4 h-4 accent-black" />
+                                                    <span className="text-sm font-medium">{b}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                )}
+                            </div>
+
+                            {/* Variant Inventory Matrix */}
+                            {trackInventory && trackVariantInventory && (
+                                <div className="pt-6 border-t border-neutral-100">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-xs font-semibold uppercase tracking-widest">Inventory by Variant</h3>
+                                        <span className="text-[10px] text-neutral-400 uppercase tracking-wider">
+                                            {variantCombos.length} combination{variantCombos.length !== 1 ? "s" : ""}
+                                        </span>
+                                    </div>
+                                    <div className="border border-neutral-200 rounded-lg overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="bg-neutral-50 border-b border-neutral-200">
+                                                    {selectedSizes.length > 0 && <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Size</th>}
+                                                    {selectedColors.length > 0 && <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Color</th>}
+                                                    {selectedBrands.length > 0 && <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Brand</th>}
+                                                    <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">SKU</th>
+                                                    <th className="px-3 py-2.5 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Stock</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-neutral-100">
+                                                {variantCombos.map((combo, idx) => (
+                                                    <tr key={combo.key} className={idx % 2 === 1 ? "bg-neutral-50/50" : ""}>
+                                                        {selectedSizes.length > 0 && <td className="px-3 py-2 font-medium">{combo.size}</td>}
+                                                        {selectedColors.length > 0 && <td className="px-3 py-2 text-neutral-600">{combo.color}</td>}
+                                                        {selectedBrands.length > 0 && <td className="px-3 py-2 text-neutral-600">{combo.brand}</td>}
+                                                        <td className="px-3 py-2">
+                                                            <input
+                                                                type="text"
+                                                                value={variantData[combo.key]?.sku ?? ""}
+                                                                onChange={e => updateVariantCell(combo.key, "sku", e.target.value)}
+                                                                placeholder="e.g. SKU-001"
+                                                                className="w-full border-b border-neutral-200 bg-transparent py-1 text-sm outline-none focus:border-black transition-colors"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <input
+                                                                type="number" min="0"
+                                                                value={variantData[combo.key]?.inventory_count ?? 0}
+                                                                onChange={e => updateVariantCell(combo.key, "inventory_count", Number(e.target.value))}
+                                                                className="w-20 border-b border-neutral-200 bg-transparent py-1 text-sm outline-none focus:border-black transition-colors"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p className="text-[10px] text-neutral-400 mt-2 uppercase tracking-wider">
+                                        Toggle options above to add or remove rows. Values are preserved when you deselect and re-select an option.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right column */}
+                    <div className="space-y-6">
+                        {/* Pricing & Inventory */}
+                        <div className="bg-white p-4 sm:p-6 border border-neutral-200 space-y-6">
+                            <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Pricing & Inventory</h2>
+
+                            <div>
+                                <label htmlFor="price_ghs" className="block text-xs uppercase tracking-widest font-semibold mb-3">Price (GHS)</label>
+                                <DebouncedInput
+                                    type="number" id="price_ghs" value={formData.price_ghs} onChange={handleChange}
+                                    min="0" step="0.01" required
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="compare_at_price_ghs" className="block text-xs uppercase tracking-widest font-semibold mb-3">Compare-at Price / Was Price (GHS)</label>
+                                <DebouncedInput
+                                    type="number" id="compare_at_price_ghs" value={formData.compare_at_price_ghs} onChange={handleChange}
+                                    min="0" step="0.01"
+                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black rounded-none"
+                                    placeholder="Leave blank to clear"
+                                />
+                                <p className="text-[10px] text-neutral-400 mt-1 uppercase tracking-wider">Shows strikethrough original price on cards and product pages. Leave blank if unused.</p>
+                            </div>
+
+                            <div className="flex items-start gap-3 p-4 bg-neutral-50 border border-neutral-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(p => ({ ...p, is_sale: !p.is_sale }))}
+                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none mt-0.5 ${formData.is_sale ? "bg-[#E8485A]" : "bg-neutral-300"}`}
+                                >
+                                    <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${formData.is_sale ? "translate-x-4" : "translate-x-0"}`} />
+                                </button>
+                                <div className="flex-1">
+                                    <p className="text-xs uppercase tracking-widest font-semibold">On Sale</p>
+                                    <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">Shows Sale ribbon. Enter a percentage discount below to slash the price.</p>
+                                    {formData.is_sale && (
+                                        <div className="mt-3">
+                                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Discount % (e.g. 20 for 20% off)</label>
+                                            <input
+                                                type="number" min="0" max="100" step="1"
+                                                value={formData.discount_value}
+                                                onChange={e => setFormData(p => ({ ...p, discount_value: Number(e.target.value) }))}
+                                                className="w-32 border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none text-sm"
+                                            />
+                                            {formData.discount_value > 0 && (
+                                                <p className="text-[10px] text-[#E8485A] mt-1 uppercase tracking-wider font-semibold">
+                                                    Effective price: GH₵{(Number(formData.price_ghs) * (1 - Number(formData.discount_value) / 100)).toFixed(2)} (was GH₵{Number(formData.price_ghs).toFixed(2)})
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3 p-4 bg-neutral-50 border border-neutral-200">
+                                <button
+                                    type="button" onClick={() => setTrackInventory((v: boolean) => !v)}
+                                    className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none mt-0.5 ${trackInventory ? "bg-black" : "bg-neutral-300"}`}
+                                >
+                                    <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${trackInventory ? "translate-x-4" : "translate-x-0"}`} />
+                                </button>
+                                <div>
+                                    <p className="text-xs uppercase tracking-widest font-semibold">Track Inventory</p>
+                                    <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">
+                                        {trackInventory ? "Tracked — goes out of stock at 0." : "Untracked — always available."}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {trackInventory && (
+                                <div className="flex items-start gap-3 p-4 bg-neutral-50 border border-neutral-200">
+                                    <button
+                                        type="button" onClick={() => setTrackVariantInventory((v: boolean) => !v)}
+                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none mt-0.5 ${trackVariantInventory ? "bg-black" : "bg-neutral-300"}`}
+                                    >
+                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${trackVariantInventory ? "translate-x-4" : "translate-x-0"}`} />
+                                    </button>
+                                    <div>
+                                        <p className="text-xs uppercase tracking-widest font-semibold">Track Inventory by Variant</p>
+                                        <p className="text-[10px] text-neutral-400 mt-1 tracking-wider uppercase">
+                                            {trackVariantInventory ? "Each size/colour combination has its own stock count." : "All variants share one global stock count."}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {trackInventory && !trackVariantInventory && (
+                                <div>
+                                    <label htmlFor="inventory_count" className="block text-xs uppercase tracking-widest font-semibold mb-3">Inventory Count</label>
+                                    <input
+                                        type="number" id="inventory_count" value={formData.inventory_count}
+                                        onChange={handleChange} min="0" required
+                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors rounded-none"
+                                    />
+                                </div>
+                            )}
+
+                            {trackInventory && trackVariantInventory && (
+                                <p className="text-[10px] text-emerald-600 uppercase tracking-widest font-semibold">
+                                    ✓ Stock is managed per variant in the matrix below.
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Wholesale Pricing */}
+                        {wholesaleTierConfig?.enabled && (
+                            <div className="bg-white p-4 sm:p-6 border border-neutral-200 space-y-5">
+                                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Wholesale Pricing</h2>
+                                <label className="flex items-center justify-between cursor-pointer">
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Product-Specific Override</p>
+                                        <p className="text-[10px] text-neutral-400 mt-0.5">When OFF, pricing inherits from the assigned wholesale category</p>
+                                    </div>
+                                    <div onClick={() => setWholesaleOverride(v => !v)}
+                                        className={`w-11 h-6 rounded-full transition-colors cursor-pointer relative flex-shrink-0 ${wholesaleOverride ? "bg-black" : "bg-neutral-200"}`}>
+                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${wholesaleOverride ? "translate-x-5" : ""}`} />
+                                    </div>
+                                </label>
+                                {wholesaleOverride ? (
+                                    <>
+                                        <p className="text-[10px] text-neutral-400 tracking-wider uppercase">Set explicit per-item prices for each quantity tier.</p>
+                                        {([
+                                            { tier: "tier1" as const, label: "Tier 1", min: wholesaleTierConfig.tier1Min, max: wholesaleTierConfig.tier1Max },
+                                            { tier: "tier2" as const, label: "Tier 2", min: wholesaleTierConfig.tier2Min, max: wholesaleTierConfig.tier2Max },
+                                            { tier: "tier3" as const, label: "Tier 3", min: wholesaleTierConfig.tier3Min, max: wholesaleTierConfig.tier3Max },
+                                        ]).map(({ tier, label, min, max }) => (
+                                            <div key={tier}>
+                                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">{label} — {min}–{max} units</label>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-neutral-400 text-sm">GH₵</span>
+                                                    <input type="number" min="0" step="0.01" value={wholesalePrices[tier]}
+                                                        onChange={e => setWholesalePrices(p => ({ ...p, [tier]: e.target.value }))}
+                                                        className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors rounded-none"
+                                                        placeholder="0.00" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                ) : (
+                                    <p className="text-[10px] text-emerald-600 uppercase tracking-widest font-semibold">
+                                        ✓ Will inherit from assigned wholesale category
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Media */}
+                        <div className="bg-white p-4 sm:p-6 border border-neutral-200 space-y-4">
+                            <div>
+                                <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-200 pb-4">Product Media</h2>
+                                <p className="text-[10px] text-neutral-400 tracking-wider uppercase mt-4">Up to 10 files — select multiple at once. First image is the primary display.</p>
+                            </div>
+                            <ImageUploader
+                                bucket="product-images" folder="products"
+                                currentUrls={imageUrls} onUpload={setImageUrls}
+                                onUploading={setUploadingMedia} maxFiles={10} label="Product Media"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    );
+}

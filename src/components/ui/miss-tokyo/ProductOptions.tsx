@@ -7,15 +7,18 @@ import { useCart } from "@/store/useCart";
 import { toast } from "@/lib/toast";
 import { resolveWholesalePrice, WholesaleTiers } from "@/lib/wholesale";
 import type { AutoDiscountRule } from "@/lib/autoDiscount";
+import { supabase } from "@/lib/supabase";
 
 export interface ColorVariant { name: string; hex: string; in_stock: boolean; }
 export interface SizeVariant { label: string; in_stock: boolean; }
 export interface ProductVariant {
     size: string | null;
     color: string | null;
-    stitching: string | null;
+    brand: string | null;
     inventory_count: number;
 }
+
+export interface BrandVariant { name: string; in_stock: boolean; }
 
 interface Props {
     productId: string;
@@ -41,6 +44,8 @@ interface Props {
     trackVariantInventory?: boolean;
     trackInventory?: boolean;
     productVariants?: ProductVariant[];
+    availableBrands?: string[] | null;
+    brandVariants?: BrandVariant[] | null;
     autoDiscountRule?: AutoDiscountRule | null;
     preorderEnabled?: boolean;
     preorderEstimatedDate?: string | null;
@@ -111,6 +116,8 @@ export function ProductOptions(props: Props) {
         trackVariantInventory = false,
         trackInventory = true,
         productVariants,
+        availableBrands,
+        brandVariants,
         autoDiscountRule,
         preorderEnabled = false,
         preorderEstimatedDate = null,
@@ -169,8 +176,13 @@ export function ProductOptions(props: Props) {
         }).map(s => ({ ...s, label: displaySizeLabel(s.label) }));
     })();
 
+    const brands: BrandVariant[] = brandVariants && brandVariants.length > 0
+        ? brandVariants
+        : (availableBrands || []).map(n => ({ name: n, in_stock: true }));
+
     const [selectedColor, setSelectedColor] = useState<string>(colors[0]?.name ?? "");
     const [selectedSize, setSelectedSize] = useState<string>(sizes.find(s => s.in_stock)?.label ?? "");
+    const [selectedBrand, setSelectedBrand] = useState<string>(brands[0]?.name ?? "");
     const [qty, setQty] = useState(1);
 
     // ── Variant-aware availability ─────────────────────────────────────────────
@@ -219,6 +231,19 @@ export function ProductOptions(props: Props) {
         return result;
     }, [trackVariantInventory, productVariants, selectedColor]);
 
+    /**
+     * Set of brands that have stock for the currently selected size + color combo.
+     * null → variant inventory not tracked.
+     */
+    const brandsWithStock = useMemo<Set<string> | null>(() => {
+        if (!trackVariantInventory || !productVariants?.length) return null;
+        const result = new Set<string>();
+        for (const v of productVariants) {
+            if ((v.inventory_count ?? 0) > 0 && v.brand != null) result.add(v.brand);
+        }
+        return result;
+    }, [trackVariantInventory, productVariants]);
+
     // On mount: once variant stock data is ready, advance size to first in-stock option.
     // Skip when pre-order is enabled — all sizes are orderable, no need to force-advance.
     useEffect(() => {
@@ -251,6 +276,16 @@ export function ProductOptions(props: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [colorsWithStock]);
 
+    // Advance brand to first in-stock option when variant data resolves.
+    useEffect(() => {
+        if (preorderEnabled) return;
+        if (!brandsWithStock) return;
+        if (selectedBrand && brandsWithStock.has(selectedBrand)) return;
+        const first = brands.find(b => brandsWithStock.has(b.name));
+        setSelectedBrand(first?.name ?? "");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [brandsWithStock]);
+
     /** Effective stock for the currently selected size + color combo */
     const effectiveInventory = useMemo(() => {
         // Scenario A: If track_inventory is false, stock is infinite (sentinel 9999).
@@ -258,9 +293,11 @@ export function ProductOptions(props: Props) {
 
         // Scenario C: If track_variant_inventory is true, use per-combo variant data.
         if (trackVariantInventory && productVariants?.length) {
+            const hasBrandDimension = brands.length > 0;
             const match = productVariants.find(v =>
                 displaySizeLabel(v.size ?? "") === selectedSize &&
-                (v.color ?? "") === selectedColor
+                (v.color ?? "") === selectedColor &&
+                (!hasBrandDimension || (v.brand ?? "") === selectedBrand)
             );
             return match?.inventory_count ?? 0;
         }
@@ -278,21 +315,43 @@ export function ProductOptions(props: Props) {
     const setCartOpen = useCart(s => s.setIsOpen);
 
     useEffect(() => {
-        try {
-            const wl: string[] = JSON.parse(localStorage.getItem("mt_wishlist") || "[]");
-            setWishlisted(wl.includes(productId));
-        } catch { /* noop */ }
+        (async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data } = await supabase
+                        .from("wishlists")
+                        .select("id")
+                        .eq("user_id", user.id)
+                        .eq("product_id", productId)
+                        .maybeSingle();
+                    setWishlisted(!!data);
+                } else {
+                    const wl: string[] = JSON.parse(localStorage.getItem("mt_wishlist") || "[]");
+                    setWishlisted(wl.includes(productId));
+                }
+            } catch { /* noop */ }
+        })();
     }, [productId]);
 
     useEffect(() => {
         return () => { if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current); };
     }, []);
 
-    const toggleWishlist = () => {
+    const toggleWishlist = async () => {
         try {
-            const wl: string[] = JSON.parse(localStorage.getItem("mt_wishlist") || "[]");
-            const next = wishlisted ? wl.filter(id => id !== productId) : [...wl, productId];
-            localStorage.setItem("mt_wishlist", JSON.stringify(next));
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                if (wishlisted) {
+                    await supabase.from("wishlists").delete().eq("user_id", user.id).eq("product_id", productId);
+                } else {
+                    await supabase.from("wishlists").insert({ user_id: user.id, product_id: productId });
+                }
+            } else {
+                const wl: string[] = JSON.parse(localStorage.getItem("mt_wishlist") || "[]");
+                const next = wishlisted ? wl.filter(id => id !== productId) : [...wl, productId];
+                localStorage.setItem("mt_wishlist", JSON.stringify(next));
+            }
             setWishlisted(!wishlisted);
             toast.success(wishlisted ? "Removed from wishlist" : "♥ Saved to wishlist");
         } catch { /* noop */ }
@@ -341,13 +400,14 @@ export function ProductOptions(props: Props) {
             return false;
         }
         addItem({
-            id: `${productId}-${selectedSize}-${selectedColor}`,
+            id: `${productId}-${selectedSize}-${selectedColor}-${selectedBrand}`,
             productId,
             name,
             slug,
             price: baseProductPrice,
             size: selectedSize || "One size",
             color: selectedColor || undefined,
+            brand: selectedBrand || undefined,
             quantity: qty,
             imageUrl,
             inventoryCount: effectiveInventory,
@@ -374,7 +434,7 @@ export function ProductOptions(props: Props) {
         if (addedToBag) return;
         if (doAddToCart({ isPreOrder: true })) {
             setAddedToBag(true);
-            setCartOpen(true);
+            // Cart stays closed — user opens manually
             if (addedToBagTimer.current) clearTimeout(addedToBagTimer.current);
             addedToBagTimer.current = setTimeout(() => setAddedToBag(false), 2000);
         }
@@ -657,6 +717,55 @@ export function ProductOptions(props: Props) {
                     >
                         Size guide →
                     </button>
+                </div>
+            )}
+
+            {/* Brand selector — distinct chip style */}
+            {brands.length > 0 && (
+                <div style={{ marginBottom: 22 }}>
+                    <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted, #7A7167)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                        Brand{" "}
+                        <span style={{ fontWeight: 400, color: "var(--ink, #141210)", letterSpacing: 0, textTransform: "none", fontSize: 12 }}>
+                            {selectedBrand}
+                        </span>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                        {brands.map(b => {
+                            const inStock = brandsWithStock !== null ? brandsWithStock.has(b.name) : b.in_stock;
+                            const canSelect = preorderEnabled || inStock;
+                            const isActive = selectedBrand === b.name;
+                            return (
+                                <button
+                                    key={b.name}
+                                    onClick={() => { if (canSelect) setSelectedBrand(b.name); }}
+                                    disabled={!canSelect}
+                                    title={inStock ? b.name : preorderEnabled ? `${b.name} — pre-order` : `${b.name} — out of stock`}
+                                    style={{
+                                        position: "relative",
+                                        padding: "7px 14px",
+                                        border: `1.5px solid ${isActive ? "var(--gold, #C9A96E)" : inStock ? "rgba(201,169,110,0.35)" : "rgba(20,18,16,0.08)"}`,
+                                        borderRadius: 20,
+                                        fontSize: 11, fontWeight: isActive ? 600 : 400,
+                                        letterSpacing: "0.04em",
+                                        color: isActive ? "var(--ink, #141210)" : inStock ? "var(--muted, #7A7167)" : "rgba(20,18,16,0.3)",
+                                        background: isActive ? "rgba(201,169,110,0.12)" : "transparent",
+                                        cursor: canSelect ? "pointer" : "not-allowed",
+                                        transition: "all 0.15s",
+                                        overflow: "hidden",
+                                    }}
+                                >
+                                    {b.name}
+                                    {!inStock && (
+                                        <span style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+                                            <svg width="100%" height="100%" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
+                                                <line x1="0" y1="100%" x2="100%" y2="0" stroke="rgba(20,18,16,0.2)" strokeWidth="1" />
+                                            </svg>
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 

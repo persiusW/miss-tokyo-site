@@ -176,7 +176,7 @@ export function AssetsTab() {
                                         <AssetInput label="Descriptive Context (Alt)" value={asset?.alt_text || ""} onChange={v => handleAssetSave(def.section_key, { alt_text: v })} placeholder="High-end fashion photography..." />
                                         <div className="pt-4 flex justify-between items-center border-t border-gray-50">
                                             <p className="text-[9px] text-gray-300 uppercase tracking-widest">
-                                                {asset?.updated_at ? `Last sync: ${new Date(asset.updated_at).toLocaleDateString()}` : "Pending Initial Setup"}
+                                                {asset?.updated_at ? `Last sync: ${new Date(asset.updated_at).toLocaleDateString("en-GB")}` : "Pending Initial Setup"}
                                             </p>
                                             <button 
                                                 onClick={() => handleAssetSave(def.section_key, { is_active: !asset?.is_active })}

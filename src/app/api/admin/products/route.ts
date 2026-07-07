@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -29,17 +30,20 @@ export async function POST(req: NextRequest) {
         price_ghs,
         inventory_count,
         track_inventory,
+        track_variant_inventory,
         description,
         category_type,
         category_ids,
         image_urls,
         available_sizes,
         available_colors,
-        available_stitching,
+        available_brands,
+        brand_variants,
         wholesale_override,
         wholesale_price_tier_1,
         wholesale_price_tier_2,
         wholesale_price_tier_3,
+        variants,
     } = body;
 
     if (!name || !slug || price_ghs == null) {
@@ -53,15 +57,17 @@ export async function POST(req: NextRequest) {
             slug,
             sku: sku ?? null,
             price_ghs: Number(price_ghs),
-            inventory_count: track_inventory ? Number(inventory_count) : 9999,
+            inventory_count: track_inventory && !track_variant_inventory ? Number(inventory_count) : 9999,
             track_inventory: track_inventory ?? true,
+            track_variant_inventory: track_variant_inventory ?? false,
             description,
             category_type,
             category_ids: category_ids ?? [],
             image_urls: image_urls ?? [],
             available_sizes: available_sizes ?? [],
             available_colors: available_colors ?? [],
-            available_stitching: available_stitching ?? [],
+            available_brands: available_brands ?? [],
+            brand_variants: brand_variants ?? null,
             is_active: true,
             wholesale_override: wholesale_override ?? false,
             wholesale_price_tier_1: wholesale_override && wholesale_price_tier_1 ? Number(wholesale_price_tier_1) : null,
@@ -76,20 +82,51 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
     }
 
-    // LOG ACTIVITY
-    await logActivity({
+    // Insert per-variant inventory rows when tracking by variant
+    if (track_inventory && track_variant_inventory && variants && variants.length > 0) {
+        const toInsert = variants.map((v: any) => ({
+            product_id: data.id,
+            size: v.size || null,
+            color: v.color || null,
+            brand: v.brand || null,
+            sku: v.sku || null,
+            inventory_count: v.inventory_count ?? 0,
+        }));
+
+        const { error: insertErr } = await supabaseAdmin
+            .from("product_variants")
+            .insert(toInsert);
+
+        if (insertErr) {
+            console.error("[admin/products POST] variant insert failed:", insertErr.message);
+            return NextResponse.json({ error: `Variant insert failed: ${insertErr.message}` }, { status: 500 });
+        }
+
+        // Sync product-level inventory_count to variant sum
+        const variantSum = toInsert.reduce((sum: number, v: { inventory_count: number }) => sum + (v.inventory_count ?? 0), 0);
+        const { error: syncErr } = await supabaseAdmin
+            .from("products")
+            .update({ inventory_count: variantSum })
+            .eq("id", data.id);
+        if (syncErr) {
+            console.error("[admin/products POST] inventory_count sync failed:", syncErr.message);
+        }
+    }
+
+    revalidatePath("/", "page");
+    revalidatePath("/shop", "page");
+    revalidatePath("/catalog/products", "page");
+    revalidateTag("products", "max");
+
+    // Activity logging is telemetry — run after the response so the UI isn't blocked on it
+    after(() => logActivity({
         userId: user.id,
         userRole: caller.role,
         actionType: "CREATE",
         resource: "product",
         resourceId: data.id,
         details: { name: name, slug: data.slug }
-    });
-
-    revalidatePath("/", "page");
-    revalidatePath("/shop", "page");
-    revalidatePath("/catalog/products", "page");
-    revalidateTag("products", "max");
+    }));
 
     return NextResponse.json({ success: true, product: data });
 }
@@ -100,21 +137,22 @@ export async function PATCH(req: NextRequest) {
     const { data: { user } } = await serverClient.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: caller } = await supabaseAdmin
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await req.json();
     const { id, ...fields } = body;
 
     if (!id) {
         return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+
+    // Role check and old-record fetch (for activity-log diffing) are independent
+    // reads — run them in parallel to cut one DB round trip per update.
+    const [{ data: caller }, { data: oldData }] = await Promise.all([
+        supabaseAdmin.from("profiles").select("role").eq("id", user.id).single(),
+        supabaseAdmin.from("products").select("*").eq("id", id).single(),
+    ]);
+
+    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Fast path: toggle-only fields (is_active, is_sale, discount_value).
@@ -150,7 +188,8 @@ export async function PATCH(req: NextRequest) {
         image_urls,
         available_sizes,
         available_colors,
-        available_stitching,
+        available_brands,
+        brand_variants,
         is_active,
         wholesale_override,
         wholesale_price_tier_1,
@@ -158,13 +197,6 @@ export async function PATCH(req: NextRequest) {
         wholesale_price_tier_3,
         variants,
     } = fields;
-
-    // 1. Fetch current record for diffing
-    const { data: oldData } = await supabaseAdmin
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single();
 
     const updateFields = {
         name,
@@ -183,7 +215,8 @@ export async function PATCH(req: NextRequest) {
         image_urls: image_urls ?? [],
         available_sizes: available_sizes ?? [],
         available_colors: available_colors ?? [],
-        available_stitching: available_stitching ?? [],
+        available_brands: available_brands ?? [],
+        brand_variants: brand_variants ?? null,
         is_active: is_active ?? true,
         wholesale_override: wholesale_override ?? false,
         wholesale_price_tier_1: wholesale_override && wholesale_price_tier_1 ? Number(wholesale_price_tier_1) : null,
@@ -232,7 +265,7 @@ export async function PATCH(req: NextRequest) {
             product_id: id,
             size: v.size || null,
             color: v.color || null,
-            stitching: v.stitching || null,
+            brand: v.brand || null,
             sku: v.sku || null,
             inventory_count: v.inventory_count ?? 0,
         }));
@@ -269,8 +302,13 @@ export async function PATCH(req: NextRequest) {
         await supabaseAdmin.from("product_variants").delete().eq("product_id", id);
     }
 
-    // LOG ACTIVITY
-    await logActivity({
+    revalidatePath("/", "page");
+    revalidatePath("/shop", "page");
+    revalidatePath("/catalog/products", "page");
+    revalidateTag("products", "max");
+
+    // Activity logging is telemetry — run after the response so the UI isn't blocked on it
+    after(() => logActivity({
         userId: user.id,
         userRole: caller.role,
         actionType: "UPDATE",
@@ -278,12 +316,7 @@ export async function PATCH(req: NextRequest) {
         resourceId: id,
         oldData,
         newData: updateFields
-    });
-
-    revalidatePath("/", "page");
-    revalidatePath("/shop", "page");
-    revalidatePath("/catalog/products", "page");
-    revalidateTag("products", "max");
+    }));
 
     return NextResponse.json({ success: true });
 }

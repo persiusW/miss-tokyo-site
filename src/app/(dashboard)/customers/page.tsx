@@ -30,7 +30,7 @@ function downloadCSV(rows: Contact[], filename: string) {
         c.email,
         c.phone || "",
         SOURCE_LABELS[c.source] || c.source,
-        new Date(c.created_at).toLocaleDateString(),
+        new Date(c.created_at).toLocaleDateString("en-GB"),
     ]);
     const csv = [headers, ...data]
         .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
@@ -303,7 +303,7 @@ export default function CustomersPage() {
                                         </span>
                                     </td>
                                     <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-4)", whiteSpace: "nowrap" }}>
-                                        {new Date(contact.created_at).toLocaleDateString()}
+                                        {new Date(contact.created_at).toLocaleDateString("en-GB")}
                                     </td>
                                 </tr>
                             ))}

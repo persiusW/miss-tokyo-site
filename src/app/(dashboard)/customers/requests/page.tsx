@@ -114,7 +114,7 @@ export default function CustomRequestsPage() {
                                         </div>
                                     </td>
                                     <td style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>
-                                        {new Date(req.created_at).toLocaleDateString()}
+                                        {new Date(req.created_at).toLocaleDateString("en-GB")}
                                     </td>
                                     <td>
                                         <select

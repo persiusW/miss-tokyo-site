@@ -179,7 +179,7 @@ export function QuickAddModal({
             inventoryCount: effectiveInventory,
             isPreOrder: isPreorderMode,
             estimatedAvailability: isPreorderMode ? undefined : undefined,
-        }, isPreorderMode);
+        }, false);
         setAdding(false);
         setAdded(true);
         setTimeout(onClose, 1400);

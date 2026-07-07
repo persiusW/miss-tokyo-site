@@ -548,6 +548,7 @@ export default function OrderDetailPage() {
                                         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px", marginTop: 4 }}>
                                             {item.size && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>Size: <strong style={{ color: "var(--ac-ink)" }}>{item.size}</strong></span>}
                                             {item.color && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>Color: <strong style={{ color: "var(--ac-ink)" }}>{item.color}</strong></span>}
+                                            {item.brand && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>Brand: <strong style={{ color: "var(--ac-ink)" }}>{item.brand}</strong></span>}
                                             {(item.sku || (item.productId && productSkus[item.productId])) && (
                                                 <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>
                                                     SKU: <strong style={{ fontFamily: "var(--f-mono)", color: "var(--ac-ink)" }}>{item.sku || productSkus[item.productId]}</strong>
@@ -801,9 +802,9 @@ export default function OrderDetailPage() {
                                                 )}
                                                 <div>
                                                     <p style={{ fontWeight: 600, color: "#222" }}>{name}</p>
-                                                    {(item.size || item.color) && (
+                                                    {(item.size || item.color || item.brand) && (
                                                         <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginTop: 2 }}>
-                                                            {[item.size, item.color].filter(Boolean).join(" · ")}
+                                                            {[item.size, item.color, item.brand].filter(Boolean).join(" · ")}
                                                         </p>
                                                     )}
                                                 </div>

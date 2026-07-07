@@ -1,0 +1,50 @@
+{
+  "node": {
+    "408ce6dfd25067b894022d8b3fb231c0c17df3a423": {
+      "workers": {
+        "app/(dashboard)/settings/page": {
+          "moduleId": 36846,
+          "async": false,
+          "exportedName": "inviteTeamMember",
+          "filename": "src/app/(dashboard)/settings/actions.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/settings/page": "action-browser"
+      },
+      "exportedName": "inviteTeamMember",
+      "filename": "src/app/(dashboard)/settings/actions.ts"
+    },
+    "40fea11e352786bd78f66a54046a125d5e5a9131b3": {
+      "workers": {
+        "app/(dashboard)/settings/page": {
+          "moduleId": 36846,
+          "async": false,
+          "exportedName": "removeTeamMember",
+          "filename": "src/app/(dashboard)/settings/actions.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/settings/page": "action-browser"
+      },
+      "exportedName": "removeTeamMember",
+      "filename": "src/app/(dashboard)/settings/actions.ts"
+    },
+    "40692db10e5207542789fe0825ef63195a514d6784": {
+      "workers": {
+        "app/(dashboard)/settings/page": {
+          "moduleId": 36846,
+          "async": false,
+          "exportedName": "sendPasswordResetLink",
+          "filename": "src/app/(dashboard)/settings/actions.ts"
+        }
+      },
+      "layer": {
+        "app/(dashboard)/settings/page": "action-browser"
+      },
+      "exportedName": "sendPasswordResetLink",
+      "filename": "src/app/(dashboard)/settings/actions.ts"
+    }
+  },
+  "edge": {}
+}
