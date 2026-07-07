@@ -783,6 +783,34 @@
   .ac-page-h1 { font-size: 36px; }
 }
 
+/* ─── Mobile: stack page headers, collapse content grids, full-width actions ── */
+@media (max-width: 760px) {
+  /* Page header: title on top, actions wrap below full-width */
+  .ac-page-head { flex-direction: column; align-items: stretch; }
+  .ac-page-actions { width: 100%; flex-wrap: wrap; }
+  .ac-page-actions > .ac-input,
+  .ac-page-actions > input[type="text"] { flex: 1 1 100%; width: 100% !important; }
+  .ac-page-actions > .ac-btn { flex: 1 1 auto; justify-content: center; }
+
+  /* Collapse fixed-ratio content grids to a single column. Targets the inline
+     grid templates used across dashboard pages (1fr 1fr, 2fr 1fr, 1fr 2fr,
+     1fr 1fr 1fr) while leaving responsive auto-fill grids alone. */
+  .admin-shell [style*="1fr 1fr"],
+  .admin-shell [style*="2fr 1fr"],
+  .admin-shell [style*="1fr 2fr"],
+  .admin-shell [style*="3fr 2fr"],
+  .admin-shell [style*="2fr 3fr"] { grid-template-columns: 1fr !important; }
+
+  /* KPI grid single column on the smallest screens for legibility */
+  .ac-kpi-value { font-size: 30px; }
+
+  /* Modals fill more of the viewport */
+  .ac-modal { width: calc(100vw - 24px); max-width: none !important; }
+
+  /* Bulk action bar wraps instead of overflowing */
+  .ac-bulk-bar { flex-wrap: wrap; max-width: calc(100vw - 24px); }
+}
+
 /* ─── Tailwind → theme-var compatibility bridge ──────────────────────────────
    Some dashboard pages/tabs still use hardcoded Tailwind neutral utilities
    (bg-white, border-neutral-*, text-neutral-*, bg-black) from before the Atelier
