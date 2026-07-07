@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { MoreHorizontal, Copy, Printer, Eye, Truck, X, Search, Store } from "lucide-react";
+import { MoreHorizontal, Copy, Printer, Eye, Truck, X, Search, Store, ChevronLeft, ChevronRight } from "lucide-react";
 import { updateOrderStatus, bulkUpdateOrderStatus } from "./actions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -76,6 +76,8 @@ const TABS: { key: Tab; label: string }[] = [
     { key: "all-orders",  label: "All" },
 ];
 
+// Legacy client-side filtering — used only when the page does not pass
+// server-computed counts (pre-orders, test-orders reuse this component).
 function matchesSearch(order: Order, q: string): boolean {
     const s = q.toLowerCase();
     return (
@@ -88,9 +90,7 @@ function matchesSearch(order: Order, q: string): boolean {
 function filterOrders(orders: Order[], tab: Tab, search: string): Order[] {
     const q = search.trim();
     if (tab === "all") {
-        return q
-            ? orders.filter(o => matchesSearch(o, q))
-            : orders.filter(o => o.status === "paid");
+        return q ? orders.filter(o => matchesSearch(o, q)) : orders.filter(o => o.status === "paid");
     }
     const baseFilter = (() => {
         switch (tab) {
@@ -105,6 +105,19 @@ function filterOrders(orders: Order[], tab: Tab, search: string): Order[] {
         }
     })();
     return q ? baseFilter.filter(o => matchesSearch(o, q)) : baseFilter;
+}
+
+function computeLocalCounts(orders: Order[]): Record<Tab, number> {
+    return {
+        all:          orders.filter(o => o.status === "paid").length,
+        packed:       orders.filter(o => o.status === "packed").length,
+        pickups:      orders.filter(o => o.status === "ready_for_pickup").length,
+        shipped:      orders.filter(o => o.status === "shipped").length,
+        fulfilled:    orders.filter(o => ["fulfilled", "delivered"].includes(o.status)).length,
+        cancelled:    orders.filter(o => ["cancelled", "failed"].includes(o.status)).length,
+        refunded:     orders.filter(o => o.status === "refunded").length,
+        "all-orders": orders.length,
+    };
 }
 
 // ─── Dispatch Modal ───────────────────────────────────────────────────────────
@@ -223,11 +236,36 @@ function DispatchModal({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
+type OrdersClientProps = {
+    orders: Order[];
+    // Server-pagination props — when omitted (pre-orders, test-orders), the
+    // component falls back to legacy client-side filtering over `orders`.
+    tab?: Tab;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+    totalCount?: number;
+    tabCounts?: Record<Tab, number>;
+};
+
+export function OrdersClient({
+    orders: initialOrders,
+    tab: tabProp,
+    search: serverSearch = "",
+    page = 1,
+    pageSize = 100,
+    totalCount = 0,
+    tabCounts: serverTabCounts,
+}: OrdersClientProps) {
     const router = useRouter();
+    const [isPending, startTransition] = useTransition();
+    const serverMode = serverTabCounts !== undefined;
+
     const [orders, setOrders] = useState(initialOrders);
-    const [activeTab, setActiveTab] = useState<Tab>("all");
-    const [search, setSearch] = useState("");
+    // In client mode these drive filtering; in server mode the tab comes from the URL
+    // and this search box mirrors it (navigation is debounced).
+    const [clientTab, setClientTab] = useState<Tab>("all");
+    const [search, setSearch] = useState(serverSearch);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
@@ -235,21 +273,54 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
     const [dispatchOrders, setDispatchOrders] = useState<Order[]>([]);
     const [bulkLoading, setBulkLoading] = useState(false);
 
-    const visibleOrders = filterOrders(orders, activeTab, search);
+    // Re-sync when the server sends a new page (tab/search/page nav or router.refresh)
+    useEffect(() => { setOrders(initialOrders); }, [initialOrders]);
+    useEffect(() => { setSearch(serverSearch); }, [serverSearch]);
+
+    const activeTab: Tab = serverMode ? (tabProp ?? "all") : clientTab;
+
+    // Server mode: current page IS the visible set. Client mode: filter locally.
+    const visibleOrders = serverMode ? orders : filterOrders(orders, clientTab, search);
     const allSelected = visibleOrders.length > 0 && visibleOrders.every(o => selected.has(o.id));
 
-    const tabCounts: Record<Tab, number> = {
-        all:          orders.filter(o => o.status === "paid").length,
-        packed:       orders.filter(o => o.status === "packed").length,
-        pickups:      orders.filter(o => o.status === "ready_for_pickup").length,
-        shipped:      orders.filter(o => o.status === "shipped").length,
-        fulfilled:    orders.filter(o => ["fulfilled", "delivered"].includes(o.status)).length,
-        cancelled:    orders.filter(o => ["cancelled", "failed"].includes(o.status)).length,
-        refunded:     orders.filter(o => o.status === "refunded").length,
-        "all-orders": orders.length,
+    const tabCounts: Record<Tab, number> = serverMode ? serverTabCounts! : computeLocalCounts(orders);
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+    const buildUrl = (next: { tab?: Tab; q?: string; page?: number }) => {
+        const params = new URLSearchParams();
+        const t = next.tab ?? activeTab;
+        const q = next.q ?? search;
+        const p = next.page ?? 1;
+        if (t !== "all") params.set("tab", t);
+        if (q.trim()) params.set("q", q.trim());
+        if (p > 1) params.set("page", String(p));
+        const qs = params.toString();
+        return `/sales/orders${qs ? `?${qs}` : ""}`;
     };
 
-    useEffect(() => { setSelected(new Set()); }, [activeTab, search]);
+    const navigate = (next: { tab?: Tab; q?: string; page?: number }) => {
+        startTransition(() => router.push(buildUrl(next)));
+    };
+
+    const goToTab = (tab: Tab) => {
+        setSelected(new Set());
+        if (serverMode) navigate({ tab, page: 1 });
+        else setClientTab(tab);
+    };
+
+    // Debounce search-box → URL navigation (server mode only)
+    const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const onSearchChange = (value: string) => {
+        setSearch(value);
+        if (!serverMode) { setSelected(new Set()); return; }
+        if (searchDebounce.current) clearTimeout(searchDebounce.current);
+        searchDebounce.current = setTimeout(() => {
+            setSelected(new Set());
+            navigate({ q: value, page: 1 });
+        }, 350);
+    };
+
+    useEffect(() => { setSelected(new Set()); }, [page]);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -286,6 +357,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
         toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} → ${status}.`);
         setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, status } : o));
         setSelected(new Set());
+        router.refresh();
 
         if (status === "fulfilled" || status === "cancelled" || status === "packed") {
             await Promise.all(ids.map(async orderId => {
@@ -322,6 +394,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
             toast.success(`${pickupIds.length} order${pickupIds.length > 1 ? "s" : ""} marked ready for pickup.`);
             setOrders(prev => prev.map(o => pickupIds.includes(o.id) ? { ...o, status: "ready_for_pickup" } : o));
             setSelected(new Set());
+            router.refresh();
         } catch (err: any) {
             toast.error(err.message || "Failed to mark pickup ready.");
         }
@@ -360,6 +433,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
             setSelected(new Set());
             setShowDispatch(false);
             setDispatchOrders([]);
+            router.refresh();
         } catch (err: any) {
             toast.error(err.message || "Dispatch failed.");
         }
@@ -372,6 +446,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
         if (!result.success) { toast.error("Failed to mark fulfilled."); return; }
         toast.success("Order marked fulfilled.");
         setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "fulfilled" } : o));
+        router.refresh();
         try {
             const res = await fetch("/api/email/fulfillment", {
                 method: "POST",
@@ -398,6 +473,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
             if (!res.ok) throw new Error(data.error || "Failed");
             toast.success("Order marked ready for pickup.");
             setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "ready_for_pickup" } : o));
+            router.refresh();
         } catch (err: any) {
             toast.error(err.message || "Failed.");
         }
@@ -428,7 +504,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                     {TABS.map(tab => (
                         <button
                             key={tab.key}
-                            onClick={() => setActiveTab(tab.key)}
+                            onClick={() => goToTab(tab.key)}
                             className={`px-5 py-3 text-xs font-semibold uppercase tracking-widest transition-colors border-b-2 -mb-px flex items-center gap-2 whitespace-nowrap ${
                                 activeTab === tab.key
                                     ? "border-black text-black"
@@ -451,12 +527,12 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                     <input
                         type="text"
                         value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="SEARCH BY NAME, EMAIL OR ORDER ID"
+                        onChange={e => onSearchChange(e.target.value)}
+                        placeholder="SEARCH BY NAME, EMAIL, PHONE OR REFERENCE"
                         className="border-b border-neutral-300 bg-transparent outline-none focus:border-black text-[10px] uppercase tracking-widest py-1 w-64 placeholder:text-neutral-400"
                     />
                     {search && (
-                        <button onClick={() => setSearch("")} className="text-neutral-400 hover:text-black">
+                        <button onClick={() => onSearchChange("")} className="text-neutral-400 hover:text-black">
                             <X size={13} />
                         </button>
                     )}
@@ -466,7 +542,7 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
             {/* Search context indicator */}
             {search && (
                 <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 border-t-0 text-[10px] text-neutral-500 uppercase tracking-widest">
-                    Showing {visibleOrders.length} result{visibleOrders.length !== 1 ? "s" : ""} across all statuses for &ldquo;{search}&rdquo;
+                    {(serverMode ? totalCount : visibleOrders.length)} result{(serverMode ? totalCount : visibleOrders.length) !== 1 ? "s" : ""}{activeTab === "all" ? " across all statuses" : ""} for &ldquo;{search}&rdquo;
                 </div>
             )}
 
@@ -698,6 +774,31 @@ export function OrdersClient({ orders: initialOrders }: { orders: Order[] }) {
                     </tbody>
                 </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-4 border border-neutral-200 border-t-0 bg-white">
+                    <span className="text-[10px] uppercase tracking-widest text-neutral-500">
+                        Page {page} of {totalPages} · {totalCount} order{totalCount !== 1 ? "s" : ""}
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => navigate({ page: page - 1 })}
+                            disabled={page <= 1 || isPending}
+                            className="flex items-center gap-1 px-3 py-2 text-[10px] uppercase tracking-widest border border-neutral-200 hover:border-black disabled:opacity-40 disabled:hover:border-neutral-200 transition-colors"
+                        >
+                            <ChevronLeft size={13} /> Prev
+                        </button>
+                        <button
+                            onClick={() => navigate({ page: page + 1 })}
+                            disabled={page >= totalPages || isPending}
+                            className="flex items-center gap-1 px-3 py-2 text-[10px] uppercase tracking-widest border border-neutral-200 hover:border-black disabled:opacity-40 disabled:hover:border-neutral-200 transition-colors"
+                        >
+                            Next <ChevronRight size={13} />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {showDispatch && (
                 <DispatchModal

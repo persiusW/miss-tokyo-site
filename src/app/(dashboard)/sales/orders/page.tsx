@@ -1,27 +1,25 @@
-import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { fetchOrderStats } from "@/lib/utils/metrics";
 import { OrdersClient } from "./OrdersClient";
+import { fetchOrdersPage, type OrderTab, ORDER_TABS } from "./ordersQuery";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+export default async function OrdersPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ tab?: string; q?: string; page?: string }>;
+}) {
+    const sp = await searchParams;
+    const validTabs = ORDER_TABS.map(t => t.key);
+    const tab: OrderTab = validTabs.includes(sp.tab as OrderTab) ? (sp.tab as OrderTab) : "all";
+    const search = sp.q ?? "";
+    const page = Math.max(1, Number(sp.page) || 1);
 
-export default async function OrdersPage() {
-    const [{ data: orders }, stats] = await Promise.all([
-        supabase
-            .from("orders")
-            .select("id, customer_name, customer_email, customer_phone, total_amount, status, payment_status, paystack_reference, shipping_address, delivery_method, created_at, has_preorder, is_mixed_order, customer_metadata")
-            .or("has_preorder.eq.false,is_mixed_order.eq.true")
-            .order("created_at", { ascending: false })
-            .limit(500),
+    const [ordersPage, stats] = await Promise.all([
+        fetchOrdersPage(tab, search, page),
         fetchOrderStats(),
     ]);
-
-    if (!orders) {
-        console.error("[OrdersPage] Failed to load orders from Supabase");
-    }
-
-    const allOrders = orders ?? [];
 
     return (
         <div className="space-y-6">
@@ -62,7 +60,15 @@ export default async function OrdersPage() {
                 </div>
             </div>
 
-            <OrdersClient orders={allOrders} />
+            <OrdersClient
+                orders={ordersPage.orders}
+                tab={ordersPage.tab}
+                search={ordersPage.search}
+                page={ordersPage.page}
+                pageSize={ordersPage.pageSize}
+                totalCount={ordersPage.totalCount}
+                tabCounts={ordersPage.tabCounts}
+            />
         </div>
     );
 }
