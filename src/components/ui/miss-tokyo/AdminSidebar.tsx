@@ -1,13 +1,42 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/ui/miss-tokyo/LogoutButton";
 
-type NavItem = { label: string; href: string; badge?: string };
+// ─── Icons ────────────────────────────────────────────────────────────────────
 
-function NavLink({ href, label, badge }: NavItem) {
+const Ico = {
+    Dashboard:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>,
+    Chart:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-7"/></svg>,
+    POS:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 10h18M8 14h2"/></svg>,
+    Orders:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M4 6h16l-1.5 11a2 2 0 0 1-2 1.7H7.5a2 2 0 0 1-2-1.7L4 6Z"/><path d="M9 10v0M15 10v0"/></svg>,
+    Doc:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg>,
+    Tag:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M20 12 12.5 4.5A2 2 0 0 0 11 4H5a1 1 0 0 0-1 1v6a2 2 0 0 0 .5 1.3L12 20l8-8Z"/><circle cx="8" cy="8" r="1"/></svg>,
+    Sparkles:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6L12 4Z"/><path d="M19 16l.7 1.8L21.5 18l-1.8.7L19 20.5l-.7-1.8L16.5 18l1.8-.7L19 16Z"/></svg>,
+    Gift:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="9" width="18" height="11" rx="1"/><path d="M3 13h18M12 9v11"/><path d="M8 9c0-3 4-3 4 0 0-3 4-3 4 0"/></svg>,
+    Wallet:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14" r="1.2"/></svg>,
+    Box:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>,
+    Grid:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>,
+    Users:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 20a5 5 0 0 1 5.5-5"/></svg>,
+    Mail:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>,
+    Truck:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="2" y="7" width="12" height="10" rx="1"/><path d="M14 10h4l3 3v4h-7"/><circle cx="7" cy="18.5" r="1.6"/><circle cx="17" cy="18.5" r="1.6"/></svg>,
+    Cart:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M3 4h2l2.5 11a2 2 0 0 0 2 1.5h7.5a2 2 0 0 0 2-1.6L21 8H7"/><circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/></svg>,
+    Finance:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+    Cog:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+    Team:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>,
+    Home:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/></svg>,
+    Logout:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/><path d="M10 16l-4-4 4-4M6 12h11"/></svg>,
+    ChevronLeft:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>,
+    ChevronRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>,
+};
+
+// ─── Nav item ─────────────────────────────────────────────────────────────────
+
+import type { ReactElement } from "react";
+type NavItemDef = { label: string; href: string; Icon: () => ReactElement; badge?: string };
+
+function NavItem({ label, href, Icon, badge, onClose, collapsed }: NavItemDef & { onClose: () => void; collapsed: boolean }) {
     const pathname = usePathname();
     const isActive =
         (href === "/overview" && pathname === "/overview") ||
@@ -16,211 +45,125 @@ function NavLink({ href, label, badge }: NavItem) {
     return (
         <Link
             href={href}
-            className={`flex items-center justify-between px-3 py-[5px] text-sm transition-all duration-150 ${
-                isActive
-                    ? "bg-neutral-100 text-black font-semibold border-l-2 border-black"
-                    : "text-neutral-500 hover:bg-neutral-50 hover:text-black border-l-2 border-transparent"
-            }`}
-            style={{ borderRadius: "0 6px 6px 0" }}
+            className={`admin-nav-item${isActive ? " active" : ""}`}
+            onClick={onClose}
+            title={collapsed ? label : undefined}
         >
-            <span>{label}</span>
-            {badge && (
-                <span
-                    className="text-[8px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded"
-                    style={{ backgroundColor: "#b8960c", color: "white" }}
-                >
-                    {badge}
-                </span>
-            )}
+            <Icon />
+            {!collapsed && <span className="admin-nav-label">{label}</span>}
+            {!collapsed && badge && <span className="admin-nav-badge">{badge}</span>}
         </Link>
     );
 }
 
-function NavSection({ title, items }: { title: string; items: NavItem[] }) {
+function NavGroup({ title, items, onClose, collapsed }: { title: string; items: NavItemDef[]; onClose: () => void; collapsed: boolean }) {
     return (
-        <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-400 mb-1 px-3">
-                {title}
-            </p>
-            <ul className="space-y-0.5">
-                {items.map((item) => (
-                    <li key={item.href}>
-                        <NavLink {...item} />
-                    </li>
-                ))}
-            </ul>
+        <div className="admin-nav-group">
+            {!collapsed && <div className="admin-nav-title">{title}</div>}
+            {items.map(item => <NavItem key={item.href} {...item} onClose={onClose} collapsed={collapsed} />)}
         </div>
     );
 }
 
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
 type Props = {
+    businessName: string;
     isFullAccess: boolean;
     showCustomRequests: boolean;
-    businessName: string;
+    mobileOpen: boolean;
+    onClose: () => void;
+    collapsed: boolean;
+    onToggleCollapse: () => void;
 };
 
-export function AdminSidebar({ isFullAccess, showCustomRequests, businessName }: Props) {
-    const [mobileOpen, setMobileOpen] = useState(false);
-
+export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, mobileOpen, onClose, collapsed, onToggleCollapse }: Props) {
     const displayName = businessName || "Miss Tokyo";
 
-    const salesItems: NavItem[] = [
-        { label: "Point of Sale", href: "/pos" },
-        { label: "POS History", href: "/pos/history" },
-        { label: "Orders", href: "/sales/orders" },
-        { label: "Pre-Orders", href: "/sales/pre-orders" },
-        { label: "Abandoned Carts", href: "/customers/abandoned" },
-        { label: "Discounts", href: "/catalog/discounts" },
-        { label: "Auto Discounts", href: "/catalog/auto-discounts" },
-        { label: "Gift Cards", href: "/catalog/gift-cards" },
-        ...(isFullAccess
-            ? [
-                  { label: "Pay Links", href: "/finance/links" },
-                  { label: "Invoices", href: "/finance/invoices" },
-              ]
-            : []),
+    const overviewItems: NavItemDef[] = [
+        { label: "Dashboard",  href: "/overview",        Icon: Ico.Dashboard },
+        { label: "Analytics",  href: "/sales/analytics", Icon: Ico.Chart },
     ];
 
-    const catalogueItems: NavItem[] = [
-        { label: "Products", href: "/catalog/products" },
-        { label: "Categories", href: "/catalog/categories" },
-        ...(isFullAccess ? [{ label: "Wholesalers", href: "/sales/wholesalers" }] : []),
+    const salesItems: NavItemDef[] = [
+        { label: "Point of Sale",    href: "/pos",                Icon: Ico.POS },
+        { label: "POS History",      href: "/pos/history",        Icon: Ico.Doc },
+        { label: "Orders",           href: "/sales/orders",       Icon: Ico.Orders },
+        { label: "Pre-Orders",       href: "/sales/pre-orders",   Icon: Ico.Box },
+        { label: "Abandoned Carts",  href: "/customers/abandoned",Icon: Ico.Cart },
+        { label: "Discounts",        href: "/catalog/discounts",  Icon: Ico.Tag },
+        { label: "Auto Discounts",   href: "/catalog/auto-discounts", Icon: Ico.Sparkles },
+        { label: "Gift Cards",       href: "/catalog/gift-cards", Icon: Ico.Gift },
+        ...(isFullAccess ? [
+            { label: "Pay Links",    href: "/finance/links",      Icon: Ico.Wallet },
+            { label: "Invoices",     href: "/finance/invoices",   Icon: Ico.Doc },
+        ] : []),
     ];
 
-    const customerItems: NavItem[] = [
-        { label: "Contact List", href: "/customers" },
-        { label: "Form Submissions", href: "/customers/forms" },
-        { label: "Riders", href: "/sales/riders" },
-        ...(showCustomRequests
-            ? [{ label: "Custom Requests", href: "/customers/requests" }]
-            : []),
+    const catalogueItems: NavItemDef[] = [
+        { label: "Products",     href: "/catalog/products",    Icon: Ico.Box },
+        { label: "Categories",   href: "/catalog/categories",  Icon: Ico.Grid },
+        ...(isFullAccess ? [{ label: "Wholesalers", href: "/sales/wholesalers", Icon: Ico.Users }] : []),
     ];
 
-    const settingsItems: NavItem[] = isFullAccess
+    const customerItems: NavItemDef[] = [
+        { label: "Contact List",   href: "/customers",          Icon: Ico.Users },
+        { label: "Form Submissions", href: "/customers/forms",  Icon: Ico.Mail },
+        { label: "Riders",         href: "/sales/riders",       Icon: Ico.Truck },
+        ...(showCustomRequests ? [{ label: "Custom Requests", href: "/customers/requests", Icon: Ico.Sparkles }] : []),
+    ];
+
+    const settingsItems: NavItemDef[] = isFullAccess
         ? [
-              { label: "Site Settings", href: "/settings" },
-              { label: "CMS", href: "/cms", badge: "New" },
+              { label: "Site Settings", href: "/settings", Icon: Ico.Cog },
+              { label: "Team",          href: "/team",     Icon: Ico.Team },
           ]
         : [];
 
-    const navContent = (
-        <nav className="flex-1 py-3 px-2 space-y-3 overflow-y-auto">
-            <NavSection
-                title="Overview"
-                items={[
-                    { label: "Dashboard", href: "/overview" },
-                    { label: "Analytics", href: "/sales/analytics" },
-                ]}
-            />
-            <NavSection title="Sales" items={salesItems} />
-            <NavSection title="Catalogue" items={catalogueItems} />
-            <NavSection title="Customers" items={customerItems} />
-            {settingsItems.length > 0 && (
-                <NavSection title="Settings" items={settingsItems} />
-            )}
-        </nav>
-    );
-
-    const bottomStrip = (
-        <div className="border-t border-neutral-100 px-2 py-3 space-y-1">
-            <Link
-                href="/"
-                className="flex items-center px-3 py-2 text-xs text-neutral-400 hover:text-black rounded-lg hover:bg-neutral-50 transition-all duration-150"
-            >
-                ← Storefront
-            </Link>
-            <LogoutButton />
-        </div>
-    );
-
     return (
-        <>
-            {/* ── Desktop sidebar ── */}
-            <aside className="w-[220px] shrink-0 border-r border-neutral-200 hidden md:flex flex-col h-screen sticky top-0 bg-white">
-                <div className="px-4 py-6 border-b border-neutral-100">
-                    <Link
-                        href="/overview"
-                        className="font-serif text-lg tracking-widest uppercase block text-neutral-900 leading-tight"
-                    >
-                        {displayName}
-                    </Link>
-                    <span className="text-[9px] uppercase tracking-widest text-neutral-400 mt-1.5 block">
-                        Atelier Console
-                    </span>
+        <aside className={`admin-sidebar${mobileOpen ? " open" : ""}${collapsed ? " collapsed" : ""}`}>
+            {/* Brand */}
+            <div className="admin-brand">
+                <div className="admin-brand-mark">
+                    <span className="admin-brand-dot" />
+                    {!collapsed && (
+                        <Link href="/overview" className="admin-brand-name" onClick={onClose}>
+                            {displayName}
+                        </Link>
+                    )}
                 </div>
-                {navContent}
-                {bottomStrip}
-            </aside>
-
-            {/* ── Mobile top bar ── */}
-            <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-neutral-200 flex items-center justify-between px-4 h-14">
-                <Link
-                    href="/overview"
-                    className="font-serif text-base tracking-widest uppercase text-neutral-900"
-                >
-                    {displayName}
-                </Link>
-                <button
-                    onClick={() => setMobileOpen(true)}
-                    aria-label="Open navigation"
-                    className="p-2 text-neutral-600 hover:text-black transition-colors"
-                >
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                    >
-                        <line x1="3" y1="6" x2="21" y2="6" />
-                        <line x1="3" y1="12" x2="21" y2="12" />
-                        <line x1="3" y1="18" x2="21" y2="18" />
-                    </svg>
-                </button>
+                {!collapsed && <div className="admin-brand-sub">Atelier Console</div>}
             </div>
 
-            {/* ── Mobile overlay ── */}
-            {mobileOpen && (
-                <div
-                    className="md:hidden fixed inset-0 z-40 bg-black/40"
-                    onClick={() => setMobileOpen(false)}
-                />
-            )}
+            {/* Navigation */}
+            <nav className="admin-nav">
+                <NavGroup title="Overview"  items={overviewItems}  onClose={onClose} collapsed={collapsed} />
+                <NavGroup title="Sales"     items={salesItems}     onClose={onClose} collapsed={collapsed} />
+                <NavGroup title="Catalogue" items={catalogueItems} onClose={onClose} collapsed={collapsed} />
+                <NavGroup title="Customers" items={customerItems}  onClose={onClose} collapsed={collapsed} />
+                {settingsItems.length > 0 && (
+                    <NavGroup title="Settings" items={settingsItems} onClose={onClose} collapsed={collapsed} />
+                )}
+            </nav>
 
-            {/* ── Mobile slide-in drawer ── */}
-            <aside
-                className={`md:hidden fixed top-0 left-0 z-50 h-full bg-white flex flex-col shadow-2xl transition-transform duration-200 w-[260px] ${
-                    mobileOpen ? "translate-x-0" : "-translate-x-full"
-                }`}
+            {/* Collapse toggle */}
+            <button
+                type="button"
+                className="admin-sidebar-collapse-btn"
+                onClick={onToggleCollapse}
+                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-                <div className="flex items-center justify-between px-4 h-14 border-b border-neutral-100 shrink-0">
-                    <span className="font-serif text-base tracking-widest uppercase text-neutral-900">
-                        {displayName}
-                    </span>
-                    <button
-                        onClick={() => setMobileOpen(false)}
-                        aria-label="Close navigation"
-                        className="p-1.5 text-neutral-500 hover:text-black transition-colors"
-                    >
-                        <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                        >
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                    </button>
-                </div>
-                {navContent}
-                {bottomStrip}
-            </aside>
-        </>
+                {collapsed ? <Ico.ChevronRight /> : <Ico.ChevronLeft />}
+            </button>
+
+            {/* Footer */}
+            <div className="admin-sidebar-foot">
+                <Link href="/" className="admin-foot-link" onClick={onClose} title={collapsed ? "Storefront" : undefined}>
+                    <Ico.Home />
+                    {!collapsed && <span className="admin-foot-label">Storefront</span>}
+                </Link>
+                <LogoutButton className="admin-foot-link" iconEl={<Ico.Logout />} />
+            </div>
+        </aside>
     );
 }

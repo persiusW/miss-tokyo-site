@@ -37,9 +37,7 @@ export default function PayLinksPage() {
         setLoading(false);
     };
 
-    useEffect(() => {
-        fetchLinks(tab);
-    }, [tab]);
+    useEffect(() => { fetchLinks(tab); }, [tab]);
 
     useEffect(() => {
         supabase
@@ -48,9 +46,7 @@ export default function PayLinksPage() {
             .eq("id", "default")
             .single()
             .then(({ data }: { data: any }) => {
-                if (data?.email) {
-                    setForm(prev => ({ ...prev, email: prev.email || data.email }));
-                }
+                if (data?.email) setForm(prev => ({ ...prev, email: prev.email || data.email }));
             });
     }, []);
 
@@ -70,7 +66,6 @@ export default function PayLinksPage() {
 
             if (data.authorizationUrl) {
                 setGeneratedUrl(data.authorizationUrl);
-
                 await supabase.from("pay_links").insert([{
                     email: form.email,
                     amount: Number(form.amount),
@@ -79,7 +74,6 @@ export default function PayLinksPage() {
                     paystack_reference: data.reference || null,
                     status: "active",
                 }]);
-
                 if (tab === "active") fetchLinks("active");
                 toast.success("Pay link generated.");
             } else {
@@ -115,63 +109,49 @@ export default function PayLinksPage() {
     const colSpan = tab === "active" ? 6 : 5;
 
     return (
-        <div className="space-y-12">
-            <header>
-                <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Pay Links</h1>
-                <p className="text-neutral-500">Generate direct Paystack checkout URLs for custom amounts.</p>
-            </header>
+        <>
+            <div className="ac-page-head">
+                <div>
+                    <h1 className="ac-page-h1">Pay Links</h1>
+                    <p className="ac-page-sub">Generate direct Paystack checkout URLs for custom amounts.</p>
+                </div>
+            </div>
 
             {/* Generator */}
-            <div className="bg-white border border-neutral-200 p-8">
-                <h2 className="text-xs font-semibold uppercase tracking-widest mb-6 border-b border-neutral-100 pb-4">Generate New Link</h2>
-                <form onSubmit={handleGenerate} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="ac-card" style={{ marginBottom: 24 }}>
+                <div className="ac-card-head"><span className="ac-card-title">Generate New Link</span></div>
+                <form onSubmit={handleGenerate} style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Customer Email</label>
-                            <input
-                                type="email" required
-                                value={form.email}
+                            <label className="ac-label">Customer Email</label>
+                            <input type="email" required value={form.email}
                                 onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                                placeholder="client@email.com"
-                            />
+                                className="ac-input" style={{ marginTop: 4 }}
+                                placeholder="client@email.com" />
                         </div>
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Amount (GHS)</label>
-                            <input
-                                type="number" min="1" step="0.01" required
-                                value={form.amount}
+                            <label className="ac-label">Amount (GHS)</label>
+                            <input type="number" min="1" step="0.01" required value={form.amount}
                                 onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                                placeholder="0.00"
-                            />
+                                className="ac-input" style={{ marginTop: 4 }}
+                                placeholder="0.00" />
                         </div>
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Description (Optional)</label>
-                            <input
-                                type="text"
-                                value={form.description}
+                            <label className="ac-label">Description (Optional)</label>
+                            <input type="text" value={form.description}
                                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
-                                placeholder="e.g. Bespoke slide deposit"
-                            />
+                                className="ac-input" style={{ marginTop: 4 }}
+                                placeholder="e.g. Bespoke slide deposit" />
                         </div>
                     </div>
-                    <div className="flex items-center gap-6">
-                        <button
-                            type="submit" disabled={generating}
-                            className="px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                        >
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                        <button type="submit" disabled={generating} className="ac-btn ac-btn-primary">
                             {generating ? "Generating..." : "Generate Pay Link"}
                         </button>
                         {generatedUrl && (
-                            <div className="flex items-center gap-3 flex-1 bg-neutral-50 border border-neutral-200 px-4 py-3 rounded">
-                                <span className="font-mono text-xs text-neutral-600 truncate flex-1">{generatedUrl}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => copyToClipboard(generatedUrl)}
-                                    className="text-[10px] uppercase tracking-widest text-black border-b border-black flex-shrink-0"
-                                >
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", padding: "8px 14px" }}>
+                                <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-ink-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{generatedUrl}</span>
+                                <button type="button" onClick={() => copyToClipboard(generatedUrl)} className="ac-text-link" style={{ flexShrink: 0, fontSize: 11 }}>
                                     Copy
                                 </button>
                             </div>
@@ -181,79 +161,72 @@ export default function PayLinksPage() {
             </div>
 
             {/* Tabs + History */}
-            <div className="bg-white border border-neutral-200 overflow-x-auto">
-                <div className="px-6 py-4 border-b border-neutral-200 flex items-center gap-6">
-                    <button
-                        onClick={() => setTab("active")}
-                        className={`text-xs uppercase tracking-widest font-semibold pb-1 transition-colors ${tab === "active" ? "border-b-2 border-black text-black" : "text-neutral-400 hover:text-black"}`}
-                    >
+            <div className="ac-card flush">
+                <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--ac-line)", display: "flex", gap: 20 }}>
+                    <button onClick={() => setTab("active")}
+                        className={`ac-tab ${tab === "active" ? "active" : ""}`}>
                         Active
                     </button>
-                    <button
-                        onClick={() => setTab("archived")}
-                        className={`text-xs uppercase tracking-widest font-semibold pb-1 transition-colors ${tab === "archived" ? "border-b-2 border-black text-black" : "text-neutral-400 hover:text-black"}`}
-                    >
+                    <button onClick={() => setTab("archived")}
+                        className={`ac-tab ${tab === "archived" ? "active" : ""}`}>
                         Archived
                     </button>
                 </div>
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
-                        <tr>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Customer</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Description</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Amount</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Date</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Link</th>
-                            {tab === "active" && (
-                                <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Action</th>
-                            )}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                        {loading ? (
-                            <tr><td colSpan={colSpan} className="px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</td></tr>
-                        ) : links.length === 0 ? (
+                <div className="ac-table-wrap">
+                    <table className="ac-table">
+                        <thead>
                             <tr>
-                                <td colSpan={colSpan} className="px-6 py-16 text-center text-neutral-500 italic font-serif">
+                                <th>Customer</th>
+                                <th>Description</th>
+                                <th className="r">Amount</th>
+                                <th>Date</th>
+                                <th className="r">Link</th>
+                                {tab === "active" && <th className="r">Action</th>}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan={colSpan} className="ac-table-empty">Loading...</td></tr>
+                            ) : links.length === 0 ? (
+                                <tr><td colSpan={colSpan} className="ac-table-empty">
                                     {tab === "active" ? "No active pay links." : "No archived pay links."}
-                                </td>
-                            </tr>
-                        ) : links.map((link) => (
-                            <tr key={link.id} className="hover:bg-neutral-50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <a href={`mailto:${link.email}`} className="text-neutral-700 hover:underline">{link.email}</a>
-                                </td>
-                                <td className="px-6 py-4 text-neutral-500 max-w-[200px] truncate">{link.description || "—"}</td>
-                                <td className="px-6 py-4 text-right font-medium">GH₵ {Number(link.amount).toFixed(2)}</td>
-                                <td className="px-6 py-4 text-neutral-500 text-xs">{new Date(link.created_at).toLocaleDateString("en-GB")}</td>
-                                <td className="px-6 py-4 text-right">
-                                    {link.paystack_url ? (
-                                        <button
-                                            onClick={() => copyToClipboard(link.paystack_url!)}
-                                            className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black transition-colors"
-                                        >
-                                            Copy Link
-                                        </button>
-                                    ) : (
-                                        <span className="text-xs text-neutral-300">Unavailable</span>
-                                    )}
-                                </td>
-                                {tab === "active" && (
-                                    <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => handleArchive(link.id)}
-                                            disabled={archiving === link.id}
-                                            className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black transition-colors disabled:opacity-50"
-                                        >
-                                            {archiving === link.id ? "..." : "Archive"}
-                                        </button>
+                                </td></tr>
+                            ) : links.map(link => (
+                                <tr key={link.id}>
+                                    <td>
+                                        <a href={`mailto:${link.email}`} className="ac-text-link" style={{ fontSize: 13 }}>{link.email}</a>
                                     </td>
-                                )}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                    <td style={{ fontSize: 12, color: "var(--ac-ink-3)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {link.description || "—"}
+                                    </td>
+                                    <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500 }}>GH₵ {Number(link.amount).toFixed(2)}</td>
+                                    <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(link.created_at).toLocaleDateString("en-GB")}</td>
+                                    <td className="r">
+                                        {link.paystack_url ? (
+                                            <button onClick={() => copyToClipboard(link.paystack_url!)}
+                                                className="ac-text-link" style={{ fontSize: 11 }}>
+                                                Copy Link
+                                            </button>
+                                        ) : (
+                                            <span style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>Unavailable</span>
+                                        )}
+                                    </td>
+                                    {tab === "active" && (
+                                        <td className="r">
+                                            <button onClick={() => handleArchive(link.id)} disabled={archiving === link.id}
+                                                style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }}
+                                                onMouseEnter={e => (e.currentTarget.style.color = "var(--ac-ink)")}
+                                                onMouseLeave={e => (e.currentTarget.style.color = "var(--ac-ink-4)")}>
+                                                {archiving === link.id ? "..." : "Archive"}
+                                            </button>
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
+        </>
     );
 }

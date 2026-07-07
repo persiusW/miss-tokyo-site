@@ -1,9 +1,10 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
+import "./admin.css";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
 import { RealtimeStockMonitor } from "@/components/ui/miss-tokyo/RealtimeStockMonitor";
-import { AdminSidebar } from "@/components/ui/miss-tokyo/AdminSidebar";
+import { AdminShellClient } from "@/components/ui/miss-tokyo/AdminShellClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { logSignIn } from "@/lib/utils/logSignIn";
@@ -20,6 +21,12 @@ async function safeQuery<T>(fn: () => PromiseLike<{ data: T | null }>, ms = 8000
     } catch {
         return null;
     }
+}
+
+function getInitials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
 }
 
 // Sidebar settings rarely change — cache for 60 s so every dashboard render
@@ -47,7 +54,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         serverClient.auth.getClaims(),
         getLayoutSettings(),
     ]);
-    const userId = claimsResult.data?.claims?.sub as string | undefined;
+    const claims = claimsResult.data?.claims;
+    const userId = claims?.sub as string | undefined;
     const storeSettings = storeData as { enable_custom_requests: boolean } | null;
     const businessSettings = bizData as { business_name: string } | null;
 
@@ -66,9 +74,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     }
 
     const isAuthorized = ["admin", "owner", "sales_staff"].includes(userRole || "");
-    if (!isAuthorized) {
-        redirect("/admin/login?error=unauthorized");
-    }
+    if (!isAuthorized) redirect("/admin/login?error=unauthorized");
 
     if (userRole && ["owner", "sales_staff"].includes(userRole)) {
         logSignIn(userId, userRole).catch(() => {}); // fire-and-forget, don't block render
@@ -78,22 +84,27 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     const showCustomRequests = storeSettings?.enable_custom_requests ?? true;
     const businessName = businessSettings?.business_name ?? "Miss Tokyo";
 
+    // Display name for the topbar comes from the JWT claims (email + user_metadata
+    // are present on the Supabase access token) — no extra getUser round trip.
+    const displayName = ((claims?.user_metadata as { full_name?: string } | undefined)?.full_name)
+        || (claims?.email as string | undefined)
+        || "Admin";
+    const topbarUser = {
+        name: displayName,
+        initials: getInitials(displayName),
+        role: userRole ?? "staff",
+    };
+
     return (
         <>
-            <div className="h-screen overflow-hidden bg-neutral-50 font-sans flex text-neutral-900">
-                <AdminSidebar
-                    isFullAccess={isFullAccess}
-                    showCustomRequests={showCustomRequests}
-                    businessName={businessName}
-                />
-
-                {/* Main content — offset on mobile for the fixed top bar */}
-                <main className="flex-1 min-w-0 overflow-y-auto w-full md:w-auto p-6 md:p-12 pt-20 md:pt-12">
-                    <div className="max-w-7xl mx-auto">
-                        {children}
-                    </div>
-                </main>
-            </div>
+            <AdminShellClient
+                businessName={businessName}
+                isFullAccess={isFullAccess}
+                showCustomRequests={showCustomRequests}
+                user={topbarUser}
+            >
+                {children}
+            </AdminShellClient>
             <Toaster />
             <RealtimeStockMonitor />
         </>

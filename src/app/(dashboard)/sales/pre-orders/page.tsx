@@ -24,42 +24,38 @@ export default async function PreOrdersPage() {
     const stats = await fetchPreOrderStats(allOrders);
 
     return (
-        <div className="space-y-6">
-            <header>
-                <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Pre-Orders</h1>
-                <p className="text-neutral-500">Orders containing at least one pre-order item. Fulfil regular items via the main Orders page; return here when the pre-order stock arrives.</p>
-            </header>
+        <>
+            <div className="ac-page-head">
+                <div>
+                    <h1 className="ac-page-h1">Pre-Orders</h1>
+                    <p className="ac-page-sub">Orders containing at least one pre-order item. Fulfil regular items via the main Orders page; return here when the pre-order stock arrives.</p>
+                </div>
+            </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Total Value</span>
-                    <span className="text-3xl font-serif">GH₵ {stats.totalValue.toFixed(2)}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">
-                        ALL PRE-ORDER ORDERS
-                    </span>
+            <div className="ac-kpi-grid" style={{ marginBottom: 24 }}>
+                <div className="ac-kpi">
+                    <span className="ac-kpi-label">Total Value</span>
+                    <span className="ac-kpi-value"><span className="ac-kpi-ccy">GH₵ </span>{stats.totalValue.toFixed(2)}</span>
+                    <span className="ac-kpi-sub">All pre-order orders</span>
                 </div>
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Awaiting Stock</span>
-                    <span className="text-3xl font-serif text-amber-600">{stats.pendingCount}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">
-                        PAID · PENDING · PROCESSING
-                    </span>
+                <div className="ac-kpi">
+                    <span className="ac-kpi-label">Awaiting Stock</span>
+                    <span className="ac-kpi-value" style={{ color: "var(--ac-warn)" }}>{stats.pendingCount}</span>
+                    <span className="ac-kpi-sub">Paid · Pending · Processing</span>
                 </div>
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Fulfilled</span>
-                    <span className="text-3xl font-serif text-green-700">{stats.fulfilledCount}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">SHIPPED · DELIVERED</span>
+                <div className="ac-kpi">
+                    <span className="ac-kpi-label">Fulfilled</span>
+                    <span className="ac-kpi-value" style={{ color: "var(--ac-accent)" }}>{stats.fulfilledCount}</span>
+                    <span className="ac-kpi-sub">Shipped · Delivered</span>
                 </div>
-                <div className="bg-white border border-neutral-200 p-6">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Cancelled</span>
-                    <span className="text-3xl font-serif text-neutral-500">{stats.cancelledCount}</span>
-                    <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">
-                        CANCELLED · REFUNDED
-                    </span>
+                <div className="ac-kpi">
+                    <span className="ac-kpi-label">Cancelled</span>
+                    <span className="ac-kpi-value">{stats.cancelledCount}</span>
+                    <span className="ac-kpi-sub">Cancelled · Refunded</span>
                 </div>
             </div>
 
             <OrdersClient orders={allOrders} />
-        </div>
+        </>
     );
 }

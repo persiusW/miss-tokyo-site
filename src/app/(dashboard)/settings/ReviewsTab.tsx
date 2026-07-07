@@ -3,14 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import {
-    ChevronDown,
-    ChevronUp,
-    Trash2,
-    ArrowUp,
-    ArrowDown,
-    Star,
-} from "lucide-react";
 
 type Review = {
     id: string;
@@ -210,17 +202,14 @@ export function ReviewsTab() {
                             </span>
 
                             {/* Stars preview */}
-                            <div className="flex gap-0.5 shrink-0">
-                                {[1, 2, 3, 4, 5].map((s) => (
-                                    <Star
-                                        key={s}
-                                        size={10}
-                                        className={
-                                            s <= review.star_rating
-                                                ? "fill-amber-400 text-amber-400"
-                                                : "text-neutral-200"
-                                        }
-                                    />
+                            <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                                {[1, 2, 3, 4, 5].map(s => (
+                                    <svg key={s} width="10" height="10" viewBox="0 0 24 24"
+                                        fill={s <= review.star_rating ? "var(--ac-warn)" : "none"}
+                                        stroke={s <= review.star_rating ? "var(--ac-warn)" : "var(--ac-line)"}
+                                        strokeWidth="1.6" strokeLinecap="round">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                    </svg>
                                 ))}
                             </div>
 
@@ -232,7 +221,7 @@ export function ReviewsTab() {
                                     disabled={index === 0}
                                     className="p-1 text-neutral-400 hover:text-black disabled:opacity-30 transition-colors"
                                 >
-                                    <ArrowUp size={14} />
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>
                                 </button>
                                 <button
                                     type="button"
@@ -240,7 +229,7 @@ export function ReviewsTab() {
                                     disabled={index === reviews.length - 1}
                                     className="p-1 text-neutral-400 hover:text-black disabled:opacity-30 transition-colors"
                                 >
-                                    <ArrowDown size={14} />
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
                                 </button>
                             </div>
 
@@ -267,11 +256,10 @@ export function ReviewsTab() {
                                 onClick={() => toggleExpand(review.id)}
                                 className="shrink-0 text-neutral-400 hover:text-black transition-colors"
                             >
-                                {isExpanded ? (
-                                    <ChevronUp size={16} />
-                                ) : (
-                                    <ChevronDown size={16} />
-                                )}
+                                {isExpanded
+                                    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+                                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                }
                             </button>
 
                             <button
@@ -279,7 +267,7 @@ export function ReviewsTab() {
                                 onClick={() => handleDelete(review.id)}
                                 className="shrink-0 text-neutral-400 hover:text-red-500 transition-colors"
                             >
-                                <Trash2 size={14} />
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                             </button>
                         </div>
 
@@ -378,14 +366,12 @@ export function ReviewsTab() {
                                                 }
                                                 className="transition-transform hover:scale-110"
                                             >
-                                                <Star
-                                                    size={20}
-                                                    className={
-                                                        s <= review.star_rating
-                                                            ? "fill-amber-400 text-amber-400"
-                                                            : "text-neutral-200"
-                                                    }
-                                                />
+                                                <svg width="20" height="20" viewBox="0 0 24 24"
+                                                    fill={s <= review.star_rating ? "var(--ac-warn)" : "none"}
+                                                    stroke={s <= review.star_rating ? "var(--ac-warn)" : "var(--ac-line)"}
+                                                    strokeWidth="1.6" strokeLinecap="round">
+                                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                                </svg>
                                             </button>
                                         ))}
                                     </div>

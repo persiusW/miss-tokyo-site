@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { X, Search, Building2 } from "lucide-react";
 
 type WholesaleUser = {
     id: string;
@@ -92,137 +91,114 @@ export default function WholesalersPage() {
     };
 
     return (
-        <div className="space-y-10 max-w-4xl">
-            <header className="flex items-start justify-between">
+        <>
+            <div className="ac-page-head">
                 <div>
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Wholesalers</h1>
-                    <p className="text-neutral-500">Manage B2B wholesale accounts. These users see exclusive tier pricing on the storefront.</p>
+                    <h1 className="ac-page-h1">Wholesalers</h1>
+                    <p className="ac-page-sub">Manage B2B wholesale accounts. These users see exclusive tier pricing on the storefront.</p>
                 </div>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
-                >
-                    <Building2 size={14} />
+                <button onClick={() => setShowModal(true)} className="ac-btn ac-btn-primary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ display: "inline", marginRight: 6 }}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
                     Manage Wholesalers
                 </button>
-            </header>
+            </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white border border-neutral-200 p-6">
-                    <p className="text-3xl font-serif mb-1">{wholesalers.length}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">Active Wholesale Accounts</p>
+            <div className="ac-kpi-grid" style={{ marginBottom: 24 }}>
+                <div className="ac-kpi">
+                    <span className="ac-kpi-label">Active Wholesale Accounts</span>
+                    <span className="ac-kpi-value">{wholesalers.length}</span>
                 </div>
             </div>
 
             {/* Table */}
-            <div className="bg-white border border-neutral-200">
-                <div className="px-8 py-4 border-b border-neutral-100">
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Wholesale Accounts</p>
-                </div>
-
+            <div className="ac-card flush">
+                <div className="ac-card-head"><span className="ac-card-title">Wholesale Accounts</span></div>
                 {loading ? (
-                    <p className="px-8 py-10 text-neutral-400 italic font-serif">Loading wholesalers...</p>
+                    <div className="ac-empty"><p className="ac-empty-title">Loading wholesalers...</p></div>
                 ) : wholesalers.length === 0 ? (
-                    <div className="px-8 py-12 text-center space-y-3">
-                        <Building2 size={32} className="mx-auto text-neutral-300" />
-                        <p className="text-neutral-400 italic font-serif">No wholesale accounts yet.</p>
-                        <p className="text-[10px] uppercase tracking-widest text-neutral-400">
-                            Use "Manage Wholesalers" to promote existing customers.
-                        </p>
+                    <div className="ac-empty">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ color: "var(--ac-ink-4)", marginBottom: 8 }}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                        <p className="ac-empty-title">No wholesale accounts yet.</p>
+                        <p style={{ fontSize: 11, color: "var(--ac-ink-4)", textTransform: "uppercase", letterSpacing: ".06em", marginTop: 4 }}>Use "Manage Wholesalers" to promote existing customers.</p>
                     </div>
                 ) : (
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b border-neutral-100">
-                                <th className="px-8 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Account</th>
-                                <th className="px-4 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Granted</th>
-                                <th className="px-8 py-3" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {wholesalers.map(w => (
-                                <tr key={w.id} className="border-b border-neutral-50 last:border-b-0 hover:bg-neutral-50 transition-colors">
-                                    <td className="px-8 py-4">
-                                        <p className="text-sm font-semibold">{w.full_name || "—"}</p>
-                                        <p className="text-[10px] text-neutral-400 tracking-wide">{w.email}</p>
-                                    </td>
-                                    <td className="px-4 py-4 text-[11px] text-neutral-500">
-                                        {new Date(w.created_at).toLocaleDateString("en-GB")}
-                                    </td>
-                                    <td className="px-8 py-4 text-right">
-                                        <button
-                                            onClick={() => handleRevoke(w)}
-                                            className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-red-600 transition-colors font-semibold"
-                                        >
-                                            Revoke Access
-                                        </button>
-                                    </td>
+                    <div className="ac-table-wrap">
+                        <table className="ac-table">
+                            <thead>
+                                <tr>
+                                    <th>Account</th>
+                                    <th>Granted</th>
+                                    <th style={{ width: 100 }}></th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {wholesalers.map(w => (
+                                    <tr key={w.id}>
+                                        <td>
+                                            <div style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{w.full_name || "—"}</div>
+                                            <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{w.email}</div>
+                                        </td>
+                                        <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(w.created_at).toLocaleDateString("en-GB")}</td>
+                                        <td style={{ textAlign: "right" }}>
+                                            <button onClick={() => handleRevoke(w)}
+                                                style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
+                                                onMouseEnter={e => (e.currentTarget.style.color = "var(--ac-danger)")}
+                                                onMouseLeave={e => (e.currentTarget.style.color = "var(--ac-ink-4)")}>
+                                                Revoke Access
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
 
             {/* Manage Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white w-full max-w-lg border border-neutral-200 shadow-2xl">
-                        <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
-                            <h2 className="font-serif text-lg tracking-widest uppercase">Promote to Wholesale</h2>
+                <div className="ac-modal">
+                    <div className="ac-modal-box" style={{ maxWidth: 500 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                            <h2 style={{ fontFamily: "var(--f-display)", fontSize: 18, fontWeight: 600, color: "var(--ac-ink)" }}>Promote to Wholesale</h2>
                             <button onClick={() => { setShowModal(false); setSearchQuery(""); setSearchResults([]); }}
-                                className="text-neutral-400 hover:text-black">
-                                <X size={18} />
-                            </button>
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", fontSize: 22 }}>×</button>
                         </div>
-                        <div className="p-8 space-y-6">
-                            <p className="text-[10px] text-neutral-500 uppercase tracking-widest leading-relaxed">
-                                Search for an existing customer account by email to grant them wholesale pricing access.
-                            </p>
-                            <div className="relative">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                                <input
-                                    type="email"
-                                    placeholder="Search by email..."
-                                    value={searchQuery}
-                                    onChange={e => handleSearch(e.target.value)}
-                                    className="w-full pl-9 border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm transition-colors"
-                                    autoFocus
-                                />
-                            </div>
+                        <p style={{ fontSize: 11, color: "var(--ac-ink-4)", textTransform: "uppercase", letterSpacing: ".06em", lineHeight: 1.6, marginBottom: 16 }}>
+                            Search for an existing customer account by email to grant them wholesale pricing access.
+                        </p>
+                        <div style={{ position: "relative", marginBottom: 16 }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ac-ink-4)", pointerEvents: "none" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="email" placeholder="Search by email..."
+                                value={searchQuery} onChange={e => handleSearch(e.target.value)}
+                                className="ac-input" style={{ paddingLeft: 34 }}
+                                autoFocus />
+                        </div>
 
-                            {searching && (
-                                <p className="text-[10px] uppercase tracking-widest text-neutral-400 italic">Searching...</p>
-                            )}
-
-                            {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
-                                <p className="text-[10px] uppercase tracking-widest text-neutral-400">No matching customer accounts found.</p>
-                            )}
-
-                            {searchResults.length > 0 && (
-                                <div className="space-y-2">
-                                    {searchResults.map(result => (
-                                        <div key={result.id} className="flex items-center justify-between p-4 border border-neutral-100 hover:border-neutral-300 transition-colors">
-                                            <div>
-                                                <p className="text-sm font-semibold">{result.full_name || "—"}</p>
-                                                <p className="text-[10px] text-neutral-400 tracking-wide">{result.email}</p>
-                                            </div>
-                                            <button
-                                                onClick={() => handlePromote(result)}
-                                                disabled={promoting === result.id}
-                                                className="px-4 py-2 bg-black text-white text-[10px] uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                                            >
-                                                {promoting === result.id ? "..." : "Promote"}
-                                            </button>
+                        {searching && <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)", fontStyle: "italic" }}>Searching...</p>}
+                        {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
+                            <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)" }}>No matching customer accounts found.</p>
+                        )}
+                        {searchResults.length > 0 && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                {searchResults.map(result => (
+                                    <div key={result.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)" }}>
+                                        <div>
+                                            <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ac-ink)" }}>{result.full_name || "—"}</div>
+                                            <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{result.email}</div>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                                        <button onClick={() => handlePromote(result)} disabled={promoting === result.id}
+                                            className="ac-btn ac-btn-primary ac-btn-sm">
+                                            {promoting === result.id ? "..." : "Promote"}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

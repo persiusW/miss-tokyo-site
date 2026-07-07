@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { Plus, Trash2 } from "lucide-react";
 import { saveAutoDiscount, toggleAutoDiscount, deleteAutoDiscount } from "./actions";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -90,14 +89,12 @@ export default function AutoDiscountsPage() {
                 .or("is_active.eq.true,is_active.is.null")
                 .order("name")
                 .limit(200),
-            // Count actual usage from orders (auto_discount_title is comma-separated rule titles)
             supabase
                 .from("orders")
                 .select("auto_discount_title")
                 .not("auto_discount_title", "is", null),
         ]);
 
-        // Build title → order count map from real order data
         const usageMap: Record<string, number> = {};
         for (const o of discountOrders ?? []) {
             if (!o.auto_discount_title) continue;
@@ -107,7 +104,6 @@ export default function AutoDiscountsPage() {
             }
         }
 
-        // Merge computed usage into rules (overrides stale webhook-tracked usage_count)
         const rulesWithUsage = (ruleData ?? []).map((r: AutoDiscount) => ({
             ...r,
             usage_count: usageMap[r.title] ?? 0,
@@ -120,8 +116,6 @@ export default function AutoDiscountsPage() {
     };
 
     useEffect(() => { fetchAll(); }, []);
-
-    // ── Form helpers ──────────────────────────────────────────────────────────
 
     const openCreate = () => {
         setEditingId(null);
@@ -168,8 +162,6 @@ export default function AutoDiscountsPage() {
         }));
     };
 
-    // ── Save ──────────────────────────────────────────────────────────────────
-
     const save = async () => {
         if (!form.title.trim()) { toast.error("Title is required."); return; }
         if (!form.discount_value || Number(form.discount_value) <= 0) {
@@ -210,8 +202,6 @@ export default function AutoDiscountsPage() {
         }
     };
 
-    // ── Toggle active ─────────────────────────────────────────────────────────
-
     const toggleActive = async (rule: AutoDiscount) => {
         setRules(prev => prev.map(r => r.id === rule.id ? { ...r, is_active: !r.is_active } : r));
         const result = await toggleAutoDiscount(rule.id, rule.is_active, rule.title);
@@ -222,8 +212,6 @@ export default function AutoDiscountsPage() {
             fetch("/api/admin/revalidate-discounts", { method: "POST" });
         }
     };
-
-    // ── Delete ────────────────────────────────────────────────────────────────
 
     const deleteRule = async (id: string) => {
         if (!confirm("Delete this automatic discount rule?")) return;
@@ -237,8 +225,6 @@ export default function AutoDiscountsPage() {
             fetch("/api/admin/revalidate-discounts", { method: "POST" });
         }
     };
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     function formatDiscount(rule: AutoDiscount) {
         return rule.discount_type === "PERCENTAGE"
@@ -272,314 +258,280 @@ export default function AutoDiscountsPage() {
         ? products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()))
         : products;
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    const toggleStyle = (active: boolean) => ({
+        position: "relative" as const,
+        display: "inline-flex",
+        height: 20,
+        width: 36,
+        alignItems: "center",
+        borderRadius: 10,
+        background: active ? "var(--ac-accent)" : "var(--ac-line)",
+        border: "none",
+        cursor: "pointer",
+        transition: "background .2s",
+        flexShrink: 0,
+    });
+
+    const toggleKnobStyle = (active: boolean) => ({
+        display: "inline-block",
+        height: 14,
+        width: 14,
+        borderRadius: "50%",
+        background: "#fff",
+        boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+        transform: active ? "translateX(18px)" : "translateX(3px)",
+        transition: "transform .2s",
+    });
 
     return (
-        <div className="p-6 md:p-10 max-w-6xl">
-            <div className="flex items-center justify-between mb-8">
+        <>
+            <div className="ac-page-head">
                 <div>
-                    <h1 className="font-serif text-2xl tracking-widest uppercase">Auto Discounts</h1>
-                    <p className="text-sm text-neutral-500 mt-1">
-                        Rules that apply automatically at checkout — no code required.
-                    </p>
+                    <h1 className="ac-page-h1">Auto Discounts</h1>
+                    <p className="ac-page-sub">Rules that apply automatically at checkout — no code required.</p>
                 </div>
-                <button
-                    onClick={openCreate}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
-                >
-                    <Plus size={14} />
+                <button onClick={openCreate} className="ac-btn ac-btn-primary">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ display: "inline", marginRight: 6 }}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     New Rule
                 </button>
             </div>
 
-            {/* ── List ── */}
             {loading ? (
-                <p className="text-neutral-400 italic font-serif">Loading…</p>
+                <div className="ac-card">
+                    <div className="ac-empty"><p className="ac-empty-title">Loading…</p></div>
+                </div>
             ) : rules.length === 0 ? (
-                <div className="text-center py-24 border border-dashed border-neutral-200">
-                    <p className="text-neutral-400 italic">No automatic discount rules yet.</p>
-                    <button onClick={openCreate} className="mt-4 text-xs uppercase tracking-widest underline underline-offset-4 text-neutral-600 hover:text-black transition-colors">
-                        Create your first rule
-                    </button>
+                <div className="ac-card">
+                    <div className="ac-empty">
+                        <p className="ac-empty-title">No automatic discount rules yet.</p>
+                        <button onClick={openCreate} className="ac-btn ac-btn-ghost" style={{ marginTop: 12 }}>Create your first rule</button>
+                    </div>
                 </div>
             ) : (
-                <div className="border border-neutral-200 divide-y divide-neutral-100">
-                    {/* Header row */}
-                    <div className="hidden md:grid grid-cols-[2fr_1fr_2fr_1fr_80px_80px] gap-4 px-5 py-3 bg-neutral-50 text-[10px] uppercase tracking-widest text-neutral-500 font-semibold">
-                        <span>Title</span>
-                        <span>Discount</span>
-                        <span>Applies To</span>
-                        <span>Min Qty</span>
-                        <span>Uses</span>
-                        <span className="text-right">Active</span>
+                <div className="ac-card flush">
+                    <div className="ac-table-wrap">
+                        <table className="ac-table">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Discount</th>
+                                    <th>Applies To</th>
+                                    <th>Min Qty</th>
+                                    <th className="r">Uses</th>
+                                    <th className="r">Active</th>
+                                    <th style={{ width: 40 }}></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rules.map(rule => (
+                                    <tr key={rule.id} style={{ cursor: "pointer" }} onClick={() => openEdit(rule)}>
+                                        <td>
+                                            <div style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{rule.title}</div>
+                                            <div style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2 }}>{formatDates(rule)}</div>
+                                        </td>
+                                        <td>
+                                            <span className={`ac-badge ${rule.discount_type === "PERCENTAGE" ? "ac-badge-info" : "ac-badge-warn"}`}>
+                                                {formatDiscount(rule)}
+                                            </span>
+                                        </td>
+                                        <td style={{ fontSize: 12, color: "var(--ac-ink-3)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {formatScope(rule)}
+                                        </td>
+                                        <td style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>
+                                            {rule.min_quantity}×
+                                            <span style={{ color: "var(--ac-ink-4)", marginLeft: 4, fontSize: 11 }}>
+                                                {rule.quantity_scope === "ACROSS_TARGET" ? "(across)" : "(per item)"}
+                                            </span>
+                                        </td>
+                                        <td className="r" style={{ fontSize: 13 }}>{rule.usage_count}</td>
+                                        <td className="r" onClick={e => { e.stopPropagation(); toggleActive(rule); }}>
+                                            <button type="button" style={toggleStyle(rule.is_active)} aria-pressed={rule.is_active}>
+                                                <span style={toggleKnobStyle(rule.is_active)} />
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <button
+                                                className="ac-btn ac-btn-ghost ac-btn-sm"
+                                                style={{ padding: "4px 8px" }}
+                                                onClick={e => { e.stopPropagation(); openEdit(rule); }}
+                                            >
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z"/></svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
-
-                    {rules.map(rule => (
-                        <div
-                            key={rule.id}
-                            className="grid grid-cols-1 md:grid-cols-[2fr_1fr_2fr_1fr_80px_80px] gap-4 px-5 py-4 items-center hover:bg-neutral-50 transition-colors cursor-pointer"
-                            onClick={() => openEdit(rule)}
-                        >
-                            <div>
-                                <p className="font-medium text-sm">{rule.title}</p>
-                                <p className="text-[11px] text-neutral-400 mt-0.5">{formatDates(rule)}</p>
-                            </div>
-                            <div>
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${rule.discount_type === "PERCENTAGE" ? "bg-purple-50 text-purple-700" : "bg-blue-50 text-blue-700"}`}>
-                                    {formatDiscount(rule)}
-                                </span>
-                            </div>
-                            <div className="text-xs text-neutral-600 truncate">{formatScope(rule)}</div>
-                            <div className="text-xs text-neutral-600">
-                                {rule.min_quantity}×
-                                <span className="text-neutral-400 ml-1">
-                                    {rule.quantity_scope === "ACROSS_TARGET" ? "(across)" : "(per item)"}
-                                </span>
-                            </div>
-                            <div className="text-sm text-neutral-600">{rule.usage_count}</div>
-                            <div className="flex justify-end" onClick={e => { e.stopPropagation(); toggleActive(rule); }}>
-                                <button
-                                    type="button"
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${rule.is_active ? "bg-black" : "bg-neutral-200"}`}
-                                    aria-pressed={rule.is_active}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${rule.is_active ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
                 </div>
             )}
 
             {/* ── Form Drawer ── */}
             {showForm && (
-                <div className="fixed inset-0 z-50 flex">
-                    <div className="flex-1 bg-black/40" onClick={closeForm} />
-                    <div className="w-full max-w-xl bg-white overflow-y-auto flex flex-col shadow-2xl">
-                        <div className="flex items-center justify-between px-8 py-6 border-b border-neutral-100 flex-shrink-0">
-                            <h2 className="font-serif text-lg tracking-widest uppercase">
+                <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex" }}>
+                    <div style={{ flex: 1, background: "rgba(0,0,0,.5)" }} onClick={closeForm} />
+                    <div style={{
+                        width: "100%", maxWidth: 480,
+                        background: "var(--ac-panel)",
+                        borderLeft: "1px solid var(--ac-line)",
+                        overflowY: "auto",
+                        display: "flex", flexDirection: "column",
+                        boxShadow: "-8px 0 40px rgba(0,0,0,.3)",
+                    }}>
+                        {/* Drawer header */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: "1px solid var(--ac-line)", flexShrink: 0 }}>
+                            <h2 style={{ fontFamily: "var(--f-display)", fontSize: 18, fontWeight: 600, color: "var(--ac-ink)", letterSpacing: ".04em" }}>
                                 {editingId ? "Edit Rule" : "New Rule"}
                             </h2>
-                            <button onClick={closeForm} className="text-neutral-400 hover:text-black transition-colors text-2xl leading-none">×</button>
+                            <button onClick={closeForm} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", fontSize: 22, lineHeight: 1 }}>×</button>
                         </div>
 
-                        <div className="flex-1 px-8 py-6 space-y-6">
-
-                            {/* Title */}
+                        <div style={{ flex: 1, padding: "24px", display: "flex", flexDirection: "column", gap: 20 }}>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">Title (customer-visible)</label>
-                                <input
-                                    type="text"
-                                    value={form.title}
+                                <label className="ac-label">Title (customer-visible)</label>
+                                <input type="text" value={form.title}
                                     onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                                    className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm"
-                                    placeholder='e.g. "3 for 120"'
-                                />
+                                    className="ac-input" style={{ marginTop: 4 }}
+                                    placeholder='e.g. "3 for 120"' />
                             </div>
 
-                            {/* Discount type + value */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">Discount Type</label>
-                                    <select
-                                        value={form.discount_type}
+                                    <label className="ac-label">Discount Type</label>
+                                    <select value={form.discount_type}
                                         onChange={e => setForm(f => ({ ...f, discount_type: e.target.value as "PERCENTAGE" | "FIXED" }))}
-                                        className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm"
-                                    >
+                                        className="ac-select" style={{ marginTop: 4 }}>
                                         <option value="PERCENTAGE">Percentage %</option>
                                         <option value="FIXED">Fixed GH₵</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">
-                                        Value ({form.discount_type === "PERCENTAGE" ? "%" : "GH₵"})
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={form.discount_value}
+                                    <label className="ac-label">Value ({form.discount_type === "PERCENTAGE" ? "%" : "GH₵"})</label>
+                                    <input type="number" min="0" step="0.01" value={form.discount_value}
                                         onChange={e => setForm(f => ({ ...f, discount_value: e.target.value }))}
-                                        className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm"
-                                        placeholder={form.discount_type === "PERCENTAGE" ? "e.g. 20" : "e.g. 30"}
-                                    />
+                                        className="ac-input" style={{ marginTop: 4 }}
+                                        placeholder={form.discount_type === "PERCENTAGE" ? "e.g. 20" : "e.g. 30"} />
                                 </div>
                             </div>
 
-                            {/* Applies to */}
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">Applies To</label>
-                                <select
-                                    value={form.applies_to}
+                                <label className="ac-label">Applies To</label>
+                                <select value={form.applies_to}
                                     onChange={e => setForm(f => ({ ...f, applies_to: e.target.value as AutoDiscountForm["applies_to"] }))}
-                                    className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm"
-                                >
+                                    className="ac-select" style={{ marginTop: 4 }}>
                                     <option value="ALL_PRODUCTS">All Products</option>
                                     <option value="SPECIFIC_CATEGORIES">Specific Categories</option>
                                     <option value="SPECIFIC_PRODUCTS">Specific Products</option>
                                 </select>
                             </div>
 
-                            {/* Category multi-select */}
                             {form.applies_to === "SPECIFIC_CATEGORIES" && (
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">Target Categories</label>
-                                    <div className="border border-neutral-200 max-h-48 overflow-y-auto divide-y divide-neutral-100">
+                                    <label className="ac-label">Target Categories</label>
+                                    <div style={{ border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", maxHeight: 200, overflowY: "auto", marginTop: 4 }}>
                                         {categories.map(cat => (
-                                            <label key={cat.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-neutral-50">
-                                                <input
-                                                    type="checkbox"
+                                            <label key={cat.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid var(--ac-line)" }}>
+                                                <input type="checkbox" className="ac-checkbox"
                                                     checked={form.target_category_ids.includes(cat.id)}
-                                                    onChange={() => toggleCat(cat.id)}
-                                                    className="accent-black"
-                                                />
-                                                <span className="text-sm">{cat.name}</span>
+                                                    onChange={() => toggleCat(cat.id)} />
+                                                <span style={{ fontSize: 13, color: "var(--ac-ink)" }}>{cat.name}</span>
                                             </label>
                                         ))}
                                     </div>
                                 </div>
                             )}
 
-                            {/* Product multi-select */}
                             {form.applies_to === "SPECIFIC_PRODUCTS" && (
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">Target Products</label>
-                                    <input
-                                        type="text"
-                                        value={productSearch}
+                                    <label className="ac-label">Target Products</label>
+                                    <input type="text" value={productSearch}
                                         onChange={e => setProductSearch(e.target.value)}
                                         placeholder="Search products…"
-                                        className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm mb-2"
-                                    />
-                                    <div className="border border-neutral-200 max-h-48 overflow-y-auto divide-y divide-neutral-100">
+                                        className="ac-input" style={{ marginTop: 4, marginBottom: 8 }} />
+                                    <div style={{ border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", maxHeight: 200, overflowY: "auto" }}>
                                         {filteredProducts.map(prod => (
-                                            <label key={prod.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-neutral-50">
-                                                <input
-                                                    type="checkbox"
+                                            <label key={prod.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid var(--ac-line)" }}>
+                                                <input type="checkbox" className="ac-checkbox"
                                                     checked={form.target_product_ids.includes(prod.id)}
-                                                    onChange={() => toggleProd(prod.id)}
-                                                    className="accent-black"
-                                                />
-                                                <span className="text-sm">{prod.name}</span>
+                                                    onChange={() => toggleProd(prod.id)} />
+                                                <span style={{ fontSize: 13, color: "var(--ac-ink)" }}>{prod.name}</span>
                                             </label>
                                         ))}
                                     </div>
                                     {form.target_product_ids.length > 0 && (
-                                        <p className="text-[11px] text-neutral-500 mt-1">{form.target_product_ids.length} product(s) selected</p>
+                                        <p style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>{form.target_product_ids.length} product(s) selected</p>
                                     )}
                                 </div>
                             )}
 
-                            {/* Min quantity + scope */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">Min Quantity</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        value={form.min_quantity}
+                                    <label className="ac-label">Min Quantity</label>
+                                    <input type="number" min="1" step="1" value={form.min_quantity}
                                         onChange={e => setForm(f => ({ ...f, min_quantity: e.target.value }))}
-                                        className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm"
-                                    />
+                                        className="ac-input" style={{ marginTop: 4 }} />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">Qty Scope</label>
-                                    <select
-                                        value={form.quantity_scope}
+                                    <label className="ac-label">Qty Scope</label>
+                                    <select value={form.quantity_scope}
                                         onChange={e => setForm(f => ({ ...f, quantity_scope: e.target.value as "ACROSS_TARGET" | "PER_PRODUCT" }))}
-                                        className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm"
-                                    >
+                                        className="ac-select" style={{ marginTop: 4 }}>
                                         <option value="ACROSS_TARGET">Across All Matching Items</option>
                                         <option value="PER_PRODUCT">Per Individual Product</option>
                                     </select>
                                 </div>
                             </div>
 
-                            {/* Qty scope hint */}
-                            <p className="text-[11px] text-neutral-400 -mt-4">
+                            <p style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: -12 }}>
                                 {form.quantity_scope === "ACROSS_TARGET"
                                     ? "Combined quantity of all matching items must reach the minimum."
                                     : "Each product line must individually meet the minimum quantity."}
                             </p>
 
-                            {/* Min order amount */}
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">Min Order Amount (GH₵, optional)</label>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={form.min_order_amount}
+                                <label className="ac-label">Min Order Amount (GH₵, optional)</label>
+                                <input type="number" min="0" step="0.01" value={form.min_order_amount}
                                     onChange={e => setForm(f => ({ ...f, min_order_amount: e.target.value }))}
-                                    className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm"
-                                    placeholder="Leave blank for no minimum"
-                                />
+                                    className="ac-input" style={{ marginTop: 4 }}
+                                    placeholder="Leave blank for no minimum" />
                             </div>
 
-                            {/* Start / End dates */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">Start Date</label>
-                                    <input
-                                        type="datetime-local"
-                                        value={form.starts_at}
+                                    <label className="ac-label">Start Date</label>
+                                    <input type="datetime-local" value={form.starts_at}
                                         onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))}
-                                        className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm"
-                                    />
+                                        className="ac-input" style={{ marginTop: 4 }} />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] uppercase tracking-widest font-semibold mb-2">End Date</label>
-                                    <input
-                                        type="datetime-local"
-                                        value={form.ends_at}
+                                    <label className="ac-label">End Date</label>
+                                    <input type="datetime-local" value={form.ends_at}
                                         onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))}
-                                        className="w-full border-b border-neutral-300 focus:border-black bg-transparent py-2 outline-none rounded-none text-sm"
-                                        placeholder="Leave blank = no end"
-                                    />
+                                        className="ac-input" style={{ marginTop: 4 }} />
                                 </div>
                             </div>
 
-                            {/* Active toggle */}
-                            <div className="flex items-center justify-between py-2">
-                                <span className="text-sm font-medium">Active</span>
-                                <button
-                                    type="button"
-                                    onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${form.is_active ? "bg-black" : "bg-neutral-200"}`}
-                                    aria-pressed={form.is_active}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${form.is_active ? "translate-x-[18px]" : "translate-x-[3px]"}`} />
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
+                                <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ac-ink)" }}>Active</span>
+                                <button type="button" onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
+                                    style={toggleStyle(form.is_active)} aria-pressed={form.is_active}>
+                                    <span style={toggleKnobStyle(form.is_active)} />
                                 </button>
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="px-8 py-5 border-t border-neutral-100 flex items-center justify-between gap-4 flex-shrink-0">
+                        <div style={{ padding: "16px 24px", borderTop: "1px solid var(--ac-line)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
                             {editingId && (
-                                <button
-                                    type="button"
-                                    onClick={() => deleteRule(editingId)}
-                                    className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 transition-colors uppercase tracking-widest"
-                                >
-                                    <Trash2 size={13} />
+                                <button type="button" onClick={() => deleteRule(editingId)}
+                                    style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-danger)", background: "none", border: "none", cursor: "pointer" }}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                                     Delete
                                 </button>
                             )}
-                            <div className="flex gap-3 ml-auto">
-                                <button
-                                    type="button"
-                                    onClick={closeForm}
-                                    className="px-5 py-2.5 text-xs uppercase tracking-widest border border-neutral-200 hover:bg-neutral-50 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={save}
-                                    disabled={saving}
-                                    className="px-5 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                                >
+                            <div style={{ display: "flex", gap: 10, marginLeft: "auto" }}>
+                                <button type="button" onClick={closeForm} className="ac-btn ac-btn-ghost">Cancel</button>
+                                <button type="button" onClick={save} disabled={saving} className="ac-btn ac-btn-primary">
                                     {saving ? "Saving…" : (editingId ? "Update" : "Create")}
                                 </button>
                             </div>
@@ -587,6 +539,6 @@ export default function AutoDiscountsPage() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

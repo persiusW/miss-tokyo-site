@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { toast } from "@/lib/toast";
-import { Pencil, Trash2, Check, X, Plus } from "lucide-react";
 
 type Rider = {
     id: string;
@@ -121,7 +120,7 @@ export function RidersTab() {
                     onClick={() => setIsAdding(!isAdding)}
                     className="flex items-center gap-2 bg-black text-white px-5 py-2.5 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
                 >
-                    <Plus size={13} /> {isAdding ? "Cancel" : "Add Rider"}
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg> {isAdding ? "Cancel" : "Add Rider"}
                 </button>
             </div>
 
@@ -222,9 +221,13 @@ export function RidersTab() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3 justify-end">
                                             <button onClick={() => handleSaveEdit(rider.id)} disabled={saving}
-                                                className="text-green-600 hover:text-green-800 disabled:opacity-50"><Check size={16} /></button>
+                                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-accent)" }}>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                            </button>
                                             <button onClick={() => setEditingId(null)}
-                                                className="text-neutral-400 hover:text-black"><X size={16} /></button>
+                                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)" }}>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -259,9 +262,13 @@ export function RidersTab() {
                                             ) : (
                                                 <>
                                                     <button onClick={() => startEdit(rider)}
-                                                        className="text-neutral-400 hover:text-black transition-colors"><Pencil size={14} /></button>
+                                                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)" }}>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                    </button>
                                                     <button onClick={() => setConfirmDeleteId(rider.id)}
-                                                        className="text-neutral-400 hover:text-red-600 transition-colors"><Trash2 size={14} /></button>
+                                                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)" }}>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                                    </button>
                                                 </>
                                             )}
                                         </div>

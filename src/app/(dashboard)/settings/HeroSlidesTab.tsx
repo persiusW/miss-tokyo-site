@@ -3,16 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import {
-    Eye,
-    EyeOff,
-    ChevronDown,
-    ChevronUp,
-    Trash2,
-    ArrowUp,
-    ArrowDown,
-    Plus,
-} from "lucide-react";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 
 type HeroSlide = {
@@ -188,7 +178,7 @@ export function HeroSlidesTab() {
                     onClick={handleAddSlide}
                     className="flex items-center gap-2 px-4 py-2 bg-black text-white text-[10px] uppercase tracking-widest hover:bg-neutral-800 transition-colors"
                 >
-                    <Plus size={12} />
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
                     Add New Slide
                 </button>
             </div>
@@ -228,7 +218,7 @@ export function HeroSlidesTab() {
                                     disabled={index === 0}
                                     className="p-1 text-neutral-400 hover:text-black disabled:opacity-30 transition-colors"
                                 >
-                                    <ArrowUp size={14} />
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>
                                 </button>
                                 <button
                                     type="button"
@@ -236,7 +226,7 @@ export function HeroSlidesTab() {
                                     disabled={index === slides.length - 1}
                                     className="p-1 text-neutral-400 hover:text-black disabled:opacity-30 transition-colors"
                                 >
-                                    <ArrowDown size={14} />
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
                                 </button>
                             </div>
 
@@ -249,11 +239,10 @@ export function HeroSlidesTab() {
                                 className="shrink-0 text-neutral-400 hover:text-black transition-colors"
                                 title={slide.enabled ? "Visible" : "Hidden"}
                             >
-                                {slide.enabled ? (
-                                    <Eye size={16} />
-                                ) : (
-                                    <EyeOff size={16} className="text-neutral-300" />
-                                )}
+                                {slide.enabled
+                                    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ac-line)" strokeWidth="1.6" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                }
                             </button>
 
                             {/* Expand */}
@@ -262,11 +251,10 @@ export function HeroSlidesTab() {
                                 onClick={() => toggleExpand(slide.id)}
                                 className="shrink-0 text-neutral-400 hover:text-black transition-colors"
                             >
-                                {isExpanded ? (
-                                    <ChevronUp size={16} />
-                                ) : (
-                                    <ChevronDown size={16} />
-                                )}
+                                {isExpanded
+                                    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+                                    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                }
                             </button>
 
                             {/* Delete */}
@@ -275,7 +263,7 @@ export function HeroSlidesTab() {
                                 onClick={() => handleDelete(slide.id)}
                                 className="shrink-0 text-neutral-400 hover:text-red-500 transition-colors"
                             >
-                                <Trash2 size={14} />
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                             </button>
                         </div>
 

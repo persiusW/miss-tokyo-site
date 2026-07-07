@@ -7,8 +7,6 @@ import { useParams } from "next/navigation";
 import { toast } from "@/lib/toast";
 import { updateOrderStatus, updateFulfillmentStatus } from "../actions";
 
-import { Printer, X } from "lucide-react";
-
 type Order = {
     id: string;
     customer_email: string;
@@ -47,17 +45,32 @@ type Rider = {
 
 const STATUSES = ["pending", "paid", "refunded", "cancelled"];
 
+const STATUS_CLASS: Record<string, string> = {
+    pending:          "ac-badge-pending",
+    paid:             "ac-badge-paid",
+    processing:       "ac-badge-processing",
+    packed:           "ac-badge-packed",
+    shipped:          "ac-badge-shipped",
+    ready_for_pickup: "ac-badge-info",
+    fulfilled:        "ac-badge-fulfilled",
+    delivered:        "ac-badge-delivered",
+    refunded:         "ac-badge-inactive",
+    cancelled:        "ac-badge-cancelled",
+    failed:           "ac-badge-failed",
+};
+
+// Print-only STATUS_STYLES (kept for receipt div)
 const STATUS_STYLES: Record<string, string> = {
-    pending:          "bg-amber-50 text-amber-700",
-    paid:             "bg-green-50 text-green-700",
-    processing:       "bg-blue-50 text-blue-700",
-    packed:           "bg-blue-50 text-blue-700",
-    shipped:          "bg-purple-50 text-purple-700",
-    ready_for_pickup: "bg-neutral-900 text-white",
-    fulfilled:        "bg-indigo-50 text-indigo-700",
-    delivered:        "bg-green-50 text-green-700",
-    refunded:         "bg-neutral-100 text-neutral-600",
-    cancelled:        "bg-red-50 text-red-600",
+    pending:          "background:#FEF3C7;color:#92400E",
+    paid:             "background:#D1FAE5;color:#065F46",
+    processing:       "background:#DBEAFE;color:#1E40AF",
+    packed:           "background:#DBEAFE;color:#1E40AF",
+    shipped:          "background:#EDE9FE;color:#5B21B6",
+    ready_for_pickup: "background:#111827;color:#fff",
+    fulfilled:        "background:#E0E7FF;color:#3730A3",
+    delivered:        "background:#D1FAE5;color:#065F46",
+    refunded:         "background:#F5F5F5;color:#525252",
+    cancelled:        "background:#FEE2E2;color:#991B1B",
 };
 
 function isPickupOrder(order: Order) {
@@ -93,23 +106,23 @@ function RiderPicker({
     }, []);
 
     return (
-        <div className="bg-neutral-50 border border-neutral-200 p-6 space-y-5">
-            <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-widest">Assign Dispatch Rider</h3>
-                <button onClick={onCancel} className="text-neutral-400 hover:text-black">
-                    <X size={16} />
+        <div className="ac-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <h3 className="ac-card-title">Assign Dispatch Rider</h3>
+                <button onClick={onCancel} className="ac-modal-close" style={{ position: "static" }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
 
             {loading ? (
-                <p className="text-xs text-neutral-400 italic">Loading riders...</p>
+                <p style={{ fontSize: 12, color: "var(--ac-ink-4)", fontStyle: "italic" }}>Loading riders…</p>
             ) : riders.length === 0 ? (
-                <p className="text-xs text-red-500">No active riders. Add riders in Settings → Riders.</p>
+                <p style={{ fontSize: 12, color: "var(--ac-danger)" }}>No active riders. Add riders in Settings → Riders.</p>
             ) : (
                 <select
                     value={selectedRider}
                     onChange={e => setSelectedRider(e.target.value)}
-                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm"
+                    className="ac-select"
                 >
                     {riders.map(r => (
                         <option key={r.id} value={r.id}>
@@ -119,29 +132,25 @@ function RiderPicker({
                 </select>
             )}
 
-            <label className="flex items-center gap-3 cursor-pointer">
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                 <input
                     type="checkbox"
                     checked={notifyRider}
                     onChange={e => setNotifyRider(e.target.checked)}
-                    className="w-4 h-4 accent-black"
+                    className="ac-checkbox"
                 />
-                <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-700">
+                <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-2)" }}>
                     Notify rider via SMS
                 </span>
             </label>
 
-            <div className="flex gap-3 pt-2">
-                <button
-                    onClick={onCancel}
-                    className="px-5 py-2.5 text-xs uppercase tracking-widest border border-neutral-200 hover:border-black text-neutral-500 hover:text-black transition-colors"
-                >
-                    Cancel
-                </button>
+            <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
+                <button onClick={onCancel} className="ac-btn ac-btn-ghost" type="button">Cancel</button>
                 <button
                     onClick={() => selectedRider && onConfirm(selectedRider, notifyRider)}
                     disabled={!selectedRider || riders.length === 0}
-                    className="px-6 py-2.5 bg-blue-600 text-white text-xs uppercase tracking-widest font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    className="ac-btn ac-btn-primary"
+                    type="button"
                 >
                     Confirm & Ship
                 </button>
@@ -174,7 +183,6 @@ export default function OrderDetailPage() {
         ]).then(async ([{ data: ord }, { data: biz }, { data: ss }]) => {
             if (ord) {
                 setOrder(ord);
-                // Fetch SKUs for order items
                 if (ord.items && Array.isArray(ord.items)) {
                     const productIds = ord.items
                         .map((i: any) => i.productId)
@@ -218,14 +226,13 @@ export default function OrderDetailPage() {
         });
     }, [id]);
 
-    // Plain status update (for status panel buttons, refund, cancel, collected)
     const updateStatus = async (newStatus: string) => {
         if (!order) return;
         setUpdating(true);
         if (newStatus === "fulfilled" || newStatus === "cancelled") setNotifStatus("sending");
-        
+
         const res = await updateOrderStatus(order.id, newStatus);
-        
+
         if (!res.success) {
             toast.error(res.error || "Failed to update status.");
             setNotifStatus("idle");
@@ -238,7 +245,6 @@ export default function OrderDetailPage() {
             } : prev);
             toast.success(`Status updated to ${newStatus}.`);
 
-            // Trigger Email/SMS
             if (newStatus === "fulfilled" || newStatus === "cancelled") {
                 try {
                     await fetch("/api/email/fulfillment", {
@@ -256,7 +262,6 @@ export default function OrderDetailPage() {
         setUpdating(false);
     };
 
-    // Fulfillment status update (separate from payment/order status)
     const updateFulfillmentStatusLocal = async (newFulfillmentStatus: string) => {
         if (!order) return;
         setUpdating(true);
@@ -270,7 +275,6 @@ export default function OrderDetailPage() {
         setUpdating(false);
     };
 
-    // Pickup-ready: API handles DB update + email + SMS
     const handlePickupReady = async () => {
         if (!order) return;
         setUpdating(true);
@@ -292,7 +296,6 @@ export default function OrderDetailPage() {
         setUpdating(false);
     };
 
-    // Dispatch: API handles DB update (status → shipped) + email + SMS
     const handleDispatch = async (riderId: string, notifyRider: boolean) => {
         if (!order) return;
         setUpdating(true);
@@ -307,7 +310,6 @@ export default function OrderDetailPage() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Dispatch failed");
             setOrder(prev => prev ? { ...prev, status: "shipped", assigned_rider_id: riderId } : prev);
-            // Load the newly assigned rider for the UI card
             supabase.from("riders").select("full_name, phone_number, bike_reg, image_url").eq("id", riderId).single()
                 .then(({ data: r }: { data: any }) => { if (r) setAssignedRider(r as AssignedRider); });
             setNotifStatus("sent");
@@ -346,7 +348,7 @@ export default function OrderDetailPage() {
             `Email: ${order.customer_email}`,
             `Amount: GH₵ ${Number(order.total_amount).toFixed(2)}`,
             `Reference: ${order.paystack_reference || "—"}`,
-            `Date: ${new Date(order.created_at).toLocaleDateString("en-GB")}`,
+            `Date: ${new Date(order.created_at).toLocaleDateString()}`,
         ].join("\n");
         navigator.clipboard.writeText(text);
         toast.success("Customer details copied.");
@@ -354,18 +356,18 @@ export default function OrderDetailPage() {
 
     if (loading) {
         return (
-            <div className="space-y-8">
-                <Link href="/sales/orders" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black">← Orders</Link>
-                <p className="text-neutral-400 italic font-serif">Loading...</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <Link href="/sales/orders" className="ac-text-link" style={{ fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase" }}>← Orders</Link>
+                <p style={{ color: "var(--ac-ink-4)", fontFamily: "var(--f-display)", fontStyle: "italic" }}>Loading…</p>
             </div>
         );
     }
 
     if (!order) {
         return (
-            <div className="space-y-8">
-                <Link href="/sales/orders" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black">← Orders</Link>
-                <p className="text-neutral-500 italic font-serif">Order not found.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <Link href="/sales/orders" className="ac-text-link" style={{ fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase" }}>← Orders</Link>
+                <p style={{ color: "var(--ac-ink-4)", fontFamily: "var(--f-display)", fontStyle: "italic" }}>Order not found.</p>
             </div>
         );
     }
@@ -375,6 +377,7 @@ export default function OrderDetailPage() {
     const dateStr = new Date(order.created_at).toLocaleDateString("en-GH", { year: "numeric", month: "long", day: "numeric" });
     const addr = typeof order.shipping_address === "string" ? order.shipping_address : order.shipping_address?.text || null;
     const pickup = isPickupOrder(order);
+    const effectiveStatus = (order.payment_status && order.payment_status !== "pending") ? order.payment_status : order.status;
 
     return (
         <>
@@ -400,97 +403,71 @@ export default function OrderDetailPage() {
             }
         `}</style>
 
-        <div className="no-print space-y-8">
-            {/* Top bar */}
-            <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="no-print" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            {/* Page heading */}
+            <div className="ac-page-head" style={{ flexWrap: "wrap" }}>
                 <div>
-                    <Link href="/sales/orders" className="text-xs uppercase tracking-widest text-neutral-500 hover:text-black transition-colors">
+                    <Link href="/sales/orders" className="ac-text-link" style={{ fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase" }}>
                         ← Orders
                     </Link>
-                    <div className="flex items-center gap-3 mt-3">
-                        <h1 className="font-serif text-3xl tracking-widest uppercase">
-                            #{orderNum}
-                        </h1>
-                        <span className={`px-3 py-1 text-[10px] uppercase tracking-widest font-semibold rounded ${STATUS_STYLES[(order.payment_status && order.payment_status !== "pending") ? order.payment_status : order.status] || "bg-neutral-100 text-neutral-600"}`}>
-                            {(order.payment_status && order.payment_status !== "pending") ? order.payment_status : order.status}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+                        <h1 className="ac-page-h1">#{orderNum}</h1>
+                        <span className={`ac-badge ${STATUS_CLASS[effectiveStatus] ?? "ac-badge-inactive"}`}>
+                            {effectiveStatus}
                         </span>
-                        <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded-sm ${pickup ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-500"}`}>
+                        <span className={`ac-badge ${pickup ? "ac-badge-info" : "ac-badge-inactive"}`}>
                             {pickup ? "Pickup" : "Delivery"}
                         </span>
                     </div>
-                    <p className="text-xs text-neutral-400 mt-1">{dateStr}</p>
+                    <p className="ac-page-sub">{dateStr}</p>
                 </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                    {/* Packed-stage primary action */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     {order.status === "packed" && (
                         pickup ? (
-                            <button
-                                onClick={handlePickupReady}
-                                disabled={updating}
-                                className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-neutral-900 text-white hover:bg-black transition-colors disabled:opacity-50"
-                            >
-                                {notifStatus === "sending" ? "Sending..." : "Send Pickup Ready Notification"}
+                            <button onClick={handlePickupReady} disabled={updating} className="ac-btn ac-btn-primary" type="button">
+                                {notifStatus === "sending" ? "Sending…" : "Send Pickup Ready Notification"}
                             </button>
                         ) : (
-                            <button
-                                onClick={() => setShowRiderPicker(v => !v)}
-                                disabled={updating}
-                                className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
-                            >
+                            <button onClick={() => setShowRiderPicker(v => !v)} disabled={updating} className="ac-btn ac-btn-primary" type="button">
                                 Assign Rider & Ship
                             </button>
                         )
                     )}
-
-                    {/* Collected button for ready_for_pickup */}
                     {order.status === "ready_for_pickup" && (
-                        <button onClick={() => updateStatus("fulfilled")} disabled={updating}
-                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50">
+                        <button onClick={() => updateStatus("fulfilled")} disabled={updating} className="ac-btn ac-btn-primary" type="button">
                             Mark Collected
                         </button>
                     )}
-
-                    {/* Mark Fulfilled for shipped orders */}
                     {order.status === "shipped" && (
-                        <button onClick={() => updateStatus("fulfilled")} disabled={updating}
-                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                        <button onClick={() => updateStatus("fulfilled")} disabled={updating} className="ac-btn ac-btn-primary" type="button">
                             Mark Fulfilled
                         </button>
                     )}
-
                     {order.status !== "refunded" && order.status !== "cancelled" && (
-                        <button onClick={() => updateStatus("refunded")} disabled={updating}
-                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-colors disabled:opacity-50">
+                        <button onClick={() => updateStatus("refunded")} disabled={updating} className="ac-btn ac-btn-ghost" type="button">
                             Refund
                         </button>
                     )}
                     {order.status !== "cancelled" && (
-                        <button onClick={() => updateStatus("cancelled")} disabled={updating}
-                            className="px-5 py-2.5 text-[11px] uppercase tracking-widest font-bold bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50">
+                        <button onClick={() => updateStatus("cancelled")} disabled={updating} className="ac-btn ac-btn-sm" type="button"
+                            style={{ background: "color-mix(in oklab, var(--ac-danger) 12%, transparent)", color: "var(--ac-danger)", borderColor: "color-mix(in oklab, var(--ac-danger) 25%, transparent)" }}>
                             Cancel
                         </button>
                     )}
-                    <button onClick={copyDetails}
-                        className="px-5 py-2.5 text-xs uppercase tracking-widest border border-neutral-200 hover:border-black text-neutral-500 hover:text-black transition-colors">
-                        Copy Details
-                    </button>
+                    <button onClick={copyDetails} className="ac-btn ac-btn-ghost" type="button">Copy Details</button>
                     {["paid", "processing", "packed", "shipped", "ready_for_pickup", "fulfilled", "delivered"].includes(order.status) && (
-                        <button
-                            onClick={handleResendConfirmation}
-                            disabled={resending}
-                            className="px-5 py-2.5 text-xs uppercase tracking-widest border border-neutral-200 hover:border-black text-neutral-500 hover:text-black transition-colors disabled:opacity-50"
-                        >
-                            {resending ? "Sending..." : "Resend Confirmation"}
+                        <button onClick={handleResendConfirmation} disabled={resending} className="ac-btn ac-btn-ghost" type="button">
+                            {resending ? "Sending…" : "Resend Confirmation"}
                         </button>
                     )}
-                    <button onClick={() => window.print()}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors">
-                        <Printer size={14} /> Print Receipt
+                    <button onClick={() => window.print()} className="ac-btn ac-btn-primary" type="button">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        Print Receipt
                     </button>
                 </div>
             </div>
 
-            {/* Inline rider picker (delivery orders, packed status) */}
+            {/* Inline rider picker */}
             {showRiderPicker && order.status === "packed" && !pickup && (
                 <RiderPicker
                     orderId={order.id}
@@ -502,21 +479,30 @@ export default function OrderDetailPage() {
 
             {/* Notification sent banner */}
             {notifStatus === "sent" && (
-                <div className="bg-green-50 border border-green-200 px-5 py-3 text-xs uppercase tracking-widest text-green-700 font-semibold">
-                    ✓ Customer notified via email & SMS
+                <div style={{
+                    background: "color-mix(in oklab, var(--ac-accent) 10%, transparent)",
+                    border: "1px solid color-mix(in oklab, var(--ac-accent) 25%, transparent)",
+                    borderRadius: "var(--r-md)",
+                    padding: "12px 20px",
+                    fontSize: 12,
+                    color: "var(--ac-accent)",
+                    fontWeight: 600,
+                    letterSpacing: ".06em",
+                }}>
+                    ✓ Customer notified via email &amp; SMS
                 </div>
             )}
 
             {/* 2-column layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
 
                 {/* LEFT: Customer Details + Items */}
-                <div className="space-y-6">
-                    <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
-                        <div className="px-6 py-4 border-b border-neutral-100">
-                            <h2 className="text-xs uppercase tracking-widest font-semibold">Customer Details</h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div className="ac-card">
+                        <div className="ac-card-head">
+                            <h2 className="ac-card-title">Customer Details</h2>
                         </div>
-                        {[
+                        {([
                             ["Customer", order.customer_name || "—"],
                             ["Email",    order.customer_email],
                             ["Phone",    order.customer_phone || "—"],
@@ -525,91 +511,93 @@ export default function OrderDetailPage() {
                             ...(order.customer_metadata?.snapchat ? [["Snapchat", order.customer_metadata.snapchat]] : []),
                             ["Type",     pickup ? "Store Pickup" : (order.delivery_method || "Delivery")],
                             ["Date",     new Date(order.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })],
-                        ].map(([label, value]) => (
-                            <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
-                                <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
-                                <span className="text-neutral-900 font-medium font-mono text-right max-w-[60%] break-all">{value}</span>
+                        ] as [string, string][]).map(([label, value]) => (
+                            <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>{label}</span>
+                                <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-ink)", fontWeight: 500, textAlign: "right", maxWidth: "60%", wordBreak: "break-all" }}>{value}</span>
                             </div>
                         ))}
                         {order.shipping_address?.text && (
-                            <div className="px-6 py-3 flex justify-between items-start text-sm gap-4">
-                                <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 shrink-0">Address</span>
-                                <span className="text-neutral-900 font-medium text-right">{order.shipping_address.text}</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)", flexShrink: 0 }}>Address</span>
+                                <span style={{ fontSize: 12, color: "var(--ac-ink)", textAlign: "right" }}>{order.shipping_address.text}</span>
                             </div>
                         )}
                     </div>
 
                     {/* Items */}
-                    <div className="bg-white border border-neutral-200">
-                        <div className="px-6 py-4 border-b border-neutral-100">
-                            <h2 className="text-xs uppercase tracking-widest font-semibold">Ordered Items</h2>
+                    <div className="ac-card flush">
+                        <div className="ac-card-head" style={{ padding: "16px 20px" }}>
+                            <h2 className="ac-card-title">Ordered Items</h2>
                         </div>
-                        <div className="divide-y divide-neutral-100">
-                            {order.items && order.items.length > 0 ? (
-                                order.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="px-6 py-4 flex gap-4 items-center">
-                                        {(item.imageUrl || item.image_url) && (
-                                            <div className="w-14 h-16 bg-neutral-50 flex-shrink-0 overflow-hidden border border-neutral-100">
-                                                <img src={item.imageUrl || item.image_url} alt={item.name} className="w-full h-full object-cover" />
-                                            </div>
-                                        )}
-                                        <div className="flex-1 space-y-1 min-w-0">
-                                            <div className="flex justify-between gap-2">
-                                                <h3 className="font-serif text-sm truncate">{item.name || "Product"}</h3>
-                                                {item.price && (
-                                                    <span className="font-mono text-sm shrink-0">GH₵ {(Number(item.price) * (item.quantity || 1)).toFixed(2)}</span>
-                                                )}
-                                            </div>
-                                            <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                                                {item.size && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Size: <span className="text-neutral-900 font-semibold">{item.size}</span></span>}
-                                                {item.color && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Color: <span className="text-neutral-900 font-semibold">{item.color}</span></span>}
-                                                {item.brand && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Brand: <span className="text-neutral-900 font-semibold">{item.brand}</span></span>}
-                                                {(item.sku || (item.productId && productSkus[item.productId])) && (
-                                                    <span className="text-[10px] uppercase tracking-widest text-neutral-500">
-                                                        SKU: <span className="text-neutral-900 font-semibold font-mono">{item.sku || productSkus[item.productId]}</span>
-                                                    </span>
-                                                )}
-                                                {/* {item.stitching && <span className="text-[10px] uppercase tracking-widest text-neutral-500">Stitching: <span className="text-neutral-900 font-semibold">{item.stitching}</span></span>} */}
-                                                <span className="text-[10px] uppercase tracking-widest text-neutral-500">Qty: <span className="text-neutral-900 font-semibold">{item.quantity || 1}</span></span>
-                                            </div>
+                        {order.items && order.items.length > 0 ? (
+                            order.items.map((item: any, idx: number) => (
+                                <div key={idx} style={{ display: "flex", gap: 16, alignItems: "center", padding: "14px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                    {(item.imageUrl || item.image_url) && (
+                                        <div style={{ width: 52, height: 60, flexShrink: 0, overflow: "hidden", borderRadius: "var(--r-sm)", border: "1px solid var(--ac-line)", background: "var(--ac-panel-2)" }}>
+                                            <img src={item.imageUrl || item.image_url} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                        </div>
+                                    )}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                            <span style={{ fontFamily: "var(--f-display)", fontSize: 14, color: "var(--ac-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name || "Product"}</span>
+                                            {item.price && (
+                                                <span style={{ fontFamily: "var(--f-mono)", fontSize: 13, color: "var(--ac-ink)", flexShrink: 0 }}>GH₵ {(Number(item.price) * (item.quantity || 1)).toFixed(2)}</span>
+                                            )}
+                                        </div>
+                                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px", marginTop: 4 }}>
+                                            {item.size && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>Size: <strong style={{ color: "var(--ac-ink)" }}>{item.size}</strong></span>}
+                                            {item.color && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>Color: <strong style={{ color: "var(--ac-ink)" }}>{item.color}</strong></span>}
+                                            {item.brand && <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>Brand: <strong style={{ color: "var(--ac-ink)" }}>{item.brand}</strong></span>}
+                                            {(item.sku || (item.productId && productSkus[item.productId])) && (
+                                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>
+                                                    SKU: <strong style={{ fontFamily: "var(--f-mono)", color: "var(--ac-ink)" }}>{item.sku || productSkus[item.productId]}</strong>
+                                                </span>
+                                            )}
+                                            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>Qty: <strong style={{ color: "var(--ac-ink)" }}>{item.quantity || 1}</strong></span>
                                         </div>
                                     </div>
-                                ))
-                            ) : (
-                                <div className="px-6 py-6 space-y-1">
-                                    <p className="text-neutral-400 italic text-sm font-serif">No line items stored.</p>
-                                    <p className="text-[10px] uppercase tracking-widest text-neutral-400">
-                                        Total: <span className="text-neutral-700 font-semibold">GH₵ {Number(order.total_amount).toFixed(2)}</span>
-                                        {order.paystack_reference && <> · Ref: <span className="font-mono text-neutral-700">{order.paystack_reference}</span></>}
-                                    </p>
                                 </div>
-                            )}
-                        </div>
+                            ))
+                        ) : (
+                            <div style={{ padding: "24px 20px" }}>
+                                <p style={{ color: "var(--ac-ink-4)", fontStyle: "italic", fontFamily: "var(--f-display)", fontSize: 14 }}>No line items stored.</p>
+                                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginTop: 6 }}>
+                                    Total: <strong style={{ color: "var(--ac-ink-2)" }}>GH₵ {Number(order.total_amount).toFixed(2)}</strong>
+                                    {order.paystack_reference && <> · Ref: <strong style={{ fontFamily: "var(--f-mono)" }}>{order.paystack_reference}</strong></>}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* RIGHT: Payment + Status */}
-                <div className="space-y-6">
-                    <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
-                        <div className="px-6 py-4 border-b border-neutral-100">
-                            <h2 className="text-xs uppercase tracking-widest font-semibold">Payment</h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* Payment */}
+                    <div className="ac-card">
+                        <div className="ac-card-head">
+                            <h2 className="ac-card-title">Payment</h2>
                         </div>
-                        {[
-                            ["Provider",    order.paystack_reference ? "Paystack" : "N/A"],
-                            ["Reference",   order.paystack_reference || "—"],
-                            ["Status",      (() => {
-                                // Derive from payment_status; fall back to status for orders that predate the migration
+                        {([
+                            ["Provider",  order.paystack_reference ? "Paystack" : "N/A"],
+                            ["Reference", order.paystack_reference || "—"],
+                            ["Status", (() => {
                                 const ps = (!order.payment_status || order.payment_status === "pending")
                                     ? (["paid","processing","packed","shipped","ready_for_pickup","fulfilled","delivered"].includes(order.status) ? "paid" : order.status === "refunded" ? "refunded" : order.status === "cancelled" ? "cancelled" : "pending")
                                     : order.payment_status;
                                 return ps === "paid" ? "Successful" : ps === "refunded" ? "Refunded" : ps === "cancelled" ? "Cancelled" : "Pending";
                             })()],
-                        ].map(([label, value]) => (
-                            <div key={label} className="px-6 py-3 flex justify-between items-center text-sm">
-                                <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">{label}</span>
-                                <span className={`font-medium font-mono ${label === "Status" && value === "Successful" ? "text-green-700" : label === "Status" && value === "Refunded" ? "text-neutral-500" : label === "Status" && value === "Cancelled" ? "text-red-600" : label === "Status" && value === "Pending" ? "text-amber-600" : "text-neutral-900"}`}>
-                                    {value}
-                                </span>
+                        ] as [string, string][]).map(([label, value]) => (
+                            <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>{label}</span>
+                                <span style={{
+                                    fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500,
+                                    color: label === "Status" && value === "Successful" ? "var(--ac-accent)"
+                                         : label === "Status" && value === "Refunded"   ? "var(--ac-ink-3)"
+                                         : label === "Status" && value === "Cancelled"  ? "var(--ac-danger)"
+                                         : label === "Status" && value === "Pending"    ? "var(--ac-warn)"
+                                         : "var(--ac-ink)",
+                                }}>{value}</span>
                             </div>
                         ))}
                         {(
@@ -617,135 +605,130 @@ export default function OrderDetailPage() {
                             (order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0)
                         ) && (
                             <>
-                                <div className="px-6 py-3 flex justify-between items-center text-sm">
-                                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Subtotal</span>
-                                    <span className="font-medium font-mono text-neutral-900">GH₵ {(Number(order.total_amount) + Number(order.discount_amount ?? 0) + Number(order.auto_discount_amount ?? 0)).toFixed(2)}</span>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Subtotal</span>
+                                    <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-ink)" }}>GH₵ {(Number(order.total_amount) + Number(order.discount_amount ?? 0) + Number(order.auto_discount_amount ?? 0)).toFixed(2)}</span>
                                 </div>
                                 {order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0 && (
-                                    <div className="px-6 py-3 flex justify-between items-center text-sm">
-                                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Auto Discount ({order.auto_discount_title})</span>
-                                        <span className="font-medium font-mono text-green-600">-GH₵ {Number(order.auto_discount_amount).toFixed(2)}</span>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Auto Discount ({order.auto_discount_title})</span>
+                                        <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-accent)" }}>-GH₵ {Number(order.auto_discount_amount).toFixed(2)}</span>
                                     </div>
                                 )}
                                 {order.discount_code && Number(order.discount_amount ?? 0) > 0 && (
-                                    <div className="px-6 py-3 flex justify-between items-center text-sm">
-                                        <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Discount ({order.discount_code})</span>
-                                        <span className="font-medium font-mono text-green-600">-GH₵ {Number(order.discount_amount).toFixed(2)}</span>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Discount ({order.discount_code})</span>
+                                        <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-accent)" }}>-GH₵ {Number(order.discount_amount).toFixed(2)}</span>
                                     </div>
                                 )}
                             </>
                         )}
-                        <div className="px-6 py-3 flex justify-between items-center text-sm">
-                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Amount Paid</span>
-                            <span className="font-medium font-mono text-neutral-900">GH₵ {Number(order.total_amount).toFixed(2)}</span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Amount Paid</span>
+                            <span style={{ fontFamily: "var(--f-mono)", fontSize: 13, color: "var(--ac-ink)", fontWeight: 600 }}>GH₵ {Number(order.total_amount).toFixed(2)}</span>
                         </div>
                     </div>
 
-                    <div className="bg-white border border-neutral-200 p-6 space-y-5">
-                        <h2 className="text-xs uppercase tracking-widest font-semibold">Payment Status</h2>
-                        <div className="flex flex-wrap gap-2">
+                    {/* Payment Status */}
+                    <div className="ac-card" style={{ padding: 20 }}>
+                        <h2 className="ac-card-title" style={{ marginBottom: 14 }}>Payment Status</h2>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                             {STATUSES.map(s => {
-                                // payment_status='pending' is just the DB default (not meaningful),
-                                // so if payment_status is 'pending' or null, fall back to order.status.
                                 const effectivePaymentStatus =
                                     (order.payment_status && order.payment_status !== "pending")
                                         ? order.payment_status
                                         : order.status;
                                 const isActive = effectivePaymentStatus === s;
                                 return (
-                                <button
-                                    key={s}
-                                    onClick={() => updateStatus(s)}
-                                    disabled={updating || isActive}
-                                    className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${
-                                        isActive
-                                            ? "bg-black text-white cursor-default"
-                                            : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                                    } disabled:opacity-50`}
-                                >
-                                    {s}
-                                </button>
+                                    <button
+                                        key={s}
+                                        onClick={() => updateStatus(s)}
+                                        disabled={updating || isActive}
+                                        className={`ac-btn ac-btn-sm ${isActive ? "ac-btn-primary" : "ac-btn-ghost"}`}
+                                        style={isActive ? {} : {}}
+                                    >
+                                        {s}
+                                    </button>
                                 );
                             })}
                         </div>
                     </div>
 
                     {/* Fulfillment Status */}
-                    <div className="bg-white border border-neutral-200 p-6 space-y-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-xs uppercase tracking-widest font-semibold">Fulfillment Status</h2>
+                    <div className="ac-card" style={{ padding: 20 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                            <h2 className="ac-card-title">Fulfillment Status</h2>
                             {order.fulfillment_status && (
-                                <span className="text-[10px] uppercase tracking-widest font-semibold bg-blue-50 text-blue-700 px-2 py-1">
+                                <span className={`ac-badge ${STATUS_CLASS[order.fulfillment_status] ?? "ac-badge-info"}`}>
                                     {order.fulfillment_status === "ready_for_pickup" ? "Ready for Pickup" : order.fulfillment_status}
                                 </span>
                             )}
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            {(["inbox", "processing", "packed", "shipped", "ready_for_pickup", "delivered"] as const).map(s => (
-                                <button
-                                    key={s}
-                                    onClick={() => updateFulfillmentStatusLocal(s)}
-                                    disabled={updating || order.fulfillment_status === s}
-                                    className={`px-4 py-2 text-[10px] uppercase tracking-widest font-semibold transition-colors ${
-                                        order.fulfillment_status === s
-                                            ? "bg-blue-600 text-white cursor-default"
-                                            : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                                    } disabled:opacity-50`}
-                                >
-                                    {s === "ready_for_pickup" ? "Ready for Pickup" : s}
-                                </button>
-                            ))}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {(["inbox", "processing", "packed", "shipped", "ready_for_pickup", "delivered"] as const).map(s => {
+                                const isActive = order.fulfillment_status === s;
+                                return (
+                                    <button
+                                        key={s}
+                                        onClick={() => updateFulfillmentStatusLocal(s)}
+                                        disabled={updating || isActive}
+                                        className={`ac-btn ac-btn-sm ${isActive ? "ac-btn-primary" : "ac-btn-ghost"}`}
+                                    >
+                                        {s === "ready_for_pickup" ? "Ready for Pickup" : s}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 
-                    {/* Pickup info panel (pickup orders) */}
+                    {/* Pickup info panel */}
                     {pickup && pickupSettings && (
-                        <div className="bg-white border border-neutral-200">
+                        <div className="ac-card flush">
                             <button
                                 onClick={() => setPickupPanelOpen(v => !v)}
-                                className="w-full px-6 py-4 flex items-center justify-between border-b border-neutral-100"
+                                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: "none", border: "none", cursor: "pointer", borderBottom: pickupPanelOpen ? "1px solid var(--ac-line)" : "none" }}
                             >
-                                <div className="flex items-center gap-3">
-                                    <span className="inline-block w-2 h-2 rounded-full bg-neutral-900" />
-                                    <h2 className="text-xs uppercase tracking-widest font-semibold">Pickup Instructions</h2>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--ac-ink)", display: "inline-block" }} />
+                                    <h2 className="ac-card-title">Pickup Instructions</h2>
                                 </div>
-                                <span className="text-neutral-400 text-sm">{pickupPanelOpen ? "▲" : "▼"}</span>
+                                <span style={{ color: "var(--ac-ink-4)", fontSize: 12 }}>{pickupPanelOpen ? "▲" : "▼"}</span>
                             </button>
                             {pickupPanelOpen && (
-                                <div className="px-6 py-4 space-y-3">
-                                    <p className="text-sm leading-relaxed text-neutral-700" style={{ whiteSpace: "pre-wrap" }}>
-                                        {pickupSettings.instructions}
-                                    </p>
-                                    <div className="text-[11px] text-neutral-500 space-y-1 pt-2 border-t border-neutral-100">
-                                        {pickupSettings.address && <p>📍 {pickupSettings.address}</p>}
-                                        {pickupSettings.phone && <p>📞 {pickupSettings.phone}</p>}
-                                        {pickupSettings.wait && <p>⏱ Ready in: {pickupSettings.wait}</p>}
+                                <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+                                    <p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--ac-ink-2)", whiteSpace: "pre-wrap" }}>{pickupSettings.instructions}</p>
+                                    <div style={{ borderTop: "1px solid var(--ac-line)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                                        {pickupSettings.address && <p style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>📍 {pickupSettings.address}</p>}
+                                        {pickupSettings.phone && <p style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>📞 {pickupSettings.phone}</p>}
+                                        {pickupSettings.wait && <p style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>⏱ Ready in: {pickupSettings.wait}</p>}
                                     </div>
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Assigned Rider card (delivery orders that have been shipped/fulfilled) */}
+                    {/* Assigned Rider */}
                     {assignedRider && !pickup && (
-                        <div className="bg-white border border-neutral-200 divide-y divide-neutral-100">
-                            <div className="px-6 py-4 border-b border-neutral-100 flex items-center gap-3">
-                                <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
-                                <h2 className="text-xs uppercase tracking-widest font-semibold">Dispatch Rider</h2>
+                        <div className="ac-card flush">
+                            <div className="ac-card-head">
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--ac-accent)", display: "inline-block" }} />
+                                    <h2 className="ac-card-title">Dispatch Rider</h2>
+                                </div>
                             </div>
-                            <div className="px-6 py-4 flex items-center gap-4">
+                            <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 14 }}>
                                 {assignedRider.image_url ? (
-                                    <img src={assignedRider.image_url} alt={assignedRider.full_name} className="w-12 h-12 rounded-full object-cover shrink-0 border border-neutral-100" />
+                                    <img src={assignedRider.image_url} alt={assignedRider.full_name} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: "1px solid var(--ac-line)" }} />
                                 ) : (
-                                    <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center shrink-0">
-                                        <span className="text-sm font-serif font-semibold text-neutral-400">{assignedRider.full_name.charAt(0)}</span>
+                                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                        <span style={{ fontFamily: "var(--f-display)", fontSize: 16, color: "var(--ac-ink-4)" }}>{assignedRider.full_name.charAt(0)}</span>
                                     </div>
                                 )}
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-sm text-neutral-900 truncate">{assignedRider.full_name}</p>
-                                    <p className="text-xs text-neutral-500 mt-0.5">{assignedRider.phone_number}</p>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ fontWeight: 600, fontSize: 14, color: "var(--ac-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{assignedRider.full_name}</p>
+                                    <p style={{ fontSize: 12, color: "var(--ac-ink-3)", marginTop: 2 }}>{assignedRider.phone_number}</p>
                                     {assignedRider.bike_reg && (
-                                        <p className="text-[10px] font-mono text-neutral-400 mt-0.5">{assignedRider.bike_reg}</p>
+                                        <p style={{ fontSize: 11, fontFamily: "var(--f-mono)", color: "var(--ac-ink-4)", marginTop: 2 }}>{assignedRider.bike_reg}</p>
                                     )}
                                 </div>
                             </div>
@@ -756,82 +739,80 @@ export default function OrderDetailPage() {
         </div>
 
         {/* ── Print Receipt (screen-hidden via fixed position, print-visible) ── */}
-        <div id="admin-receipt-print" className="bg-white p-12 max-w-2xl">
-            <div className="flex items-start justify-between mb-8 pb-6 border-b border-neutral-100">
+        <div id="admin-receipt-print" style={{ backgroundColor: "#fff", padding: 48, maxWidth: 600 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32, paddingBottom: 24, borderBottom: "1px solid #e5e5e5" }}>
                 <div>
-                    <h2 className="font-serif text-xl tracking-widest uppercase">{bizName}</h2>
-                    <p className="text-[10px] uppercase tracking-widest text-neutral-400 mt-1">Order Receipt</p>
+                    <h2 style={{ fontFamily: "Georgia, serif", fontSize: 20, letterSpacing: ".1em", textTransform: "uppercase" }}>{bizName}</h2>
+                    <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".12em", color: "#999", marginTop: 4 }}>Order Receipt</p>
                 </div>
-                <div className="text-right">
-                    <p className="font-mono text-sm font-bold text-neutral-900">#{orderNum}</p>
-                    <p className="text-xs text-neutral-400 mt-1">{dateStr}</p>
-                    <span className={`mt-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
+                <div style={{ textAlign: "right" }}>
+                    <p style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: "#111" }}>#{orderNum}</p>
+                    <p style={{ fontSize: 12, color: "#999", marginTop: 4 }}>{dateStr}</p>
+                    <span style={{ marginTop: 8, display: "inline-block", padding: "2px 8px", fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, ...Object.fromEntries((STATUS_STYLES[order.status] ?? "background:#f5f5f5;color:#666").split(";").filter(Boolean).map(s => { const [k, v] = s.split(":"); return [k?.trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase()), v?.trim()]; }).filter(([k]) => k)) }}>
                         {order.status === "ready_for_pickup" ? "Ready for Pickup" : order.status}
                     </span>
                 </div>
             </div>
 
             {(order.customer_name || addr || order.delivery_method) && (
-                <div className="mb-8 pb-6 border-b border-neutral-100 grid grid-cols-2 gap-6">
+                <div style={{ marginBottom: 32, paddingBottom: 24, borderBottom: "1px solid #e5e5e5", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
                     {order.customer_name && (
                         <div>
-                            <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-2">Customer</p>
-                            <p className="text-sm text-neutral-800 font-medium">{order.customer_name}</p>
-                            {order.customer_phone && <p className="text-xs text-neutral-500">{order.customer_phone}</p>}
-                            {order.customer_email && <p className="text-xs text-neutral-500">{order.customer_email}</p>}
+                            <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".12em", fontWeight: 700, color: "#999", marginBottom: 8 }}>Customer</p>
+                            <p style={{ fontSize: 14, color: "#333", fontWeight: 600 }}>{order.customer_name}</p>
+                            {order.customer_phone && <p style={{ fontSize: 12, color: "#666" }}>{order.customer_phone}</p>}
+                            {order.customer_email && <p style={{ fontSize: 12, color: "#666" }}>{order.customer_email}</p>}
                         </div>
                     )}
                     {addr && (
                         <div>
-                            <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-2">{pickup ? "Pickup Location" : "Delivery Address"}</p>
-                            <p className="text-sm text-neutral-700 whitespace-pre-line">{pickup ? (bizContact.address || "Store") : addr}</p>
-                            {order.delivery_method && (
-                                <p className="text-[10px] uppercase tracking-widest text-neutral-400 mt-1">{order.delivery_method}</p>
-                            )}
+                            <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".12em", fontWeight: 700, color: "#999", marginBottom: 8 }}>{pickup ? "Pickup Location" : "Delivery Address"}</p>
+                            <p style={{ fontSize: 13, color: "#555", whiteSpace: "pre-line" }}>{pickup ? (bizContact.address || "Store") : addr}</p>
+                            {order.delivery_method && <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginTop: 4 }}>{order.delivery_method}</p>}
                         </div>
                     )}
                 </div>
             )}
 
-            <div className="mb-8">
-                <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 mb-4">Items Ordered</p>
+            <div style={{ marginBottom: 32 }}>
+                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".12em", fontWeight: 700, color: "#999", marginBottom: 16 }}>Items Ordered</p>
                 {items.length === 0 ? (
-                    <p className="text-sm text-neutral-400 italic">No item details available.</p>
+                    <p style={{ fontSize: 13, color: "#999", fontStyle: "italic" }}>No item details available.</p>
                 ) : (
-                    <table className="w-full text-sm">
+                    <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
                         <thead>
-                            <tr className="border-b border-neutral-100">
-                                <th className="text-left text-[10px] uppercase tracking-widest text-neutral-400 font-semibold pb-2">Item</th>
-                                <th className="text-center text-[10px] uppercase tracking-widest text-neutral-400 font-semibold pb-2 w-12">Qty</th>
-                                <th className="text-right text-[10px] uppercase tracking-widest text-neutral-400 font-semibold pb-2 w-28">Price</th>
-                                <th className="text-right text-[10px] uppercase tracking-widest text-neutral-400 font-semibold pb-2 w-28">Total</th>
+                            <tr style={{ borderBottom: "1px solid #e5e5e5" }}>
+                                <th style={{ textAlign: "left", fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", color: "#999", fontWeight: 700, paddingBottom: 8 }}>Item</th>
+                                <th style={{ textAlign: "center", fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", color: "#999", fontWeight: 700, paddingBottom: 8, width: 48 }}>Qty</th>
+                                <th style={{ textAlign: "right", fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", color: "#999", fontWeight: 700, paddingBottom: 8, width: 96 }}>Price</th>
+                                <th style={{ textAlign: "right", fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", color: "#999", fontWeight: 700, paddingBottom: 8, width: 96 }}>Total</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-neutral-50">
+                        <tbody>
                             {items.map((item: any, i: number) => {
                                 const name  = item.name || item.productName || "Item";
                                 const price = Number(item.price ?? item.unit_price ?? 0);
                                 const qty   = Number(item.quantity ?? item.qty ?? 1);
                                 return (
-                                    <tr key={i}>
-                                        <td className="py-3">
-                                            <div className="flex items-center gap-3">
+                                    <tr key={i} style={{ borderBottom: "1px solid #f5f5f5" }}>
+                                        <td style={{ padding: "10px 0" }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                                 {(item.imageUrl || item.image_url) && (
-                                                    <img src={item.imageUrl || item.image_url} alt={name} className="w-14 h-14 object-cover border border-neutral-100" />
+                                                    <img src={item.imageUrl || item.image_url} alt={name} style={{ width: 52, height: 52, objectFit: "cover", border: "1px solid #eee" }} />
                                                 )}
                                                 <div>
-                                                    <p className="font-medium text-neutral-800">{name}</p>
+                                                    <p style={{ fontWeight: 600, color: "#222" }}>{name}</p>
                                                     {(item.size || item.color || item.brand) && (
-                                                        <p className="text-[10px] uppercase tracking-wider text-neutral-400 mt-0.5">
+                                                        <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "#999", marginTop: 2 }}>
                                                             {[item.size, item.color, item.brand].filter(Boolean).join(" · ")}
                                                         </p>
                                                     )}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="py-3 text-center text-neutral-600">{qty}</td>
-                                        <td className="py-3 text-right text-neutral-600">GH₵ {price.toFixed(2)}</td>
-                                        <td className="py-3 text-right font-medium">GH₵ {(price * qty).toFixed(2)}</td>
+                                        <td style={{ padding: "10px 0", textAlign: "center", color: "#555" }}>{qty}</td>
+                                        <td style={{ padding: "10px 0", textAlign: "right", color: "#555" }}>GH₵ {price.toFixed(2)}</td>
+                                        <td style={{ padding: "10px 0", textAlign: "right", fontWeight: 600 }}>GH₵ {(price * qty).toFixed(2)}</td>
                                     </tr>
                                 );
                             })}
@@ -840,54 +821,53 @@ export default function OrderDetailPage() {
                 )}
             </div>
 
-            <div className="flex justify-end border-t border-neutral-200 pt-4">
-                <div className="w-56 space-y-2 text-sm">
+            <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid #e5e5e5", paddingTop: 16 }}>
+                <div style={{ width: 200, display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
                     {(
                         (order.discount_code && Number(order.discount_amount ?? 0) > 0) ||
                         (order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0)
                     ) && (
                         <>
-                            <div className="flex justify-between text-neutral-500">
+                            <div style={{ display: "flex", justifyContent: "space-between", color: "#666" }}>
                                 <span>Subtotal</span>
                                 <span>GH₵ {(Number(order.total_amount ?? 0) + Number(order.discount_amount ?? 0) + Number(order.auto_discount_amount ?? 0)).toFixed(2)}</span>
                             </div>
                             {order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0 && (
-                                <div className="flex justify-between text-green-600">
+                                <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
                                     <span>Auto Discount ({order.auto_discount_title})</span>
                                     <span>-GH₵ {Number(order.auto_discount_amount ?? 0).toFixed(2)}</span>
                                 </div>
                             )}
                             {order.discount_code && Number(order.discount_amount ?? 0) > 0 && (
-                                <div className="flex justify-between text-green-600">
+                                <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
                                     <span>Discount ({order.discount_code})</span>
                                     <span>-GH₵ {Number(order.discount_amount ?? 0).toFixed(2)}</span>
                                 </div>
                             )}
                         </>
                     )}
-                    <div className="flex justify-between font-semibold text-base">
+                    <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, borderTop: "1px solid #e5e5e5", paddingTop: 8 }}>
                         <span>Total Paid</span>
                         <span>GH₵ {Number(order.total_amount ?? 0).toFixed(2)}</span>
                     </div>
                     {order.paystack_reference && (
-                        <div className="flex justify-between text-neutral-400 text-xs">
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "#999", fontSize: 11 }}>
                             <span>Ref</span>
-                            <span className="font-mono">{order.paystack_reference.substring(0, 16)}</span>
+                            <span style={{ fontFamily: "monospace" }}>{order.paystack_reference.substring(0, 16)}</span>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Pickup instructions on print receipt */}
             {pickup && pickupSettings && (
-                <div className="mt-8" style={{ backgroundColor: "#F7F2EC", padding: "16px", border: "1px solid #E8E4DE" }}>
-                    <p style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "10px" }}>
+                <div style={{ marginTop: 32, backgroundColor: "#F7F2EC", padding: 16, border: "1px solid #E8E4DE" }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".12em", marginBottom: 10 }}>
                         📦 Store Pickup Instructions
                     </p>
-                    <p style={{ fontSize: "13px", lineHeight: 1.7, color: "#404040", whiteSpace: "pre-wrap", marginBottom: "12px" }}>
+                    <p style={{ fontSize: 13, lineHeight: 1.7, color: "#404040", whiteSpace: "pre-wrap", marginBottom: 12 }}>
                         {pickupSettings.instructions}
                     </p>
-                    <div style={{ borderTop: "1px solid #DDD8D1", paddingTop: "10px", fontSize: "12px", color: "#525252", lineHeight: 2 }}>
+                    <div style={{ borderTop: "1px solid #DDD8D1", paddingTop: 10, fontSize: 12, color: "#525252", lineHeight: 2 }}>
                         {pickupSettings.address && <div>📍 {pickupSettings.address}</div>}
                         {pickupSettings.phone && <div>📞 {pickupSettings.phone}</div>}
                         {pickupSettings.wait && <div>⏱ Ready in: {pickupSettings.wait}</div>}
@@ -895,15 +875,15 @@ export default function OrderDetailPage() {
                 </div>
             )}
 
-            <div className="border-t border-neutral-100 mt-8 pt-6 text-center space-y-1">
+            <div style={{ borderTop: "1px solid #e5e5e5", marginTop: 32, paddingTop: 24, textAlign: "center" }}>
                 {(bizContact.address || bizContact.contact || bizContact.email) && (
-                    <div className="text-xs text-neutral-500 space-y-0.5 mb-3">
-                        {bizContact.address && <p>{bizContact.address}</p>}
-                        {bizContact.contact && <p>{bizContact.contact}</p>}
-                        {bizContact.email  && <p>{bizContact.email}</p>}
+                    <div style={{ fontSize: 12, color: "#888", marginBottom: 12, lineHeight: 1.8 }}>
+                        {bizContact.address && <div>{bizContact.address}</div>}
+                        {bizContact.contact && <div>{bizContact.contact}</div>}
+                        {bizContact.email && <div>{bizContact.email}</div>}
                     </div>
                 )}
-                <p className="text-[10px] uppercase tracking-widest text-neutral-400">
+                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".12em", color: "#aaa" }}>
                     Thank you for your order — {bizName}
                 </p>
             </div>

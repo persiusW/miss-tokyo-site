@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
-import { Pencil, Trash2, X, Check, Star, Tag, Copy, Search, LayoutGrid, List } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { createCategory, updateCategory, deleteCategory } from "./actions";
 
@@ -48,20 +47,20 @@ function WholesalePricingFields({
         { key: "t3" as const, label: `Tier 3 — ${tierConfig.tier3Min}–${tierConfig.tier3Max} units` },
     ];
     return (
-        <div className="grid grid-cols-3 gap-4 mt-4 p-4 bg-neutral-50 border border-neutral-200 rounded-lg">
-            <p className="col-span-3 text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-1">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 12, padding: 14, background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-md)" }}>
+            <p style={{ gridColumn: "1 / -1", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-4)", marginBottom: 4 }}>
                 Category Wholesale Tier Prices
             </p>
             {tiers.map(({ key, label }) => (
                 <div key={key}>
-                    <label className="block text-[10px] uppercase tracking-widest text-neutral-400 mb-1">{label}</label>
-                    <div className="flex items-center gap-1">
-                        <span className="text-neutral-400 text-xs">GH₵</span>
+                    <label style={{ display: "block", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginBottom: 4 }}>{label}</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ color: "var(--ac-ink-4)", fontSize: 11 }}>GH₵</span>
                         <input
                             type="number" min="0" step="0.01"
                             value={prices[key]}
                             onChange={e => onChange({ ...prices, [key]: e.target.value })}
-                            className="w-full border-b border-neutral-300 bg-transparent py-1 outline-none focus:border-black text-sm transition-colors"
+                            className="ac-input"
                             placeholder="0.00"
                         />
                     </div>
@@ -293,132 +292,136 @@ export default function CategoriesPage() {
     };
 
     return (
-        <div className="space-y-12">
-            <header className="flex items-start justify-between gap-4 flex-wrap">
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div className="ac-page-head">
                 <div>
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Categories</h1>
-                    <p className="text-neutral-500">
+                    <h1 className="ac-page-h1">Categories</h1>
+                    <p className="ac-page-sub">
                         Organise your catalog. Mark categories as Wholesale to enable B2B tier pricing.
-                        <span className="ml-3 text-xs font-semibold uppercase tracking-widest text-amber-600">
+                        <span className="ac-badge ac-badge-warn" style={{ marginLeft: 10 }}>
                             {categories.filter(c => c.is_featured).length}/3 Featured
                         </span>
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div className="admin-search" style={{ position: "relative" }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ac-ink-4)" strokeWidth="1.8" strokeLinecap="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                         <input
                             type="text"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="Search categories…"
-                            className="pl-9 pr-4 py-2.5 border border-neutral-200 bg-white text-sm outline-none focus:border-black transition-colors w-56 rounded-none"
+                            className="ac-input"
+                            style={{ paddingLeft: 32, width: 200 }}
                         />
                     </div>
                     {/* View toggle */}
-                    <div className="flex border border-neutral-200">
+                    <div style={{ display: "flex", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", overflow: "hidden" }}>
                         <button
                             onClick={() => setViewMode("list")}
                             title="List view"
-                            className={`p-2.5 transition-colors ${viewMode === "list" ? "bg-black text-white" : "bg-white text-neutral-400 hover:text-black"}`}
+                            className="ac-btn ac-btn-ghost ac-btn-sm"
+                            style={{ borderRadius: 0, border: "none", background: viewMode === "list" ? "var(--ac-ink)" : "transparent", color: viewMode === "list" ? "var(--ac-bg)" : "var(--ac-ink-4)" }}
                         >
-                            <List size={15} />
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                         </button>
                         <button
                             onClick={() => setViewMode("grid")}
                             title="Grid view"
-                            className={`p-2.5 transition-colors ${viewMode === "grid" ? "bg-black text-white" : "bg-white text-neutral-400 hover:text-black"}`}
+                            className="ac-btn ac-btn-ghost ac-btn-sm"
+                            style={{ borderRadius: 0, border: "none", background: viewMode === "grid" ? "var(--ac-ink)" : "transparent", color: viewMode === "grid" ? "var(--ac-bg)" : "var(--ac-ink-4)" }}
                         >
-                            <LayoutGrid size={15} />
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                         </button>
                     </div>
                     <button
                         onClick={() => setIsAdding(!isAdding)}
-                        className="bg-black text-white px-6 py-3 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors whitespace-nowrap"
+                        className="ac-btn ac-btn-primary"
+                        type="button"
                     >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
                         {isAdding ? "Cancel" : "New Category"}
                     </button>
                 </div>
-            </header>
+            </div>
 
             {isAdding && (
-                <form onSubmit={handleAdd} className="bg-white border border-neutral-200 p-8 space-y-8">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Add Category</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-6">
+                <form onSubmit={handleAdd} className="ac-card" style={{ padding: 24 }}>
+                    <div className="ac-card-head" style={{ marginBottom: 20 }}>
+                        <h2 className="ac-card-title">Add Category</h2>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Name</label>
+                                <label className="ac-label">Name</label>
                                 <input type="text" value={form.name} onChange={e => handleNameChange(e.target.value)} required
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                                    className="ac-input"
                                     placeholder="e.g. Footwear" />
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Slug</label>
+                                <label className="ac-label">Slug</label>
                                 <input type="text" value={form.slug} onChange={e => setForm(prev => ({ ...prev, slug: e.target.value }))} required
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors font-mono text-sm"
+                                    className="ac-input"
+                                    style={{ fontFamily: "var(--f-mono)", fontSize: 12 }}
                                     placeholder="footwear" />
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Description</label>
+                                <label className="ac-label">Description</label>
                                 <input type="text" value={form.description} onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black transition-colors"
+                                    className="ac-input"
                                     placeholder="Optional" />
                             </div>
                             {/* Wholesale toggle */}
-                            <div>
-                                <label className="flex items-center justify-between cursor-pointer group">
-                                    <div>
-                                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Wholesale Category</p>
-                                        <p className="text-[10px] text-neutral-400 mt-0.5">Enable B2B tier pricing on this category</p>
-                                    </div>
-                                    <div
-                                        onClick={() => setNewIsWholesale(v => !v)}
-                                        className={`w-11 h-6 rounded-full transition-colors cursor-pointer flex-shrink-0 relative ${newIsWholesale ? "bg-black" : "bg-neutral-200"}`}
-                                    >
-                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${newIsWholesale ? "translate-x-5" : ""}`} />
-                                    </div>
-                                </label>
-                                {newIsWholesale && (
-                                    <WholesalePricingFields prices={newWholesalePrices} onChange={setNewWholesalePrices} tierConfig={tierConfig} />
-                                )}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0" }}>
+                                <div>
+                                    <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-2)" }}>Wholesale Category</p>
+                                    <p style={{ fontSize: 10, color: "var(--ac-ink-4)", marginTop: 2 }}>Enable B2B tier pricing on this category</p>
+                                </div>
+                                <div
+                                    onClick={() => setNewIsWholesale(v => !v)}
+                                    style={{ width: 40, height: 22, borderRadius: 11, cursor: "pointer", position: "relative", flexShrink: 0, background: newIsWholesale ? "var(--ac-ink)" : "var(--ac-line)", transition: "background .2s" }}
+                                >
+                                    <span style={{ display: "inline-block", height: 18, width: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)", position: "absolute", top: 2, left: newIsWholesale ? 20 : 2, transition: "left .2s" }} />
+                                </div>
                             </div>
+                            {newIsWholesale && (
+                                <WholesalePricingFields prices={newWholesalePrices} onChange={setNewWholesalePrices} tierConfig={tierConfig} />
+                            )}
                             {/* Pre-Order toggle */}
-                            <div>
-                                <label className="flex items-center justify-between cursor-pointer group">
-                                    <div>
-                                        <p className="text-[10px] uppercase tracking-widest font-semibold text-neutral-500">Pre-Order Category</p>
-                                        <p className="text-[10px] text-neutral-400 mt-0.5">Mark all products in this category as pre-order</p>
-                                    </div>
-                                    <div
-                                        onClick={() => setNewPreorderEnabled(v => !v)}
-                                        className={`w-11 h-6 rounded-full transition-colors cursor-pointer flex-shrink-0 relative ${newPreorderEnabled ? "bg-amber-500" : "bg-neutral-200"}`}
-                                    >
-                                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${newPreorderEnabled ? "translate-x-5" : ""}`} />
-                                    </div>
-                                </label>
-                                {newPreorderEnabled && (
-                                    <div className="mt-3 flex items-center gap-3 p-3 bg-amber-50 border border-amber-200">
-                                        <label className="text-[10px] uppercase tracking-widest font-semibold text-amber-700 whitespace-nowrap">Est. Weeks</label>
-                                        <input
-                                            type="number" min="1" max="52"
-                                            value={newPreorderWeeks}
-                                            onChange={e => setNewPreorderWeeks(e.target.value)}
-                                            className="w-20 border-b border-amber-400 bg-transparent py-1 outline-none focus:border-amber-600 text-sm text-neutral-700"
-                                            placeholder="e.g. 6"
-                                        />
-                                        <span className="text-[10px] text-amber-600">weeks from today</span>
-                                    </div>
-                                )}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 0" }}>
+                                <div>
+                                    <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-2)" }}>Pre-Order Category</p>
+                                    <p style={{ fontSize: 10, color: "var(--ac-ink-4)", marginTop: 2 }}>Mark all products in this category as pre-order</p>
+                                </div>
+                                <div
+                                    onClick={() => setNewPreorderEnabled(v => !v)}
+                                    style={{ width: 40, height: 22, borderRadius: 11, cursor: "pointer", position: "relative", flexShrink: 0, background: newPreorderEnabled ? "var(--ac-warn)" : "var(--ac-line)", transition: "background .2s" }}
+                                >
+                                    <span style={{ display: "inline-block", height: 18, width: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)", position: "absolute", top: 2, left: newPreorderEnabled ? 20 : 2, transition: "left .2s" }} />
+                                </div>
                             </div>
+                            {newPreorderEnabled && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: "color-mix(in oklab, var(--ac-warn) 10%, transparent)", border: "1px solid color-mix(in oklab, var(--ac-warn) 25%, transparent)", borderRadius: "var(--r-sm)" }}>
+                                    <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-warn)", whiteSpace: "nowrap" }}>Est. Weeks</label>
+                                    <input
+                                        type="number" min="1" max="52"
+                                        value={newPreorderWeeks}
+                                        onChange={e => setNewPreorderWeeks(e.target.value)}
+                                        className="ac-input"
+                                        style={{ width: 72 }}
+                                        placeholder="e.g. 6"
+                                    />
+                                    <span style={{ fontSize: 10, color: "var(--ac-warn)" }}>weeks from today</span>
+                                </div>
+                            )}
                         </div>
                         <div>
                             <ImageUploader bucket="product-images" folder="categories" currentUrl={null} onUpload={setNewImageUrl} aspectRatio="video" label="Category Image" />
                         </div>
                     </div>
-                    <div className="flex justify-end border-t border-neutral-100 pt-6">
-                        <button type="submit" disabled={saving}
-                            className="px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50">
-                            {saving ? "Saving..." : "Add Category"}
+                    <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--ac-line)", paddingTop: 16, marginTop: 8 }}>
+                        <button type="submit" disabled={saving} className="ac-btn ac-btn-primary">
+                            {saving ? "Saving…" : "Add Category"}
                         </button>
                     </div>
                 </form>
@@ -431,84 +434,71 @@ export default function CategoriesPage() {
                     : categories;
 
                 if (loading) return (
-                    <div className="bg-white border border-neutral-200 px-6 py-12 text-center text-neutral-500 italic font-serif">Loading...</div>
+                    <div className="ac-card"><div className="ac-empty"><div className="ac-empty-title">Loading…</div></div></div>
                 );
                 if (categories.length === 0) return (
-                    <div className="bg-white border border-neutral-200 px-6 py-16 text-center text-neutral-500 italic font-serif">No categories yet. Add your first above.</div>
+                    <div className="ac-card"><div className="ac-empty"><div className="ac-empty-title">No categories yet. Add your first above.</div></div></div>
                 );
                 if (filtered.length === 0) return (
-                    <div className="bg-white border border-neutral-200 px-6 py-12 text-center text-neutral-400 text-sm">No categories match &ldquo;{search}&rdquo;</div>
+                    <div className="ac-card"><div className="ac-empty"><div className="ac-empty-title">No categories match &ldquo;{search}&rdquo;</div></div></div>
                 );
 
                 /* ── Grid view ─────────────────────────────────────────── */
                 if (viewMode === "grid") return (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
                         {filtered.map(cat => (
-                            <div key={cat.id} className="bg-white border border-neutral-200 group relative flex flex-col overflow-hidden">
-                                {/* Image */}
-                                <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden">
+                            <div key={cat.id} className="ac-card" style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                                <div style={{ position: "relative", aspectRatio: "4/3", background: "var(--ac-panel-2)", overflow: "hidden" }}>
                                     {cat.image_url
-                                        ? <img src={cat.image_url} alt={cat.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                        : <div className="w-full h-full bg-neutral-100 flex items-center justify-center"><span className="text-neutral-300 text-xs uppercase tracking-widest">No image</span></div>
+                                        ? <img src={cat.image_url} alt={cat.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                        : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-line)" }}>No image</span></div>
                                     }
-                                    {/* Featured star overlay */}
                                     <button
                                         onClick={() => toggleFeatured(cat.id, cat.is_featured)}
                                         title={cat.is_featured ? "Unfeature" : "Feature on homepage"}
-                                        className={`absolute top-2 right-2 transition-colors ${cat.is_featured ? "text-amber-400" : "text-white/60 hover:text-amber-400"}`}
+                                        style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", cursor: "pointer", color: cat.is_featured ? "var(--ac-warn)" : "rgba(255,255,255,.6)" }}
                                     >
-                                        <Star size={16} fill={cat.is_featured ? "currentColor" : "none"} />
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill={cat.is_featured ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                                     </button>
-                                    {/* Badges */}
-                                    <div className="absolute top-2 left-2 flex flex-col gap-1">
-                                        {cat.is_wholesale && (
-                                            <span className="flex items-center gap-1 text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 bg-emerald-600 text-white rounded-full">
-                                                <Tag size={8} /> B2B
-                                            </span>
-                                        )}
-                                        {!cat.is_active && (
-                                            <span className="text-[9px] uppercase tracking-widest font-bold px-1.5 py-0.5 bg-neutral-700 text-white rounded-full">
-                                                Inactive
-                                            </span>
-                                        )}
+                                    <div style={{ position: "absolute", top: 8, left: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+                                        {cat.is_wholesale && <span className="ac-badge ac-badge-ok" style={{ fontSize: 9 }}>B2B</span>}
+                                        {!cat.is_active && <span className="ac-badge ac-badge-inactive" style={{ fontSize: 9 }}>Inactive</span>}
                                     </div>
                                 </div>
-                                {/* Body */}
-                                <div className="p-3 flex flex-col gap-1.5 flex-1">
-                                    <p className="font-medium text-sm text-neutral-900 truncate">{cat.name}</p>
-                                    <p className="font-mono text-[10px] text-neutral-400 truncate">{cat.slug}</p>
-                                    {cat.description && <p className="text-[11px] text-neutral-500 line-clamp-2">{cat.description}</p>}
+                                <div style={{ padding: "10px 12px", flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
+                                    <p style={{ fontWeight: 500, fontSize: 13, color: "var(--ac-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.name}</p>
+                                    <p style={{ fontFamily: "var(--f-mono)", fontSize: 10, color: "var(--ac-ink-4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.slug}</p>
+                                    {cat.description && <p style={{ fontSize: 11, color: "var(--ac-ink-3)", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{cat.description}</p>}
                                     {cat.is_wholesale && (
-                                        <div className="text-[10px] text-neutral-500 space-y-0.5 mt-auto pt-1 border-t border-neutral-100">
-                                            {cat.wholesale_tier_1_price != null && <div>T1: GH₵{cat.wholesale_tier_1_price}</div>}
-                                            {cat.wholesale_tier_2_price != null && <div>T2: GH₵{cat.wholesale_tier_2_price}</div>}
-                                            {cat.wholesale_tier_3_price != null && <div>T3: GH₵{cat.wholesale_tier_3_price}</div>}
+                                        <div style={{ fontSize: 10, color: "var(--ac-ink-3)", marginTop: "auto", paddingTop: 4, borderTop: "1px solid var(--ac-line)", display: "flex", flexDirection: "column", gap: 1 }}>
+                                            {cat.wholesale_tier_1_price != null && <span>T1: GH₵{cat.wholesale_tier_1_price}</span>}
+                                            {cat.wholesale_tier_2_price != null && <span>T2: GH₵{cat.wholesale_tier_2_price}</span>}
+                                            {cat.wholesale_tier_3_price != null && <span>T3: GH₵{cat.wholesale_tier_3_price}</span>}
                                         </div>
                                     )}
                                 </div>
-                                {/* Actions */}
-                                <div className="px-3 pb-3 flex items-center justify-between gap-2 border-t border-neutral-100 pt-2">
-                                    <button
-                                        onClick={() => toggleActive(cat.id, cat.is_active)}
-                                        className={`px-2 py-0.5 text-[9px] uppercase tracking-widest rounded ${cat.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}
-                                    >
+                                <div style={{ padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid var(--ac-line)" }}>
+                                    <button onClick={() => toggleActive(cat.id, cat.is_active)} className={`ac-badge ${cat.is_active ? "ac-badge-ok" : "ac-badge-inactive"}`} style={{ cursor: "pointer" }}>
                                         {cat.is_active ? "Active" : "Inactive"}
                                     </button>
-                                    <div className="flex items-center gap-2">
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                         {!cat.is_wholesale && (
-                                            <button onClick={() => handleDuplicateAsWholesale(cat)} disabled={saving} title="Duplicate as Wholesale"
-                                                className="text-neutral-400 hover:text-emerald-600 transition-colors disabled:opacity-50"><Copy size={13} /></button>
+                                            <button onClick={() => handleDuplicateAsWholesale(cat)} disabled={saving} title="Duplicate as Wholesale" style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                            </button>
                                         )}
-                                        <button onClick={() => startEdit(cat)} title="Edit"
-                                            className="text-neutral-400 hover:text-black transition-colors"><Pencil size={13} /></button>
+                                        <button onClick={() => startEdit(cat)} title="Edit" style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                        </button>
                                         {confirmDeleteId === cat.id ? (
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={() => handleDelete(cat.id)} className="text-[10px] text-red-600 font-semibold">Yes</button>
-                                                <button onClick={() => setConfirmDeleteId(null)} className="text-[10px] text-neutral-400">No</button>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                <button onClick={() => handleDelete(cat.id)} style={{ fontSize: 10, color: "var(--ac-danger)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>Yes</button>
+                                                <button onClick={() => setConfirmDeleteId(null)} style={{ fontSize: 10, color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }}>No</button>
                                             </div>
                                         ) : (
-                                            <button onClick={() => setConfirmDeleteId(cat.id)} title="Delete"
-                                                className="text-neutral-400 hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
+                                            <button onClick={() => setConfirmDeleteId(cat.id)} title="Delete" style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -519,185 +509,174 @@ export default function CategoriesPage() {
 
                 /* ── List / table view ─────────────────────────────────── */
                 return (
-            <div className="bg-white border border-neutral-200 overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
+            <div className="ac-card flush">
+                <div className="ac-table-wrap">
+                <table className="ac-table">
+                    <thead>
                         <tr>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Image</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Name</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Slug</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Description</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Featured</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Wholesale / Pre-Order</th>
-                            <th className="px-6 py-4"></th>
+                            <th style={{ width: 52 }}>Image</th>
+                            <th>Name</th>
+                            <th>Slug</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                            <th>Featured</th>
+                            <th>Wholesale / Pre-Order</th>
+                            <th style={{ width: 80 }}></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody>
                         {(() => {
                             return filtered.map((cat) => (
                             editingId === cat.id ? (
-                                <tr key={cat.id} className="bg-neutral-50">
-                                    <td className="px-6 py-4">
-                                        <div className="w-20">
+                                <tr key={cat.id} style={{ background: "var(--ac-panel-2)" }}>
+                                    <td>
+                                        <div style={{ width: 72 }}>
                                             <ImageUploader bucket="product-images" folder="categories" currentUrl={editForm.image_url || null}
                                                 onUpload={(url) => setEditForm(prev => ({ ...prev, image_url: url }))} aspectRatio="square" label="" />
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td>
                                         <input type="text" value={editForm.name} onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                                            className="w-full border-b border-neutral-300 bg-transparent py-1 outline-none focus:border-black transition-colors" />
+                                            className="ac-input" style={{ fontSize: 13 }} />
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td>
                                         <input type="text" value={editForm.slug} onChange={e => setEditForm(prev => ({ ...prev, slug: e.target.value }))}
-                                            className="w-full border-b border-neutral-300 bg-transparent py-1 outline-none focus:border-black transition-colors font-mono text-xs" />
+                                            className="ac-input" style={{ fontFamily: "var(--f-mono)", fontSize: 11 }} />
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td>
                                         <input type="text" value={editForm.description} onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                                            className="w-full border-b border-neutral-300 bg-transparent py-1 outline-none focus:border-black transition-colors" />
+                                            className="ac-input" style={{ fontSize: 13 }} />
                                     </td>
-                                    <td className="px-6 py-4"><span className="text-xs text-neutral-400 italic">editing</span></td>
-                                    <td className="px-6 py-4">—</td>
-                                    <td className="px-6 py-4 min-w-[260px]">
-                                        <div className="space-y-3">
-                                            {/* Wholesale */}
-                                            <label className="flex items-center gap-2 cursor-pointer">
+                                    <td><span style={{ fontSize: 11, color: "var(--ac-ink-4)", fontStyle: "italic" }}>editing</span></td>
+                                    <td>—</td>
+                                    <td style={{ minWidth: 240 }}>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                                                 <div onClick={() => setEditIsWholesale(v => !v)}
-                                                    className={`w-9 h-5 rounded-full transition-colors cursor-pointer relative flex-shrink-0 ${editIsWholesale ? "bg-black" : "bg-neutral-200"}`}>
-                                                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editIsWholesale ? "translate-x-4" : ""}`} />
+                                                    style={{ width: 36, height: 20, borderRadius: 10, cursor: "pointer", position: "relative", flexShrink: 0, background: editIsWholesale ? "var(--ac-ink)" : "var(--ac-line)", transition: "background .2s" }}>
+                                                    <span style={{ display: "inline-block", height: 16, width: 16, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)", position: "absolute", top: 2, left: editIsWholesale ? 18 : 2, transition: "left .2s" }} />
                                                 </div>
-                                                <span className="text-[10px] uppercase tracking-widest text-neutral-500 font-semibold">
-                                                    {editIsWholesale ? "Wholesale" : "Retail"}
-                                                </span>
+                                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-3)" }}>{editIsWholesale ? "Wholesale" : "Retail"}</span>
                                             </label>
                                             {editIsWholesale && (
-                                                <div className="space-y-1">
+                                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                                                     {[
                                                         { key: "t1" as const, label: `T1 (${tierConfig?.tier1Min ?? 3}–${tierConfig?.tier1Max ?? 5})` },
                                                         { key: "t2" as const, label: `T2 (${tierConfig?.tier2Min ?? 8}–${tierConfig?.tier2Max ?? 10})` },
                                                         { key: "t3" as const, label: `T3 (${tierConfig?.tier3Min ?? 12}–${tierConfig?.tier3Max ?? 24})` },
                                                     ].map(({ key, label }) => (
-                                                        <div key={key} className="flex items-center gap-1">
-                                                            <span className="text-[9px] text-neutral-400 w-20 flex-shrink-0">{label}</span>
-                                                            <span className="text-neutral-400 text-xs">₵</span>
+                                                        <div key={key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                                            <span style={{ fontSize: 9, color: "var(--ac-ink-4)", width: 72, flexShrink: 0 }}>{label}</span>
+                                                            <span style={{ color: "var(--ac-ink-4)", fontSize: 11 }}>₵</span>
                                                             <input type="number" min="0" step="0.01" value={editWholesalePrices[key]}
                                                                 onChange={e => setEditWholesalePrices(p => ({ ...p, [key]: e.target.value }))}
-                                                                className="w-20 border-b border-neutral-300 bg-transparent py-0.5 outline-none focus:border-black text-xs transition-colors"
+                                                                className="ac-input"
+                                                                style={{ width: 72, fontSize: 11 }}
                                                                 placeholder="0.00" />
                                                         </div>
                                                     ))}
                                                 </div>
                                             )}
-                                            {/* Pre-Order */}
-                                            <label className="flex items-center gap-2 cursor-pointer">
+                                            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                                                 <div onClick={() => setEditPreorderEnabled(v => !v)}
-                                                    className={`w-9 h-5 rounded-full transition-colors cursor-pointer relative flex-shrink-0 ${editPreorderEnabled ? "bg-amber-500" : "bg-neutral-200"}`}>
-                                                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editPreorderEnabled ? "translate-x-4" : ""}`} />
+                                                    style={{ width: 36, height: 20, borderRadius: 10, cursor: "pointer", position: "relative", flexShrink: 0, background: editPreorderEnabled ? "var(--ac-warn)" : "var(--ac-line)", transition: "background .2s" }}>
+                                                    <span style={{ display: "inline-block", height: 16, width: 16, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)", position: "absolute", top: 2, left: editPreorderEnabled ? 18 : 2, transition: "left .2s" }} />
                                                 </div>
-                                                <span className="text-[10px] uppercase tracking-widest text-amber-600 font-semibold">
-                                                    {editPreorderEnabled ? "Pre-Order On" : "Pre-Order Off"}
-                                                </span>
+                                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-warn)" }}>{editPreorderEnabled ? "Pre-Order On" : "Pre-Order Off"}</span>
                                             </label>
                                             {editPreorderEnabled && (
-                                                <div className="flex items-center gap-2">
-                                                    <input type="number" min="1" max="52"
-                                                        value={editPreorderWeeks}
+                                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                                    <input type="number" min="1" max="52" value={editPreorderWeeks}
                                                         onChange={e => setEditPreorderWeeks(e.target.value)}
-                                                        className="w-16 border-b border-amber-400 bg-transparent py-0.5 outline-none focus:border-amber-600 text-xs text-neutral-700"
+                                                        className="ac-input"
+                                                        style={{ width: 60, fontSize: 11 }}
                                                         placeholder="wks" />
-                                                    <span className="text-[9px] text-amber-600">weeks from today</span>
+                                                    <span style={{ fontSize: 9, color: "var(--ac-warn)" }}>weeks from today</span>
                                                 </div>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3 justify-end">
+                                    <td>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end" }}>
                                             <button onClick={() => handleSaveEdit(cat.id)} disabled={saving}
-                                                className="text-green-600 hover:text-green-800 transition-colors disabled:opacity-50" title="Save">
-                                                <Check size={16} />
+                                                style={{ color: "var(--ac-accent)", background: "none", border: "none", cursor: "pointer" }} title="Save">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
                                             </button>
-                                            <button onClick={cancelEdit} className="text-neutral-400 hover:text-black transition-colors" title="Cancel">
-                                                <X size={16} />
+                                            <button onClick={cancelEdit} style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }} title="Cancel">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
                             ) : (
-                                <tr key={cat.id} className="hover:bg-neutral-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="w-12 h-12 bg-neutral-100 overflow-hidden flex-shrink-0">
+                                <tr key={cat.id}>
+                                    <td>
+                                        <div style={{ width: 44, height: 44, background: "var(--ac-panel-2)", borderRadius: "var(--r-sm)", overflow: "hidden", border: "1px solid var(--ac-line)" }}>
                                             {cat.image_url
-                                                ? <img src={cat.image_url} alt={cat.name} className="w-full h-full object-cover" />
-                                                : <div className="w-full h-full bg-neutral-200" />}
+                                                ? <img src={cat.image_url} alt={cat.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                : null}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 font-medium text-neutral-900">
-                                        <div className="flex items-center gap-2">
+                                    <td style={{ fontWeight: 500, color: "var(--ac-ink)" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                             {cat.name}
-                                            {cat.is_wholesale && (
-                                                <span className="flex items-center gap-1 text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full">
-                                                    <Tag size={9} /> B2B
-                                                </span>
-                                            )}
+                                            {cat.is_wholesale && <span className="ac-badge ac-badge-ok" style={{ fontSize: 9 }}>B2B</span>}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4"><span className="font-mono text-xs text-neutral-500">{cat.slug}</span></td>
-                                    <td className="px-6 py-4 text-neutral-600 max-w-xs truncate">{cat.description || "—"}</td>
-                                    <td className="px-6 py-4">
+                                    <td style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-4)" }}>{cat.slug}</td>
+                                    <td style={{ color: "var(--ac-ink-2)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.description || "—"}</td>
+                                    <td>
                                         <button onClick={() => toggleActive(cat.id, cat.is_active)}
-                                            className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${cat.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-500"}`}>
+                                            className={`ac-badge ${cat.is_active ? "ac-badge-ok" : "ac-badge-inactive"}`}
+                                            style={{ cursor: "pointer" }}>
                                             {cat.is_active ? "Active" : "Inactive"}
                                         </button>
                                     </td>
-                                    <td className="px-6 py-4 text-center">
+                                    <td style={{ textAlign: "center" }}>
                                         <button onClick={() => toggleFeatured(cat.id, cat.is_featured)}
                                             title={cat.is_featured ? "Unfeature" : "Feature on homepage"}
-                                            className={`transition-colors ${cat.is_featured ? "text-amber-500 hover:text-amber-300" : "text-neutral-300 hover:text-amber-500"}`}>
-                                            <Star size={16} fill={cat.is_featured ? "currentColor" : "none"} />
+                                            style={{ color: cat.is_featured ? "var(--ac-warn)" : "var(--ac-line)", background: "none", border: "none", cursor: "pointer" }}>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill={cat.is_featured ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                                         </button>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="space-y-1">
+                                    <td>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                                             {cat.is_wholesale ? (
-                                                <div className="text-[10px] text-neutral-500 space-y-0.5">
-                                                    {cat.wholesale_tier_1_price != null && <div>T1: GH₵{cat.wholesale_tier_1_price}</div>}
-                                                    {cat.wholesale_tier_2_price != null && <div>T2: GH₵{cat.wholesale_tier_2_price}</div>}
-                                                    {cat.wholesale_tier_3_price != null && <div>T3: GH₵{cat.wholesale_tier_3_price}</div>}
+                                                <div style={{ fontSize: 10, color: "var(--ac-ink-3)", display: "flex", flexDirection: "column", gap: 1 }}>
+                                                    {cat.wholesale_tier_1_price != null && <span>T1: GH₵{cat.wholesale_tier_1_price}</span>}
+                                                    {cat.wholesale_tier_2_price != null && <span>T2: GH₵{cat.wholesale_tier_2_price}</span>}
+                                                    {cat.wholesale_tier_3_price != null && <span>T3: GH₵{cat.wholesale_tier_3_price}</span>}
                                                 </div>
                                             ) : (
-                                                <span className="text-[10px] text-neutral-300">—</span>
+                                                <span style={{ fontSize: 10, color: "var(--ac-line)" }}>—</span>
                                             )}
                                             {cat.preorder_enabled && (
-                                                <span className="inline-block text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full">
+                                                <span className="ac-badge ac-badge-warn" style={{ fontSize: 9 }}>
                                                     Pre-Order{cat.preorder_estimated_weeks ? ` · ${cat.preorder_estimated_weeks}wks` : ""}
                                                 </span>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td>
                                         {confirmDeleteId === cat.id ? (
-                                            <div className="flex items-center gap-3 justify-end">
-                                                <span className="text-xs text-neutral-500">Delete?</span>
-                                                <button onClick={() => handleDelete(cat.id)} className="text-xs uppercase tracking-widest text-red-600 hover:text-red-800 font-semibold">Yes</button>
-                                                <button onClick={() => setConfirmDeleteId(null)} className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black">No</button>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                                                <span style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>Delete?</span>
+                                                <button onClick={() => handleDelete(cat.id)} style={{ fontSize: 11, color: "var(--ac-danger)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>Yes</button>
+                                                <button onClick={() => setConfirmDeleteId(null)} style={{ fontSize: 11, color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }}>No</button>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center gap-3 justify-end">
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end" }}>
                                                 {!cat.is_wholesale && (
-                                                    <button
-                                                        onClick={() => handleDuplicateAsWholesale(cat)}
-                                                        disabled={saving}
-                                                        className="text-neutral-400 hover:text-emerald-600 transition-colors disabled:opacity-50"
-                                                        title="Duplicate as Wholesale"
-                                                    >
-                                                        <Copy size={15} />
+                                                    <button onClick={() => handleDuplicateAsWholesale(cat)} disabled={saving} title="Duplicate as Wholesale"
+                                                        style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }}>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                                     </button>
                                                 )}
-                                                <button onClick={() => startEdit(cat)} className="text-neutral-400 hover:text-black transition-colors" title="Edit">
-                                                    <Pencil size={15} />
+                                                <button onClick={() => startEdit(cat)} style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }} title="Edit">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                                 </button>
-                                                <button onClick={() => setConfirmDeleteId(cat.id)} className="text-neutral-400 hover:text-red-600 transition-colors" title="Delete">
-                                                    <Trash2 size={15} />
+                                                <button onClick={() => setConfirmDeleteId(cat.id)} style={{ color: "var(--ac-ink-4)", background: "none", border: "none", cursor: "pointer" }} title="Delete">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                                                 </button>
                                             </div>
                                         )}
@@ -708,6 +687,7 @@ export default function CategoriesPage() {
                         })()}
                     </tbody>
                 </table>
+                </div>
             </div>
                 );
             })()}

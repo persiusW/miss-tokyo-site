@@ -5,12 +5,12 @@ import { notFound } from "next/navigation";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const STATUS_STYLES: Record<string, string> = {
-    shipped:   "bg-blue-50 text-blue-700",
-    fulfilled: "bg-green-50 text-green-700",
-    delivered: "bg-green-50 text-green-700",
-    cancelled: "bg-red-50 text-red-500",
-    processing:"bg-yellow-50 text-yellow-700",
+const STATUS_BADGE: Record<string, string> = {
+    shipped:    "ac-badge ac-badge-shipped",
+    fulfilled:  "ac-badge ac-badge-fulfilled",
+    delivered:  "ac-badge ac-badge-delivered",
+    cancelled:  "ac-badge ac-badge-cancelled",
+    processing: "ac-badge ac-badge-processing",
 };
 
 export default async function RiderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,114 +29,104 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
     const rider = riderRes.data;
     const orders = ordersRes.data ?? [];
 
-    const delivered   = orders.filter(o => ["fulfilled", "delivered"].includes(o.status)).length;
-    const inTransit   = orders.filter(o => o.status === "shipped").length;
-    const cancelled   = orders.filter(o => o.status === "cancelled").length;
+    const delivered    = orders.filter(o => ["fulfilled", "delivered"].includes(o.status)).length;
+    const inTransit    = orders.filter(o => o.status === "shipped").length;
+    const cancelled    = orders.filter(o => o.status === "cancelled").length;
     const totalRevenue = orders.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
     const deliveryRate = orders.length > 0 ? ((delivered / orders.length) * 100).toFixed(0) : "0";
 
     return (
-        <div className="space-y-10">
-            {/* Back */}
-            <Link href="/sales/riders" className="text-xs uppercase tracking-widest text-neutral-400 hover:text-black transition-colors">
-                ← All Riders
-            </Link>
-
-            {/* Rider header */}
-            <div className="flex items-center gap-6">
-                {rider.image_url ? (
-                    <img src={rider.image_url} alt={rider.full_name} className="w-16 h-16 rounded-full object-cover" />
-                ) : (
-                    <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center">
-                        <span className="text-2xl font-serif text-neutral-400">{rider.full_name.charAt(0)}</span>
-                    </div>
-                )}
+        <>
+            <div className="ac-page-head" style={{ marginBottom: 24 }}>
                 <div>
-                    <div className="flex items-center gap-3 mb-1">
-                        <h1 className="font-serif text-3xl tracking-widest uppercase">{rider.full_name}</h1>
-                        <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded font-semibold ${rider.is_active ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-400"}`}>
-                            {rider.is_active ? "Active" : "Inactive"}
-                        </span>
+                    <Link href="/sales/riders" className="ac-text-link" style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12 }}>
+                        ← All Riders
+                    </Link>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                        {rider.image_url ? (
+                            <img src={rider.image_url} alt={rider.full_name} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                        ) : (
+                            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                <span style={{ fontSize: 20, fontFamily: "var(--f-display)", color: "var(--ac-ink-3)" }}>{rider.full_name.charAt(0)}</span>
+                            </div>
+                        )}
+                        <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                                <h1 className="ac-page-h1" style={{ marginBottom: 0 }}>{rider.full_name}</h1>
+                                <span className={`ac-badge ${rider.is_active ? "ac-badge-ok" : "ac-badge-inactive"}`}>
+                                    {rider.is_active ? "Active" : "Inactive"}
+                                </span>
+                            </div>
+                            <p className="ac-page-sub" style={{ marginBottom: 0 }}>
+                                {rider.phone_number}
+                                {rider.bike_reg && (
+                                    <span style={{ marginLeft: 12, fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-4)" }}>{rider.bike_reg}</span>
+                                )}
+                            </p>
+                        </div>
                     </div>
-                    <p className="text-neutral-500 text-sm">
-                        {rider.phone_number}
-                        {rider.bike_reg && <span className="ml-3 font-mono text-neutral-400">{rider.bike_reg}</span>}
-                    </p>
                 </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="ac-kpi-grid" style={{ marginBottom: 24 }}>
                 {[
-                    { label: "Total Orders",   value: orders.length },
-                    { label: "In Transit",     value: inTransit },
-                    { label: "Delivered",      value: delivered },
-                    { label: "Cancelled",      value: cancelled },
-                    { label: "Delivery Rate",  value: `${deliveryRate}%` },
+                    { label: "Total Orders",  value: orders.length,        mono: false },
+                    { label: "In Transit",    value: inTransit,            mono: false },
+                    { label: "Delivered",     value: delivered,            mono: false },
+                    { label: "Cancelled",     value: cancelled,            mono: false },
+                    { label: "Delivery Rate", value: `${deliveryRate}%`,   mono: false },
                 ].map(({ label, value }) => (
-                    <div key={label} className="bg-white border border-neutral-200 p-6">
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500 mb-3 block">{label}</span>
-                        <span className="text-2xl font-serif">{value}</span>
+                    <div key={label} className="ac-kpi">
+                        <span className="ac-kpi-label">{label}</span>
+                        <span className="ac-kpi-value">{value}</span>
                     </div>
                 ))}
-            </div>
-
-            <div className="bg-white border border-neutral-200 p-6">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500 mb-2 block">Total Revenue Handled</span>
-                <span className="text-3xl font-serif">GH₵ {totalRevenue.toFixed(2)}</span>
-            </div>
-
-            {/* Orders table */}
-            <div className="bg-white border border-neutral-200">
-                <div className="px-8 py-5 border-b border-neutral-100 flex items-center justify-between">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest">Assigned Orders</h2>
-                    <span className="text-xs text-neutral-400">{orders.length} orders</span>
+                <div className="ac-kpi">
+                    <span className="ac-kpi-label">Revenue Handled</span>
+                    <span className="ac-kpi-value"><span className="ac-kpi-ccy">GH₵ </span>{totalRevenue.toFixed(2)}</span>
                 </div>
+            </div>
 
+            <div className="ac-card flush">
+                <div className="ac-card-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span className="ac-card-title">Assigned Orders</span>
+                    <span style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{orders.length} orders</span>
+                </div>
                 {orders.length === 0 ? (
-                    <div className="px-8 py-16 text-center text-neutral-400 italic font-serif text-sm">
-                        No orders assigned to this rider yet.
+                    <div className="ac-empty">
+                        <p className="ac-empty-title">No orders assigned to this rider yet.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-neutral-50 border-b border-neutral-100">
+                    <div className="ac-table-wrap">
+                        <table className="ac-table">
+                            <thead>
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Order</th>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Customer</th>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Phone</th>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Address</th>
-                                    <th className="px-6 py-3 text-right text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Amount</th>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Status</th>
-                                    <th className="px-6 py-3 text-left text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Date</th>
-                                    <th className="px-6 py-3"></th>
+                                    <th>Order</th>
+                                    <th>Customer</th>
+                                    <th>Phone</th>
+                                    <th>Address</th>
+                                    <th className="r">Amount</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th style={{ width: 60 }}></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-neutral-50">
+                            <tbody>
                                 {orders.map(o => {
-                                    const ref = o.id.substring(0, 8).toUpperCase();
+                                    const ref  = o.id.substring(0, 8).toUpperCase();
                                     const addr = (o.shipping_address as any)?.text || (o.shipping_address as any)?.city || "—";
-                                    const statusStyle = STATUS_STYLES[o.status] || "bg-neutral-100 text-neutral-500";
+                                    const badgeClass = STATUS_BADGE[o.status] || "ac-badge ac-badge-inactive";
                                     return (
-                                        <tr key={o.id} className="hover:bg-neutral-50 transition-colors">
-                                            <td className="px-6 py-4 font-mono text-xs text-neutral-600">#{ref}</td>
-                                            <td className="px-6 py-4 text-neutral-800">{o.customer_name || o.customer_email || "—"}</td>
-                                            <td className="px-6 py-4 text-neutral-500 text-xs">{o.customer_phone || "—"}</td>
-                                            <td className="px-6 py-4 text-neutral-500 text-xs max-w-[200px] truncate">{addr}</td>
-                                            <td className="px-6 py-4 text-right font-medium">GH₵ {Number(o.total_amount).toFixed(2)}</td>
-                                            <td className="px-6 py-4">
-                                                <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded font-semibold ${statusStyle}`}>
-                                                    {o.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-neutral-400 text-xs">
-                                                {new Date(o.created_at).toLocaleDateString("en-GB")}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <Link href={`/sales/orders/${o.id}`}
-                                                    className="text-[10px] uppercase tracking-widest text-neutral-400 hover:text-black transition-colors">
-                                                    View →
-                                                </Link>
+                                        <tr key={o.id}>
+                                            <td style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-3)" }}>#{ref}</td>
+                                            <td style={{ fontWeight: 500 }}>{o.customer_name || o.customer_email || "—"}</td>
+                                            <td style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>{o.customer_phone || "—"}</td>
+                                            <td style={{ fontSize: 11, color: "var(--ac-ink-4)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{addr}</td>
+                                            <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500 }}>GH₵ {Number(o.total_amount).toFixed(2)}</td>
+                                            <td><span className={badgeClass}>{o.status}</span></td>
+                                            <td style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{new Date(o.created_at).toLocaleDateString("en-GB")}</td>
+                                            <td>
+                                                <Link href={`/sales/orders/${o.id}`} className="ac-text-link" style={{ fontSize: 11 }}>View →</Link>
                                             </td>
                                         </tr>
                                     );
@@ -146,6 +136,6 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                     </div>
                 )}
             </div>
-        </div>
+        </>
     );
 }

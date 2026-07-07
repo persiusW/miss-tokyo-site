@@ -2,38 +2,31 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { Calendar, TrendingUp, BarChart2, FileText, Lightbulb } from "lucide-react";
 import { RevenueLineChart, OrdersBarChart, TopItemsList, type DailyPoint, type TopItem } from "./HighlightsTab";
 import { SalesByItemTable, SalesByVariantTable, SalesBySourceTable, DiscountPerformanceTable, type ItemRow, type VariantRow, type SourceRow, type DiscountRow } from "./ReportsTab";
 import { TrafficTab, type HourlyPoint, type WeekdayPoint, type RegionRow, type NewCustomerPoint, type DemandSignals } from "./TrafficTab";
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-// After dual-status migration, filter by payment_status directly in the query.
-// REVENUE_STATUSES is no longer needed for the primary filter.
-// const REVENUE_STATUSES = ["paid", "packed", "processing", "ready for pickup", "shipped", "fulfilled", "delivered"];
 
 type Preset = "today" | "yesterday" | "7d" | "30d" | "ytd" | "custom";
 type Tab = "highlights" | "traffic" | "reports" | "insights";
 
 const PRESETS: { key: Preset; label: string }[] = [
-    { key: "today", label: "Today" },
+    { key: "today",     label: "Today" },
     { key: "yesterday", label: "Yesterday" },
-    { key: "7d", label: "Past 7 Days" },
-    { key: "30d", label: "Past 30 Days" },
-    { key: "ytd", label: "Year to Date" },
-    { key: "custom", label: "Custom" },
+    { key: "7d",        label: "Past 7 Days" },
+    { key: "30d",       label: "Past 30 Days" },
+    { key: "ytd",       label: "Year to Date" },
+    { key: "custom",    label: "Custom" },
 ];
 
-const TABS: { key: Tab; label: string; Icon: any }[] = [
-    { key: "highlights", label: "Highlights", Icon: TrendingUp },
-    { key: "traffic", label: "Traffic", Icon: BarChart2 },
-    { key: "reports", label: "Reports", Icon: FileText },
-    { key: "insights", label: "Insights", Icon: Lightbulb },
+const TABS: { key: Tab; label: string }[] = [
+    { key: "highlights", label: "Highlights" },
+    { key: "traffic",    label: "Traffic" },
+    { key: "reports",    label: "Reports" },
+    { key: "insights",  label: "Insights" },
 ];
 
 function getPresetRange(preset: Preset): { start: Date; end: Date } {
     const now = new Date();
-    // Use UTC midnight so date boundaries match Supabase's UTC-stored timestamps
     const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     switch (preset) {
         case "today":
@@ -72,91 +65,9 @@ function toInputDate(d: Date) {
     return d.toISOString().substring(0, 10);
 }
 
-// ─── Aggregation helpers ──────────────────────────────────────────────────────
 type RawOrder = { id: string; status: string; payment_status?: string; total_amount: number; items: any; created_at: string; customer_email?: string; customer_name?: string; source?: string; discount_code?: string | null; discount_amount?: number | null; auto_discount_title?: string | null; paystack_reference?: string | null; shipping_address?: any };
 
-// function aggregateData(orders: RawOrder[], allOrders: RawOrder[]) {
-//     // const revenueOrders = orders.filter(o => REVENUE_STATUSES.includes(o.status));
-
-//     // Revenue by date
-//     const revByDate: Record<string, number> = {};
-//     for (const o of revenueOrders) {
-//         const d = o.created_at.substring(0, 10);
-//         revByDate[d] = (revByDate[d] ?? 0) + Number(o.total_amount ?? 0);
-//     }
-//     const revenueChart: DailyPoint[] = Object.entries(revByDate)
-//         .sort(([a], [b]) => a.localeCompare(b))
-//         .map(([date, value]) => ({ date: fmtDate(date), value: Math.round(value * 100) / 100 }));
-
-//     // Orders by date (all statuses)
-//     const ordByDate: Record<string, number> = {};
-//     for (const o of allOrders) {
-//         const d = o.created_at.substring(0, 10);
-//         ordByDate[d] = (ordByDate[d] ?? 0) + 1;
-//     }
-//     const ordersChart: DailyPoint[] = Object.entries(ordByDate)
-//         .sort(([a], [b]) => a.localeCompare(b))
-//         .map(([date, value]) => ({ date: fmtDate(date), value }));
-
-//     // Top items + sales by item/variant
-//     const itemMap: Record<string, ItemRow> = {};
-//     const variantMap: Record<string, VariantRow> = {};
-
-//     // for (const order of revenueOrders) {
-//     //     const items: any[] = Array.isArray(order.items) ? order.items : [];
-//     //     const lineSum = items.reduce((s: number, i: any) => s + Number(i.price ?? 0) * Number(i.quantity ?? 1), 0);
-//     for (const order of revenueOrders) {
-//         // BULLETPROOF JSON PARSING: Handles strings, arrays, and nested objects
-//         let items: any[] = [];
-//         try {
-//             const rawItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
-//             // Sometimes it's saved as an array directly
-//             if (Array.isArray(rawItems)) {
-//                 items = rawItems;
-//             }
-//             // Sometimes it's nested inside a property like { items: [] } or { products: [] }
-//             else if (rawItems && typeof rawItems === 'object') {
-//                 items = rawItems.items || rawItems.products || rawItems.cart || [];
-//             }
-//         } catch (e) {
-//             console.error("Failed to parse order items:", e);
-//         }
-
-//         const lineSum = items.reduce((s: number, i: any) => s + Number(i.price ?? 0) * Number(i.quantity ?? 1), 0);
-//         for (const item of items) {
-//             const qty = Number(item.quantity ?? 1);
-//             const lineAmt = Number(item.price ?? 0) * qty;
-//             const share = lineSum > 0 ? lineAmt / lineSum : 1 / items.length;
-//             const rev = Number(order.total_amount ?? 0) * share;
-//             const iKey = item.productId || item.name || "Unknown";
-//             const name = item.name || iKey.substring(0, 20) || "Unknown";
-
-//             if (!itemMap[iKey]) itemMap[iKey] = { name, productId: iKey, units: 0, revenue: 0 };
-//             itemMap[iKey].units += qty;
-//             itemMap[iKey].revenue += rev;
-
-//             const size = item.size || "";
-//             const color = item.color || "";
-//             const vKey = `${iKey}|${size}|${color}`;
-//             if (!variantMap[vKey]) variantMap[vKey] = { name, productId: iKey, size, color, units: 0, revenue: 0 };
-//             variantMap[vKey].units += qty;
-//             variantMap[vKey].revenue += rev;
-//         }
-//     }
-
-//     const topItems: TopItem[] = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-//     const itemRows: ItemRow[] = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue);
-//     const variantRows: VariantRow[] = Object.values(variantMap).sort((a, b) => b.revenue - a.revenue);
-
-//     const totalRevenue = revenueOrders.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
-//     const itemsSold = revenueOrders.flatMap(o => Array.isArray(o.items) ? o.items : [])
-//         .reduce((s: number, i: any) => s + (Number(i.quantity) || 1), 0);
-
-//     return { revenueChart, ordersChart, topItems, itemRows, variantRows, totalRevenue, itemsSold };
-// }
-
 function aggregateData(revenueOrders: RawOrder[], allOrders: RawOrder[]) {
-    // 1. THE FIX: Force parse the database strings into real arrays
     for (const o of revenueOrders) {
         if (typeof o.items === "string") {
             try { o.items = JSON.parse(o.items); } catch (e) { o.items = []; }
@@ -170,7 +81,6 @@ function aggregateData(revenueOrders: RawOrder[], allOrders: RawOrder[]) {
         if (!Array.isArray(o.items)) o.items = [];
     }
 
-    // 2. Revenue by date
     const revByDate: Record<string, number> = {};
     for (const o of revenueOrders) {
         const d = o.created_at.substring(0, 10);
@@ -180,7 +90,6 @@ function aggregateData(revenueOrders: RawOrder[], allOrders: RawOrder[]) {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, value]) => ({ date: fmtDate(date), value: Math.round(value * 100) / 100 }));
 
-    // 3. Orders by date (all statuses)
     const ordByDate: Record<string, number> = {};
     for (const o of allOrders) {
         const d = o.created_at.substring(0, 10);
@@ -190,12 +99,11 @@ function aggregateData(revenueOrders: RawOrder[], allOrders: RawOrder[]) {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, value]) => ({ date: fmtDate(date), value }));
 
-    // 4. Top items + sales by item/variant
     const itemMap: Record<string, ItemRow> = {};
     const variantMap: Record<string, VariantRow> = {};
 
     for (const order of revenueOrders) {
-        const items = order.items; // This is safely guaranteed to be an array now!
+        const items = order.items;
         const lineSum = items.reduce((s: number, i: any) => s + Number(i.price ?? 0) * Number(i.quantity ?? 1), 0);
 
         for (const item of items) {
@@ -225,15 +133,12 @@ function aggregateData(revenueOrders: RawOrder[], allOrders: RawOrder[]) {
     const variantRows: VariantRow[] = Object.values(variantMap).sort((a, b) => b.revenue - a.revenue);
 
     const totalRevenue = revenueOrders.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
-
-    // 5. Items Sold calculation (This will now properly count the items!)
     const itemsSold = revenueOrders.flatMap(o => o.items)
         .reduce((s: number, i: any) => s + (Number(i.quantity) || 1), 0);
 
     return { revenueChart, ordersChart, topItems, itemRows, variantRows, totalRevenue, itemsSold };
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AnalyticsPage() {
     const [activeTab, setActiveTab] = useState<Tab>("highlights");
     const [preset, setPreset] = useState<Preset>("30d");
@@ -250,7 +155,6 @@ export default function AnalyticsPage() {
     const [totalOrders, setTotalOrders] = useState(0);
     const [paidOrdersCount, setPaidOrdersCount] = useState(0);
 
-    // Reports + Traffic
     const [sourceRows, setSourceRows] = useState<SourceRow[]>([]);
     const [discountRows, setDiscountRows] = useState<DiscountRow[]>([]);
     const [hourlyOrders, setHourlyOrders] = useState<HourlyPoint[]>([]);
@@ -271,62 +175,7 @@ export default function AnalyticsPage() {
         ? { start: new Date(customStart), end: new Date(customEnd + "T23:59:59") }
         : getPresetRange(preset);
 
-    const dateLabel = preset === "custom"
-        ? `${customStart}_${customEnd}`
-        : preset;
-
-    // const fetchData = useCallback(async () => {
-    //     setLoading(true);
-    //     const { start, end } = dateRange;
-
-    //     const { data: allOrders } = await supabase
-    //         .from("orders")
-    //         .select("id, status, total_amount, items, created_at, customer_email, customer_name")
-    //         .gte("created_at", start.toISOString())
-    //         .lte("created_at", end.toISOString())
-    //         .order("created_at");
-
-    //     const rows = (allOrders ?? []) as RawOrder[];
-    //     const revenueRows = rows.filter(o => REVENUE_STATUSES.includes(o.status));
-
-    //     const agg = aggregateData(revenueRows, rows);
-    //     setRevenueChart(agg.revenueChart);
-    //     setOrdersChart(agg.ordersChart);
-    //     setTopItems(agg.topItems);
-    //     setItemRows(agg.itemRows);
-    //     setVariantRows(agg.variantRows);
-    //     setTotalRevenue(agg.totalRevenue);
-    //     setItemsSold(agg.itemsSold);
-    //     setTotalOrders(rows.length);
-    //     // Compute customer insights
-    //     const revenueRowsForInsights = rows.filter(o => REVENUE_STATUSES.includes(o.status));
-    //     const customerMap: Record<string, { name: string; orders: number; revenue: number }> = {};
-    //     for (const o of revenueRowsForInsights) {
-    //         const email = o.customer_email || "unknown";
-    //         if (!customerMap[email]) customerMap[email] = { name: o.customer_name || email, orders: 0, revenue: 0 };
-    //         customerMap[email].orders += 1;
-    //     }
-    //     for (const o of revenueRowsForInsights) {
-    //         const email = o.customer_email || "unknown";
-    //         if (customerMap[email]) customerMap[email].revenue += Number(o.total_amount ?? 0);
-    //     }
-    //     const allCustomers = Object.entries(customerMap);
-    //     const uniqueCustomers = allCustomers.length;
-    //     const repeatBuyers = allCustomers.filter(([, v]) => v.orders > 1).length;
-    //     const totalRevForAvg = allCustomers.reduce((s, [, v]) => s + v.revenue, 0);
-    //     setInsightsData({
-    //         uniqueCustomers,
-    //         repeatBuyers,
-    //         repeatRate: uniqueCustomers > 0 ? Math.round((repeatBuyers / uniqueCustomers) * 100) : 0,
-    //         topCustomers: allCustomers
-    //             .sort(([, a], [, b]) => b.orders - a.orders)
-    //             .slice(0, 5)
-    //             .map(([email, v]) => ({ email, name: v.name, orders: v.orders, revenue: v.revenue })),
-    //         avgRevenuePerCustomer: uniqueCustomers > 0 ? totalRevForAvg / uniqueCustomers : 0,
-    //     });
-    //     setLoading(false);
-    //     // eslint-disable-next-line react-hooks/exhaustive-deps
-    // }, [preset, customStart, customEnd]);
+    const dateLabel = preset === "custom" ? `${customStart}_${customEnd}` : preset;
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -334,7 +183,6 @@ export default function AnalyticsPage() {
 
         const SELECT_FIELDS = "id, status, payment_status, total_amount, items, created_at, customer_email, customer_name, source, discount_code, discount_amount, auto_discount_title, paystack_reference, shipping_address";
 
-        // Fetch all orders (for order-count + traffic patterns)
         const { data: allOrders } = await supabase
             .from("orders")
             .select(SELECT_FIELDS)
@@ -342,7 +190,6 @@ export default function AnalyticsPage() {
             .lte("created_at", end.toISOString())
             .order("created_at");
 
-        // Demand signals: newsletter signups + bespoke inquiries in this period
         const [{ count: newsletterCount }, { count: inquiryCount }] = await Promise.all([
             supabase.from("newsletter_subs").select("id", { count: "exact", head: true })
                 .gte("created_at", start.toISOString())
@@ -354,8 +201,6 @@ export default function AnalyticsPage() {
 
         const rows = (allOrders ?? []) as RawOrder[];
 
-        // Revenue orders: prefer payment_status='paid'; fall back to legacy status
-        // for orders created before the dual-status migration (payment_status may be null).
         const LEGACY_PAID = ["paid", "processing", "fulfilled", "delivered", "packed", "ready_for_pickup", "shipped"];
         const revenueRows = rows.filter(o =>
             o.payment_status === "paid" ||
@@ -373,9 +218,6 @@ export default function AnalyticsPage() {
         setTotalOrders(rows.length);
         setPaidOrdersCount(revenueRows.length);
 
-        // ── Traffic & Reports aggregations ─────────────────────────────────
-
-        // Peak ordering hours (0–23, from all orders)
         const hourMap: Record<number, number> = {};
         for (const o of rows) {
             const h = new Date(o.created_at).getHours();
@@ -388,19 +230,16 @@ export default function AnalyticsPage() {
             }))
         );
 
-        // Peak ordering days (Mon–Sun, from all orders)
         const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         const dayMap: Record<number, number> = {};
         for (const o of rows) {
             const d = new Date(o.created_at).getDay();
             dayMap[d] = (dayMap[d] ?? 0) + 1;
         }
-        // Reorder Mon–Sun
         setWeekdayOrders(
             [1, 2, 3, 4, 5, 6, 0].map(d => ({ day: DAY_LABELS[d], value: dayMap[d] ?? 0 }))
         );
 
-        // New customer acquisition (first order per email per day, from all orders)
         const seenEmails = new Set<string>();
         const newCustByDate: Record<string, number> = {};
         for (const o of rows) {
@@ -416,7 +255,6 @@ export default function AnalyticsPage() {
             Object.entries(newCustByDate).map(([date, value]) => ({ date, value }))
         );
 
-        // Sales by source (all orders for counts, paid orders for revenue)
         const srcMap: Record<string, { orders: number; revenue: number }> = {};
         for (const o of rows) {
             const s = o.source || "storefront";
@@ -434,12 +272,10 @@ export default function AnalyticsPage() {
                 .sort((a, b) => b.revenue - a.revenue)
         );
 
-        // Discount performance (paid orders only) — with order-level details
         const discMap: Record<string, { name: string; type: string; uses: number; savings: number; revenue: number; orders: { orderId: string; reference: string | null; customer: string; amount: number; date: string }[] }> = {};
         for (const o of revenueRows) {
             if (!o.discount_code) continue;
             const code = o.discount_code.toUpperCase();
-            // auto_discount_title is set on the order for automatic discounts; null/absent = manual coupon
             const isAuto = !!o.auto_discount_title;
             const name = isAuto ? o.auto_discount_title! : code;
             if (!discMap[code]) discMap[code] = { name, type: isAuto ? "automatic" : "coupon", uses: 0, savings: 0, revenue: 0, orders: [] };
@@ -462,7 +298,6 @@ export default function AnalyticsPage() {
                 .sort((a, b) => b.revenue - a.revenue)
         );
 
-        // Geographic breakdown from shipping_address.region
         const regionMap: Record<string, number> = {};
         for (const o of rows) {
             const addr = (o as any).shipping_address;
@@ -477,7 +312,6 @@ export default function AnalyticsPage() {
                 .sort((a, b) => b.orders - a.orders)
         );
 
-        // Demand signals
         const uniqueCusts = new Set(revenueRows.map(o => (o.customer_email || "").toLowerCase().trim()).filter(Boolean));
         const custOrderCounts: Record<string, number> = {};
         for (const o of revenueRows) {
@@ -492,14 +326,9 @@ export default function AnalyticsPage() {
             repeatBuyers: repeatBuyerCount,
         });
 
-        // BULLETPROOF INSIGHTS CALCULATION
         const customerMap: Record<string, { name: string; orders: number; revenue: number }> = {};
-
-        // Notice we are iterating over revenueRows here, NOT rows!
         for (const o of revenueRows) {
-            // Lowercase the email so capitalization doesn't create duplicate users
             const email = (o.customer_email || "unknown").toLowerCase().trim();
-
             if (!customerMap[email]) {
                 customerMap[email] = { name: o.customer_name || email, orders: 0, revenue: 0 };
             }
@@ -512,23 +341,11 @@ export default function AnalyticsPage() {
         const repeatBuyers = allCustomers.filter(([, v]) => v.orders > 1).length;
         const totalRevForAvg = allCustomers.reduce((s, [, v]) => s + v.revenue, 0);
 
-        // setInsightsData({
-        //     uniqueCustomers,
-        //     repeatBuyers,
-        //     repeatRate: uniqueCustomers > 0 ? Math.round((repeatBuyers / uniqueCustomers) * 100) : 0,
-        //     topCustomers: allCustomers
-        //         .sort(([, a], [, b]) => b.orders - a.orders)
-        //         .slice(0, 5)
-        //         .map(([email, v]) => ({ email, name: v.name, orders: v.orders, revenue: v.revenue })),
-        //     avgRevenuePerCustomer: uniqueCustomers > 0 ? totalRevForAvg / uniqueCustomers : 0,
-        // });
-
         setInsightsData({
             uniqueCustomers,
             repeatBuyers,
             repeatRate: uniqueCustomers > 0 ? Math.round((repeatBuyers / uniqueCustomers) * 100) : 0,
             topCustomers: allCustomers
-                // FIX: Now sorts by Total Revenue instead of Order Count!
                 .sort(([, a], [, b]) => b.revenue - a.revenue)
                 .slice(0, 5)
                 .map(([email, v]) => ({ email, name: v.name, orders: v.orders, revenue: v.revenue })),
@@ -541,65 +358,62 @@ export default function AnalyticsPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    // const avgOrder = totalOrders > 0
-    //     ? (totalRevenue / revenueChart.reduce((s, d) => s + (d.value > 0 ? 1 : 0), 0) || totalRevenue)
-    //     : 0;
-
     const avgOrder = paidOrdersCount > 0 ? (totalRevenue / paidOrdersCount) : 0;
 
     const kpis = [
-        { label: "Revenue", value: `GH₵ ${totalRevenue.toFixed(2)}` },
-        { label: "Orders", value: String(totalOrders) },
-        { label: "Items Sold", value: String(itemsSold) },
-        // { label: "Avg. Order", value: `GH₵ ${totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : "0.00"}` },
-        { label: "Avg. Order", value: `GH₵ ${avgOrder.toFixed(2)}` },
+        { label: "Revenue",    value: `GH₵ ${totalRevenue.toFixed(2)}`, sub: "Paid orders" },
+        { label: "Orders",     value: String(totalOrders),               sub: "All statuses" },
+        { label: "Items Sold", value: String(itemsSold),                 sub: "Paid orders" },
+        { label: "Avg. Order", value: `GH₵ ${avgOrder.toFixed(2)}`,     sub: "Per paid order" },
     ];
 
     return (
-        <div className="space-y-8">
-            <header>
-                <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Analytics</h1>
-                <p className="text-neutral-500">Revenue performance, order flow, and product insights.</p>
-            </header>
+        <>
+            {/* Page heading */}
+            <div className="ac-page-head">
+                <div>
+                    <h1 className="ac-page-h1">Analytics</h1>
+                    <p className="ac-page-sub">Revenue performance, order flow, and product insights.</p>
+                </div>
+            </div>
 
             {/* Date Range Picker */}
-            <div className="bg-white rounded-2xl shadow-sm p-5">
-                <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <Calendar size={14} className="text-neutral-400" />
-                    <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400">Date Range</span>
+            <div className="ac-card" style={{ padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ac-ink-4)" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Date Range</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {PRESETS.map(p => (
                         <button
                             key={p.key}
                             onClick={() => setPreset(p.key)}
-                            className={`px-4 py-2 text-[11px] uppercase tracking-widest font-semibold rounded-lg transition-all ${preset === p.key
-                                ? "bg-black text-white"
-                                : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
-                                }`}
+                            className={`ac-btn ac-btn-sm ${preset === p.key ? "ac-btn-primary" : "ac-btn-ghost"}`}
                         >
                             {p.label}
                         </button>
                     ))}
                 </div>
                 {preset === "custom" && (
-                    <div className="flex items-center gap-4 mt-4 pt-4 border-t border-neutral-100">
-                        <div className="flex items-center gap-2">
-                            <label className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 whitespace-nowrap">From</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--ac-line)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)", whiteSpace: "nowrap" }}>From</label>
                             <input
                                 type="date"
                                 value={customStart}
                                 onChange={e => setCustomStart(e.target.value)}
-                                className="border-b border-neutral-300 bg-transparent py-1 px-2 outline-none focus:border-black text-sm transition-colors"
+                                className="ac-input"
+                                style={{ width: "auto" }}
                             />
                         </div>
-                        <div className="flex items-center gap-2">
-                            <label className="text-[10px] uppercase tracking-widest font-semibold text-neutral-400 whitespace-nowrap">To</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <label style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)", whiteSpace: "nowrap" }}>To</label>
                             <input
                                 type="date"
                                 value={customEnd}
                                 onChange={e => setCustomEnd(e.target.value)}
-                                className="border-b border-neutral-300 bg-transparent py-1 px-2 outline-none focus:border-black text-sm transition-colors"
+                                className="ac-input"
+                                style={{ width: "auto" }}
                             />
                         </div>
                     </div>
@@ -607,50 +421,55 @@ export default function AnalyticsPage() {
             </div>
 
             {/* KPI Strip */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {kpis.map(({ label, value }) => (
-                    <div key={label} className="bg-white rounded-2xl shadow-sm p-5">
-                        <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold block mb-3">{label}</span>
-                        <span className="text-2xl font-serif text-neutral-900">
-                            {loading ? <span className="inline-block w-20 h-6 bg-neutral-100 rounded animate-pulse" /> : value}
-                        </span>
+            <div className="ac-kpi-grid">
+                {kpis.map(({ label, value, sub }) => (
+                    <div key={label} className="ac-kpi">
+                        <div className="ac-kpi-label">{label}</div>
+                        <div className="ac-kpi-value">
+                            {loading
+                                ? <span style={{ display: "inline-block", width: 80, height: 28, background: "var(--ac-panel-2)", borderRadius: "var(--r-sm)", animation: "pulse 1.5s infinite" }} />
+                                : value}
+                        </div>
+                        <div className="ac-kpi-sub">{sub}</div>
                     </div>
                 ))}
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex gap-1 bg-white rounded-2xl shadow-sm p-1.5">
-                {TABS.map(({ key, label, Icon }) => (
+            <div className="ac-tabs">
+                {TABS.map(({ key, label }) => (
                     <button
                         key={key}
                         onClick={() => setActiveTab(key)}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-widest transition-all ${activeTab === key
-                            ? "bg-black text-white shadow-sm"
-                            : "text-neutral-400 hover:text-black"
-                            }`}
+                        className={`ac-tab ${activeTab === key ? "active" : ""}`}
                     >
-                        <Icon size={13} />
-                        <span className="hidden sm:inline">{label}</span>
+                        {label}
                     </button>
                 ))}
             </div>
 
             {/* Tab Content */}
             {activeTab === "highlights" && (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white rounded-2xl shadow-sm p-6">
-                            <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Total Revenue over Time</h2>
-                            {loading ? <div className="h-[220px] bg-neutral-50 rounded-xl animate-pulse" /> : <RevenueLineChart data={revenueChart} />}
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                        <div className="ac-card" style={{ padding: 24 }}>
+                            <h2 className="ac-card-title" style={{ marginBottom: 20 }}>Total Revenue over Time</h2>
+                            {loading
+                                ? <div style={{ height: 220, background: "var(--ac-panel-2)", borderRadius: "var(--r-md)" }} />
+                                : <RevenueLineChart data={revenueChart} />}
                         </div>
-                        <div className="bg-white rounded-2xl shadow-sm p-6">
-                            <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Orders over Time</h2>
-                            {loading ? <div className="h-[220px] bg-neutral-50 rounded-xl animate-pulse" /> : <OrdersBarChart data={ordersChart} />}
+                        <div className="ac-card" style={{ padding: 24 }}>
+                            <h2 className="ac-card-title" style={{ marginBottom: 20 }}>Orders over Time</h2>
+                            {loading
+                                ? <div style={{ height: 220, background: "var(--ac-panel-2)", borderRadius: "var(--r-md)" }} />
+                                : <OrdersBarChart data={ordersChart} />}
                         </div>
                     </div>
-                    <div className="bg-white rounded-2xl shadow-sm p-6">
-                        <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Top Selling Items</h2>
-                        {loading ? <div className="h-40 bg-neutral-50 rounded-xl animate-pulse" /> : <TopItemsList items={topItems} />}
+                    <div className="ac-card" style={{ padding: 24 }}>
+                        <h2 className="ac-card-title" style={{ marginBottom: 20 }}>Top Selling Items</h2>
+                        {loading
+                            ? <div style={{ height: 160, background: "var(--ac-panel-2)", borderRadius: "var(--r-md)" }} />
+                            : <TopItemsList items={topItems} />}
                     </div>
                 </div>
             )}
@@ -668,13 +487,13 @@ export default function AnalyticsPage() {
             )}
 
             {activeTab === "reports" && (
-                <div className="space-y-4">
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     {loading ? (
-                        <div className="space-y-4">
+                        <>
                             {[1, 2, 3, 4].map(i => (
-                                <div key={i} className="bg-white rounded-2xl shadow-sm h-16 animate-pulse" />
+                                <div key={i} className="ac-card" style={{ height: 64 }} />
                             ))}
-                        </div>
+                        </>
                     ) : (
                         <>
                             <SalesByItemTable items={itemRows} dateLabel={dateLabel} />
@@ -687,60 +506,65 @@ export default function AnalyticsPage() {
             )}
 
             {activeTab === "insights" && (
-                <div className="space-y-6">
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     {loading || !insightsData ? (
-                        <div className="bg-white rounded-2xl shadow-sm h-48 animate-pulse" />
+                        <div className="ac-card" style={{ height: 192 }} />
                     ) : (
                         <>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="ac-kpi-grid">
                                 {[
-                                    { label: "Unique Customers", value: String(insightsData.uniqueCustomers) },
-                                    { label: "Repeat Buyers", value: String(insightsData.repeatBuyers) },
-                                    { label: "Repeat Rate", value: `${insightsData.repeatRate}%` },
-                                    { label: "Avg Rev / Customer", value: `GH₵ ${insightsData.avgRevenuePerCustomer.toFixed(2)}` },
+                                    { label: "Unique Customers",    value: String(insightsData.uniqueCustomers) },
+                                    { label: "Repeat Buyers",       value: String(insightsData.repeatBuyers) },
+                                    { label: "Repeat Rate",         value: `${insightsData.repeatRate}%` },
+                                    { label: "Avg Rev / Customer",  value: `GH₵ ${insightsData.avgRevenuePerCustomer.toFixed(2)}` },
                                 ].map(({ label, value }) => (
-                                    <div key={label} className="bg-white rounded-2xl shadow-sm p-5">
-                                        <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-semibold block mb-3">{label}</span>
-                                        <span className="text-2xl font-serif text-neutral-900">{value}</span>
+                                    <div key={label} className="ac-kpi">
+                                        <div className="ac-kpi-label">{label}</div>
+                                        <div className="ac-kpi-value">{value}</div>
                                     </div>
                                 ))}
                             </div>
                             {insightsData.topCustomers.length > 0 && (
-                                <div className="bg-white rounded-2xl shadow-sm p-6">
-                                    <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6">Top Customers by Revenue</h2>
-                                    <table className="w-full text-left text-sm">
-                                        <thead>
-                                            <tr className="border-b border-neutral-100">
-                                                <th className="pb-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold">Customer</th>
-                                                <th className="pb-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold text-right">Orders</th>
-                                                <th className="pb-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold text-right">Revenue</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-neutral-50">
-                                            {insightsData.topCustomers.map((c, i) => (
-                                                <tr key={i} className="hover:bg-neutral-50 transition-colors">
-                                                    <td className="py-3">
-                                                        <div className="font-medium text-neutral-900">{c.name !== c.email ? c.name : "—"}</div>
-                                                        <div className="text-[11px] text-neutral-400 font-mono">{c.email}</div>
-                                                    </td>
-                                                    <td className="py-3 text-right font-semibold text-neutral-800">{c.orders}</td>
-                                                    <td className="py-3 text-right font-mono text-neutral-700">GH₵ {c.revenue.toFixed(2)}</td>
+                                <div className="ac-card flush">
+                                    <div className="ac-card-head" style={{ padding: "16px 20px 0" }}>
+                                        <h2 className="ac-card-title">Top Customers by Revenue</h2>
+                                    </div>
+                                    <div className="ac-table-wrap">
+                                        <table className="ac-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Customer</th>
+                                                    <th className="r">Orders</th>
+                                                    <th className="r">Revenue</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                {insightsData.topCustomers.map((c, i) => (
+                                                    <tr key={i}>
+                                                        <td>
+                                                            <div style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{c.name !== c.email ? c.name : "—"}</div>
+                                                            <div style={{ fontSize: 11, color: "var(--ac-ink-4)", fontFamily: "var(--f-mono)" }}>{c.email}</div>
+                                                        </td>
+                                                        <td className="r" style={{ fontWeight: 600 }}>{c.orders}</td>
+                                                        <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12 }}>GH₵ {c.revenue.toFixed(2)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             )}
                             {insightsData.uniqueCustomers === 0 && (
-                                <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
-                                    <Lightbulb size={40} className="mx-auto text-neutral-200 mb-4" />
-                                    <p className="text-neutral-400 italic font-serif">No order data for this period.</p>
+                                <div className="ac-card" style={{ padding: 48, textAlign: "center" }}>
+                                    <div className="ac-empty">
+                                        <div className="ac-empty-title">No order data for this period.</div>
+                                    </div>
                                 </div>
                             )}
                         </>
                     )}
                 </div>
             )}
-        </div>
+        </>
     );
 }

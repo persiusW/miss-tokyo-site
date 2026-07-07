@@ -21,10 +21,14 @@ const TOPICS = ["All", "Order help", "Size & fit", "Returns", "Delivery", "Colla
 const STATUSES = ["All", "Unread", "Read", "Replied"] as const;
 const PAGE_SIZE = 25;
 
-const STATUS_BADGE: Record<string, { dot: string; label: string }> = {
-    unread:  { dot: "bg-amber-400",  label: "Unread" },
-    read:    { dot: "bg-neutral-400", label: "Read" },
-    replied: { dot: "bg-green-500",  label: "Replied" },
+const STATUS_DOT: Record<string, string> = {
+    unread:  "var(--ac-warn)",
+    read:    "var(--ac-ink-4)",
+    replied: "var(--ac-accent)",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+    unread: "Unread", read: "Read", replied: "Replied",
 };
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -93,7 +97,6 @@ export default function FormSubmissionsPage() {
         fetchUnread();
     }, [fetchRows, fetchUnread]);
 
-    // Refresh unread count every 60 seconds
     useEffect(() => {
         refreshRef.current = setInterval(fetchUnread, 60_000);
         const onFocus = () => fetchUnread();
@@ -104,7 +107,6 @@ export default function FormSubmissionsPage() {
         };
     }, [fetchUnread]);
 
-    // Reset page when filters change
     useEffect(() => { setPage(0); }, [topicFilter, statusFilter, debouncedSearch]);
 
     const openPanel = async (row: Submission) => {
@@ -138,222 +140,172 @@ export default function FormSubmissionsPage() {
     const totalPages = Math.ceil(total / PAGE_SIZE);
 
     return (
-        <div className="space-y-8">
-            <header className="flex items-center justify-between gap-4">
+        <>
+            <div className="ac-page-head">
                 <div>
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-1 flex items-center gap-3">
+                    <h1 className="ac-page-h1" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         Form Submissions
                         {unreadCount > 0 && (
-                            <span className="text-sm font-sans font-semibold bg-amber-400 text-white px-2 py-0.5 rounded-full tracking-normal">
-                                {unreadCount} unread
-                            </span>
+                            <span className="ac-badge ac-badge-warn">{unreadCount} unread</span>
                         )}
                     </h1>
-                    <p className="text-neutral-500 text-sm">Contact form submissions from the public site.</p>
+                    <p className="ac-page-sub">Contact form submissions from the public site.</p>
                 </div>
-            </header>
-
-            {/* ── Filter bar ── */}
-            <div className="flex flex-wrap gap-3 items-center">
-                <input
-                    type="search"
-                    placeholder="Search name or email…"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="border border-neutral-200 bg-white px-3 py-2 text-sm focus:outline-none focus:border-black rounded-md w-56"
-                />
-                <select
-                    value={topicFilter}
-                    onChange={e => setTopicFilter(e.target.value)}
-                    className="border border-neutral-200 bg-white px-3 py-2 text-sm focus:outline-none focus:border-black rounded-md"
-                >
-                    {TOPICS.map(t => <option key={t}>{t}</option>)}
-                </select>
-                <select
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                    className="border border-neutral-200 bg-white px-3 py-2 text-sm focus:outline-none focus:border-black rounded-md"
-                >
-                    {STATUSES.map(s => <option key={s}>{s}</option>)}
-                </select>
-                <span className="text-xs text-neutral-400 ml-auto">{total} result{total !== 1 ? "s" : ""}</span>
             </div>
 
-            {/* ── Table ── */}
-            <div className="bg-white border border-neutral-200 overflow-x-auto rounded-md">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
-                        <tr>
-                            {["Date", "Name", "Email", "Topic", "Order #", "Status", "Actions"].map(h => (
-                                <th key={h} className="px-5 py-3.5 text-xs font-semibold uppercase tracking-widest text-neutral-500">
-                                    {h}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                        {loading ? (
+            {/* Filter bar */}
+            <div className="ac-card" style={{ marginBottom: 16 }}>
+                <div style={{ padding: "12px 16px", display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                    <input type="search" placeholder="Search name or email…"
+                        value={search} onChange={e => setSearch(e.target.value)}
+                        className="ac-input" style={{ width: 220 }} />
+                    <select value={topicFilter} onChange={e => setTopicFilter(e.target.value)} className="ac-select">
+                        {TOPICS.map(t => <option key={t}>{t}</option>)}
+                    </select>
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="ac-select">
+                        {STATUSES.map(s => <option key={s}>{s}</option>)}
+                    </select>
+                    <span style={{ fontSize: 11, color: "var(--ac-ink-4)", marginLeft: "auto" }}>{total} result{total !== 1 ? "s" : ""}</span>
+                </div>
+            </div>
+
+            {/* Table */}
+            <div className="ac-card flush">
+                <div className="ac-table-wrap">
+                    <table className="ac-table">
+                        <thead>
                             <tr>
-                                <td colSpan={7} className="px-5 py-12 text-center text-neutral-400 italic font-serif">
-                                    Loading…
-                                </td>
+                                <th>Date</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Topic</th>
+                                <th>Order #</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
-                        ) : rows.length === 0 ? (
-                            <tr>
-                                <td colSpan={7} className="px-5 py-12 text-center text-neutral-400 italic font-serif">
-                                    No submissions found.
-                                </td>
-                            </tr>
-                        ) : rows.map(row => {
-                            const badge = STATUS_BADGE[row.status] ?? STATUS_BADGE.read;
-                            const isUnread = row.status === "unread";
-                            return (
-                                <tr key={row.id} className={`hover:bg-neutral-50 transition-colors ${isUnread ? "font-medium" : ""}`}>
-                                    <td className="px-5 py-3.5 text-neutral-500 text-xs whitespace-nowrap">
-                                        {new Date(row.submitted_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                                    </td>
-                                    <td className="px-5 py-3.5">
-                                        <span className={isUnread ? "text-neutral-900" : "text-neutral-700"}>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan={7} className="ac-table-empty">Loading…</td></tr>
+                            ) : rows.length === 0 ? (
+                                <tr><td colSpan={7} className="ac-table-empty">No submissions found.</td></tr>
+                            ) : rows.map(row => {
+                                const isUnread = row.status === "unread";
+                                return (
+                                    <tr key={row.id} style={{ fontWeight: isUnread ? 600 : undefined }}>
+                                        <td style={{ fontSize: 11, color: "var(--ac-ink-4)", whiteSpace: "nowrap" }}>
+                                            {new Date(row.submitted_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                        </td>
+                                        <td style={{ color: isUnread ? "var(--ac-ink)" : "var(--ac-ink-2)" }}>
                                             {[row.first_name, row.last_name].filter(Boolean).join(" ")}
-                                        </span>
-                                    </td>
-                                    <td className="px-5 py-3.5 text-neutral-600">{row.email}</td>
-                                    <td className="px-5 py-3.5 text-neutral-600">{row.topic}</td>
-                                    <td className="px-5 py-3.5 text-neutral-500">{row.order_number || "—"}</td>
-                                    <td className="px-5 py-3.5">
-                                        <span className="flex items-center gap-1.5 text-xs">
-                                            <span className={`w-2 h-2 rounded-full shrink-0 ${badge.dot}`} />
-                                            {badge.label}
-                                        </span>
-                                    </td>
-                                    <td className="px-5 py-3.5">
-                                        <div className="flex items-center gap-3">
-                                            <button
-                                                onClick={() => openPanel(row)}
-                                                className="text-xs font-medium text-black hover:underline"
-                                            >
-                                                View
-                                            </button>
-                                            <a
-                                                href={`mailto:${row.email}?subject=Re: your Miss Tokyo enquiry`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-xs text-neutral-500 hover:text-black hover:underline"
-                                            >
-                                                Reply
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                                        </td>
+                                        <td style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>{row.email}</td>
+                                        <td style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>{row.topic}</td>
+                                        <td style={{ fontSize: 12, color: "var(--ac-ink-4)" }}>{row.order_number || "—"}</td>
+                                        <td>
+                                            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--ac-ink-3)" }}>
+                                                <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_DOT[row.status], flexShrink: 0 }} />
+                                                {STATUS_LABEL[row.status] ?? row.status}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                                <button onClick={() => openPanel(row)} className="ac-text-link" style={{ fontSize: 12 }}>View</button>
+                                                <a href={`mailto:${row.email}?subject=Re: your Miss Tokyo enquiry`}
+                                                    target="_blank" rel="noopener noreferrer"
+                                                    style={{ fontSize: 12, color: "var(--ac-ink-4)" }}
+                                                    onMouseEnter={e => (e.currentTarget.style.color = "var(--ac-ink)")}
+                                                    onMouseLeave={e => (e.currentTarget.style.color = "var(--ac-ink-4)")}>
+                                                    Reply
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            {/* ── Pagination ── */}
+            {/* Pagination */}
             {totalPages > 1 && (
-                <div className="flex items-center justify-between">
-                    <p className="text-xs text-neutral-500">
-                        Page {page + 1} of {totalPages}
-                    </p>
-                    <div className="flex gap-2">
-                        <button
-                            disabled={page === 0}
-                            onClick={() => setPage(p => p - 1)}
-                            className="px-3 py-1.5 text-xs border border-neutral-200 rounded-md disabled:opacity-40 hover:border-black transition-colors"
-                        >
-                            ← Prev
-                        </button>
-                        <button
-                            disabled={page >= totalPages - 1}
-                            onClick={() => setPage(p => p + 1)}
-                            className="px-3 py-1.5 text-xs border border-neutral-200 rounded-md disabled:opacity-40 hover:border-black transition-colors"
-                        >
-                            Next →
-                        </button>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+                    <p style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>Page {page + 1} of {totalPages}</p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="ac-btn ac-btn-ghost ac-btn-sm">← Prev</button>
+                        <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="ac-btn ac-btn-ghost ac-btn-sm">Next →</button>
                     </div>
                 </div>
             )}
 
-            {/* ── Slide-over panel ── */}
+            {/* Slide-over panel */}
             {selected && (
                 <>
-                    <div
-                        className="fixed inset-0 z-40 bg-black/30"
-                        onClick={() => setSelected(null)}
-                    />
-                    <aside className="fixed top-0 right-0 z-50 h-full w-full max-w-lg bg-white shadow-2xl flex flex-col">
+                    <div style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(0,0,0,.4)" }} onClick={() => setSelected(null)} />
+                    <aside style={{
+                        position: "fixed", top: 0, right: 0, zIndex: 50,
+                        height: "100%", width: "100%", maxWidth: 460,
+                        background: "var(--ac-panel)",
+                        borderLeft: "1px solid var(--ac-line)",
+                        boxShadow: "-8px 0 40px rgba(0,0,0,.25)",
+                        display: "flex", flexDirection: "column",
+                    }}>
                         {/* Panel header */}
-                        <div className="flex items-center justify-between px-6 py-5 border-b border-neutral-100 shrink-0">
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--ac-line)", flexShrink: 0 }}>
                             <div>
-                                <h2 className="font-semibold text-neutral-900">
+                                <h2 style={{ fontSize: 14, fontWeight: 600, color: "var(--ac-ink)" }}>
                                     {[selected.first_name, selected.last_name].filter(Boolean).join(" ")}
                                 </h2>
-                                <p className="text-xs text-neutral-500 mt-0.5">{selected.email}</p>
+                                <p style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2 }}>{selected.email}</p>
                             </div>
-                            <button
-                                onClick={() => setSelected(null)}
-                                className="p-2 text-neutral-400 hover:text-black transition-colors"
-                                aria-label="Close"
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            <button onClick={() => setSelected(null)}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", padding: 6 }}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
                         </div>
 
                         {/* Panel body */}
-                        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-                            {/* Meta */}
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 20 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                 {[
                                     ["Topic", selected.topic],
-                                    ["Status", STATUS_BADGE[selected.status]?.label ?? selected.status],
+                                    ["Status", STATUS_LABEL[selected.status] ?? selected.status],
                                     ["Order #", selected.order_number || "—"],
-                                    ["Submitted", new Date(selected.submitted_at).toLocaleString("en-GB", {
-                                        day: "2-digit", month: "short", year: "numeric",
-                                        hour: "2-digit", minute: "2-digit",
-                                    })],
+                                    ["Submitted", new Date(selected.submitted_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })],
                                     ...(selected.replied_at ? [["Replied", new Date(selected.replied_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric" })]] : []),
                                 ].map(([label, value]) => (
                                     <div key={label as string}>
-                                        <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-1">{label}</p>
-                                        <p className="text-neutral-800">{value}</p>
+                                        <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginBottom: 4 }}>{label}</p>
+                                        <p style={{ fontSize: 13, color: "var(--ac-ink)" }}>{value}</p>
                                     </div>
                                 ))}
                             </div>
 
-                            {/* Message */}
                             <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">Message</p>
-                                <div className="bg-neutral-50 border border-neutral-100 rounded-lg p-4 text-sm text-neutral-800 leading-relaxed whitespace-pre-wrap">
+                                <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginBottom: 8 }}>Message</p>
+                                <div style={{ background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", padding: "14px 16px", fontSize: 13, color: "var(--ac-ink-2)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
                                     {selected.message}
                                 </div>
                             </div>
                         </div>
 
                         {/* Panel footer */}
-                        <div className="shrink-0 px-6 py-4 border-t border-neutral-100 flex items-center gap-3">
+                        <div style={{ flexShrink: 0, padding: "14px 20px", borderTop: "1px solid var(--ac-line)", display: "flex", alignItems: "center", gap: 10 }}>
                             {selected.status !== "replied" && (
-                                <button
-                                    onClick={markReplied}
-                                    disabled={panelUpdating}
-                                    className="flex-1 py-2.5 bg-black text-white text-xs font-semibold uppercase tracking-widest rounded-md hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                                >
+                                <button onClick={markReplied} disabled={panelUpdating} className="ac-btn ac-btn-primary" style={{ flex: 1 }}>
                                     {panelUpdating ? "Updating…" : "Mark as Replied"}
                                 </button>
                             )}
-                            <a
-                                href={`mailto:${selected.email}?subject=Re: your Miss Tokyo enquiry`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 py-2.5 border border-neutral-200 text-xs font-semibold uppercase tracking-widest rounded-md hover:border-black text-center transition-colors"
-                            >
+                            <a href={`mailto:${selected.email}?subject=Re: your Miss Tokyo enquiry`}
+                                target="_blank" rel="noopener noreferrer"
+                                className="ac-btn ac-btn-ghost" style={{ flex: 1, textAlign: "center" }}>
                                 Reply via Email
                             </a>
                         </div>
                     </aside>
                 </>
             )}
-        </div>
+        </>
     );
 }

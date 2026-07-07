@@ -4,8 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { X } from "lucide-react";
-
 type Source = "order" | "custom_request" | "newsletter" | "manual";
 
 type Contact = {
@@ -23,13 +21,6 @@ const SOURCE_LABELS: Record<Source, string> = {
     custom_request: "Custom Request",
     newsletter: "Newsletter",
     manual: "Manual",
-};
-
-const SOURCE_STYLES: Record<Source, string> = {
-    order: "bg-green-50 text-green-700",
-    custom_request: "bg-amber-50 text-amber-700",
-    newsletter: "bg-blue-50 text-blue-700",
-    manual: "bg-neutral-100 text-neutral-600",
 };
 
 function downloadCSV(rows: Contact[], filename: string) {
@@ -225,190 +216,146 @@ export default function CustomersPage() {
 
     const selectedContacts = contacts.filter(c => selected.has(c.id));
 
+    const SOURCE_CLASS: Record<Source, string> = {
+        order:          "ac-badge-ok",
+        custom_request: "ac-badge-warn",
+        newsletter:     "ac-badge-info",
+        manual:         "ac-badge-inactive",
+    };
+
     return (
-        <div className="space-y-8">
-            {/* Header */}
-            <header className="flex flex-wrap items-start justify-between gap-4">
+        <>
+            {/* Page heading */}
+            <div className="ac-page-head">
                 <div>
-                    <h1 className="font-serif text-3xl tracking-widest uppercase mb-2">Contacts</h1>
-                    <p className="text-neutral-500 text-sm">Unified clientele across orders, requests, and subscriptions.</p>
+                    <h1 className="ac-page-h1">Customers</h1>
+                    <p className="ac-page-sub">
+                        Unified clientele across orders, requests &amp; subscriptions.
+                        {!loading && <span style={{ fontFamily: "var(--f-mono)", fontSize: 11 }}>{contacts.length.toLocaleString()} contacts</span>}
+                    </p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => downloadCSV(contacts, `miss-tokyo-contacts-${new Date().toISOString().slice(0, 10)}.csv`)}
-                        className="border border-neutral-300 text-neutral-700 px-5 py-2.5 text-xs uppercase tracking-widest hover:border-black hover:text-black transition-colors"
-                    >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button className="ac-btn ac-btn-ghost" type="button"
+                        onClick={() => downloadCSV(contacts, `miss-tokyo-contacts-${new Date().toISOString().slice(0, 10)}.csv`)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M12 4v12"/><path d="m6 10 6 6 6-6"/><path d="M4 20h16"/></svg>
                         Export All
                     </button>
-                    <button
-                        onClick={() => setShowAddModal(true)}
-                        className="bg-black text-white px-5 py-2.5 text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors"
-                    >
-                        + Add Contact
+                    <button className="ac-btn ac-btn-primary" type="button" onClick={() => setShowAddModal(true)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                        Add Contact
                     </button>
                 </div>
-            </header>
+            </div>
 
-            {/* Bulk Action Bar */}
-            {someSelected && (
-                <div className="flex items-center gap-4 bg-neutral-900 text-white px-6 py-3">
-                    <span className="text-xs tracking-widest uppercase text-neutral-300">
-                        {selected.size} selected
-                    </span>
-                    <div className="flex-1" />
-                    <button
-                        onClick={handleExportSelected}
-                        className="text-xs uppercase tracking-widest text-white hover:text-neutral-300 transition-colors px-4 py-1.5 border border-neutral-600 hover:border-neutral-400"
-                    >
-                        Export Selected
-                    </button>
-                    <button
-                        onClick={handleDeleteSelected}
-                        disabled={deleting}
-                        className="text-xs uppercase tracking-widest text-red-400 hover:text-red-300 transition-colors px-4 py-1.5 border border-red-800 hover:border-red-600 disabled:opacity-50"
-                    >
-                        {deleting ? "Deleting..." : "Delete Selected"}
-                    </button>
+            {/* Table card */}
+            <div className="ac-card flush">
+                {/* Bulk bar */}
+                {someSelected && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: "1px solid var(--ac-line)", background: "var(--ac-panel-2)" }}>
+                        <span className="ac-bulk-label">{selected.size} selected</span>
+                        <div style={{ flex: 1 }} />
+                        <button className="ac-btn ac-btn-ghost ac-btn-sm" onClick={handleExportSelected} type="button">Export Selected</button>
+                        <button className="ac-btn ac-btn-sm" onClick={handleDeleteSelected} disabled={deleting} type="button"
+                            style={{ background: "color-mix(in oklab, var(--ac-danger) 12%, transparent)", color: "var(--ac-danger)", borderColor: "color-mix(in oklab, var(--ac-danger) 25%, transparent)" }}>
+                            {deleting ? "Deleting…" : "Delete Selected"}
+                        </button>
+                    </div>
+                )}
+
+                <div className="ac-table-wrap">
+                    <table className="ac-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: 40 }}>
+                                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="ac-checkbox" />
+                                </th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Source</th>
+                                <th className="r">Added</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan={6} className="ac-table-empty">Aggregating clientele data…</td></tr>
+                            ) : contacts.length === 0 ? (
+                                <tr><td colSpan={6} className="ac-table-empty">No contacts found.</td></tr>
+                            ) : contacts.map((contact) => (
+                                <tr
+                                    key={contact.id}
+                                    onClick={() => router.push(`/customers/${encodeURIComponent(contact.email)}`)}
+                                    className={selected.has(contact.id) ? "selected" : ""}
+                                >
+                                    <td onClick={e => e.stopPropagation()}>
+                                        <input type="checkbox" checked={selected.has(contact.id)} onChange={() => toggleOne(contact.id)} className="ac-checkbox" />
+                                    </td>
+                                    <td style={{ color: "var(--ac-ink)", fontWeight: 500, whiteSpace: "nowrap" }}>
+                                        {contact.name || <em style={{ color: "var(--ac-ink-4)", fontWeight: 400 }}>—</em>}
+                                    </td>
+                                    <td style={{ color: "var(--ac-ink-2)", whiteSpace: "nowrap" }}>{contact.email}</td>
+                                    <td style={{ color: "var(--ac-ink-3)", whiteSpace: "nowrap", fontFamily: "var(--f-mono)", fontSize: 12 }}>
+                                        {contact.phone || <span style={{ color: "var(--ac-ink-4)" }}>—</span>}
+                                    </td>
+                                    <td>
+                                        <span className={`ac-badge ${SOURCE_CLASS[contact.source]}`}>
+                                            {SOURCE_LABELS[contact.source]}
+                                        </span>
+                                    </td>
+                                    <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-4)", whiteSpace: "nowrap" }}>
+                                        {new Date(contact.created_at).toLocaleDateString("en-GB")}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            )}
-
-            {/* Table */}
-            <div className="bg-white border border-neutral-200 overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
-                        <tr>
-                            <th className="px-4 py-4 w-10">
-                                <input
-                                    type="checkbox"
-                                    checked={allSelected}
-                                    onChange={toggleAll}
-                                    className="w-4 h-4 accent-black cursor-pointer"
-                                    aria-label="Select all"
-                                />
-                            </th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Name</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Email</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Phone</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Primary Source</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Added On</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                        {loading ? (
-                            <tr>
-                                <td colSpan={6} className="px-6 py-12 text-center text-neutral-500 italic font-serif">
-                                    Aggregating clientele data...
-                                </td>
-                            </tr>
-                        ) : contacts.length === 0 ? (
-                            <tr>
-                                <td colSpan={6} className="px-6 py-12 text-center text-neutral-500 italic font-serif">
-                                    No contacts found.
-                                </td>
-                            </tr>
-                        ) : contacts.map((contact) => (
-                            <tr
-                                key={contact.id}
-                                onClick={() => router.push(`/customers/${encodeURIComponent(contact.email)}`)}
-                                className={`cursor-pointer hover:bg-neutral-50 transition-colors ${selected.has(contact.id) ? "bg-neutral-50" : ""}`}
-                            >
-                                <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
-                                    <input
-                                        type="checkbox"
-                                        checked={selected.has(contact.id)}
-                                        onChange={() => toggleOne(contact.id)}
-                                        className="w-4 h-4 accent-black cursor-pointer"
-                                        aria-label={`Select ${contact.name || contact.email}`}
-                                    />
-                                </td>
-                                <td className="px-4 py-4 font-medium text-neutral-900 whitespace-nowrap">
-                                    {contact.name || <span className="text-neutral-400 font-normal italic">—</span>}
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-neutral-600">
-                                    {contact.email}
-                                </td>
-                                <td className="px-4 py-4 text-neutral-500 whitespace-nowrap">
-                                    {contact.phone || <span className="text-neutral-300">—</span>}
-                                </td>
-                                <td className="px-4 py-4">
-                                    <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${SOURCE_STYLES[contact.source]}`}>
-                                        {SOURCE_LABELS[contact.source]}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-4 text-neutral-400 text-xs text-right whitespace-nowrap">
-                                    {new Date(contact.created_at).toLocaleDateString("en-GB")}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
             </div>
 
             {/* Add Contact Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div
-                        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-                        onClick={() => setShowAddModal(false)}
-                    />
-                    <div className="relative bg-white w-full max-w-md shadow-2xl">
-                        <div className="flex items-center justify-between px-8 py-6 border-b border-neutral-100">
-                            <h2 className="font-serif text-xl tracking-widest uppercase">Add Contact</h2>
-                            <button
-                                onClick={() => setShowAddModal(false)}
-                                className="flex items-center justify-center w-8 h-8 text-neutral-400 hover:text-black transition-colors"
-                                aria-label="Close"
-                            >
-                                <X size={18} />
+                <div className="ac-modal-scrim" onClick={e => { if (e.target === e.currentTarget) setShowAddModal(false); }}>
+                    <div className="ac-modal">
+                        <div className="ac-modal-head">
+                            <div className="ac-modal-title">Add Contact</div>
+                            <button className="ac-modal-close" onClick={() => setShowAddModal(false)} type="button">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
                         </div>
-                        <form onSubmit={handleAddContact} className="px-8 py-8 space-y-6">
-                            <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Full Name</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={addForm.name}
-                                    onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 text-sm outline-none focus:border-black transition-colors"
-                                    placeholder="Abena Mensah"
-                                />
+                        <form onSubmit={handleAddContact}>
+                            <div className="ac-modal-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                                <div>
+                                    <label className="ac-label">Full Name</label>
+                                    <input type="text" required value={addForm.name}
+                                        onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
+                                        className="ac-input" placeholder="Abena Mensah" />
+                                </div>
+                                <div>
+                                    <label className="ac-label">Email Address</label>
+                                    <input type="email" required value={addForm.email}
+                                        onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))}
+                                        className="ac-input" placeholder="abena@example.com" />
+                                </div>
+                                <div>
+                                    <label className="ac-label">Phone (Optional)</label>
+                                    <input type="tel" value={addForm.phone}
+                                        onChange={e => setAddForm(p => ({ ...p, phone: e.target.value }))}
+                                        className="ac-input" placeholder="+233 …" />
+                                </div>
+                                {addStatus === "error" && (
+                                    <p style={{ fontSize: 12, color: "var(--ac-danger)" }}>Failed to save. Try again.</p>
+                                )}
                             </div>
-                            <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Email Address</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={addForm.email}
-                                    onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 text-sm outline-none focus:border-black transition-colors"
-                                    placeholder="abena@example.com"
-                                />
+                            <div className="ac-modal-foot">
+                                <button className="ac-btn ac-btn-ghost" type="button" onClick={() => setShowAddModal(false)}>Cancel</button>
+                                <button className="ac-btn ac-btn-primary" type="submit" disabled={addStatus === "saving"}>
+                                    {addStatus === "saving" ? "Saving…" : "Save Contact"}
+                                </button>
                             </div>
-                            <div>
-                                <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Phone (Optional)</label>
-                                <input
-                                    type="tel"
-                                    value={addForm.phone}
-                                    onChange={e => setAddForm(p => ({ ...p, phone: e.target.value }))}
-                                    className="w-full border-b border-neutral-300 bg-transparent py-2 text-sm outline-none focus:border-black transition-colors"
-                                    placeholder="+233 ..."
-                                />
-                            </div>
-                            {addStatus === "error" && (
-                                <p className="text-xs text-red-600 tracking-wide">Failed to save. Try again.</p>
-                            )}
-                            <button
-                                type="submit"
-                                disabled={addStatus === "saving"}
-                                className="w-full py-4 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                            >
-                                {addStatus === "saving" ? "Saving..." : "Save Contact"}
-                            </button>
                         </form>
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }

@@ -75,7 +75,6 @@ export default function AbandonedCartsPage() {
             toast.success("Reminder sent.");
             setRemindedIds(prev => new Set([...prev, order.id]));
 
-            // Log to abandoned_history
             await supabase.from("abandoned_history").insert([{
                 order_id: order.id,
                 customer_email: order.customer_email,
@@ -94,79 +93,77 @@ export default function AbandonedCartsPage() {
     };
 
     return (
-        <div className="space-y-12">
-            <header className="flex items-center justify-between">
+        <>
+            <div className="ac-page-head">
                 <div>
-                    <h1 className="font-serif text-3xl tracking-widests uppercase mb-2">Abandoned Carts</h1>
-                    <p className="text-neutral-500">Orders started but not completed (pending with no payment).</p>
+                    <h1 className="ac-page-h1">Abandoned Carts</h1>
+                    <p className="ac-page-sub">Orders started but not completed (pending with no payment).</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="ac-tabs">
                     {TIME_FILTERS.map(tf => (
                         <button
                             key={tf.key}
                             onClick={() => setTimeFilter(tf.key)}
-                            className={`px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
-                                timeFilter === tf.key
-                                    ? "bg-black text-white"
-                                    : "bg-white border border-neutral-200 text-neutral-500 hover:border-black hover:text-black"
-                            }`}
+                            className={`ac-tab ${timeFilter === tf.key ? "active" : ""}`}
                         >
                             {tf.label}
                         </button>
                     ))}
                 </div>
-            </header>
-
-            <div className="bg-white border border-neutral-200 overflow-x-auto">
-                <table className="w-full text-sm text-left whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
-                        <tr>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Customer</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Email</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Cart Value</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Items</th>
-                            <th className="px-6 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Date</th>
-                            <th className="px-6 py-4 text-right"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100">
-                        {loading ? (
-                            <tr><td colSpan={6} className="px-6 py-12 text-center text-neutral-400 italic font-serif">Loading...</td></tr>
-                        ) : orders.length === 0 ? (
-                            <tr><td colSpan={6} className="px-6 py-16 text-center text-neutral-400 italic font-serif">No abandoned carts in this period.</td></tr>
-                        ) : orders.map(order => (
-                            <tr key={order.id} className="hover:bg-neutral-50 transition-colors">
-                                <td className="px-6 py-4 font-medium text-neutral-900">
-                                    {order.customer_name || <span className="text-neutral-400 italic">Unknown</span>}
-                                </td>
-                                <td className="px-6 py-4 text-neutral-600">
-                                    {order.customer_email || "—"}
-                                </td>
-                                <td className="px-6 py-4 text-right font-medium">
-                                    GH₵ {Number(order.total_amount ?? 0).toFixed(2)}
-                                </td>
-                                <td className="px-6 py-4 text-neutral-500 text-xs">{itemCount(order.items)}</td>
-                                <td className="px-6 py-4 text-right text-neutral-400 text-xs">
-                                    {new Date(order.created_at).toLocaleDateString("en-GB")}
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    {remindedIds.has(order.id) ? (
-                                        <span className="text-[10px] uppercase tracking-widest text-green-600">Sent</span>
-                                    ) : (
-                                        <button
-                                            onClick={() => handleRemind(order)}
-                                            disabled={sending === order.id || !order.customer_email}
-                                            className="text-[10px] uppercase tracking-widest px-4 py-2 bg-black text-white hover:bg-neutral-800 transition-colors disabled:opacity-40"
-                                        >
-                                            {sending === order.id ? "Sending..." : "Send Reminder"}
-                                        </button>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
             </div>
-        </div>
+
+            <div className="ac-card flush">
+                <div className="ac-table-wrap">
+                    <table className="ac-table">
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Email</th>
+                                <th className="r">Cart Value</th>
+                                <th>Items</th>
+                                <th className="r">Date</th>
+                                <th className="r"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading ? (
+                                <tr><td colSpan={6} className="ac-table-empty">Loading...</td></tr>
+                            ) : orders.length === 0 ? (
+                                <tr><td colSpan={6} className="ac-table-empty">No abandoned carts in this period.</td></tr>
+                            ) : orders.map(order => (
+                                <tr key={order.id}>
+                                    <td style={{ fontWeight: 500, color: "var(--ac-ink)" }}>
+                                        {order.customer_name || <span style={{ color: "var(--ac-ink-4)", fontStyle: "italic" }}>Unknown</span>}
+                                    </td>
+                                    <td style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>
+                                        {order.customer_email || "—"}
+                                    </td>
+                                    <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500 }}>
+                                        GH₵ {Number(order.total_amount ?? 0).toFixed(2)}
+                                    </td>
+                                    <td style={{ fontSize: 12, color: "var(--ac-ink-4)" }}>{itemCount(order.items)}</td>
+                                    <td className="r" style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>
+                                        {new Date(order.created_at).toLocaleDateString("en-GB")}
+                                    </td>
+                                    <td className="r">
+                                        {remindedIds.has(order.id) ? (
+                                            <span className="ac-badge ac-badge-ok">Sent</span>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleRemind(order)}
+                                                disabled={sending === order.id || !order.customer_email}
+                                                className="ac-btn ac-btn-primary ac-btn-sm"
+                                            >
+                                                {sending === order.id ? "Sending..." : "Send Reminder"}
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </>
     );
 }

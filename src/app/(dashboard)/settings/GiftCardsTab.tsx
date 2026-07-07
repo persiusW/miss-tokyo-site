@@ -3,9 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
-import { X, Plus } from "lucide-react";
-
-const inputCls = "w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-black transition-colors bg-white";
 
 export function GiftCardsTab() {
     const [enabled, setEnabled] = useState(true);
@@ -66,137 +63,104 @@ export function GiftCardsTab() {
         toast.success("Gift card settings saved.");
     };
 
+    const toggleStyle = (on: boolean) => ({
+        width: 40, height: 22, borderRadius: 11, cursor: "pointer" as const,
+        position: "relative" as const, flexShrink: 0,
+        background: on ? "var(--ac-ink)" : "var(--ac-line)", transition: "background .2s",
+    });
+    const knobStyle = (on: boolean) => ({
+        display: "inline-block", height: 18, width: 18, borderRadius: "50%",
+        background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+        position: "absolute" as const, top: 2,
+        left: on ? 20 : 2, transition: "left .2s",
+    });
+
     return (
-        <div className="space-y-6 max-w-2xl">
-            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-6">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Gift Card Settings</h2>
+        <div style={{ maxWidth: 560, display: "flex", flexDirection: "column", gap: 20 }}>
+            <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 24 }}>
+                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-3)" }}>Gift Card Settings</p>
 
                 {/* Enable toggle */}
-                <div className="flex items-center justify-between py-3 border-b border-neutral-100">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 16, borderBottom: "1px solid var(--ac-line)" }}>
                     <div>
-                        <p className="text-sm font-medium text-neutral-900">Enable Gift Cards</p>
-                        <p className="text-xs text-neutral-400 mt-0.5">When off, the gift cards page shows a "Coming soon" state.</p>
+                        <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ac-ink)" }}>Enable Gift Cards</p>
+                        <p style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2 }}>When off, the gift cards page shows a "Coming soon" state.</p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setEnabled(v => !v)}
-                        className={`w-12 h-6 rounded-full transition-colors relative ${enabled ? "bg-black" : "bg-neutral-200"}`}
-                    >
-                        <span
-                            className="absolute top-1 w-4 h-4 bg-white rounded-full transition-all"
-                            style={{ left: enabled ? "26px" : "2px" }}
-                        />
-                    </button>
+                    <div onClick={() => setEnabled(v => !v)} style={toggleStyle(enabled)}>
+                        <span style={knobStyle(enabled)} />
+                    </div>
                 </div>
 
                 {/* Min / Max */}
-                <div className="grid grid-cols-2 gap-4">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-1.5">Minimum Amount (GH₵)</label>
-                        <input
-                            type="number"
-                            min="1"
-                            value={minAmount}
-                            onChange={e => setMinAmount(Number(e.target.value))}
-                            className={inputCls}
-                        />
+                        <label className="ac-label">Minimum Amount (GH₵)</label>
+                        <input type="number" min="1" value={minAmount}
+                            onChange={e => setMinAmount(Number(e.target.value))} className="ac-input" />
                     </div>
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-1.5">Maximum Amount (GH₵)</label>
-                        <input
-                            type="number"
-                            min="1"
-                            value={maxAmount}
-                            onChange={e => setMaxAmount(Number(e.target.value))}
-                            className={inputCls}
-                        />
+                        <label className="ac-label">Maximum Amount (GH₵)</label>
+                        <input type="number" min="1" value={maxAmount}
+                            onChange={e => setMaxAmount(Number(e.target.value))} className="ac-input" />
                     </div>
                 </div>
 
                 {/* Preset amounts */}
                 <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Preset Amounts</label>
-                    <div className="flex flex-wrap gap-2 mb-3">
+                    <label className="ac-label">Preset Amounts</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                         {presets.map(val => (
-                            <span key={val} className="flex items-center gap-1.5 bg-neutral-100 text-neutral-700 text-xs px-3 py-1.5 rounded-full">
+                            <span key={val} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-xl)", padding: "4px 10px", fontSize: 12, color: "var(--ac-ink-2)" }}>
                                 GH₵{val}
-                                <button type="button" onClick={() => removePreset(val)} className="text-neutral-400 hover:text-rose-500 transition-colors">
-                                    <X size={11} />
+                                <button type="button" onClick={() => removePreset(val)}
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", display: "flex", padding: 0 }}>
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                 </button>
                             </span>
                         ))}
                     </div>
-                    <div className="flex gap-2">
-                        <input
-                            type="number"
-                            value={newPreset}
-                            onChange={e => setNewPreset(e.target.value)}
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <input type="number" value={newPreset} onChange={e => setNewPreset(e.target.value)}
                             onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addPreset())}
-                            placeholder="Add amount…"
-                            className={inputCls}
-                        />
-                        <button
-                            type="button"
-                            onClick={addPreset}
-                            className="flex items-center gap-1 px-4 py-2 bg-black text-white text-xs uppercase tracking-widest rounded-lg hover:bg-neutral-800 transition-colors whitespace-nowrap"
-                        >
-                            <Plus size={12} /> Add
+                            placeholder="Add amount…" className="ac-input" style={{ flex: 1 }} />
+                        <button type="button" onClick={addPreset} className="ac-btn ac-btn-ghost ac-btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                            Add
                         </button>
                     </div>
                 </div>
 
                 {/* Expiry */}
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between py-3 border-b border-neutral-100">
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 12, borderBottom: "1px solid var(--ac-line)" }}>
                         <div>
-                            <p className="text-sm font-medium text-neutral-900">Gift Cards Never Expire</p>
-                            <p className="text-xs text-neutral-400 mt-0.5">When off, specify validity in days below.</p>
+                            <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ac-ink)" }}>Gift Cards Never Expire</p>
+                            <p style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2 }}>When off, specify validity in days below.</p>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setNeverExpires(v => !v)}
-                            className={`w-12 h-6 rounded-full transition-colors relative ${neverExpires ? "bg-black" : "bg-neutral-200"}`}
-                        >
-                            <span
-                                className="absolute top-1 w-4 h-4 bg-white rounded-full transition-all"
-                                style={{ left: neverExpires ? "26px" : "2px" }}
-                            />
-                        </button>
+                        <div onClick={() => setNeverExpires(v => !v)} style={toggleStyle(neverExpires)}>
+                            <span style={knobStyle(neverExpires)} />
+                        </div>
                     </div>
                     {!neverExpires && (
                         <div>
-                            <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-1.5">Validity (days)</label>
-                            <input
-                                type="number"
-                                min="1"
-                                value={validityDays}
-                                onChange={e => setValidityDays(Number(e.target.value))}
-                                className={inputCls}
-                            />
+                            <label className="ac-label">Validity (days)</label>
+                            <input type="number" min="1" value={validityDays}
+                                onChange={e => setValidityDays(Number(e.target.value))} className="ac-input" />
                         </div>
                     )}
                 </div>
 
                 {/* Delivery note */}
                 <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-1.5">Delivery Note</label>
-                    <p className="text-[10px] text-neutral-400 mb-2 uppercase tracking-wider">Shown in the hero section of the gift cards page.</p>
-                    <textarea
-                        rows={3}
-                        value={deliveryNote}
-                        onChange={e => setDeliveryNote(e.target.value)}
-                        className={`${inputCls} resize-y min-h-[80px]`}
-                    />
+                    <label className="ac-label">Delivery Note</label>
+                    <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ac-ink-4)", marginBottom: 6 }}>Shown in the hero section of the gift cards page.</p>
+                    <textarea rows={3} value={deliveryNote} onChange={e => setDeliveryNote(e.target.value)}
+                        className="ac-textarea" style={{ minHeight: 80, resize: "vertical" }} />
                 </div>
 
                 {/* Save */}
-                <div className="flex justify-end border-t border-neutral-100 pt-4">
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="px-6 py-2.5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 rounded-lg"
-                    >
+                <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--ac-line)", paddingTop: 16 }}>
+                    <button type="button" onClick={handleSave} disabled={saving} className="ac-btn ac-btn-primary">
                         {saving ? "Saving…" : "Save Settings"}
                     </button>
                 </div>
