@@ -2,9 +2,20 @@
 // Handles: Web Push Notifications + PWA Caching
 
 // ─── Cache Names (bump version suffix to force cache invalidation) ────────────
-const SHELL_CACHE  = "mt-shell-v2";
-const IMAGE_CACHE  = "mt-images-v2";
-const DATA_CACHE   = "mt-data-v2";
+// v3: stop caching private (admin/dashboard) pages. Bumping the version evicts
+// any authenticated shells the v2 cache-first catch-all had already stored, so
+// a logged-out user no longer sees a cached dashboard.
+const SHELL_CACHE  = "mt-shell-v3";
+const IMAGE_CACHE  = "mt-images-v3";
+const DATA_CACHE   = "mt-data-v3";
+
+// ─── Private route prefixes — NEVER cached (auth-gated admin dashboard) ───────
+// Mirrors the dashboard/account protection in src/proxy.ts. Caching these would
+// let the shell render for a logged-out user before any API call 401s.
+const PRIVATE_PREFIXES = [
+    "/overview", "/sales", "/catalog", "/customers", "/finance",
+    "/seo", "/settings", "/cms", "/communications", "/team", "/admin",
+];
 
 // ─── App Shell URLs to precache on install ────────────────────────────────────
 const SHELL_URLS = [
@@ -61,7 +72,10 @@ self.addEventListener("fetch", (event) => {
     // Only handle http/https — chrome-extension:// and others throw on cache.put
     if (url.protocol !== "http:" && url.protocol !== "https:") return;
 
-    // ── NEVER cache: financial & auth endpoints ──
+    // ── NEVER cache: financial, auth, private admin & API endpoints ──
+    // Only apply passthrough rules to our own origin — cross-origin (Supabase,
+    // Paystack CDN) is handled by the strategy branches below.
+    const sameOrigin = url.origin === self.location.origin;
     const isPaystack =
         url.hostname.includes("paystack.co") ||
         url.pathname.startsWith("/api/paystack");
@@ -71,8 +85,14 @@ self.addEventListener("fetch", (event) => {
         url.pathname === "/register" ||
         url.pathname.startsWith("/auth/");
     const isCheckout = url.pathname.startsWith("/checkout");
+    // Private admin dashboard pages + all first-party API responses — these are
+    // auth-dependent and must never be served from cache (esp. after logout).
+    const isPrivate = sameOrigin && (
+        url.pathname.startsWith("/api") ||
+        PRIVATE_PREFIXES.some((p) => url.pathname === p || url.pathname.startsWith(p + "/"))
+    );
 
-    if (isPaystack || isAuth || isCheckout) {
+    if (isPaystack || isAuth || isCheckout || isPrivate) {
         return; // pass through to network, no caching
     }
 
@@ -197,6 +217,17 @@ function safePut(cache, request, response) {
         // ignore unparseable URLs
     }
 }
+
+// ─── Message: clear caches on demand (called on logout) ──────────────────────
+self.addEventListener("message", (event) => {
+    if (event.data?.type === "CLEAR_PRIVATE_CACHE") {
+        // Nuke the shell + data caches so no authenticated page survives logout.
+        // Images are non-sensitive and left intact.
+        event.waitUntil(
+            Promise.all([caches.delete(SHELL_CACHE), caches.delete(DATA_CACHE)])
+        );
+    }
+});
 
 // ─── Web Push: show notification ──────────────────────────────────────────────
 self.addEventListener("push", (event) => {

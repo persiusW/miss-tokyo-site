@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
-import { confirmSale } from "@/lib/inventory";
-import { normAttr } from "@/lib/utils/normAttr";
+import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
 
 const NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const ORDER_FIELDS = "id, customer_name, customer_email, customer_phone, shipping_address, delivery_method, total_amount, items, discount_code, discount_amount, status, paystack_reference";
@@ -106,59 +105,11 @@ export async function GET(req: Request) {
                     }
 
                     if (!stockDecremented) {
-                        // Fallback for orders predating the reservation system
+                        // Fallback for orders predating the reservation system — via the
+                        // inventory lib's sanctioned path (keeps inventory writes in one place).
                         const orderItems: any[] = Array.isArray(currentOrder?.items) ? (currentOrder.items as any[]) : [];
                         if (orderItems.length > 0) {
-                            const pIds = [...new Set(orderItems.map((i: any) => i.productId).filter(Boolean))];
-                            const { data: fbProducts } = await supabase
-                                .from("products")
-                                .select("id, inventory_count, track_inventory, track_variant_inventory")
-                                .in("id", pIds);
-                            const fbProductMap = new Map((fbProducts ?? []).map((p: any) => [p.id, p]));
-
-                            const variantTrackedPIds = new Set<string>(
-                                (fbProducts ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
-                            );
-                            const variantIdLookup: Record<string, string> = {};
-                            if (variantTrackedPIds.size > 0) {
-                                const { data: fbVariants } = await supabase
-                                    .from("product_variants")
-                                    .select("id, product_id, size, color, brand, inventory_count")
-                                    .in("product_id", [...variantTrackedPIds]);
-                                for (const v of fbVariants ?? []) {
-                                    const k = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
-                                    variantIdLookup[k] = v.id;
-                                }
-                            }
-
-                            await Promise.allSettled(orderItems.map(async (item: any) => {
-                                const product = fbProductMap.get(item.productId);
-                                if (!product || product.track_inventory === false) return;
-                                const qty = item.quantity ?? 1;
-                                if (product.track_variant_inventory) {
-                                    const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
-                                    const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
-                                    if (resolvedVariantId) {
-                                        const { data: variant } = await supabase
-                                            .from("product_variants")
-                                            .select("inventory_count")
-                                            .eq("id", resolvedVariantId)
-                                            .single();
-                                        if (variant) {
-                                            await supabase.from("product_variants")
-                                                .update({ inventory_count: Math.max(0, (variant.inventory_count ?? 0) - qty) })
-                                                .eq("id", resolvedVariantId);
-                                        }
-                                    }
-                                    await supabase.from("products")
-                                        .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
-                                        .eq("id", item.productId);
-                                } else {
-                                    await supabase.from("products")
-                                        .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
-                                        .eq("id", item.productId);
-                                }
-                            }));
+                            await fallbackDecrementFromItems(orderItems);
                             console.log(`[verify] fallback stock decrement applied for order ${metaOrderId}`);
                         }
                     }

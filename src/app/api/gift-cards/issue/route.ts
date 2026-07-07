@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
                 sender_name: sender_name || null,
                 message: message || null,
                 is_active: true,
+                status: "active",
             }])
             .select()
             .single();

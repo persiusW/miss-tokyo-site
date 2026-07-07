@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -112,20 +113,20 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    // LOG ACTIVITY
-    await logActivity({
+    revalidatePath("/", "page");
+    revalidatePath("/shop", "page");
+    revalidatePath("/catalog/products", "page");
+    revalidateTag("products", "max");
+
+    // Activity logging is telemetry — run after the response so the UI isn't blocked on it
+    after(() => logActivity({
         userId: user.id,
         userRole: caller.role,
         actionType: "CREATE",
         resource: "product",
         resourceId: data.id,
         details: { name: name, slug: data.slug }
-    });
-
-    revalidatePath("/", "page");
-    revalidatePath("/shop", "page");
-    revalidatePath("/catalog/products", "page");
-    revalidateTag("products", "max");
+    }));
 
     return NextResponse.json({ success: true, product: data });
 }
@@ -136,21 +137,22 @@ export async function PATCH(req: NextRequest) {
     const { data: { user } } = await serverClient.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: caller } = await supabaseAdmin
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await req.json();
     const { id, ...fields } = body;
 
     if (!id) {
         return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+
+    // Role check and old-record fetch (for activity-log diffing) are independent
+    // reads — run them in parallel to cut one DB round trip per update.
+    const [{ data: caller }, { data: oldData }] = await Promise.all([
+        supabaseAdmin.from("profiles").select("role").eq("id", user.id).single(),
+        supabaseAdmin.from("products").select("*").eq("id", id).single(),
+    ]);
+
+    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Fast path: toggle-only fields (is_active, is_sale, discount_value).
@@ -195,13 +197,6 @@ export async function PATCH(req: NextRequest) {
         wholesale_price_tier_3,
         variants,
     } = fields;
-
-    // 1. Fetch current record for diffing
-    const { data: oldData } = await supabaseAdmin
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single();
 
     const updateFields = {
         name,
@@ -307,8 +302,13 @@ export async function PATCH(req: NextRequest) {
         await supabaseAdmin.from("product_variants").delete().eq("product_id", id);
     }
 
-    // LOG ACTIVITY
-    await logActivity({
+    revalidatePath("/", "page");
+    revalidatePath("/shop", "page");
+    revalidatePath("/catalog/products", "page");
+    revalidateTag("products", "max");
+
+    // Activity logging is telemetry — run after the response so the UI isn't blocked on it
+    after(() => logActivity({
         userId: user.id,
         userRole: caller.role,
         actionType: "UPDATE",
@@ -316,12 +316,7 @@ export async function PATCH(req: NextRequest) {
         resourceId: id,
         oldData,
         newData: updateFields
-    });
-
-    revalidatePath("/", "page");
-    revalidatePath("/shop", "page");
-    revalidatePath("/catalog/products", "page");
-    revalidateTag("products", "max");
+    }));
 
     return NextResponse.json({ success: true });
 }
