@@ -44,20 +44,6 @@ function isPickup(order: Order) {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_STYLES: Record<string, string> = {
-    paid:              "bg-green-50 text-green-700",
-    packed:            "bg-blue-50 text-blue-700",
-    shipped:           "bg-indigo-50 text-indigo-700",
-    processing:        "bg-blue-50 text-blue-700",
-    pending:           "bg-amber-50 text-amber-700",
-    fulfilled:         "bg-emerald-50 text-emerald-700",
-    delivered:         "bg-emerald-100 text-emerald-800",
-    cancelled:         "bg-red-50 text-red-600",
-    failed:            "bg-red-50 text-red-600",
-    refunded:          "bg-neutral-100 text-neutral-600",
-    ready_for_pickup:  "bg-neutral-900 text-white",
-};
-
 const PAYMENT_STATUS_LABELS: Record<string, { label: string; className: string }> = {
     abandoned: { label: "Abandoned",    className: "text-neutral-400" },
     failed:    { label: "Payment Failed", className: "text-red-400" },
@@ -157,40 +143,34 @@ function DispatchModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white w-full max-w-lg border border-neutral-200 shadow-2xl">
-                <div className="flex items-center justify-between px-8 py-6 border-b border-neutral-200">
+        <div className="ac-modal-scrim" onClick={onClose}>
+            <div className="ac-modal" style={{ maxWidth: 512 }} onClick={e => e.stopPropagation()}>
+                <div className="ac-modal-head">
                     <div>
-                        <h2 className="font-serif text-xl tracking-widest uppercase">Assign Dispatch Rider</h2>
-                        <p className="text-xs text-neutral-500 mt-1">{orders.length} order{orders.length !== 1 ? "s" : ""} to dispatch</p>
+                        <h2 className="ac-modal-title">Assign Dispatch Rider</h2>
+                        <p style={{ fontSize: 12, color: "var(--ac-ink-3)", marginTop: 2 }}>{orders.length} order{orders.length !== 1 ? "s" : ""} to dispatch</p>
                     </div>
-                    <button onClick={onClose} className="text-neutral-400 hover:text-black transition-colors">
-                        <X size={20} />
-                    </button>
+                    <button onClick={onClose} className="ac-modal-close"><X size={16} /></button>
                 </div>
 
-                <div className="px-8 py-6 space-y-6">
-                    <div className="bg-neutral-50 border border-neutral-100 p-4 max-h-32 overflow-y-auto space-y-1">
+                <div className="ac-modal-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                    <div style={{ background: "var(--ac-bg)", border: "1px solid var(--ac-line)", borderRadius: 8, padding: 12, maxHeight: 128, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
                         {orders.map(o => (
-                            <div key={o.id} className="flex justify-between text-xs text-neutral-600">
-                                <span className="font-mono">{o.id.substring(0, 8).toUpperCase()}</span>
+                            <div key={o.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--ac-ink-3)" }}>
+                                <span className="ac-mono">{o.id.substring(0, 8).toUpperCase()}</span>
                                 <span>{o.customer_name || o.customer_email}</span>
                             </div>
                         ))}
                     </div>
 
                     <div>
-                        <label className="block text-[10px] uppercase tracking-widest font-semibold text-neutral-500 mb-2">Select Rider</label>
+                        <label className="ac-label" style={{ marginBottom: 8, display: "block" }}>Select Rider</label>
                         {loading ? (
-                            <p className="text-xs text-neutral-400 italic">Loading riders...</p>
+                            <p style={{ fontSize: 12, color: "var(--ac-ink-4)", fontStyle: "italic" }}>Loading riders…</p>
                         ) : riders.length === 0 ? (
-                            <p className="text-xs text-red-500">No active riders. Add riders in Settings → Riders.</p>
+                            <p style={{ fontSize: 12, color: "var(--ac-danger)" }}>No active riders. Add riders in Settings → Riders.</p>
                         ) : (
-                            <select
-                                value={selectedRider}
-                                onChange={e => setSelectedRider(e.target.value)}
-                                className="w-full border-b border-neutral-300 bg-transparent py-2 outline-none focus:border-black text-sm"
-                            >
+                            <select value={selectedRider} onChange={e => setSelectedRider(e.target.value)} className="ac-select">
                                 {riders.map(r => (
                                     <option key={r.id} value={r.id}>
                                         {r.full_name} · {r.phone_number}{r.bike_reg ? ` · ${r.bike_reg}` : ""}
@@ -200,33 +180,19 @@ function DispatchModal({
                         )}
                     </div>
 
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={notifyRider}
-                            onChange={e => setNotifyRider(e.target.checked)}
-                            className="w-4 h-4 accent-black"
-                        />
+                    <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                        <input type="checkbox" checked={notifyRider} onChange={e => setNotifyRider(e.target.checked)} className="ac-checkbox" />
                         <div>
-                            <span className="text-[10px] uppercase tracking-widest font-semibold text-neutral-700">Notify Rider via SMS</span>
-                            <p className="text-[10px] text-neutral-400 mt-0.5">Sends customer name, phone, and delivery address to rider.</p>
+                            <span className="ac-label">Notify Rider via SMS</span>
+                            <p style={{ fontSize: 10, color: "var(--ac-ink-4)", marginTop: 2 }}>Sends customer name, phone, and delivery address to rider.</p>
                         </div>
                     </label>
                 </div>
 
-                <div className="px-8 py-5 border-t border-neutral-200 flex justify-end gap-4">
-                    <button
-                        onClick={onClose}
-                        className="px-6 py-3 text-xs uppercase tracking-widest text-neutral-500 hover:text-black border border-neutral-200 hover:border-black transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleConfirm}
-                        disabled={confirming || !selectedRider || riders.length === 0}
-                        className="px-8 py-3 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50"
-                    >
-                        {confirming ? "Dispatching..." : "Confirm Dispatch"}
+                <div className="ac-modal-foot">
+                    <button onClick={onClose} className="ac-btn ac-btn-ghost">Cancel</button>
+                    <button onClick={handleConfirm} disabled={confirming || !selectedRider || riders.length === 0} className="ac-btn ac-btn-primary">
+                        {confirming ? "Dispatching…" : "Confirm Dispatch"}
                     </button>
                 </div>
             </div>
@@ -497,140 +463,115 @@ export function OrdersClient({
     const hasDeliverySelected = visibleOrders.some(o => selected.has(o.id) && !isPickup(o));
 
     return (
-        <div className="space-y-0">
-            {/* Search + Tabs row — sticky so it stays visible while scrolling orders */}
-            <div className="sticky top-0 z-10 bg-neutral-50 flex flex-col sm:flex-row sm:items-end gap-4 border-t border-b border-neutral-200 pb-0">
-                <div className="flex gap-0 overflow-x-auto">
+        <>
+            {/* Search + Tabs row */}
+            <div className="ac-tabs" style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 0, overflowX: "auto", flex: 1 }}>
                     {TABS.map(tab => (
                         <button
                             key={tab.key}
                             onClick={() => goToTab(tab.key)}
-                            className={`px-5 py-3 text-xs font-semibold uppercase tracking-widest transition-colors border-b-2 -mb-px flex items-center gap-2 whitespace-nowrap ${
-                                activeTab === tab.key
-                                    ? "border-black text-black"
-                                    : "border-transparent text-neutral-400 hover:text-black"
-                            }`}
+                            className={`ac-tab ${activeTab === tab.key ? "active" : ""}`}
                         >
                             {tab.label}
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                activeTab === tab.key ? "bg-black text-white" : "bg-neutral-100 text-neutral-500"
-                            }`}>
-                                {tabCounts[tab.key]}
-                            </span>
+                            <span className="ac-tab-count">{tabCounts[tab.key]}</span>
                         </button>
                     ))}
-                </div>
-
-                {/* Search */}
-                <div className="flex items-center gap-2 pb-3 sm:ml-auto">
-                    <Search size={13} className="text-neutral-400 shrink-0" />
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={e => onSearchChange(e.target.value)}
-                        placeholder="SEARCH BY NAME, EMAIL, PHONE OR REFERENCE"
-                        className="border-b border-neutral-300 bg-transparent outline-none focus:border-black text-[10px] uppercase tracking-widest py-1 w-64 placeholder:text-neutral-400"
-                    />
-                    {search && (
-                        <button onClick={() => onSearchChange("")} className="text-neutral-400 hover:text-black">
-                            <X size={13} />
-                        </button>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", paddingBottom: 8 }}>
+                        <Search size={13} style={{ color: "var(--ac-ink-4)", flexShrink: 0 }} />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => onSearchChange(e.target.value)}
+                            placeholder="Search name, email, phone or reference"
+                            className="ac-input-line"
+                            style={{ width: 260, fontSize: 11 }}
+                        />
+                        {search && (
+                            <button onClick={() => onSearchChange("")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", display: "inline-flex" }}>
+                                <X size={13} />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Search context indicator */}
             {search && (
-                <div className="px-4 py-2 bg-neutral-50 border border-neutral-200 border-t-0 text-[10px] text-neutral-500 uppercase tracking-widest">
+                <div style={{ padding: "8px 4px", fontSize: 10, color: "var(--ac-ink-3)", textTransform: "uppercase", letterSpacing: ".08em" }}>
                     {(serverMode ? totalCount : visibleOrders.length)} result{(serverMode ? totalCount : visibleOrders.length) !== 1 ? "s" : ""}{activeTab === "all" ? " across all statuses" : ""} for &ldquo;{search}&rdquo;
                 </div>
             )}
 
             {/* Pickups tab info banner */}
             {activeTab === "pickups" && visibleOrders.length > 0 && (
-                <div className="px-4 py-3 bg-neutral-900 text-white text-[10px] uppercase tracking-widest border-b border-neutral-700">
-                    <Store size={12} className="inline mr-2 mb-0.5" />
+                <div style={{ padding: "10px 14px", background: "var(--ac-ink)", color: "var(--ac-bg)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", marginTop: 8, borderRadius: 8 }}>
+                    <Store size={12} style={{ display: "inline", marginRight: 8, marginBottom: 2 }} />
                     {visibleOrders.length} order{visibleOrders.length !== 1 ? "s" : ""} awaiting in-store pickup
                 </div>
             )}
 
             {/* Bulk Actions Bar */}
             {selectedCount > 0 && (
-                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-black text-white px-6 py-4 shadow-2xl">
-                    <span className="text-xs uppercase tracking-widest text-neutral-300 mr-2">
-                        {selectedCount} selected
-                    </span>
+                <div className="ac-bulk-bar" style={{ position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)", zIndex: 50 }}>
+                    <span className="ac-bulk-label" style={{ marginRight: 8 }}>{selectedCount} selected</span>
 
                     {activeTab === "packed" ? (
                         <>
                             {hasPickupSelected && (
-                                <button
-                                    onClick={bulkMarkPickupReady}
-                                    disabled={bulkLoading}
-                                    className="flex items-center gap-2 text-xs uppercase tracking-widest px-4 py-2 bg-neutral-700 hover:bg-neutral-600 transition-colors disabled:opacity-50"
-                                >
+                                <button onClick={bulkMarkPickupReady} disabled={bulkLoading} className="ac-btn ac-btn-ghost ac-btn-sm">
                                     <Store size={14} /> Mark Ready for Pickup
                                 </button>
                             )}
                             {hasDeliverySelected && (
-                                <button
-                                    onClick={openDispatchForSelected}
-                                    disabled={bulkLoading}
-                                    className="flex items-center gap-2 text-xs uppercase tracking-widest px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-50"
-                                >
+                                <button onClick={openDispatchForSelected} disabled={bulkLoading} className="ac-btn ac-btn-accent ac-btn-sm">
                                     <Truck size={14} /> Assign Rider & Ship
                                 </button>
                             )}
                         </>
                     ) : (
                         <>
-                            <button onClick={() => bulkUpdate("packed")} disabled={bulkLoading}
-                                className="text-xs uppercase tracking-widest px-4 py-2 bg-neutral-700 hover:bg-neutral-600 transition-colors disabled:opacity-50">
+                            <button onClick={() => bulkUpdate("packed")} disabled={bulkLoading} className="ac-btn ac-btn-ghost ac-btn-sm">
                                 Mark Packed
                             </button>
-                            <button onClick={openDispatchForSelected} disabled={bulkLoading}
-                                className="flex items-center gap-2 text-xs uppercase tracking-widest px-4 py-2 bg-blue-600 hover:bg-blue-500 transition-colors disabled:opacity-50">
+                            <button onClick={openDispatchForSelected} disabled={bulkLoading} className="ac-btn ac-btn-accent ac-btn-sm">
                                 <Truck size={14} /> Mark Shipped
                             </button>
-                            <button onClick={() => bulkUpdate("fulfilled")} disabled={bulkLoading}
-                                className="text-xs uppercase tracking-widest px-4 py-2 bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50">
+                            <button onClick={() => bulkUpdate("fulfilled")} disabled={bulkLoading} className="ac-btn ac-btn-primary ac-btn-sm">
                                 Mark Fulfilled
                             </button>
                         </>
                     )}
 
-                    <button
-                        onClick={() => setSelected(new Set())}
-                        className="ml-2 text-neutral-400 hover:text-white transition-colors"
-                    >
+                    <button onClick={() => setSelected(new Set())} style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", display: "inline-flex" }}>
                         <X size={16} />
                     </button>
                 </div>
             )}
 
             {/* Table */}
-            <div className="bg-white border border-neutral-200 border-t-0 overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-neutral-50 border-b border-neutral-200">
+            <div className="ac-card flush" style={{ marginTop: 12 }}>
+                <div className="ac-table-wrap">
+                <table className="ac-table">
+                    <thead>
                         <tr>
-                            <th className="px-4 py-4 w-10">
-                                <input type="checkbox" checked={allSelected} onChange={toggleAll}
-                                    className="w-4 h-4 cursor-pointer accent-black" />
+                            <th style={{ width: 40 }}>
+                                <input type="checkbox" checked={allSelected} onChange={toggleAll} className="ac-checkbox" style={{ cursor: "pointer" }} />
                             </th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Order ID</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Customer</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Type</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Amount</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Status</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">Reference</th>
-                            <th className="px-4 py-4 text-xs font-semibold uppercase tracking-widest text-neutral-500 text-right">Date</th>
-                            <th className="px-4 py-4 w-12"></th>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Type</th>
+                            <th className="r">Amount</th>
+                            <th>Status</th>
+                            <th>Reference</th>
+                            <th className="r">Date</th>
+                            <th style={{ width: 48 }}></th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody>
                         {visibleOrders.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="px-6 py-16 text-center text-neutral-500 italic font-serif">
+                                <td colSpan={9} className="ac-table-empty">
                                     {search ? "No orders match your search." : "No orders in this category."}
                                 </td>
                             </tr>
@@ -638,26 +579,25 @@ export function OrdersClient({
                             <tr
                                 key={order.id}
                                 onClick={(e) => handleRowClick(e, order.id)}
-                                className={`hover:bg-neutral-50 transition-colors cursor-pointer ${selected.has(order.id) ? "bg-neutral-50" : ""}`}
+                                className={selected.has(order.id) ? "selected" : ""}
+                                style={{ cursor: "pointer" }}
                             >
-                                <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                                <td onClick={e => e.stopPropagation()}>
                                     <input type="checkbox" checked={selected.has(order.id)}
                                         onChange={() => toggleOne(order.id)}
-                                        className="w-4 h-4 cursor-pointer accent-black" />
+                                        className="ac-checkbox" style={{ cursor: "pointer" }} />
                                 </td>
-                                <td className="px-4 py-4">
-                                    <span className="font-mono text-xs text-neutral-600">
+                                <td>
+                                    <span className="ac-mono" style={{ fontSize: 12, color: "var(--ac-ink-2)" }}>
                                         {order.id.substring(0, 8).toUpperCase()}
                                     </span>
                                 </td>
-                                <td className="px-4 py-4 text-neutral-700">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                <td style={{ color: "var(--ac-ink-2)" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                                         <span>{order.customer_name || order.customer_email || "—"}</span>
                                         {order.is_mixed_order ? (
                                             <>
-                                                <span className="text-[9px] font-semibold uppercase tracking-widest bg-amber-100 text-amber-700 px-2 py-0.5 rounded-sm">
-                                                    Mixed
-                                                </span>
+                                                <span className="ac-badge ac-badge-mixed">Mixed</span>
                                                 {(() => {
                                                     const dispatched = order.customer_metadata?.regular_items_dispatched_at;
                                                     if (!dispatched) return null;
@@ -665,7 +605,7 @@ export function OrdersClient({
                                                     return (
                                                         <span
                                                             title={isFulfilled ? "Fully fulfilled" : "In-stock items shipped · Pre-order items pending"}
-                                                            className={`text-[11px] ${isFulfilled ? "text-emerald-500" : "text-blue-500"}`}
+                                                            style={{ fontSize: 11, color: isFulfilled ? "var(--ac-accent)" : "#6aa6ff" }}
                                                         >
                                                             ●
                                                         </span>
@@ -673,26 +613,20 @@ export function OrdersClient({
                                                 })()}
                                             </>
                                         ) : order.has_preorder ? (
-                                            <span className="text-[9px] font-semibold uppercase tracking-widest bg-amber-100 text-amber-700 px-2 py-0.5 rounded-sm">
-                                                Pre-Order
-                                            </span>
+                                            <span className="ac-badge ac-badge-preorder">Pre-Order</span>
                                         ) : null}
                                     </div>
                                 </td>
-                                <td className="px-4 py-4">
-                                    <span className={`px-2 py-0.5 text-[10px] uppercase tracking-widest font-semibold rounded-sm ${
-                                        isPickup(order)
-                                            ? "bg-neutral-900 text-white"
-                                            : "bg-neutral-100 text-neutral-600"
-                                    }`}>
+                                <td>
+                                    <span className={`ac-badge ${isPickup(order) ? "ac-badge-pickup" : "ac-badge-delivery"}`}>
                                         {isPickup(order) ? "Pickup" : "Delivery"}
                                     </span>
                                 </td>
-                                <td className="px-4 py-4 text-right font-medium">
+                                <td className="r" style={{ fontWeight: 500, color: "var(--ac-ink)" }}>
                                     GH₵ {Number(order.total_amount ?? 0).toFixed(2)}
                                 </td>
-                                <td className="px-4 py-4">
-                                    <span className={`px-2 py-1 text-[10px] uppercase tracking-widest rounded ${STATUS_STYLES[order.status] ?? "bg-neutral-100 text-neutral-600"}`}>
+                                <td>
+                                    <span className={`ac-badge ac-badge-${order.status}`}>
                                         {order.status === "ready_for_pickup" ? "Ready for Pickup" : order.status}
                                     </span>
                                     {order.payment_status && PAYMENT_STATUS_LABELS[order.payment_status] && (
@@ -701,15 +635,15 @@ export function OrdersClient({
                                         </span>
                                     )}
                                 </td>
-                                <td className="px-4 py-4">
-                                    <span className="font-mono text-xs text-neutral-500">
+                                <td>
+                                    <span className="ac-mono" style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>
                                         {order.paystack_reference || "—"}
                                     </span>
                                 </td>
-                                <td className="px-4 py-4 text-right text-neutral-500 text-xs">
+                                <td className="r" style={{ color: "var(--ac-ink-3)", fontSize: 12 }}>
                                     {new Date(order.created_at).toLocaleDateString("en-GB")}
                                 </td>
-                                <td className="px-4 py-4 text-right relative" onClick={e => e.stopPropagation()} data-dropdown>
+                                <td className="r" style={{ position: "relative" }} onClick={e => e.stopPropagation()} data-dropdown>
                                     <button
                                         onClick={(e) => {
                                             if (openDropdown === order.id) {
@@ -721,49 +655,37 @@ export function OrdersClient({
                                                 setOpenDropdown(order.id);
                                             }
                                         }}
-                                        className="p-1.5 text-neutral-400 hover:text-black hover:bg-neutral-100 transition-colors"
+                                        style={{ padding: 6, background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", display: "inline-flex" }}
                                     >
                                         <MoreHorizontal size={16} />
                                     </button>
                                     {openDropdown === order.id && dropdownPos && (
-                                        <div style={{ position: "fixed", top: dropdownPos.top, right: dropdownPos.right }} className="z-[9999] bg-white border border-neutral-200 shadow-lg min-w-[190px] py-1">
-                                            <button onClick={() => copyOrderId(order.id)}
-                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50 text-left">
+                                        <div style={{ position: "fixed", top: dropdownPos.top, right: dropdownPos.right }} className="ac-dropdown">
+                                            <button onClick={() => copyOrderId(order.id)} className="ac-dropdown-item">
                                                 <Copy size={13} /> Copy Order ID
                                             </button>
-                                            <Link href={`/sales/orders/${order.id}?print=1`}
-                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50"
-                                                onClick={() => setOpenDropdown(null)}>
+                                            <Link href={`/sales/orders/${order.id}?print=1`} className="ac-dropdown-item" onClick={() => setOpenDropdown(null)}>
                                                 <Printer size={13} /> Print Invoice
                                             </Link>
-                                            <div className="border-t border-neutral-100 my-1" />
+                                            <div className="ac-dropdown-sep" />
 
                                             {/* Packed-stage contextual action */}
                                             {order.status === "packed" && (
                                                 isPickup(order) ? (
-                                                    <button
-                                                        onClick={() => markPickupReadyForOrder(order)}
-                                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-900 font-semibold hover:bg-neutral-50 text-left"
-                                                    >
+                                                    <button onClick={() => markPickupReadyForOrder(order)} className="ac-dropdown-item" style={{ color: "var(--ac-ink)", fontWeight: 600 }}>
                                                         <Store size={13} /> Mark Ready for Pickup
                                                     </button>
                                                 ) : (
-                                                    <button
-                                                        onClick={() => openDispatchForOrder(order)}
-                                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-blue-700 font-semibold hover:bg-neutral-50 text-left"
-                                                    >
+                                                    <button onClick={() => openDispatchForOrder(order)} className="ac-dropdown-item" style={{ color: "#6aa6ff", fontWeight: 600 }}>
                                                         <Truck size={13} /> Assign Rider & Ship
                                                     </button>
                                                 )
                                             )}
 
-                                            <button onClick={() => markFulfilledForOrder(order)}
-                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-emerald-600 hover:bg-neutral-50 text-left">
+                                            <button onClick={() => markFulfilledForOrder(order)} className="ac-dropdown-item" style={{ color: "var(--ac-accent)" }}>
                                                 Mark Fulfilled
                                             </button>
-                                            <Link href={`/sales/orders/${order.id}`}
-                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-xs uppercase tracking-widest text-neutral-600 hover:bg-neutral-50"
-                                                onClick={() => setOpenDropdown(null)}>
+                                            <Link href={`/sales/orders/${order.id}`} className="ac-dropdown-item" onClick={() => setOpenDropdown(null)}>
                                                 <Eye size={13} /> View Details
                                             </Link>
                                         </div>
@@ -773,32 +695,24 @@ export function OrdersClient({
                         ))}
                     </tbody>
                 </table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-4 border border-neutral-200 border-t-0 bg-white">
-                    <span className="text-[10px] uppercase tracking-widest text-neutral-500">
-                        Page {page} of {totalPages} · {totalCount} order{totalCount !== 1 ? "s" : ""}
-                    </span>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => navigate({ page: page - 1 })}
-                            disabled={page <= 1 || isPending}
-                            className="flex items-center gap-1 px-3 py-2 text-[10px] uppercase tracking-widest border border-neutral-200 hover:border-black disabled:opacity-40 disabled:hover:border-neutral-200 transition-colors"
-                        >
-                            <ChevronLeft size={13} /> Prev
-                        </button>
-                        <button
-                            onClick={() => navigate({ page: page + 1 })}
-                            disabled={page >= totalPages || isPending}
-                            className="flex items-center gap-1 px-3 py-2 text-[10px] uppercase tracking-widest border border-neutral-200 hover:border-black disabled:opacity-40 disabled:hover:border-neutral-200 transition-colors"
-                        >
-                            Next <ChevronRight size={13} />
-                        </button>
-                    </div>
                 </div>
-            )}
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderTop: "1px solid var(--ac-line)" }}>
+                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>
+                            Page {page} of {totalPages} · {totalCount} order{totalCount !== 1 ? "s" : ""}
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <button onClick={() => navigate({ page: page - 1 })} disabled={page <= 1 || isPending} className="ac-btn ac-btn-ghost ac-btn-sm">
+                                <ChevronLeft size={13} /> Prev
+                            </button>
+                            <button onClick={() => navigate({ page: page + 1 })} disabled={page >= totalPages || isPending} className="ac-btn ac-btn-ghost ac-btn-sm">
+                                Next <ChevronRight size={13} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>{/* end ac-card */}
 
             {showDispatch && (
                 <DispatchModal
@@ -807,6 +721,6 @@ export function OrdersClient({
                     onConfirm={handleDispatchConfirm}
                 />
             )}
-        </div>
+        </>
     );
 }
