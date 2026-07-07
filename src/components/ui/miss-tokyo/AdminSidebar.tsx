@@ -29,6 +29,10 @@ const Ico = {
     Logout:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/><path d="M10 16l-4-4 4-4M6 12h11"/></svg>,
     ChevronLeft:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>,
     ChevronRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>,
+    // Panel-collapse controls: a sidebar panel with a chevron — reads as "collapse
+    // the side panel", not "go back".
+    PanelCollapse: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>,
+    PanelExpand:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg>,
 };
 
 // ─── Nav item ─────────────────────────────────────────────────────────────────
@@ -153,7 +157,7 @@ export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, m
                 onClick={onToggleCollapse}
                 title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-                {collapsed ? <Ico.ChevronRight /> : <Ico.ChevronLeft />}
+                {collapsed ? <Ico.PanelExpand /> : <Ico.PanelCollapse />}
             </button>
 
             {/* Footer */}
