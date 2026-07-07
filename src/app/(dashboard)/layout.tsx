@@ -38,23 +38,29 @@ const getLayoutSettings = unstable_cache(
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
     const serverClient = await createClient();
-    const [{ data: { user } }, { storeData, bizData }] = await Promise.all([
-        serverClient.auth.getUser(),
+    // getClaims() verifies the session JWT locally (no auth-server round trip)
+    // when the project uses asymmetric signing keys; it falls back to getUser()
+    // for symmetric keys. Safe here because proxy.ts middleware has already
+    // validated and refreshed the session before this RSC renders — we only
+    // need the user id (sub claim); the role still comes from the DB below.
+    const [claimsResult, { storeData, bizData }] = await Promise.all([
+        serverClient.auth.getClaims(),
         getLayoutSettings(),
     ]);
+    const userId = claimsResult.data?.claims?.sub as string | undefined;
     const storeSettings = storeData as { enable_custom_requests: boolean } | null;
     const businessSettings = bizData as { business_name: string } | null;
 
-    if (!user) {
+    if (!userId) {
         redirect("/admin/login");
     }
 
     let userRole: string | null = null;
-    if (user) {
+    {
         const { data: profile } = await supabaseAdmin
             .from("profiles")
             .select("role")
-            .eq("id", user.id)
+            .eq("id", userId)
             .single();
         userRole = profile?.role ?? null;
     }
@@ -65,7 +71,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     }
 
     if (userRole && ["owner", "sales_staff"].includes(userRole)) {
-        logSignIn(user.id, userRole).catch(() => {}); // fire-and-forget, don't block render
+        logSignIn(userId, userRole).catch(() => {}); // fire-and-forget, don't block render
     }
 
     const isFullAccess = userRole === "admin" || userRole === "owner";
