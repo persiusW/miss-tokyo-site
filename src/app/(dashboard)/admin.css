@@ -782,3 +782,39 @@
   .admin-page { padding: 16px 16px 60px; }
   .ac-page-h1 { font-size: 36px; }
 }
+
+/* ─── Tailwind → theme-var compatibility bridge ──────────────────────────────
+   Some dashboard pages/tabs still use hardcoded Tailwind neutral utilities
+   (bg-white, border-neutral-*, text-neutral-*, bg-black) from before the Atelier
+   Console design system. Remap them to theme vars inside .admin-shell so they
+   respond to light/dark instead of rendering as white slabs. Scoped to
+   .admin-shell so the public storefront is unaffected. Specificity (0,2,0) beats
+   Tailwind's (0,1,0), so no !important needed. */
+.admin-shell .bg-white       { background-color: var(--ac-bg-2); }
+.admin-shell .bg-neutral-50  { background-color: var(--ac-bg); }
+.admin-shell .bg-neutral-100 { background-color: color-mix(in oklab, var(--ac-ink) 7%, transparent); }
+.admin-shell .bg-black       { background-color: var(--ac-ink); }
+.admin-shell .bg-neutral-800 { background-color: var(--ac-ink-2); }
+.admin-shell .hover\:bg-neutral-50:hover  { background-color: color-mix(in oklab, var(--ac-ink) 4%, transparent); }
+.admin-shell .hover\:bg-neutral-100:hover { background-color: color-mix(in oklab, var(--ac-ink) 7%, transparent); }
+.admin-shell .hover\:bg-neutral-800:hover { background-color: var(--ac-ink-2); }
+
+.admin-shell .text-white       { color: var(--ac-bg); }
+.admin-shell .text-black       { color: var(--ac-ink); }
+.admin-shell .text-neutral-900 { color: var(--ac-ink); }
+.admin-shell .text-neutral-800 { color: var(--ac-ink); }
+.admin-shell .text-neutral-700 { color: var(--ac-ink-2); }
+.admin-shell .text-neutral-600 { color: var(--ac-ink-2); }
+.admin-shell .text-neutral-500 { color: var(--ac-ink-3); }
+.admin-shell .text-neutral-400 { color: var(--ac-ink-4); }
+.admin-shell .text-neutral-300 { color: var(--ac-ink-4); }
+.admin-shell .hover\:text-black:hover { color: var(--ac-ink); }
+
+.admin-shell .border-neutral-100 { border-color: var(--ac-line); }
+.admin-shell .border-neutral-200 { border-color: var(--ac-line); }
+.admin-shell .border-neutral-300 { border-color: var(--ac-line-2); }
+.admin-shell .focus\:border-black:focus { border-color: var(--ac-ink-3); }
+.admin-shell .divide-neutral-100 > :not([hidden]) ~ :not([hidden]) { border-color: var(--ac-line); }
+.admin-shell .divide-neutral-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--ac-line); }
+
+.admin-shell .accent-black { accent-color: var(--ac-accent); }
