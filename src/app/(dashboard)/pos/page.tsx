@@ -248,11 +248,24 @@ export default function POSPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessionId }),
             });
-            const { paymentUrl: url, error: sendError } = await sendRes.json();
+            const { paymentUrl: url, error: sendError, delivery } = await sendRes.json();
             if (!sendRes.ok || !url) throw new Error(sendError ?? 'Failed to send link');
 
             setPaymentUrl(url);
-            toast.success('Payment link sent!');
+
+            // Report what actually reached the customer. A failed SMS still leaves
+            // a usable link on screen for staff to share manually.
+            const emailOk = delivery?.email !== false;
+            const smsOk = delivery?.sms === 'sent';
+            if (emailOk && smsOk) {
+                toast.success('Payment link sent by email and SMS');
+            } else if (emailOk && !smsOk) {
+                toast.error(`Email sent, but SMS failed${delivery?.smsError ? `: ${delivery.smsError}` : ''}. Share the link below.`);
+            } else if (!emailOk && smsOk) {
+                toast.error(`SMS sent, but email failed${delivery?.emailError ? `: ${delivery.emailError}` : ''}.`);
+            } else {
+                toast.error('Link created but neither email nor SMS went out. Share the link below.');
+            }
         } catch (e: any) {
             toast.error(e.message ?? 'Something went wrong');
         } finally {

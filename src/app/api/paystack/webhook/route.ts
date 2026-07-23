@@ -380,7 +380,15 @@ async function handlePosPayment(
     ]);
 
     if (emailResult.status === "rejected") console.error("[POS webhook] sendOrderConfirmation failed:", emailResult.reason);
-    if (smsResult.status === "rejected") console.error("[POS webhook] sendSMS failed:", smsResult.reason);
+    if (smsResult.status === "rejected") {
+        console.error("[POS webhook] sendSMS failed:", smsResult.reason);
+    } else if (!posSession.customer_phone) {
+        console.warn("[POS webhook] no customer phone on session — confirmation SMS skipped", { posSessionId });
+    } else {
+        // sendSMS resolves with { ok: false } on an mNotify failure instead of throwing
+        const sms = smsResult.value as { ok: boolean; error?: string } | undefined;
+        if (sms && !sms.ok) console.error("[POS webhook] sendSMS not delivered:", sms.error);
+    }
     if (pushResult.status === "rejected") console.error("[POS webhook] adminPush failed:", pushResult.reason);
     if (discountResult.status === "rejected") console.error("[POS webhook] trackDiscountUsage failed:", discountResult.reason);
 }

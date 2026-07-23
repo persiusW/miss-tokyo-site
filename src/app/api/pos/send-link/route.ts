@@ -192,7 +192,10 @@ export async function POST(req: NextRequest) {
     const firstName = session.customer_name.split(' ')[0];
     const itemList = items.map((i: any) => `${i.name}${i.size ? ` (${i.size})` : ''} x${i.quantity}`).join(', ');
 
-    await Promise.allSettled([
+    // The link must reach the customer on BOTH channels. sendSMS resolves with
+    // { ok: false } on an mNotify failure rather than throwing, so the result has
+    // to be inspected — a bare .catch() reports success for undelivered texts.
+    const [emailSettled, smsSettled] = await Promise.allSettled([
         // Email
         getResend().emails.send({
             from: 'Miss Tokyo <info@info.misstokyo.shop>',
@@ -207,16 +210,41 @@ export async function POST(req: NextRequest) {
                 <p><a href="${previewUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;">Review &amp; Pay &mdash; GH&#8373;${amountWithFee.toFixed(2)}</a></p>
                 <p style="color:#999;font-size:12px;">This link expires in 30 minutes.</p>
             `,
-        }).catch((e: unknown) => console.error('[pos/send-link] email error:', e)),
+        }),
 
         // SMS
         session.customer_phone
             ? sendSMS({
                 to: session.customer_phone,
                 message: `Hi ${firstName}, your Miss Tokyo order (GH${String.fromCharCode(8373)}${amountWithFee.toFixed(2)}) is ready. Review and pay here: ${previewUrl} (expires in 30 mins)`,
-            }).catch((e: unknown) => console.error('[pos/send-link] sms error:', e))
-            : Promise.resolve(),
+            })
+            : Promise.resolve(null),
     ]);
+
+    let emailSent = false;
+    let emailError: string | null = null;
+    if (emailSettled.status === 'fulfilled') {
+        const resendError = (emailSettled.value as { error?: { message?: string } } | undefined)?.error;
+        emailSent = !resendError;
+        emailError = resendError?.message ?? null;
+    } else {
+        emailError = String((emailSettled.reason as Error)?.message ?? emailSettled.reason);
+    }
+    if (emailError) console.error('[pos/send-link] email error:', emailError);
+
+    let smsStatus: 'sent' | 'failed' | 'no_phone' = 'no_phone';
+    let smsError: string | null = null;
+    if (session.customer_phone) {
+        if (smsSettled.status === 'fulfilled') {
+            const result = smsSettled.value as { ok: boolean; error?: string } | null;
+            smsStatus = result?.ok ? 'sent' : 'failed';
+            smsError = result?.ok ? null : (result?.error ?? 'Unknown SMS error');
+        } else {
+            smsStatus = 'failed';
+            smsError = String((smsSettled.reason as Error)?.message ?? smsSettled.reason);
+        }
+    }
+    if (smsError) console.error('[pos/send-link] sms error:', smsError);
 
     // Return the preview URL — staff copies/shares this, not the raw Paystack URL
     return NextResponse.json({
@@ -224,5 +252,8 @@ export async function POST(req: NextRequest) {
         sessionId,
         total: amountWithFee,
         discount: validatedDiscount ? { code: validatedDiscount.code, amount: discountAmount, label: validatedDiscount.label } : null,
+        // Per-channel outcome so the till can tell staff what actually reached
+        // the customer instead of always claiming both were delivered
+        delivery: { email: emailSent, emailError, sms: smsStatus, smsError },
     });
 }
