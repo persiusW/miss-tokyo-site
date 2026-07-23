@@ -5,29 +5,12 @@ import { useCart, getEffectivePrice } from "@/store/useCart";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { evaluateAutoDiscounts, type AutoDiscountResult } from "@/lib/autoDiscount";
+import { GHANA_REGIONS, COUNTRIES } from "@/lib/geo";
 import Image from "next/image";
 
 // ── Static data ───────────────────────────────────────────────────────────────
-
-const GHANA_REGIONS = [
-    "Greater Accra", "Ashanti", "Western", "Central", "Eastern",
-    "Volta", "Oti", "Bono", "Bono East", "Ahafo",
-    "Northern", "Savannah", "North East", "Upper East", "Upper West", "Western North",
-];
-
-const COUNTRIES = [
-    "Ghana",
-    "Nigeria", "Côte d'Ivoire", "Togo", "Benin", "Burkina Faso",
-    "Senegal", "Gambia", "Guinea", "Sierra Leone", "Liberia", "Mali", "Niger",
-    "Cameroon", "Kenya", "Uganda", "Tanzania", "South Africa", "Ethiopia",
-    "Egypt", "Morocco", "Tunisia", "Algeria",
-    "United Kingdom", "United States", "Canada", "France", "Germany",
-    "Italy", "Spain", "Netherlands", "Belgium", "Switzerland", "Sweden", "Norway",
-    "Australia", "New Zealand", "India", "China", "Japan", "South Korea",
-    "Brazil", "Mexico", "Argentina",
-    "United Arab Emirates", "Saudi Arabia", "Qatar", "Kuwait", "Bahrain", "Oman",
-    "Other",
-];
+// Country/region lists live in @/lib/geo so the POS till offers exactly the same
+// options and writes the same address shape.
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
