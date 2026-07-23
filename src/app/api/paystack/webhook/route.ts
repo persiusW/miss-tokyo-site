@@ -3,7 +3,7 @@ export const maxDuration = 60; // 1 minute — safe window for Paystack webhook 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { revalidateTag } from "next/cache";
-import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
+import { confirmSale, fallbackDecrementFromItems, decrementDirect } from "@/lib/inventory";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMS, sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
@@ -280,12 +280,12 @@ async function handlePosPayment(
                 });
             }
 
-            const { error } = await supabaseAdmin.rpc("fn_decrement_stock", {
-                p_product_id: item.productId,
-                p_variant_id: product.track_variant_inventory ? (item.variantId ?? null) : null,
-                p_quantity: qty,
-            });
-            if (error) console.error("[POS webhook] fn_decrement_stock failed:", error.message, { productId: item.productId });
+            await decrementDirect(
+                item.productId,
+                product.track_variant_inventory ? (item.variantId ?? null) : null,
+                qty,
+                "pos settlement",
+            );
         }));
 
         revalidateTag("products", "max");
@@ -579,17 +579,15 @@ export async function POST(req: Request) {
                         console.log(`[webhook] fallback stock decrement applied for order ${orderId} (no reservation row)`);
                     }
                 } else if (productId) {
-                    // Legacy single-product path (no orderId in metadata)
+                    // Legacy single-product path (no orderId in metadata).
+                    // Goes through the inventory lib so the decrement is atomic.
                     const { data: product } = await supabaseAdmin
                         .from("products")
-                        .select("inventory_count, track_inventory")
+                        .select("track_inventory")
                         .eq("id", productId)
                         .single();
                     if (product?.track_inventory !== false) {
-                        await supabaseAdmin
-                            .from("products")
-                            .update({ inventory_count: Math.max(0, (product?.inventory_count ?? 0) - 1) })
-                            .eq("id", productId);
+                        await decrementDirect(productId, null, 1, "legacy single-product charge");
                     }
                 }
 

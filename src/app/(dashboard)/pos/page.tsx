@@ -244,6 +244,38 @@ export default function POSPage() {
         const customer = customerMode === 'search' ? selectedContact! : newCustomer;
         setSending(true);
         try {
+            // Same real-time stock gate the storefront runs before payment, so a
+            // till and a customer can't both be promised the last unit. Nets off
+            // live holds; pre-order items are exempt.
+            const checkItems = cart.map(i => ({
+                productId: i.productId,
+                variantId: i.variantId,
+                size: i.size ?? undefined,
+                color: i.color ?? undefined,
+                quantity: i.quantity,
+            }));
+            const stockRes = await fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`);
+            const stockData = await stockRes.json();
+            if (Array.isArray(stockData?.results)) {
+                const issues: string[] = [];
+                stockData.results.forEach((result: any, idx: number) => {
+                    const line = cart[idx];
+                    if (!line) return;
+                    if (!result.isActive) {
+                        issues.push(`"${line.name}" is no longer available.`);
+                    } else if (!result.preorderEnabled && result.available < line.quantity) {
+                        issues.push(result.available === 0
+                            ? `"${line.name}"${line.size ? ` (${line.size})` : ''} is sold out.`
+                            : `"${line.name}"${line.size ? ` (${line.size})` : ''} only has ${result.available} left.`);
+                    }
+                });
+                if (issues.length > 0) {
+                    toast.error(issues.join(' '));
+                    setSending(false);
+                    return;
+                }
+            }
+
             const sessionRes = await fetch('/api/pos/session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

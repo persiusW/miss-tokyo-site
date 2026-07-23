@@ -16,11 +16,20 @@
 --      summing.
 -- ============================================================
 
--- 1. Reservation uniqueness must be per variant, matching online_reservations
-DROP INDEX IF EXISTS public.idx_pos_reservations_no_duplicate;
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_reservations_no_duplicate
+-- 1. Reservation uniqueness must be per variant, matching online_reservations.
+--
+--    NOTE ON THE "DESTRUCTIVE OPERATION" WARNING: Supabase flags any DROP.
+--    The only DROP here is of an INDEX — indexes hold no data, they are derived
+--    structures rebuilt from the table. No row, column, table or constraint is
+--    removed and nothing in pos_reservations is altered.
+--
+--    The new index is created FIRST under its own name, so uniqueness is never
+--    absent even momentarily, and the old one is dropped only once the
+--    replacement is in place.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_reservations_no_duplicate_v2
     ON public.pos_reservations (product_id, variant_id, pos_session_id) NULLS NOT DISTINCT;
+
+DROP INDEX IF EXISTS public.idx_pos_reservations_no_duplicate;
 
 -- 2. Harden the reservation function
 CREATE OR REPLACE FUNCTION public.fn_reserve_pos_stock(
@@ -108,6 +117,29 @@ LANGUAGE sql STABLE AS $$
     SELECT p.id, public.fn_combined_available_stock(p.id, NULL)
     FROM public.products p
     WHERE p.id = ANY(p_product_ids);
+$$;
+
+-- 3b. Batched availability for arbitrary (product, variant) pairs, so the cart
+--     and checkout pre-checks can net off live holds in one round trip instead
+--     of reading raw inventory_count.
+--     p_items: [{"product_id":"uuid","variant_id":"uuid|null"}, ...]
+CREATE OR REPLACE FUNCTION public.fn_available_stock_batch(p_items JSONB)
+RETURNS TABLE (product_id UUID, variant_id UUID, available INTEGER)
+LANGUAGE sql STABLE AS $$
+    SELECT
+        (i.value ->> 'product_id')::UUID,
+        CASE WHEN (i.value -> 'variant_id') IS NULL OR (i.value -> 'variant_id') = 'null'::jsonb
+             THEN NULL
+             ELSE (i.value ->> 'variant_id')::UUID
+        END,
+        public.fn_combined_available_stock(
+            (i.value ->> 'product_id')::UUID,
+            CASE WHEN (i.value -> 'variant_id') IS NULL OR (i.value -> 'variant_id') = 'null'::jsonb
+                 THEN NULL
+                 ELSE (i.value ->> 'variant_id')::UUID
+            END
+        )
+    FROM jsonb_array_elements(p_items) AS i(value);
 $$;
 
 -- 4. Atomic inventory decrement — replaces the webhook's read-modify-write,

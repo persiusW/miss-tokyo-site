@@ -97,6 +97,57 @@ checks exist in the online function; both are now in the POS one.
 
 ---
 
+---
+
+## System-wide oversell sweep
+
+Follow-up pass over every path that can reduce stock, to make pre-order the
+**only** way an item sells beyond its count.
+
+**Every read-modify-write decrement is gone.** `grep "inventory_count: Math.max"`
+now returns nothing. All decrements route through `fn_decrement_stock`, one
+atomic `UPDATE` per call, where the row lock makes concurrent decrements queue
+rather than race. Converted:
+
+| Path | Was |
+|---|---|
+| `confirmSale` (storefront settlement) | read-then-write, lost updates across two orders |
+| `fallbackDecrementFromItems` | read-then-write |
+| `decrementDirect` | read-then-write |
+| POS settlement in the webhook | read-then-write, and skipped variants entirely |
+| Legacy single-product charge in the webhook | read-then-write |
+
+**Availability reads now net off live holds.** `checkStock` and `getStockStatus`
+read raw `inventory_count`, so the cart drawer, the PDP and the checkout
+pre-check all advertised units another in-flight order was already holding. Both
+now use `fn_available_stock_batch` → `fn_combined_available_stock` (on hand −
+POS holds − online holds), the same figure the reservation functions enforce.
+The `9999` untracked sentinel and pre-order items bypass as before.
+
+**POS now runs checkout's pre-payment check.** The till calls
+`/api/inventory/check` before creating the session — the same endpoint and the
+same rules the storefront uses — so staff see "sold out" or "only N left" before
+a link goes out rather than hitting a reservation failure.
+
+### Paths confirmed safe
+
+- **Storefront checkout** — `reserveStock` fails closed: order cancelled, 409
+  returned, no Paystack call.
+- **POS** — reserves at send-link, now with variant resolution.
+- **Invoices / pay links** — carry an amount, not an item list, so they never
+  touch stock by design. Selling a physical item this way bypasses inventory;
+  that is a process question, not a code defect.
+- **Pre-order** — bypasses reservation in both reserve functions, by design.
+
+### Layers now standing between a sale and an oversell
+
+1. Till/cart shows availability net of holds.
+2. `/api/inventory/check` pre-payment gate (both surfaces).
+3. Atomic reservation under a row lock, in a deterministic order.
+4. Atomic decrement at settlement.
+
+---
+
 ## Found, NOT fixed — needs a decision
 
 ### 7. Gift card double-spend across concurrent sessions (HIGH)

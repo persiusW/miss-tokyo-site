@@ -28,6 +28,42 @@ export type StockCheckResult =
     | { ok: false; code: "INSUFFICIENT_STOCK" | "PRODUCT_UNAVAILABLE"; item: string; available: number };
 
 /**
+ * The single sanctioned way to reduce stock.
+ *
+ * Every decrement in this file used to read inventory_count and write back
+ * count - qty in a separate statement. Two orders for the same product settling
+ * at the same moment both read the same starting value, so one decrement was
+ * lost and the item oversold. fn_decrement_stock does it in one UPDATE, where
+ * the row lock makes concurrent decrements queue instead of racing.
+ */
+async function decrementStock(productId: string, variantId: string | null, quantity: number): Promise<void> {
+    const { error } = await supabaseAdmin.rpc("fn_decrement_stock", {
+        p_product_id: productId,
+        p_variant_id: variantId,
+        p_quantity: quantity,
+    });
+    if (error) console.error("[inventory] fn_decrement_stock failed:", error.message, { productId, variantId, quantity });
+}
+
+/**
+ * Availability for (product, variant) pairs, net of live POS and online holds.
+ * Reading raw inventory_count lets two buyers each see the last unit as free.
+ * Falls back to null when the RPC is unavailable so callers can degrade.
+ */
+async function availabilityMap(
+    pairs: Array<{ productId: string; variantId: string | null }>,
+): Promise<Map<string, number> | null> {
+    if (!pairs.length) return new Map();
+    const { data, error } = await supabaseAdmin.rpc("fn_available_stock_batch", {
+        p_items: pairs.map(p => ({ product_id: p.productId, variant_id: p.variantId })),
+    });
+    if (error || !Array.isArray(data)) return null;
+    return new Map(
+        (data as any[]).map(r => [`${r.product_id}|${r.variant_id ?? "null"}`, Number(r.available)]),
+    );
+}
+
+/**
  * Read-only availability check. Does NOT hold stock.
  * Use for cart drawer validation and checkout page pre-check.
  */
@@ -52,21 +88,37 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
         .map((p: any) => p.id);
 
     const variantStockMap: Record<string, number> = {};
+    const variantIdMap: Record<string, string> = {};
 
     if (variantTrackedIds.length > 0) {
         const variantItems = items.filter(i => variantTrackedIds.includes(i.productId));
         if (variantItems.length > 0) {
             const { data: variants } = await supabaseAdmin
                 .from("product_variants")
-                .select("product_id, size, color, brand, inventory_count")
+                .select("id, product_id, size, color, brand, inventory_count")
                 .in("product_id", variantTrackedIds);
 
             for (const v of variants ?? []) {
                 const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
                 variantStockMap[key] = (v as any).inventory_count ?? 0;
+                variantIdMap[key] = (v as any).id;
             }
         }
     }
+
+    // Availability nets off live POS + online holds. Without it this check
+    // green-lights stock another in-flight order already holds, and the buyer
+    // only discovers it when reservation fails at payment time.
+    const resolve = (item: ReserveItem, product: any) => {
+        const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
+        return product.track_variant_inventory && item.size ? (variantIdMap[key] ?? null) : null;
+    };
+    const netAvailable = await availabilityMap(
+        items
+            .map(i => ({ item: i, product: productMap.get(i.productId) as any }))
+            .filter(x => x.product && !x.product.preorder_enabled)
+            .map(x => ({ productId: x.item.productId, variantId: resolve(x.item, x.product) })),
+    );
 
     for (const item of items) {
         const product = productMap.get(item.productId) as any;
@@ -75,16 +127,19 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
         }
         if (product.preorder_enabled) continue;
 
-        let stock: number;
-        if (product.track_variant_inventory && item.size) {
-            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
-            stock = variantStockMap[key] ?? 0;
-        } else {
-            stock = product.inventory_count ?? 0;
-        }
+        const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
+        const rawStock = product.track_variant_inventory && item.size
+            ? (variantStockMap[key] ?? 0)
+            : (product.inventory_count ?? 0);
 
-        if (stock !== 9999 && item.quantity > stock) {
-            return { ok: false, code: "INSUFFICIENT_STOCK", item: item.productId, available: stock };
+        // 9999 is the "not tracked" sentinel — never gate on it
+        if (rawStock === 9999) continue;
+
+        const netKey = `${item.productId}|${resolve(item, product) ?? "null"}`;
+        const stock = netAvailable?.get(netKey) ?? rawStock;
+
+        if (item.quantity > stock) {
+            return { ok: false, code: "INSUFFICIENT_STOCK", item: item.productId, available: Math.max(0, stock) };
         }
     }
 
@@ -111,18 +166,34 @@ export async function getStockStatus(items: ReserveItem[]): Promise<StockStatus[
         .map((p: any) => p.id);
 
     const variantStockMap: Record<string, number> = {};
+    const variantIdMap: Record<string, string> = {};
 
     if (variantTrackedIds.length > 0) {
         const { data: variants } = await supabaseAdmin
             .from("product_variants")
-            .select("product_id, size, color, brand, inventory_count")
+            .select("id, product_id, size, color, brand, inventory_count")
             .in("product_id", variantTrackedIds);
 
         for (const v of variants ?? []) {
             const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
             variantStockMap[key] = (v as any).inventory_count ?? 0;
+            variantIdMap[key] = (v as any).id;
         }
     }
+
+    const keyFor = (item: ReserveItem) =>
+        `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
+    const resolve = (item: ReserveItem, product: any) =>
+        product?.track_variant_inventory && item.size ? (variantIdMap[keyFor(item)] ?? null) : null;
+
+    // Same netting as checkStock — the cart drawer and PDP must not advertise
+    // units that are already held by an in-flight order.
+    const netAvailable = await availabilityMap(
+        items
+            .map(i => ({ item: i, product: productMap.get(i.productId) as any }))
+            .filter(x => x.product && !x.product.preorder_enabled)
+            .map(x => ({ productId: x.item.productId, variantId: resolve(x.item, x.product) })),
+    );
 
     return items.map(item => {
         const product = productMap.get(item.productId) as any;
@@ -130,18 +201,19 @@ export async function getStockStatus(items: ReserveItem[]): Promise<StockStatus[
             return { productId: item.productId, variantId: item.variantId, available: 0, isActive: false, preorderEnabled: false };
         }
 
-        let available: number;
-        if (product.track_variant_inventory && item.size) {
-            const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
-            available = variantStockMap[key] ?? 0;
-        } else {
-            available = product.inventory_count ?? 0;
-        }
+        const rawAvailable = product.track_variant_inventory && item.size
+            ? (variantStockMap[keyFor(item)] ?? 0)
+            : (product.inventory_count ?? 0);
+
+        const resolvedVariantId = resolve(item, product);
+        const net = rawAvailable === 9999
+            ? rawAvailable
+            : (netAvailable?.get(`${item.productId}|${resolvedVariantId ?? "null"}`) ?? rawAvailable);
 
         return {
             productId: item.productId,
-            variantId: item.variantId ?? null,
-            available,
+            variantId: item.variantId ?? resolvedVariantId,
+            available: Math.max(0, net),
             isActive: product.is_active ?? true,
             preorderEnabled: product.preorder_enabled ?? false,
         };
@@ -199,48 +271,13 @@ export async function confirmSale(orderId: string): Promise<boolean> {
         console.warn(`[confirmSale] Late webhook for order ${orderId}: reservation expired but payment confirmed — processing sale`);
     }
 
-    // Decrement variant-level stock
-    const variantRows = reservations.filter((r: any) => r.variant_id);
-    if (variantRows.length > 0) {
-        const vIds = variantRows.map((r: any) => r.variant_id!);
-        const { data: variants } = await supabaseAdmin
-            .from("product_variants")
-            .select("id, inventory_count")
-            .in("id", vIds);
-
-        const variantMap = new Map((variants ?? []).map((v: any) => [v.id, v.inventory_count ?? 0]));
-
-        await Promise.all(
-            variantRows.map((r: any) =>
-                supabaseAdmin
-                    .from("product_variants")
-                    .update({ inventory_count: Math.max(0, (variantMap.get(r.variant_id) ?? 0) - r.quantity) })
-                    .eq("id", r.variant_id)
-            )
-        );
-    }
-
-    // Decrement product-level stock (aggregate quantity per product)
-    const qtyByProduct: Record<string, number> = {};
-    for (const r of reservations as any[]) {
-        qtyByProduct[r.product_id] = (qtyByProduct[r.product_id] ?? 0) + r.quantity;
-    }
-
-    const pIds = Object.keys(qtyByProduct);
-    const { data: products } = await supabaseAdmin
-        .from("products")
-        .select("id, inventory_count")
-        .in("id", pIds);
-
-    const productMap = new Map((products ?? []).map((p: any) => [p.id, p.inventory_count ?? 0]));
-
+    // One atomic call per reservation row. fn_decrement_stock takes the variant
+    // down (when present) and the product-level count together, so the two can
+    // never drift apart.
     await Promise.all(
-        Object.entries(qtyByProduct).map(([productId, qty]) =>
-            supabaseAdmin
-                .from("products")
-                .update({ inventory_count: Math.max(0, (productMap.get(productId) ?? 0) - qty) })
-                .eq("id", productId)
-        )
+        (reservations as any[]).map(r =>
+            decrementStock(r.product_id, r.variant_id ?? null, r.quantity),
+        ),
     );
 
     return true;
@@ -303,25 +340,9 @@ export async function fallbackDecrementFromItems(
         if (product.track_variant_inventory) {
             const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
             const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
-            if (resolvedVariantId) {
-                const { data: variant } = await supabaseAdmin
-                    .from("product_variants")
-                    .select("inventory_count")
-                    .eq("id", resolvedVariantId)
-                    .single();
-                if (variant) {
-                    await supabaseAdmin.from("product_variants")
-                        .update({ inventory_count: Math.max(0, (variant.inventory_count ?? 0) - qty) })
-                        .eq("id", resolvedVariantId);
-                }
-            }
-            await supabaseAdmin.from("products")
-                .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
-                .eq("id", item.productId);
+            await decrementStock(item.productId, resolvedVariantId, qty);
         } else {
-            await supabaseAdmin.from("products")
-                .update({ inventory_count: Math.max(0, (product.inventory_count ?? 0) - qty) })
-                .eq("id", item.productId);
+            await decrementStock(item.productId, null, qty);
         }
     }));
 }
@@ -336,25 +357,5 @@ export async function decrementDirect(
     quantity: number,
     _reason: string
 ): Promise<void> {
-    if (variantId) {
-        const { data } = await supabaseAdmin
-            .from("product_variants")
-            .select("inventory_count")
-            .eq("id", variantId)
-            .single();
-        await supabaseAdmin
-            .from("product_variants")
-            .update({ inventory_count: Math.max(0, (data?.inventory_count ?? 0) - quantity) })
-            .eq("id", variantId);
-    } else {
-        const { data } = await supabaseAdmin
-            .from("products")
-            .select("inventory_count")
-            .eq("id", productId)
-            .single();
-        await supabaseAdmin
-            .from("products")
-            .update({ inventory_count: Math.max(0, (data?.inventory_count ?? 0) - quantity) })
-            .eq("id", productId);
-    }
+    await decrementStock(productId, variantId, quantity);
 }
