@@ -39,16 +39,64 @@ test.describe("POS fulfilment", () => {
         await addBtn.waitFor({ state: "visible" });
         await addBtn.click();
 
-        // New customer, no address
+        // New customer, phone supplied so the address is the only thing missing
         await page.getByRole("button", { name: "New", exact: true }).click();
         await page.getByPlaceholder("Full Name *").fill("Fulfilment Test");
         await page.getByPlaceholder("Email *").fill("fulfilment-test@example.com");
+        await page.getByPlaceholder(/^Phone \*/).fill("0244123456");
 
         await page.getByRole("button", { name: "Delivery", exact: true }).click();
         await page.getByRole("button", { name: /^Send Link/ }).click();
 
         await expect(page.getByText("Delivery address is required")).toBeVisible();
         await page.screenshot({ path: "tests/reports/pos-fulfilment-validation.png" });
+    });
+});
+
+/**
+ * The payment link goes out by email AND SMS. A missing phone silently skipped
+ * the text, so staff believed both had been sent.
+ */
+test.describe("POS payment link delivery", () => {
+    test("blocks send when no phone is given", async ({ page }) => {
+        await page.goto("/pos");
+        await expect(page.getByRole("heading", { name: "Point of Sale" })).toBeVisible();
+
+        const addBtn = page.getByRole("button", { name: "Add", exact: true }).first();
+        await addBtn.waitFor({ state: "visible" });
+        await addBtn.click();
+
+        await page.getByRole("button", { name: "New", exact: true }).click();
+        await page.getByPlaceholder("Full Name *").fill("No Phone");
+        await page.getByPlaceholder("Email *").fill("no-phone@example.com");
+
+        await page.getByRole("button", { name: /^Send Link/ }).click();
+        await expect(page.getByText(/phone is required/i)).toBeVisible();
+        await page.screenshot({ path: "tests/reports/pos-phone-required.png" });
+    });
+
+    test("rejects an obviously incomplete phone number", async ({ page }) => {
+        await page.goto("/pos");
+        const addBtn = page.getByRole("button", { name: "Add", exact: true }).first();
+        await addBtn.waitFor({ state: "visible" });
+        await addBtn.click();
+
+        await page.getByRole("button", { name: "New", exact: true }).click();
+        await page.getByPlaceholder("Full Name *").fill("Short Phone");
+        await page.getByPlaceholder("Email *").fill("short-phone@example.com");
+        await page.getByPlaceholder(/^Phone \*/).fill("0244");
+
+        await page.getByRole("button", { name: /^Send Link/ }).click();
+        await expect(page.getByText(/looks incomplete/i)).toBeVisible();
+    });
+
+    test("phone field is shown for existing contacts too", async ({ page }) => {
+        // An existing contact with no phone on file previously had no way to add
+        // one, so the SMS was skipped with no indication
+        await page.goto("/pos");
+        await expect(page.getByRole("heading", { name: "Point of Sale" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Existing", exact: true })).toBeVisible();
+        await expect(page.getByPlaceholder(/^Phone \*/)).toBeVisible();
     });
 });
 

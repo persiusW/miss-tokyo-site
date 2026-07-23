@@ -68,7 +68,11 @@ export default function POSPage() {
     const [contactSearch, setContactSearch] = useState('');
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-    const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '' });
+    const [newCustomer, setNewCustomer] = useState({ name: '', email: '' });
+    // Shared across both customer modes — the payment link goes out by SMS as
+    // well as email, so a phone is needed even for an existing contact that
+    // has none on file
+    const [customerPhone, setCustomerPhone] = useState('');
     const [deliveryMethod, setDeliveryMethod] = useState<PosDeliveryMethod>('pickup');
     const [deliveryAddress, setDeliveryAddress] = useState('');
     const [discountInput, setDiscountInput] = useState('');
@@ -211,6 +215,9 @@ export default function POSPage() {
             if (!newCustomer.name.trim()) { toast.error('Customer name is required'); return; }
             if (!newCustomer.email.trim()) { toast.error('Customer email is required'); return; }
         }
+        // The link is sent by email AND SMS — without a phone the text is silently skipped
+        if (!customerPhone.trim()) { toast.error('Customer phone is required — the link is sent by SMS too'); return; }
+        if (customerPhone.replace(/\D/g, '').length < 9) { toast.error('That phone number looks incomplete'); return; }
         if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
             toast.error('Delivery address is required');
             return;
@@ -224,7 +231,7 @@ export default function POSPage() {
                 body: JSON.stringify({
                     customer_name: customer.name,
                     customer_email: customer.email,
-                    customer_phone: ('phone' in customer ? customer.phone : null) || null,
+                    customer_phone: customerPhone.trim(),
                     customer_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
                     contact_id: customerMode === 'search' ? (selectedContact?.id ?? undefined) : undefined,
                     delivery_method: deliveryMethod,
@@ -262,7 +269,8 @@ export default function POSPage() {
 
     const reset = () => {
         setCart([]); setPaymentUrl(null); setSelectedContact(null);
-        setNewCustomer({ name: '', email: '', phone: '' });
+        setNewCustomer({ name: '', email: '' });
+        setCustomerPhone('');
         setDeliveryMethod('pickup'); setDeliveryAddress('');
         setAppliedDiscount(null); setDiscountInput('');
         setNotes(''); setContactSearch('');
@@ -375,7 +383,7 @@ export default function POSPage() {
                             {contacts.length > 0 && !selectedContact && (
                                 <div style={{ border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", overflow: "hidden", maxHeight: 120, overflowY: "auto" }}>
                                     {contacts.map(c => (
-                                        <button key={c.email} onClick={() => { setSelectedContact(c); setContactSearch(c.name); setContacts([]); }}
+                                        <button key={c.email} onClick={() => { setSelectedContact(c); setContactSearch(c.name); setContacts([]); setCustomerPhone(c.phone ?? ''); }}
                                             style={{ width: "100%", textAlign: "left", padding: "8px 10px", background: "var(--ac-panel-2)", border: "none", borderBottom: "1px solid var(--ac-line)", cursor: "pointer" }}>
                                             <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ac-ink)" }}>{c.name}</p>
                                             <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>{c.email}</p>
@@ -387,7 +395,6 @@ export default function POSPage() {
                                 <div style={{ padding: "8px 10px", background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)" }}>
                                     <p style={{ fontSize: 12, fontWeight: 600, color: "var(--ac-ink)" }}>{selectedContact.name}</p>
                                     <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>{selectedContact.email}</p>
-                                    {selectedContact.phone && <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>{selectedContact.phone}</p>}
                                 </div>
                             )}
                         </div>
@@ -396,7 +403,6 @@ export default function POSPage() {
                             {[
                                 { key: 'name', placeholder: 'Full Name *', type: 'text' },
                                 { key: 'email', placeholder: 'Email *', type: 'email' },
-                                { key: 'phone', placeholder: 'Phone', type: 'tel' },
                             ].map(f => (
                                 <input key={f.key} type={f.type} placeholder={f.placeholder}
                                     value={(newCustomer as any)[f.key]}
@@ -405,6 +411,12 @@ export default function POSPage() {
                             ))}
                         </div>
                     )}
+
+                    {/* Phone applies to both modes — the payment link is texted as well as emailed */}
+                    <input type="tel" placeholder="Phone * (link is sent by SMS)"
+                        value={customerPhone}
+                        onChange={e => setCustomerPhone(e.target.value)}
+                        style={inputStyle} />
 
                     {/* Gift card / discount code — same codes a customer can use at checkout */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
