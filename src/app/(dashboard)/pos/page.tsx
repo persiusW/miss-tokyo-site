@@ -94,7 +94,23 @@ export default function POSPage() {
             .limit(40);
         if (q.trim()) dbQuery = dbQuery.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
         const { data } = await dbQuery;
-        setProducts((data ?? []).map((p: any) => ({ ...p, inventory_count: p.inventory_count ?? 0 })));
+        const rows = (data ?? []).map((p: any) => ({ ...p, inventory_count: p.inventory_count ?? 0 }));
+
+        // Show stock net of live holds. The raw count lets two tills each see
+        // "2 left" for the same last-2 units and both promise them. One batched
+        // call — per-product RPCs would be 40 round trips on every keystroke.
+        const trackedIds = rows.filter((p: any) => p.track_inventory && !p.track_variant_inventory).map((p: any) => p.id);
+        if (trackedIds.length > 0) {
+            const { data: avail } = await supabase.rpc('fn_available_stock_bulk', { p_product_ids: trackedIds });
+            if (Array.isArray(avail)) {
+                const availMap = new Map(avail.map((a: any) => [a.product_id, a.available]));
+                for (const p of rows) {
+                    const net = availMap.get(p.id);
+                    if (typeof net === 'number') p.inventory_count = net;
+                }
+            }
+        }
+        setProducts(rows);
     }, []);
 
     useEffect(() => { searchProducts(query); }, [query, searchProducts]);

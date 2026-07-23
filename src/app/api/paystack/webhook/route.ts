@@ -264,38 +264,28 @@ async function handlePosPayment(
             .in("id", productIds);
         const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
 
+        // Single atomic decrement per line. The previous read-modify-write lost
+        // updates whenever two orders for the same product settled together, and
+        // skipped variant-tracked products entirely when variantId was absent.
         await Promise.allSettled(items.map(async (item: any) => {
             const product = productMap.get(item.productId);
             if (!product || product.track_inventory === false) return;
             const qty = item.quantity ?? 1;
-            if (product.track_variant_inventory && item.variantId) {
-                // Deduct variant stock
-                const { data: variant } = await supabaseAdmin
-                    .from("product_variants")
-                    .select("inventory_count")
-                    .eq("id", item.variantId)
-                    .single();
-                if (variant && typeof variant.inventory_count === "number") {
-                    await supabaseAdmin
-                        .from("product_variants")
-                        .update({ inventory_count: Math.max(0, variant.inventory_count - qty) })
-                        .eq("id", item.variantId);
-                }
-                // Also deduct product-level stock
-                if (typeof product.inventory_count === "number") {
-                    await supabaseAdmin
-                        .from("products")
-                        .update({ inventory_count: Math.max(0, product.inventory_count - qty) })
-                        .eq("id", item.productId);
-                }
-            } else if (!product.track_variant_inventory && typeof product.inventory_count === "number") {
-                await supabaseAdmin
-                    .from("products")
-                    .update({ inventory_count: Math.max(0, product.inventory_count - qty) })
-                    .eq("id", item.productId);
-            } else {
-                console.warn("[POS webhook] inventory skip: track_variant_inventory=true but variantId missing", { productId: item.productId });
+
+            if (product.track_variant_inventory && !item.variantId) {
+                // send-link resolves this now; a session drafted before that fix
+                // could still arrive here. Decrement product level and shout.
+                console.error("[POS webhook] variant unresolved — variant stock NOT decremented", {
+                    posSessionId, productId: item.productId, size: item.size, color: item.color,
+                });
             }
+
+            const { error } = await supabaseAdmin.rpc("fn_decrement_stock", {
+                p_product_id: item.productId,
+                p_variant_id: product.track_variant_inventory ? (item.variantId ?? null) : null,
+                p_quantity: qty,
+            });
+            if (error) console.error("[POS webhook] fn_decrement_stock failed:", error.message, { productId: item.productId });
         }));
 
         revalidateTag("products", "max");
