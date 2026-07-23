@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
-import { sendSMS } from "@/lib/sms";
+import { sendSMSLogged } from "@/lib/sms";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendCustomerPush } from "@/lib/customerPush";
 
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
                 .map(o => `${o.customer_name || o.customer_email} · ${(o.shipping_address as any)?.text || (o.shipping_address as any)?.city || ""}`)
                 .join("; ");
 
-            await sendSMS({
+            await sendSMSLogged("dispatch:rider", {
                 to: rider.phone_number,
                 message: `${bizName} Dispatch: You have ${orders.length} order${orders.length > 1 ? "s" : ""} to deliver. ${orderLines}. Contact dispatch for full details.`,
             });
@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
             .filter(o => !!o.customer_phone)
             .map(o => {
                 const ref = o.id.substring(0, 8).toUpperCase();
-                return sendSMS({
+                return sendSMSLogged("dispatch:customer", {
                     to: o.customer_phone!,
                     message: `${bizName}: Hi ${o.customer_name || "there"}, your order #${ref} is on its way! Your rider ${rider.full_name} will contact you at ${rider.phone_number}. Thank you!`,
                 });

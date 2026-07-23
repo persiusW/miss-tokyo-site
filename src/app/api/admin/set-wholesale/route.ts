@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendEmail } from "@/lib/email";
-import { sendSMS } from "@/lib/sms";
+import { sendSMSLogged } from "@/lib/sms";
 
 export async function POST(req: NextRequest) {
     // Auth check — only admin/owner can promote users
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
                     html,
                     from: `${bizName} <${fromEmail}>`,
                 }),
-                profile.phone ? sendSMS({
+                profile.phone ? sendSMSLogged("set-wholesale", {
                     to: profile.phone,
                     message: smsTpl?.body_text
                         ? (smsTpl.greeting ? `${smsTpl.greeting} ` : "") + smsTpl.body_text

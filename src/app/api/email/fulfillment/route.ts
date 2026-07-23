@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
-import { sendSMS, injectSmsVars } from "@/lib/sms";
+import { sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { Resend } from "resend";
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       const message = smsGreet ? `${smsGreet} ${smsBody}` : smsBody || buildFallbackSms(type, orderRef, firstName, bizName);
 
       if (message) {
-        await sendSMS({ to: order.customer_phone, message });
+        await sendSMSLogged(`fulfillment:${type}`, { to: order.customer_phone, message });
       }
     }
 

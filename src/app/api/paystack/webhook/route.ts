@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { revalidateTag } from "next/cache";
 import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { sendSMS, injectSmsVars } from "@/lib/sms";
+import { sendSMS, sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { activateAndDeliverGiftCard } from "@/lib/giftCardDelivery";
 import webpush from "web-push";
@@ -699,7 +699,7 @@ export async function POST(req: Request) {
                     const [emailResult, , smsResult, pushResult] = await Promise.allSettled([
                         emailAlreadySent ? Promise.resolve() : sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
                         isAlreadyProcessed ? Promise.resolve() : trackDiscountUsage(discount_code, discount_tag, Number(discount_amount) || 0, orderId),
-                        (emailAlreadySent || !phone) ? Promise.resolve() : sendSMS({
+                        (emailAlreadySent || !phone) ? Promise.resolve() : sendSMSLogged("webhook:order-confirmed", {
                             to: phone,
                             message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
                         }),
@@ -757,7 +757,7 @@ export async function POST(req: Request) {
                         const [emailResult, , smsResult, pushResult] = await Promise.allSettled([
                             sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
                             isAlreadyProcessed ? Promise.resolve() : trackDiscountUsage(discount_code, discount_tag, Number(discount_amount) || 0, newOrder.id),
-                            (!phone) ? Promise.resolve() : sendSMS({
+                            (!phone) ? Promise.resolve() : sendSMSLogged("webhook:order-confirmed-fallback", {
                                 to: phone,
                                 message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
                             }),

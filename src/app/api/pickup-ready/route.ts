@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
-import { sendSMS } from "@/lib/sms";
+import { sendSMSLogged } from "@/lib/sms";
 import { logActivity } from "@/lib/utils/logActivity";
 
 /**
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
           bizHours ? `🕐 ${bizHours}` : "",
         ].filter(Boolean).join(" | ");
 
-        return sendSMS({ to: order.customer_phone!, message: parts });
+        return sendSMSLogged("pickup-ready", { to: order.customer_phone!, message: parts });
       });
 
     await Promise.allSettled(smsPromises);

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendEmail } from "@/lib/email";
-import { sendSMS } from "@/lib/sms";
+import { sendSMSLogged } from "@/lib/sms";
 
 // GET /api/admin/invite-team?ids=id1,id2,...
 // Returns which of the given user IDs have never signed in (pending setup)
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
 
     await Promise.allSettled([
         sendEmail({ to: email, subject, html, from: `${bizName} <${fromEmail}>` }),
-        phone ? sendSMS({
+        phone ? sendSMSLogged("invite-team", {
             to: phone,
             message: smsTpl?.body_text
                 ? (smsTpl.greeting ? `${smsTpl.greeting} ` : "") + smsTpl.body_text
