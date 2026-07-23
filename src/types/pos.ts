@@ -2,6 +2,8 @@
 
 export type PosStatus = 'draft' | 'pending_payment' | 'paid' | 'expired' | 'cancelled';
 
+export type PosDeliveryMethod = 'pickup' | 'delivery';
+
 export interface PosItem {
     productId: string;
     variantId: string | null;
@@ -20,6 +22,7 @@ export interface PosSession {
     customer_phone: string | null;
     customer_address: string | null;
     contact_id: string | null;
+    delivery_method: PosDeliveryMethod;
     items: PosItem[];
     total_amount: number;
     status: PosStatus;

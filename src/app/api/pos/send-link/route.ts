@@ -65,6 +65,11 @@ export async function POST(req: NextRequest) {
         };
     });
 
+    // Persist the verified unit prices back onto the session — the confirmation
+    // receipt renders line items from session.items, so stale client prices there
+    // would print a receipt that doesn't add up to what was charged.
+    const pricedItems = items.map((i: any) => ({ ...i, price: priceMap[i.productId] ?? i.price ?? 0 }));
+
     // Fetch platform fee settings — same as regular checkout
     const { data: storeFeeSettings } = await supabaseAdmin
         .from('store_settings')
@@ -84,7 +89,7 @@ export async function POST(req: NextRequest) {
     // Update total_amount with server-verified value (fee-inclusive)
     await supabaseAdmin
         .from('pos_sessions')
-        .update({ total_amount: amountWithFee })
+        .update({ total_amount: amountWithFee, items: pricedItems })
         .eq('id', sessionId);
 
     // Atomic inventory reservation via DB function

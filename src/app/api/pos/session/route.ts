@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import type { PosItem } from '@/types/pos';
+import type { PosItem, PosDeliveryMethod } from '@/types/pos';
 
 export async function POST(req: NextRequest) {
     // Auth check
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
         customer_phone,
         customer_address,
         contact_id,
+        delivery_method,
         items,
         notes,
     }: {
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
         customer_phone?: string;
         customer_address?: string;
         contact_id?: string;
+        delivery_method?: PosDeliveryMethod;
         items: PosItem[];
         notes?: string;
     } = await req.json();
@@ -44,6 +46,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'items must be a non-empty array' }, { status: 400 });
     }
 
+    // Default to pickup for backward compat with any caller that omits the field
+    const fulfilment: PosDeliveryMethod = delivery_method === 'delivery' ? 'delivery' : 'pickup';
+
+    if (fulfilment === 'delivery' && !customer_address?.trim()) {
+        return NextResponse.json({ error: 'A delivery address is required for delivery orders' }, { status: 400 });
+    }
+
     const payload = {
         created_by: user.id,
         customer_name,
@@ -51,6 +60,7 @@ export async function POST(req: NextRequest) {
         customer_phone: customer_phone ?? null,
         customer_address: customer_address ?? null,
         contact_id: contact_id ?? null,
+        delivery_method: fulfilment,
         items,
         notes: notes ?? null,
         status: 'draft' as const,
