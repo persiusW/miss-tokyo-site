@@ -51,3 +51,88 @@ test.describe("POS fulfilment", () => {
         await page.screenshot({ path: "tests/reports/pos-fulfilment-validation.png" });
     });
 });
+
+/**
+ * Gift card / discount code at the till — the same codes a customer can redeem
+ * at checkout.
+ */
+test.describe("POS discount code", () => {
+    test("rejects an unknown code", async ({ page }) => {
+        await page.goto("/pos");
+        await expect(page.getByRole("heading", { name: "Point of Sale" })).toBeVisible();
+
+        const addBtn = page.getByRole("button", { name: "Add", exact: true }).first();
+        await addBtn.waitFor({ state: "visible" });
+        await addBtn.click();
+
+        await page.getByPlaceholder("Enter code").fill("DEFINITELYNOTAREALCODE");
+        await page.getByRole("button", { name: "Apply", exact: true }).click();
+
+        await expect(page.getByText(/not found or invalid/i)).toBeVisible();
+        await page.screenshot({ path: "tests/reports/pos-discount-invalid.png" });
+    });
+
+    test("applies a real code and reprices the total", async ({ page }) => {
+        await page.goto("/pos");
+        const addBtn = page.getByRole("button", { name: "Add", exact: true }).first();
+        await addBtn.waitFor({ state: "visible" });
+        await addBtn.click();
+
+        const sendBtn = page.getByRole("button", { name: /^Send Link/ });
+        const totalBefore = await sendBtn.innerText();
+        const subtotal = Number(totalBefore.replace(/[^0-9.]/g, ""));
+
+        // Pull live codes out of the catalogue rather than hardcoding one, then
+        // keep the first that actually validates for a partial discount. The
+        // catalogue's status column and the redemption check can disagree, and a
+        // code worth the whole basket leaves nothing to charge.
+        const candidates: string[] = [];
+        for (const [url, filter] of [["/catalog/discounts", false], ["/catalog/gift-cards", true]] as const) {
+            await page.goto(url);
+            if (filter) await page.locator("select.ac-select").first().selectOption("active");
+            const cells = page.locator("tbody tr td:first-child");
+            await cells.first().waitFor({ state: "visible" }).catch(() => {});
+            // The table renders a "Loading…" placeholder row first — harvesting
+            // before it resolves yields no codes at all
+            await expect(cells.first()).not.toHaveText(/loading/i, { timeout: 15_000 }).catch(() => {});
+            for (const text of await cells.allInnerTexts()) {
+                const t = text.trim();
+                if (t && !/no .*(found|yet)|loading/i.test(t)) candidates.push(t);
+            }
+        }
+
+        let code = "";
+        let expectedTotal = 0;
+        for (const candidate of candidates) {
+            const res = await page.request.post("/api/checkout/validate-code", {
+                data: { code: candidate, subtotal },
+            });
+            const body = await res.json();
+            if (body.valid && body.discount_amount > 0 && body.discount_amount < subtotal) {
+                code = body.code;
+                expectedTotal = subtotal - body.discount_amount;
+                break;
+            }
+        }
+        test.skip(!code, "no coupon or gift card yields a partial discount on this basket");
+
+        await page.goto("/pos");
+        await page.getByRole("button", { name: "Add", exact: true }).first().click();
+        await page.getByPlaceholder("Enter code").fill(code);
+        await page.getByRole("button", { name: "Apply", exact: true }).click();
+
+        // Applied badge replaces the input, and a Discount row appears
+        await expect(page.getByRole("button", { name: "Remove", exact: true })).toBeVisible();
+        await expect(page.getByText(`Discount (${code})`)).toBeVisible();
+        await page.screenshot({ path: "tests/reports/pos-discount-applied.png" });
+
+        // The Send Link button must now quote the post-discount amount.
+        // Assert on the figure, not the label — CSS uppercases the button text.
+        await expect(sendBtn).toContainText(expectedTotal.toFixed(2));
+
+        // Removing the code restores the original total
+        await page.getByRole("button", { name: "Remove", exact: true }).click();
+        await expect(page.getByPlaceholder("Enter code")).toBeVisible();
+        await expect(sendBtn).toContainText(subtotal.toFixed(2));
+    });
+});

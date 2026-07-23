@@ -11,7 +11,7 @@ export async function GET(
 
     const { data, error } = await supabaseAdmin
         .from('pos_sessions')
-        .select('id, status, expires_at, total_amount, items, paystack_reference')
+        .select('id, status, expires_at, total_amount, discount_code, discount_amount, items, paystack_reference')
         .eq('id', id)
         .single();
 
@@ -52,6 +52,8 @@ export async function GET(
         status: data.status,
         expires_at: data.expires_at,
         total_amount: data.total_amount,
+        discount_code: data.discount_code ?? null,
+        discount_amount: Number(data.discount_amount) || 0,
         items,
         paymentUrl,
     };

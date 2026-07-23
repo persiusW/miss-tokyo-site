@@ -209,6 +209,11 @@ async function handlePosPayment(
     // Staff-selected at the till; older sessions predate the column and were pickup-only
     const deliveryMethod: string = posSession.delivery_method === "delivery" ? "delivery" : "pickup";
 
+    // Server-verified in send-link — the till never supplies a discount amount
+    const posDiscountCode: string | null = posSession.discount_code ?? null;
+    const posDiscountAmount = Number(posSession.discount_amount) || 0;
+    const posDiscountTag: string | undefined = posSession.discount_tag ?? undefined;
+
     const { data: newOrder } = await supabaseAdmin
         .from("orders")
         .insert({
@@ -220,7 +225,8 @@ async function handlePosPayment(
                 : null,
             items: posSession.items,
             total_amount: posSession.total_amount,
-            discount_amount: 0,
+            discount_code: posDiscountCode,
+            discount_amount: posDiscountAmount,
             status: "paid",
             payment_status: "paid",
             paystack_reference: refFromEvent || posSession.paystack_reference,
@@ -344,7 +350,7 @@ async function handlePosPayment(
             : `Hi ${firstName}, your ${bizName} order #${orderRef} is confirmed! Check your email for the full receipt. Thank you!`;
     })();
 
-    const [emailResult, smsResult, pushResult] = await Promise.allSettled([
+    const [emailResult, smsResult, pushResult, discountResult] = await Promise.allSettled([
         sendOrderConfirmation({
             customerEmail: posSession.customer_email,
             orderRef,
@@ -356,6 +362,8 @@ async function handlePosPayment(
             feeLabel: eventMeta?.platform_fee_label || undefined,
             setupLink,
             isFirstTimeBuyer,
+            discountCode: posDiscountCode || undefined,
+            discountAmount: posDiscountAmount > 0 ? posDiscountAmount : undefined,
             ...pickupMeta,
         }),
         posSession.customer_phone
@@ -365,11 +373,16 @@ async function handlePosPayment(
             "New Order Received!",
             `POS order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${posSession.customer_name || posSession.customer_email} has been paid.`,
         ),
+        // Redeem the coupon / debit the gift card. Safe to run unguarded: the
+        // status-gated claim above means only one of the two Paystack events
+        // reaches this line for a given session.
+        trackDiscountUsage(posDiscountCode || undefined, posDiscountTag, posDiscountAmount, newOrder.id),
     ]);
 
     if (emailResult.status === "rejected") console.error("[POS webhook] sendOrderConfirmation failed:", emailResult.reason);
     if (smsResult.status === "rejected") console.error("[POS webhook] sendSMS failed:", smsResult.reason);
     if (pushResult.status === "rejected") console.error("[POS webhook] adminPush failed:", pushResult.reason);
+    if (discountResult.status === "rejected") console.error("[POS webhook] trackDiscountUsage failed:", discountResult.reason);
 }
 
 export async function POST(req: Request) {

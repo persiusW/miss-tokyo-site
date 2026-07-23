@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
         customer_address,
         contact_id,
         delivery_method,
+        discount_code,
         items,
         notes,
     }: {
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
         customer_address?: string;
         contact_id?: string;
         delivery_method?: PosDeliveryMethod;
+        discount_code?: string | null;
         items: PosItem[];
         notes?: string;
     } = await req.json();
@@ -62,6 +64,9 @@ export async function POST(req: NextRequest) {
         contact_id: contact_id ?? null,
         delivery_method: fulfilment,
         items,
+        // Only the code is stored here. Its value is resolved server-side in
+        // send-link — a client-supplied discount amount is never trusted.
+        discount_code: discount_code?.trim().toUpperCase() || null,
         notes: notes ?? null,
         status: 'draft' as const,
         // total_amount computed server-side on send-link; use client sum as placeholder for draft

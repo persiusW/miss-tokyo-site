@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
-import type { PosProduct, PosItem, PosDeliveryMethod } from '@/types/pos';
+import type { PosProduct, PosItem, PosDeliveryMethod, PosAppliedDiscount } from '@/types/pos';
 
 type Contact = { id: string | null; name: string; email: string; phone: string | null };
 type CustomerMode = 'search' | 'new';
@@ -71,6 +71,9 @@ export default function POSPage() {
     const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '' });
     const [deliveryMethod, setDeliveryMethod] = useState<PosDeliveryMethod>('pickup');
     const [deliveryAddress, setDeliveryAddress] = useState('');
+    const [discountInput, setDiscountInput] = useState('');
+    const [appliedDiscount, setAppliedDiscount] = useState<PosAppliedDiscount | null>(null);
+    const [checkingCode, setCheckingCode] = useState(false);
     const [notes, setNotes] = useState('');
     const [sending, setSending] = useState(false);
     const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
@@ -132,6 +135,73 @@ export default function POSPage() {
 
     const removeItem = (idx: number) => setCart(prev => prev.filter((_, n) => n !== idx));
     const cartTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+    const discountAmount = Math.min(appliedDiscount?.discount_amount ?? 0, cartTotal);
+    const payableTotal = Math.max(0, cartTotal - discountAmount);
+
+    // Preview only — send-link recomputes the code's worth server-side and is
+    // the value actually charged.
+    const lookupCode = useCallback(async (code: string, subtotal: number): Promise<PosAppliedDiscount | string> => {
+        const res = await fetch('/api/checkout/validate-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, subtotal }),
+        });
+        const data = await res.json();
+        if (!data.valid) return data.error ?? 'Code not found or invalid.';
+        return {
+            code: data.code,
+            type: data.type,
+            discount_type: data.discount_type,
+            discount_amount: Number(data.discount_amount) || 0,
+            label: data.label ?? 'Discount applied',
+        };
+    }, []);
+
+    const applyCode = async () => {
+        const code = discountInput.trim();
+        if (!code) { toast.error('Enter a gift card or discount code'); return; }
+        if (cart.length === 0) { toast.error('Add items before applying a code'); return; }
+        setCheckingCode(true);
+        try {
+            const result = await lookupCode(code, cartTotal);
+            if (typeof result === 'string') { toast.error(result); return; }
+            setAppliedDiscount(result);
+            setDiscountInput('');
+            toast.success(`${result.code} applied — ${result.label}`);
+        } catch {
+            toast.error('Could not check that code. Try again.');
+        } finally {
+            setCheckingCode(false);
+        }
+    };
+
+    const removeCode = () => {
+        setAppliedDiscount(null);
+        setDiscountInput('');
+    };
+
+    // A percentage coupon or partly-consuming gift card is worth a different
+    // amount once the basket changes — re-price it instead of showing a stale figure.
+    useEffect(() => {
+        if (!appliedDiscount) return;
+        if (cart.length === 0) { setAppliedDiscount(null); return; }
+        const t = setTimeout(async () => {
+            try {
+                const result = await lookupCode(appliedDiscount.code, cartTotal);
+                if (typeof result === 'string') {
+                    setAppliedDiscount(null);
+                    toast.error(`${appliedDiscount.code} no longer applies: ${result}`);
+                    return;
+                }
+                setAppliedDiscount(prev => (prev && prev.code === result.code ? result : prev));
+            } catch {
+                // Leave the current preview in place — send-link is the authority
+            }
+        }, 400);
+        return () => clearTimeout(t);
+        // Re-price on basket value only; appliedDiscount.code identifies the code in play
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cartTotal, appliedDiscount?.code, cart.length, lookupCode]);
 
     const handleSend = async () => {
         if (cart.length === 0) { toast.error('Cart is empty'); return; }
@@ -158,6 +228,7 @@ export default function POSPage() {
                     customer_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
                     contact_id: customerMode === 'search' ? (selectedContact?.id ?? undefined) : undefined,
                     delivery_method: deliveryMethod,
+                    discount_code: appliedDiscount?.code ?? null,
                     items: cart,
                     notes,
                 }),
@@ -193,6 +264,7 @@ export default function POSPage() {
         setCart([]); setPaymentUrl(null); setSelectedContact(null);
         setNewCustomer({ name: '', email: '', phone: '' });
         setDeliveryMethod('pickup'); setDeliveryAddress('');
+        setAppliedDiscount(null); setDiscountInput('');
         setNotes(''); setContactSearch('');
     };
 
@@ -256,9 +328,23 @@ export default function POSPage() {
                         </div>
                     ))}
                     {cart.length > 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 6 }}>
-                            <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 700, color: "var(--ac-ink)" }}>Total</span>
-                            <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--f-mono)", color: "var(--ac-ink)" }}>GH₵{cartTotal.toFixed(2)}</span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingTop: 6 }}>
+                            {discountAmount > 0 && (
+                                <>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>Subtotal</span>
+                                        <span style={{ fontSize: 11, fontFamily: "var(--f-mono)", color: "var(--ac-ink-3)" }}>GH₵{cartTotal.toFixed(2)}</span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>Discount ({appliedDiscount?.code})</span>
+                                        <span style={{ fontSize: 11, fontFamily: "var(--f-mono)", color: "var(--ac-accent)" }}>-GH₵{discountAmount.toFixed(2)}</span>
+                                    </div>
+                                </>
+                            )}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 700, color: "var(--ac-ink)" }}>Total</span>
+                                <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--f-mono)", color: "var(--ac-ink)" }}>GH₵{payableTotal.toFixed(2)}</span>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -320,6 +406,33 @@ export default function POSPage() {
                         </div>
                     )}
 
+                    {/* Gift card / discount code — same codes a customer can use at checkout */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <p style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".2em", fontWeight: 700, color: "var(--ac-ink-4)" }}>Gift Card / Discount</p>
+                        {appliedDiscount ? (
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 10px", background: "color-mix(in srgb, var(--ac-accent) 10%, transparent)", border: "1px solid var(--ac-accent)", borderRadius: "var(--r-sm)" }}>
+                                <div style={{ minWidth: 0 }}>
+                                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-accent)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{appliedDiscount.code}</p>
+                                    <p style={{ fontSize: 10, color: "var(--ac-ink-3)", marginTop: 1 }}>{appliedDiscount.label}</p>
+                                </div>
+                                <button onClick={removeCode} style={{ flexShrink: 0, padding: "4px 8px", fontSize: 9, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 700, border: "1px solid var(--ac-line)", background: "transparent", color: "var(--ac-ink-4)", cursor: "pointer", borderRadius: "var(--r-sm)" }}>
+                                    Remove
+                                </button>
+                            </div>
+                        ) : (
+                            <div style={{ display: "flex", gap: 6 }}>
+                                <input type="text" placeholder="Enter code" value={discountInput}
+                                    onChange={e => setDiscountInput(e.target.value.toUpperCase())}
+                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); applyCode(); } }}
+                                    style={{ ...inputStyle, flex: 1, textTransform: "uppercase" }} />
+                                <button onClick={applyCode} disabled={checkingCode || !discountInput.trim()}
+                                    style={{ flexShrink: 0, padding: "0 14px", fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 700, border: "1px solid var(--ac-ink)", background: "transparent", color: "var(--ac-ink)", cursor: (checkingCode || !discountInput.trim()) ? "not-allowed" : "pointer", opacity: (checkingCode || !discountInput.trim()) ? 0.4 : 1, borderRadius: "var(--r-sm)" }}>
+                                    {checkingCode ? '...' : 'Apply'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Fulfilment: staff picks how the customer receives the order */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <p style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".2em", fontWeight: 700, color: "var(--ac-ink-4)" }}>Fulfilment</p>
@@ -362,7 +475,7 @@ export default function POSPage() {
                         <button onClick={handleSend} disabled={sending || cart.length === 0}
                             style={{ width: "100%", padding: "14px 0", background: "var(--ac-ink)", color: "var(--ac-bg)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".2em", fontWeight: 900, border: "none", cursor: (sending || cart.length === 0) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (sending || cart.length === 0) ? 0.4 : 1, borderRadius: "var(--r-sm)" }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                            {sending ? 'Sending...' : `Send Link — GH₵${cartTotal.toFixed(2)}`}
+                            {sending ? 'Sending...' : `Send Link — GH₵${payableTotal.toFixed(2)}`}
                         </button>
                     )}
                 </div>

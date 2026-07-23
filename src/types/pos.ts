@@ -4,6 +4,18 @@ export type PosStatus = 'draft' | 'pending_payment' | 'paid' | 'expired' | 'canc
 
 export type PosDeliveryMethod = 'pickup' | 'delivery';
 
+export type PosDiscountTag = 'coupon' | 'gift_card';
+
+// Preview shape returned by POST /api/checkout/validate-code — the till shows
+// this, but the charged amount is always recomputed in /api/pos/send-link.
+export interface PosAppliedDiscount {
+    code: string;
+    type: PosDiscountTag;
+    discount_type: string;
+    discount_amount: number;
+    label: string;
+}
+
 export interface PosItem {
     productId: string;
     variantId: string | null;
@@ -24,6 +36,10 @@ export interface PosSession {
     contact_id: string | null;
     delivery_method: PosDeliveryMethod;
     items: PosItem[];
+    // Server-verified at send-link time; never accepted from the till client
+    discount_code: string | null;
+    discount_amount: number;
+    discount_tag: PosDiscountTag | null;
     total_amount: number;
     status: PosStatus;
     paystack_reference: string | null;
@@ -40,6 +56,8 @@ export interface PosSessionPublic {
     status: PosStatus;
     expires_at: string | null;
     total_amount: number;
+    discount_code: string | null;
+    discount_amount: number;
     items: Array<{
         name: string;
         sku: string | null;

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { Resend } from 'resend';
 import { sendSMS } from '@/lib/sms';
+import { validateDiscountCode } from '@/lib/discountValidation';
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
@@ -70,6 +71,28 @@ export async function POST(req: NextRequest) {
     // would print a receipt that doesn't add up to what was charged.
     const pricedItems = items.map((i: any) => ({ ...i, price: priceMap[i.productId] ?? i.price ?? 0 }));
 
+    // Re-validate the staff-entered coupon / gift card against the DB. The till
+    // only ever sends a code; its worth is computed here against the
+    // server-calculated subtotal, exactly as /api/paystack/initialize does.
+    const validatedDiscount = await validateDiscountCode(session.discount_code, totalGHS);
+
+    if (session.discount_code && !validatedDiscount) {
+        return NextResponse.json({
+            error: `Code "${session.discount_code}" is no longer valid — it may have expired, been fully redeemed, or hit its usage limit. Remove it and try again.`,
+        }, { status: 409 });
+    }
+
+    const discountAmount = validatedDiscount?.amount ?? 0;
+    const discountedSubtotal = parseFloat(Math.max(0, totalGHS - discountAmount).toFixed(2));
+
+    // Paystack cannot charge zero. A code that covers the whole basket has no
+    // payment link to send — storefront checkout rejects this case too.
+    if (discountedSubtotal <= 0) {
+        return NextResponse.json({
+            error: `"${validatedDiscount?.code}" covers the full order total (GH₵${totalGHS.toFixed(2)}). There is nothing left to charge, so no payment link can be sent.`,
+        }, { status: 409 });
+    }
+
     // Fetch platform fee settings — same as regular checkout
     const { data: storeFeeSettings } = await supabaseAdmin
         .from('store_settings')
@@ -77,19 +100,26 @@ export async function POST(req: NextRequest) {
         .eq('id', 'default')
         .maybeSingle();
 
+    // Fee is charged on the post-discount subtotal, matching storefront checkout
     const feePct = Number(storeFeeSettings?.platform_fee_percentage) || 0;
     const platformFeeAmount = feePct > 0
-        ? parseFloat((totalGHS * feePct / 100).toFixed(2))
+        ? parseFloat((discountedSubtotal * feePct / 100).toFixed(2))
         : 0;
     const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
-    const amountWithFee = parseFloat((totalGHS + platformFeeAmount).toFixed(2));
+    const amountWithFee = parseFloat((discountedSubtotal + platformFeeAmount).toFixed(2));
 
     const amountPesewas = Math.round(amountWithFee * 100);
 
     // Update total_amount with server-verified value (fee-inclusive)
     await supabaseAdmin
         .from('pos_sessions')
-        .update({ total_amount: amountWithFee, items: pricedItems })
+        .update({
+            total_amount: amountWithFee,
+            items: pricedItems,
+            discount_code: validatedDiscount?.code ?? null,
+            discount_amount: discountAmount,
+            discount_tag: validatedDiscount?.type ?? null,
+        })
         .eq('id', sessionId);
 
     // Atomic inventory reservation via DB function
@@ -125,6 +155,11 @@ export async function POST(req: NextRequest) {
             pos_session_id: sessionId,
             source: 'pos',
             ...(platformFeeAmount > 0 ? { platform_fee_amount: platformFeeAmount, platform_fee_label: platformFeeLabel } : {}),
+            ...(validatedDiscount ? {
+                discount_code: validatedDiscount.code,
+                discount_amount: discountAmount,
+                discount_tag: validatedDiscount.type,
+            } : {}),
         },
     };
 
@@ -167,6 +202,7 @@ export async function POST(req: NextRequest) {
                 <p>Hi ${firstName},</p>
                 <p>Your Miss Tokyo order is ready. Review your items and complete payment below.</p>
                 <p><strong>Items:</strong> ${itemList}</p>
+                ${validatedDiscount ? `<p><strong>Discount (${validatedDiscount.code}):</strong> -GH&#8373;${discountAmount.toFixed(2)}</p>` : ''}
                 <p><strong>Total:</strong> GH&#8373;${amountWithFee.toFixed(2)}</p>
                 <p><a href="${previewUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;">Review &amp; Pay &mdash; GH&#8373;${amountWithFee.toFixed(2)}</a></p>
                 <p style="color:#999;font-size:12px;">This link expires in 30 minutes.</p>
@@ -183,5 +219,10 @@ export async function POST(req: NextRequest) {
     ]);
 
     // Return the preview URL — staff copies/shares this, not the raw Paystack URL
-    return NextResponse.json({ paymentUrl: previewUrl, sessionId, total: amountWithFee });
+    return NextResponse.json({
+        paymentUrl: previewUrl,
+        sessionId,
+        total: amountWithFee,
+        discount: validatedDiscount ? { code: validatedDiscount.code, amount: discountAmount, label: validatedDiscount.label } : null,
+    });
 }

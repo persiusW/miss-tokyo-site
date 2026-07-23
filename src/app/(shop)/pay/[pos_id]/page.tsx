@@ -123,6 +123,14 @@ export default async function PosPaymentPage({ params }: { params: Promise<{ pos
                             </div>
                         </div>
                     ))}
+                    {session.discount_amount > 0 && (
+                        <div className="flex justify-between items-center px-4 py-3">
+                            <span className="text-[11px] uppercase tracking-widest text-neutral-500">
+                                Discount{session.discount_code ? ` (${session.discount_code})` : ""}
+                            </span>
+                            <span className="text-xs text-green-600">-GH&#8373;{Number(session.discount_amount).toFixed(2)}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between items-center px-4 py-3 bg-neutral-50">
                         <span className="text-xs uppercase tracking-widest font-bold">Total</span>
                         <span className="text-sm font-bold">GH&#8373;{Number(session.total_amount).toFixed(2)}</span>
