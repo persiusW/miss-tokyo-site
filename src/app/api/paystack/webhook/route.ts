@@ -188,7 +188,11 @@ async function trackDiscountUsage(
  * and charge.success for one session — the status-gated update means only one
  * event wins the claim; the loser sees 0 rows and exits.
  */
-async function handlePosPayment(posSessionId: string, refFromEvent: string | null) {
+async function handlePosPayment(
+    posSessionId: string,
+    refFromEvent: string | null,
+    eventMeta: Record<string, any> = {},
+) {
     const { data: posSession } = await supabaseAdmin
         .from("pos_sessions")
         .update({ status: "paid", paid_at: new Date().toISOString() })
@@ -282,7 +286,90 @@ async function handlePosPayment(posSessionId: string, refFromEvent: string | nul
                 console.warn("[POS webhook] inventory skip: track_variant_inventory=true but variantId missing", { productId: item.productId });
             }
         }));
+
+        revalidateTag("products", "max");
     }
+
+    if (!newOrder) {
+        console.error("[POS webhook] order insert failed — skipping confirmation", { posSessionId });
+        return;
+    }
+
+    // ── Confirmation: same email / SMS / admin push a storefront order gets ────
+    const orderRef = newOrder.id.substring(0, 8).toUpperCase();
+    const amountGHS = Number(posSession.total_amount) || 0;
+    const firstName = (posSession.customer_name || "").split(" ")[0] || "there";
+
+    const [{ data: biz }, { data: pickupSettings }, { data: smsTpl }] = await Promise.all([
+        supabaseAdmin.from("business_settings").select("business_name, address, contact").eq("id", "default").maybeSingle(),
+        supabaseAdmin.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").maybeSingle(),
+        supabaseAdmin.from("communication_templates").select("body_text, greeting").eq("channel", "sms").eq("event_type", "order_confirmed").maybeSingle(),
+    ]);
+
+    const bizName = biz?.business_name || "Miss Tokyo";
+    const isPickup = deliveryMethod === "pickup" && (pickupSettings?.pickup_enabled ?? true);
+    const pickupMeta = isPickup ? {
+        isPickup: true,
+        pickupInstructions: pickupSettings?.pickup_instructions || "",
+        pickupAddress: pickupSettings?.pickup_address || biz?.address || "",
+        pickupPhone: pickupSettings?.pickup_contact_phone || biz?.contact || "",
+        pickupWait: pickupSettings?.pickup_estimated_wait || "24 hours",
+    } : {};
+
+    // Link/create the customer's account so the order shows up under /account
+    let setupLink: string | undefined;
+    let isFirstTimeBuyer = false;
+    if (posSession.customer_email) {
+        const account = await ensureCustomerAccount(posSession.customer_email, posSession.customer_name);
+        if (account.userId) {
+            setupLink = account.setupLink;
+            isFirstTimeBuyer = account.isNewUser;
+        }
+    }
+
+    const smsMessage = (() => {
+        const vars: Record<string, string> = {
+            order_id: orderRef,
+            customer_name: firstName,
+            amount: `GH₵ ${amountGHS.toFixed(2)}`,
+            rider_name: "",
+            rider_phone: "",
+        };
+        if (smsTpl?.body_text) {
+            const greeting = smsTpl.greeting ? injectSmsVars(smsTpl.greeting, vars) + " " : "";
+            return greeting + injectSmsVars(smsTpl.body_text, vars);
+        }
+        return isFirstTimeBuyer
+            ? `Hi ${firstName}, your ${bizName} order #${orderRef} is confirmed! Check your email for your receipt and to set up your account. Thank you!`
+            : `Hi ${firstName}, your ${bizName} order #${orderRef} is confirmed! Check your email for the full receipt. Thank you!`;
+    })();
+
+    const [emailResult, smsResult, pushResult] = await Promise.allSettled([
+        sendOrderConfirmation({
+            customerEmail: posSession.customer_email,
+            orderRef,
+            amount: amountGHS,
+            bizName,
+            bizAddress: biz?.address || "",
+            items,
+            feeAmount: Number(eventMeta?.platform_fee_amount) || undefined,
+            feeLabel: eventMeta?.platform_fee_label || undefined,
+            setupLink,
+            isFirstTimeBuyer,
+            ...pickupMeta,
+        }),
+        posSession.customer_phone
+            ? sendSMS({ to: posSession.customer_phone, message: smsMessage })
+            : Promise.resolve(),
+        sendAdminPushNotifications(
+            "New Order Received!",
+            `POS order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${posSession.customer_name || posSession.customer_email} has been paid.`,
+        ),
+    ]);
+
+    if (emailResult.status === "rejected") console.error("[POS webhook] sendOrderConfirmation failed:", emailResult.reason);
+    if (smsResult.status === "rejected") console.error("[POS webhook] sendSMS failed:", smsResult.reason);
+    if (pushResult.status === "rejected") console.error("[POS webhook] adminPush failed:", pushResult.reason);
 }
 
 export async function POST(req: Request) {
@@ -315,7 +402,7 @@ export async function POST(req: Request) {
                 return NextResponse.json({ received: true });
             }
 
-            await handlePosPayment(meta.pos_session_id, null);
+            await handlePosPayment(meta.pos_session_id, null, meta);
             return NextResponse.json({ received: true });
         }
         // ── END POS handler ────────────────────────────────────────────────
@@ -336,7 +423,7 @@ export async function POST(req: Request) {
 
             // ── POS: charge.success from transaction/initialize ────────────────
             if (metadata.source === "pos" && metadata.pos_session_id) {
-                await handlePosPayment(metadata.pos_session_id, paystackRef);
+                await handlePosPayment(metadata.pos_session_id, paystackRef, metadata);
                 return NextResponse.json({ received: true });
             }
             // ── END POS charge.success handler ─────────────────────────────────
