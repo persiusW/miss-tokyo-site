@@ -33,6 +33,8 @@ export interface PosSession {
     customer_email: string;
     customer_phone: string | null;
     customer_address: string | null;
+    customer_country: string | null;
+    customer_region: string | null;
     contact_id: string | null;
     delivery_method: PosDeliveryMethod;
     items: PosItem[];

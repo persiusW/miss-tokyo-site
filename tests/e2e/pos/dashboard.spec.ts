@@ -22,6 +22,20 @@ test.describe("POS fulfilment", () => {
         await deliveryBtn.click();
         await expect(addressField).toBeVisible();
 
+        // Country + region mirror storefront checkout so the order stores the
+        // same shipping_address shape
+        const country = page.locator("select").filter({ hasText: "Ghana" }).first();
+        await expect(country).toBeVisible();
+        await expect(country).toHaveValue("Ghana");
+        const region = page.locator("select").filter({ hasText: "Greater Accra" }).first();
+        await expect(region).toHaveValue("Greater Accra");
+
+        // Outside Ghana the region becomes free text, as on the storefront
+        await country.selectOption("United Kingdom");
+        await expect(page.getByPlaceholder("State / Region")).toBeVisible();
+        await country.selectOption("Ghana");
+        await expect(page.locator("select").filter({ hasText: "Greater Accra" }).first()).toBeVisible();
+
         await pickupBtn.click();
         await expect(addressField).toHaveCount(0);
 

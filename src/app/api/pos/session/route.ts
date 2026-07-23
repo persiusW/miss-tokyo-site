@@ -22,6 +22,8 @@ export async function POST(req: NextRequest) {
         customer_email,
         customer_phone,
         customer_address,
+        customer_country,
+        customer_region,
         contact_id,
         delivery_method,
         discount_code,
@@ -33,6 +35,8 @@ export async function POST(req: NextRequest) {
         customer_email: string;
         customer_phone?: string;
         customer_address?: string;
+        customer_country?: string;
+        customer_region?: string;
         contact_id?: string;
         delivery_method?: PosDeliveryMethod;
         discount_code?: string | null;
@@ -61,6 +65,9 @@ export async function POST(req: NextRequest) {
         customer_email,
         customer_phone: customer_phone ?? null,
         customer_address: customer_address ?? null,
+        // Only meaningful for delivery — mirrors the storefront address fields
+        customer_country: fulfilment === 'delivery' ? (customer_country || null) : null,
+        customer_region: fulfilment === 'delivery' ? (customer_region || null) : null,
         contact_id: contact_id ?? null,
         delivery_method: fulfilment,
         items,

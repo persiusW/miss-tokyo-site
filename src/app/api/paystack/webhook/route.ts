@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMS, sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { activateAndDeliverGiftCard } from "@/lib/giftCardDelivery";
+import { buildShippingAddress } from "@/lib/geo";
 import webpush from "web-push";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
@@ -220,9 +221,13 @@ async function handlePosPayment(
             customer_email: posSession.customer_email,
             customer_name: posSession.customer_name,
             customer_phone: posSession.customer_phone,
-            shipping_address: posSession.customer_address
-                ? { address: posSession.customer_address }
-                : null,
+            // Must be the canonical { text, country, region } shape — every reader
+            // in the app looks for `text`, so the old { address } key rendered blank
+            shipping_address: buildShippingAddress(
+                posSession.customer_address,
+                posSession.customer_country,
+                posSession.customer_region,
+            ),
             items: posSession.items,
             total_amount: posSession.total_amount,
             discount_code: posDiscountCode,

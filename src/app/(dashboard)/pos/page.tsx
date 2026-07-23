@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import type { PosProduct, PosItem, PosDeliveryMethod, PosAppliedDiscount } from '@/types/pos';
+import { GHANA_REGIONS, COUNTRIES, DEFAULT_COUNTRY, DEFAULT_REGION } from '@/lib/geo';
 
 type Contact = { id: string | null; name: string; email: string; phone: string | null };
 type CustomerMode = 'search' | 'new';
@@ -75,6 +76,8 @@ export default function POSPage() {
     const [customerPhone, setCustomerPhone] = useState('');
     const [deliveryMethod, setDeliveryMethod] = useState<PosDeliveryMethod>('pickup');
     const [deliveryAddress, setDeliveryAddress] = useState('');
+    const [deliveryCountry, setDeliveryCountry] = useState(DEFAULT_COUNTRY);
+    const [deliveryRegion, setDeliveryRegion] = useState(DEFAULT_REGION);
     const [discountInput, setDiscountInput] = useState('');
     const [appliedDiscount, setAppliedDiscount] = useState<PosAppliedDiscount | null>(null);
     const [checkingCode, setCheckingCode] = useState(false);
@@ -233,6 +236,8 @@ export default function POSPage() {
                     customer_email: customer.email,
                     customer_phone: customerPhone.trim(),
                     customer_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
+                    customer_country: deliveryMethod === 'delivery' ? deliveryCountry : null,
+                    customer_region: deliveryMethod === 'delivery' ? deliveryRegion.trim() : null,
                     contact_id: customerMode === 'search' ? (selectedContact?.id ?? undefined) : undefined,
                     delivery_method: deliveryMethod,
                     discount_code: appliedDiscount?.code ?? null,
@@ -285,6 +290,7 @@ export default function POSPage() {
         setNewCustomer({ name: '', email: '' });
         setCustomerPhone('');
         setDeliveryMethod('pickup'); setDeliveryAddress('');
+        setDeliveryCountry(DEFAULT_COUNTRY); setDeliveryRegion(DEFAULT_REGION);
         setAppliedDiscount(null); setDiscountInput('');
         setNotes(''); setContactSearch('');
     };
@@ -472,9 +478,33 @@ export default function POSPage() {
                             </button>
                         </div>
                         {deliveryMethod === 'delivery' && (
-                            <textarea placeholder="Delivery address *" value={deliveryAddress}
-                                onChange={e => setDeliveryAddress(e.target.value)} rows={2}
-                                style={{ ...inputStyle, resize: "none" }} />
+                            <>
+                                <textarea placeholder="Delivery address *" value={deliveryAddress}
+                                    onChange={e => setDeliveryAddress(e.target.value)} rows={2}
+                                    style={{ ...inputStyle, resize: "none" }} />
+                                <select value={deliveryCountry}
+                                    onChange={e => {
+                                        const next = e.target.value;
+                                        setDeliveryCountry(next);
+                                        // Ghana picks from a fixed list; elsewhere it is free text
+                                        setDeliveryRegion(next === 'Ghana' ? DEFAULT_REGION : '');
+                                    }}
+                                    style={inputStyle}>
+                                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                {deliveryCountry === 'Ghana' ? (
+                                    <select value={deliveryRegion}
+                                        onChange={e => setDeliveryRegion(e.target.value)}
+                                        style={inputStyle}>
+                                        {GHANA_REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                ) : (
+                                    <input type="text" placeholder="State / Region"
+                                        value={deliveryRegion}
+                                        onChange={e => setDeliveryRegion(e.target.value)}
+                                        style={inputStyle} />
+                                )}
+                            </>
                         )}
                     </div>
 
