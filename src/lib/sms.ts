@@ -92,3 +92,34 @@ export async function sendSMS(payload: SmsPayload): Promise<{ ok: boolean; error
         return { ok: false, error: err?.message || "Unknown error" };
     }
 }
+
+/**
+ * sendSMS reports a provider rejection (bad number, no credit, bad key) by
+ * resolving with { ok: false } and only throws on a network fault. Callers that
+ * rely on try/catch or Promise.allSettled therefore treat undelivered texts as
+ * delivered unless they inspect the return value.
+ *
+ * These two wrappers make the common patterns behave the way they read.
+ */
+export class SmsError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "SmsError";
+    }
+}
+
+/** Throws SmsError when the provider did not accept the message. */
+export async function sendSMSOrThrow(payload: SmsPayload): Promise<void> {
+    const result = await sendSMS(payload);
+    if (!result.ok) throw new SmsError(result.error || "SMS was not delivered");
+}
+
+/**
+ * Sends and logs a provider rejection against `context`. Returns whether the
+ * message was accepted, for callers that surface a count.
+ */
+export async function sendSMSLogged(context: string, payload: SmsPayload): Promise<boolean> {
+    const result = await sendSMS(payload);
+    if (!result.ok) console.error(`[sms:${context}] not delivered:`, result.error);
+    return result.ok;
+}
