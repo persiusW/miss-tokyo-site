@@ -202,6 +202,9 @@ async function handlePosPayment(posSessionId: string, refFromEvent: string | nul
 
     const items: any[] = Array.isArray(posSession.items) ? posSession.items : [];
 
+    // Staff-selected at the till; older sessions predate the column and were pickup-only
+    const deliveryMethod: string = posSession.delivery_method === "delivery" ? "delivery" : "pickup";
+
     const { data: newOrder } = await supabaseAdmin
         .from("orders")
         .insert({
@@ -217,7 +220,7 @@ async function handlePosPayment(posSessionId: string, refFromEvent: string | nul
             status: "paid",
             payment_status: "paid",
             paystack_reference: refFromEvent || posSession.paystack_reference,
-            delivery_method: "pickup",
+            delivery_method: deliveryMethod,
             source: "pos",
             notes: posSession.notes,
             customer_id: posSession.contact_id,

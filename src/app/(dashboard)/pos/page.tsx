@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
-import type { PosProduct, PosItem } from '@/types/pos';
+import type { PosProduct, PosItem, PosDeliveryMethod } from '@/types/pos';
 
 type Contact = { id: string | null; name: string; email: string; phone: string | null };
 type CustomerMode = 'search' | 'new';
@@ -68,7 +68,9 @@ export default function POSPage() {
     const [contactSearch, setContactSearch] = useState('');
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-    const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', address: '' });
+    const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '' });
+    const [deliveryMethod, setDeliveryMethod] = useState<PosDeliveryMethod>('pickup');
+    const [deliveryAddress, setDeliveryAddress] = useState('');
     const [notes, setNotes] = useState('');
     const [sending, setSending] = useState(false);
     const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
@@ -139,6 +141,10 @@ export default function POSPage() {
             if (!newCustomer.name.trim()) { toast.error('Customer name is required'); return; }
             if (!newCustomer.email.trim()) { toast.error('Customer email is required'); return; }
         }
+        if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
+            toast.error('Delivery address is required');
+            return;
+        }
         const customer = customerMode === 'search' ? selectedContact! : newCustomer;
         setSending(true);
         try {
@@ -149,8 +155,9 @@ export default function POSPage() {
                     customer_name: customer.name,
                     customer_email: customer.email,
                     customer_phone: ('phone' in customer ? customer.phone : null) || null,
-                    customer_address: ('address' in customer ? customer.address : null) || null,
+                    customer_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
                     contact_id: customerMode === 'search' ? (selectedContact?.id ?? undefined) : undefined,
+                    delivery_method: deliveryMethod,
                     items: cart,
                     notes,
                 }),
@@ -184,7 +191,8 @@ export default function POSPage() {
 
     const reset = () => {
         setCart([]); setPaymentUrl(null); setSelectedContact(null);
-        setNewCustomer({ name: '', email: '', phone: '', address: '' });
+        setNewCustomer({ name: '', email: '', phone: '' });
+        setDeliveryMethod('pickup'); setDeliveryAddress('');
         setNotes(''); setContactSearch('');
     };
 
@@ -303,7 +311,6 @@ export default function POSPage() {
                                 { key: 'name', placeholder: 'Full Name *', type: 'text' },
                                 { key: 'email', placeholder: 'Email *', type: 'email' },
                                 { key: 'phone', placeholder: 'Phone', type: 'tel' },
-                                { key: 'address', placeholder: 'Address', type: 'text' },
                             ].map(f => (
                                 <input key={f.key} type={f.type} placeholder={f.placeholder}
                                     value={(newCustomer as any)[f.key]}
@@ -312,6 +319,26 @@ export default function POSPage() {
                             ))}
                         </div>
                     )}
+
+                    {/* Fulfilment: staff picks how the customer receives the order */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <p style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".2em", fontWeight: 700, color: "var(--ac-ink-4)" }}>Fulfilment</p>
+                        <div style={{ display: "flex", gap: 6 }}>
+                            <button onClick={() => setDeliveryMethod('pickup')} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "6px 10px", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", cursor: "pointer", borderRadius: "var(--r-sm)", ...(deliveryMethod === 'pickup' ? modeActive : modeInactive) }}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/></svg>
+                                Store Pickup
+                            </button>
+                            <button onClick={() => setDeliveryMethod('delivery')} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "6px 10px", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", cursor: "pointer", borderRadius: "var(--r-sm)", ...(deliveryMethod === 'delivery' ? modeActive : modeInactive) }}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                                Delivery
+                            </button>
+                        </div>
+                        {deliveryMethod === 'delivery' && (
+                            <textarea placeholder="Delivery address *" value={deliveryAddress}
+                                onChange={e => setDeliveryAddress(e.target.value)} rows={2}
+                                style={{ ...inputStyle, resize: "none" }} />
+                        )}
+                    </div>
 
                     <textarea placeholder="Staff notes (optional)" value={notes}
                         onChange={e => setNotes(e.target.value)} rows={2}
