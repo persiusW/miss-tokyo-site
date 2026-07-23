@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
-import { sendSMS, injectSmsVars } from "@/lib/sms";
+import { sendSMSOrThrow, injectSmsVars } from "@/lib/sms";
 
 export async function POST(req: NextRequest) {
     const serverClient = await createClient();
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
                 message = `Hi ${firstName}, your ${bizName} order #${orderRef} is confirmed! Check your email for your receipt. Thank you!`;
             }
 
-            await sendSMS({ to: order.customer_phone, message });
+            await sendSMSOrThrow({ to: order.customer_phone, message });
         } catch (err: any) {
             console.error("[resend-confirmation] SMS failed:", err);
             emailErrors.push(`SMS: ${err?.message || "failed"}`);

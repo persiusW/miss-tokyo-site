@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getUrl } from "@/lib/utils/getUrl";
 import { Resend } from "resend";
-import { sendSMS } from "@/lib/sms";
+import { sendSMSOrThrow } from "@/lib/sms";
 import crypto from "crypto";
 import { logActivity } from "@/lib/utils/logActivity";
 import { after } from "next/server";
@@ -85,7 +85,7 @@ export async function inviteTeamMember(data: InviteData) {
 
         if (formattedPhone) {
             try {
-                await sendSMS({ to: formattedPhone, message });
+                await sendSMSOrThrow({ to: formattedPhone, message });
             } catch (smsErr) {
                 console.error("SMS failed, but email sent:", smsErr);
                 return { success: true, warning: 'Email sent, but SMS failed.' };
