@@ -84,6 +84,7 @@ export default function POSPage() {
     const [notes, setNotes] = useState('');
     const [sending, setSending] = useState(false);
     const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+    const [completedOrderRef, setCompletedOrderRef] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
     const searchProducts = useCallback(async (q: string) => {
@@ -301,10 +302,17 @@ export default function POSPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessionId }),
             });
-            const { paymentUrl: url, error: sendError, delivery } = await sendRes.json();
+            const { paymentUrl: url, error: sendError, delivery, completed, orderRef } = await sendRes.json();
             if (!sendRes.ok || !url) throw new Error(sendError ?? 'Failed to send link');
 
             setPaymentUrl(url);
+
+            // Gift card covered the basket — the sale is already done, no link to chase
+            if (completed) {
+                setCompletedOrderRef(orderRef ?? null);
+                toast.success(`Paid in full by gift card — order ${orderRef ?? ''} created`);
+                return;
+            }
 
             // Report what actually reached the customer. A failed SMS still leaves
             // a usable link on screen for staff to share manually.
@@ -334,7 +342,7 @@ export default function POSPage() {
     };
 
     const reset = () => {
-        setCart([]); setPaymentUrl(null); setSelectedContact(null);
+        setCart([]); setPaymentUrl(null); setCompletedOrderRef(null); setSelectedContact(null);
         setNewCustomer({ name: '', email: '' });
         setCustomerPhone('');
         setDeliveryMethod('pickup'); setDeliveryAddress('');
@@ -560,7 +568,18 @@ export default function POSPage() {
                         onChange={e => setNotes(e.target.value)} rows={2}
                         style={{ ...inputStyle, resize: "none" }} />
 
-                    {paymentUrl ? (
+                    {completedOrderRef ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            <div style={{ padding: "10px 12px", background: "color-mix(in srgb, var(--ac-accent) 14%, transparent)", border: "1px solid var(--ac-accent)", borderRadius: "var(--r-sm)" }}>
+                                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-accent)", fontWeight: 700, marginBottom: 4 }}>Paid in full by gift card</p>
+                                <p style={{ fontSize: 11, color: "var(--ac-ink)", fontWeight: 600 }}>Order #{completedOrderRef}</p>
+                                <p style={{ fontSize: 10, color: "var(--ac-ink-3)", marginTop: 2 }}>Nothing to collect. Receipt sent to the customer.</p>
+                            </div>
+                            <button onClick={reset} style={{ width: "100%", padding: "10px 0", border: "1px solid var(--ac-ink)", background: "transparent", color: "var(--ac-ink)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".12em", fontWeight: 700, cursor: "pointer", borderRadius: "var(--r-sm)" }}>
+                                New Order
+                            </button>
+                        </div>
+                    ) : paymentUrl ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                             <div style={{ padding: "10px 12px", background: "color-mix(in srgb, var(--ac-accent) 10%, transparent)", border: "1px solid var(--ac-accent)", borderRadius: "var(--r-sm)" }}>
                                 <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-accent)", fontWeight: 700, marginBottom: 4 }}>Link Sent!</p>

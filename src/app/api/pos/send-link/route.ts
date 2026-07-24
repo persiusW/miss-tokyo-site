@@ -8,6 +8,7 @@ import { Resend } from 'resend';
 import { sendSMS } from '@/lib/sms';
 import { validateDiscountCode } from '@/lib/discountValidation';
 import { normAttr } from '@/lib/utils/normAttr';
+import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
@@ -126,13 +127,7 @@ export async function POST(req: NextRequest) {
     const discountAmount = validatedDiscount?.amount ?? 0;
     const discountedSubtotal = parseFloat(Math.max(0, totalGHS - discountAmount).toFixed(2));
 
-    // Paystack cannot charge zero. A code that covers the whole basket has no
-    // payment link to send — storefront checkout rejects this case too.
-    if (discountedSubtotal <= 0) {
-        return NextResponse.json({
-            error: `"${validatedDiscount?.code}" covers the full order total (GH₵${totalGHS.toFixed(2)}). There is nothing left to charge, so no payment link can be sent.`,
-        }, { status: 409 });
-    }
+    const fullyCovered = discountedSubtotal <= 0;
 
     // Fetch platform fee settings — same as regular checkout
     const { data: storeFeeSettings } = await supabaseAdmin
@@ -163,10 +158,16 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', sessionId);
 
+    // Staff-configurable in Settings. Resolved once and used for both the
+    // reservation TTL and the customer's message, so the DB and what the
+    // customer is told can never quote different windows.
+    const holdMinutes = await getPosHoldMinutes();
+
     // Atomic inventory reservation via DB function
     const { error: reserveError } = await supabaseAdmin.rpc('fn_reserve_pos_stock', {
         p_session_id: sessionId,
         p_items: reservationItems,
+        p_ttl_mins: holdMinutes,
     });
 
     if (reserveError) {
@@ -174,6 +175,37 @@ export async function POST(req: NextRequest) {
             ? 'One or more items are out of stock'
             : reserveError.message;
         return NextResponse.json({ error: msg }, { status: 409 });
+    }
+
+    const baseUrlForCompleted = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://misstokyo.shop';
+
+    // Gift card covers the whole basket — there is nothing to charge, so skip
+    // Paystack entirely and settle the sale here. Stock is already held by the
+    // reservation above, and settlePosSession is the same path a paid link takes:
+    // it creates the order, decrements stock, debits the card and sends the receipt.
+    if (fullyCovered) {
+        const result = await settlePosSession(sessionId, { logPrefix: '[POS gift-card]' });
+
+        if (!result.settled) {
+            return NextResponse.json({ error: 'This sale has already been completed.' }, { status: 409 });
+        }
+        if (!result.orderId) {
+            return NextResponse.json({ error: 'Could not create the order. Nothing was charged — try again.' }, { status: 500 });
+        }
+
+        return NextResponse.json({
+            paymentUrl: `${baseUrlForCompleted}/pay/${sessionId}`,
+            sessionId,
+            total: 0,
+            completed: true,
+            orderRef: result.orderRef,
+            discount: validatedDiscount
+                ? { code: validatedDiscount.code, amount: discountAmount, label: validatedDiscount.label }
+                : null,
+            // No `delivery` block: settlePosSession fires the confirmation email
+            // and SMS but does not report per channel, so claiming either was
+            // delivered would be a guess. Failures are logged there.
+        });
     }
 
     // Paystack Payment Request — same API as invoice feature
@@ -249,7 +281,7 @@ export async function POST(req: NextRequest) {
                 ${validatedDiscount ? `<p><strong>Discount (${validatedDiscount.code}):</strong> -GH&#8373;${discountAmount.toFixed(2)}</p>` : ''}
                 <p><strong>Total:</strong> GH&#8373;${amountWithFee.toFixed(2)}</p>
                 <p><a href="${previewUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;">Review &amp; Pay &mdash; GH&#8373;${amountWithFee.toFixed(2)}</a></p>
-                <p style="color:#999;font-size:12px;">This link expires in 30 minutes.</p>
+                <p style="color:#999;font-size:12px;">This link expires in ${holdMinutes} minutes.</p>
             `,
         }),
 
@@ -257,7 +289,7 @@ export async function POST(req: NextRequest) {
         session.customer_phone
             ? sendSMS({
                 to: session.customer_phone,
-                message: `Hi ${firstName}, your Miss Tokyo order (GH${String.fromCharCode(8373)}${amountWithFee.toFixed(2)}) is ready. Review and pay here: ${previewUrl} (expires in 30 mins)`,
+                message: `Hi ${firstName}, your Miss Tokyo order (GH${String.fromCharCode(8373)}${amountWithFee.toFixed(2)}) is ready. Review and pay here: ${previewUrl} (expires in ${holdMinutes} mins)`,
             })
             : Promise.resolve(null),
     ]);

@@ -39,5 +39,22 @@ export async function GET(req: Request) {
         if (updated && updated.length > 0) expired++;
     }
 
-    return NextResponse.json({ expired });
+    // POS sessions expire the same way. /api/pos/expire only fires when a
+    // customer opens their pay page, so a link nobody opens sat at
+    // "pending_payment" forever and cluttered POS History. Availability was
+    // never affected — fn_combined_available_stock ignores expired holds — so
+    // this is bookkeeping, and like the online path above it deliberately
+    // leaves pos_reservations rows in place: handlePosPayment still settles a
+    // late payment, and an expired hold no longer counts against stock.
+    const { data: expiredPos } = await supabaseAdmin
+        .from("pos_sessions")
+        .update({ status: "expired" })
+        .eq("status", "pending_payment")
+        .lt("expires_at", new Date().toISOString())
+        .select("id");
+
+    const posExpired = expiredPos?.length ?? 0;
+    if (posExpired > 0) console.log(`[cron/expire-reservations] expired ${posExpired} POS sessions`);
+
+    return NextResponse.json({ expired, posExpired });
 }
