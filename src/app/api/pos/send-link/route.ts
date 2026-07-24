@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
     // Hold the discount for the same window as the stock, so a second till
     // cannot be quoted value this basket is already relying on.
     if (validatedDiscount) {
-        const held = await holdDiscount(validatedDiscount, { posSessionId: sessionId }, POS_HOLD_MINUTES);
+        const held = await holdDiscount(validatedDiscount, { posSessionId: sessionId }, holdMinutes);
         if (!held) {
             // Release the stock we just took — this sale is not going ahead
             await supabaseAdmin.from('pos_reservations').delete().eq('pos_session_id', sessionId);
