@@ -38,6 +38,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_discount_holds_no_duplicate
 
 ALTER TABLE public.discount_holds ENABLE ROW LEVEL SECURITY;
 
+-- Dropped first so the whole migration is re-runnable; CREATE POLICY has no
+-- IF NOT EXISTS, and a partial re-run otherwise aborts on 42710.
+DROP POLICY IF EXISTS "staff_select_discount_holds" ON public.discount_holds;
+
 CREATE POLICY "staff_select_discount_holds"
     ON public.discount_holds FOR SELECT
     TO authenticated

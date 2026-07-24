@@ -58,18 +58,29 @@ test.describe("Badge rendering — fixture page", () => {
         await expect(row.locator("span[title*='Fully fulfilled']")).toHaveCount(0);
     });
 
+    // The dot is coloured with an inline style, not a class — the July 2026
+    // redesign moved OrdersClient off Tailwind, so the old toHaveClass(/text-blue/)
+    // assertions could never pass. The title already carries the semantic state;
+    // the style check exists so silently dropping the colour still fails.
+
     test("mixed order with regular_items_dispatched_at shows blue partial dot", async ({ page }) => {
         const row = page.locator("table tbody tr").filter({ hasText: "Mixed Partial" });
         const dot = row.locator("span[title*='Pre-order items pending']");
         await expect(dot).toBeVisible();
-        await expect(dot).toHaveClass(/text-blue/);
+        // The browser normalises the literal #6aa6ff to rgb() in the style
+        // attribute; match either form. (The fulfilled dot uses var(--ac-accent),
+        // which is left unresolved, so that one is matched by name.)
+        await expect(dot).toHaveAttribute("style", /#6aa6ff|rgb\(106,\s*166,\s*255\)/);
+        // and it must not be the fulfilled variant
+        await expect(row.locator("span[title*='Fully fulfilled']")).toHaveCount(0);
     });
 
     test("fulfilled mixed order shows green dot", async ({ page }) => {
         const row = page.locator("table tbody tr").filter({ hasText: "Mixed Fulfilled" });
         const dot = row.locator("span[title*='Fully fulfilled']");
         await expect(dot).toBeVisible();
-        await expect(dot).toHaveClass(/text-emerald/);
+        await expect(dot).toHaveAttribute("style", /--ac-accent/);
+        await expect(row.locator("span[title*='Pre-order items pending']")).toHaveCount(0);
     });
 
     test("three MIXED badges for the three mixed fixture orders", async ({ page }) => {

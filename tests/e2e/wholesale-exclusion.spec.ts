@@ -224,13 +224,24 @@ test.describe("Regression — NULL category fields do not exclude retail product
     });
 
     test("total count is consistent across pages", async ({ request }) => {
+        const PAGE_SIZE = 24; // getProducts: .range((page-1)*24, +24)
+
         const page1 = await fetchPublicProducts(request, { page: "1" });
+        expect(page1.total).toBeGreaterThan(0);
+
         const page2 = await fetchPublicProducts(request, { page: "2" });
 
-        // Both pages report the same total (the server count doesn't change between calls).
-        expect(page1.total).toBe(page2.total);
-
-        // Page 2 may be empty if there are < 25 products, but must not exceed total.
-        expect(page2.products.length).toBeLessThanOrEqual(page2.total);
+        if (page1.total > PAGE_SIZE) {
+            // Page 2 is a real page — the server count must not move between calls
+            expect(page2.total).toBe(page1.total);
+            expect(page2.products.length).toBeGreaterThan(0);
+            expect(page2.products.length).toBeLessThanOrEqual(page2.total);
+        } else {
+            // Page 2 is past the end. getProducts deliberately returns
+            // { products: [], total: 0 } for PGRST103 (offset exceeds rows) rather
+            // than erroring, so comparing totals here is meaningless — this used to
+            // fail purely because the catalogue is smaller than one page.
+            expect(page2.products).toHaveLength(0);
+        }
     });
 });

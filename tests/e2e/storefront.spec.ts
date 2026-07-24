@@ -69,15 +69,21 @@ test.describe("Homepage", () => {
     test("renders at least one navigation link", async ({ page }) => {
         await page.goto(ROUTES.home, { waitUntil: "domcontentloaded", timeout: 60_000 });
 
-        // NavBar links are hidden behind a hamburger menu on mobile (xl:hidden / hidden xl:block).
-        // Assert that either a visible nav link OR the hamburger button is present.
+        // Navigation reaches the user by one of three routes depending on width:
+        //   ≥1280px  desktop nav links in the header
+        //   768–1279  hamburger (hidden md:flex xl:hidden)
+        //   <768      MobileTabBar, a fixed bottom bar — the hamburger is hidden
+        //             below md, so on a phone the tab bar is the only nav
+        // The last case was missing, which failed every run on the mobile project.
         const shopLink = page.locator(`a[href="${ROUTES.shop}"], a[href*="shop"]`).first();
-        const hamburger = page.locator('[aria-label*="navigation menu" i], [aria-label*="menu" i]').first();
+        const hamburger = page.locator('[aria-label="Open navigation menu"]').first();
+        const tabBar = page.locator("nav.mobile-tab-bar").first();
 
         const linkVisible = await shopLink.isVisible({ timeout: 10_000 }).catch(() => false);
         const hamburgerVisible = await hamburger.isVisible({ timeout: 5_000 }).catch(() => false);
+        const tabBarVisible = await tabBar.isVisible({ timeout: 5_000 }).catch(() => false);
 
-        expect(linkVisible || hamburgerVisible).toBe(true);
+        expect(linkVisible || hamburgerVisible || tabBarVisible).toBe(true);
     });
 
     test("page title contains Miss Tokyo", async ({ page }) => {
@@ -113,11 +119,26 @@ test.describe("NavBar", () => {
         const overlayShopLink = page.locator('a[href="/shop"][class*="font-serif"], a[href="/shop"][class*="text-3xl"]').first();
         const overlayLinkVisible = await overlayShopLink.isVisible({ timeout: 5_000 }).catch(() => false);
 
+        // Below md the hamburger itself is hidden, so the overlay never opens and
+        // the bottom MobileTabBar is the only reachable nav. Prefer whichever is
+        // actually visible rather than falling back to the hidden desktop link.
+        const tabBarShopLink = page.locator('nav.mobile-tab-bar a[href="/shop"]').first();
+        const tabBarLinkVisible = await tabBarShopLink.isVisible({ timeout: 3_000 }).catch(() => false);
+
         const clickableShopLink = overlayLinkVisible
             ? overlayShopLink
-            : page.locator('nav a[href*="/shop"]').first(); // desktop fallback
+            : tabBarLinkVisible
+                ? tabBarShopLink
+                : page.locator('nav a[href*="/shop"]').first(); // desktop fallback
 
         await clickableShopLink.waitFor({ state: "visible", timeout: 10_000 });
+
+        // The Next.js dev-overlay element renders bottom-of-viewport, right on top
+        // of the mobile tab bar, and swallows the click. It does not exist in a
+        // production build, so hiding it keeps this a genuine click rather than
+        // masking the collision with force:true.
+        await page.addStyleTag({ content: "nextjs-portal{display:none !important}" }).catch(() => {});
+
         await clickableShopLink.click();
 
         await expect(page).toHaveURL(/\/shop/, { timeout: 15_000 });

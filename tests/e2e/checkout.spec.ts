@@ -65,6 +65,35 @@ async function injectCartItem(page: Page): Promise<void> {
 }
 
 /**
+ * The injected cart item is a synthetic product that does not exist in the
+ * catalogue, so /api/inventory/check reports it inactive with 0 available and
+ * checkout correctly disables Pay. That guard is working as intended — these
+ * tests are about form validation and Paystack initialisation, not stock — so
+ * the check is stubbed to report the item as healthy.
+ *
+ * Register before navigating: checkout runs the check on load.
+ */
+async function mockStockAvailable(page: Page): Promise<void> {
+    await page.route("**/api/inventory/check**", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+                results: [
+                    {
+                        productId: "playwright-test-product",
+                        variantId: null,
+                        available: 10,
+                        isActive: true,
+                        preorderEnabled: false,
+                    },
+                ],
+            }),
+        });
+    });
+}
+
+/**
  * Fills the checkout form with the canonical CHECKOUT_CUSTOMER fixture.
  * Delivery method defaults to "delivery".
  */
@@ -225,6 +254,7 @@ test.describe("Shop → Cart → Checkout critical path", () => {
     // ── 7. Form validation — required fields ──────────────────────────────────
     test("checkout form shows errors when submitted empty", async ({ page }) => {
         await injectCartItem(page);
+        await mockStockAvailable(page);
         await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
         await expect(page.locator('input[name="fullName"]')).toBeVisible({ timeout: 20_000 });
 
@@ -237,9 +267,24 @@ test.describe("Shop → Cart → Checkout critical path", () => {
         await expect(page.getByText(/email.*required/i)).toBeVisible();
     });
 
+    // ── 7b. Stock guard blocks payment ────────────────────────────────────────
+    // Tests 7 and 8 stub /api/inventory/check so they can exercise the form.
+    // This one deliberately does NOT, so the guard itself stays covered: an item
+    // the catalogue cannot supply must stop checkout before Paystack is reached.
+    test("checkout blocks payment when the cart item is unavailable", async ({ page }) => {
+        await injectCartItem(page); // synthetic product — genuinely not in the catalogue
+        await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
+        await expect(page.locator('input[name="fullName"]')).toBeVisible({ timeout: 20_000 });
+
+        const submitBtn = page.getByRole("button", { name: /pay|place order|checkout|continue/i }).first();
+        await expect(submitBtn).toBeDisabled({ timeout: 20_000 });
+        await expect(page.getByText(/no longer available|only has|sold out/i).first()).toBeVisible();
+    });
+
     // ── 8. Happy-path form fill (stops before Paystack redirect) ──────────────
     test("fully filled checkout form reaches Paystack initialisation", async ({ page }) => {
         await injectCartItem(page);
+        await mockStockAvailable(page);
         await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
         await expect(page.locator('input[name="fullName"]')).toBeVisible({ timeout: 20_000 });
 

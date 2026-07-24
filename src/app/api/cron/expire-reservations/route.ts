@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     // "pending_payment" forever and cluttered POS History. Availability was
     // never affected — fn_combined_available_stock ignores expired holds — so
     // this is bookkeeping, and like the online path above it deliberately
-    // leaves pos_reservations rows in place: handlePosPayment still settles a
+    // leaves pos_reservations rows in place: settlePosSession still settles a
     // late payment, and an expired hold no longer counts against stock.
     const { data: expiredPos } = await supabaseAdmin
         .from("pos_sessions")

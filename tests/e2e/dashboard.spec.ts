@@ -40,21 +40,26 @@ test.describe("Dashboard — Overview", () => {
         await page.goto(ROUTES.overview);
         await assertPageLoaded(page);
 
-        // Overview metric cards use "bg-white rounded-2xl shadow-sm p-6" (no card/metric class).
-        // Target any div with shadow-sm (the metric tiles and chart containers).
-        const metricCard = page
-            .locator('div[class*="shadow-sm"], div[class*="rounded-2xl"]')
-            .first();
-        await expect(metricCard).toBeVisible({ timeout: 15_000 });
+        // KPI tiles are .ac-kpi inside .ac-kpi-grid (Atelier Console design system).
+        // This previously looked for Tailwind "shadow-sm"/"rounded-2xl", which the
+        // July 2026 redesign removed — the test failed on every run for months.
+        const kpiGrid = page.locator(".ac-kpi-grid").first();
+        await expect(kpiGrid).toBeVisible({ timeout: 15_000 });
+
+        // At least one tile with a label and a value, so an empty grid still fails
+        const firstTile = kpiGrid.locator(".ac-kpi").first();
+        await expect(firstTile).toBeVisible();
+        await expect(firstTile.locator(".ac-kpi-label")).toBeVisible();
+        await expect(firstTile.locator(".ac-kpi-value")).toBeVisible();
     });
 
     test("overview sidebar nav is visible", async ({ page }) => {
         await page.goto(ROUTES.overview);
 
-        const sidebar = page
-            .locator('nav, aside, [class*="sidebar"], [class*="Sidebar"]')
-            .first();
+        // AdminSidebar renders <aside class="admin-sidebar"> with <nav class="admin-nav">
+        const sidebar = page.locator("aside.admin-sidebar").first();
         await expect(sidebar).toBeVisible({ timeout: 10_000 });
+        await expect(sidebar.locator("nav.admin-nav")).toBeVisible();
     });
 });
 
