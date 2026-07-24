@@ -7,6 +7,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { Resend } from 'resend';
 import { sendSMS } from '@/lib/sms';
 import { validateDiscountCode } from '@/lib/discountValidation';
+import { normAttr } from '@/lib/utils/normAttr';
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     const productIds = [...new Set(items.map((i: any) => i.productId))];
     const { data: dbProducts } = await supabaseAdmin
         .from('products')
-        .select('id, price_ghs, is_sale, discount_value')
+        .select('id, price_ghs, is_sale, discount_value, track_variant_inventory')
         .in('id', productIds);
 
     const priceMap: Record<string, number> = {};
@@ -55,13 +56,48 @@ export async function POST(req: NextRequest) {
         priceMap[p.id] = base;
     }
 
+    // Resolve size/colour to a real variant id. The till only knows the
+    // product's available_sizes/available_colors and always sends
+    // variantId: null, so without this every variant-tracked POS sale reserved
+    // and decremented nothing — the webhook hit its "variantId missing" skip
+    // and stock never moved.
+    const variantTrackedIds = (dbProducts ?? [])
+        .filter((p: any) => p.track_variant_inventory)
+        .map((p: any) => p.id);
+
+    const variantLookup: Record<string, string> = {};
+    if (variantTrackedIds.length > 0) {
+        const { data: variants } = await supabaseAdmin
+            .from('product_variants')
+            .select('id, product_id, size, color, brand')
+            .in('product_id', variantTrackedIds);
+        for (const v of (variants ?? [])) {
+            variantLookup[`${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`] = v.id;
+        }
+    }
+
+    const resolveVariantId = (i: any): string | null => {
+        if (i.variantId) return i.variantId;
+        if (!variantTrackedIds.includes(i.productId)) return null;
+        return variantLookup[`${i.productId}|${normAttr(i.size)}|${normAttr(i.color)}|${normAttr(i.brand)}`] ?? null;
+    };
+
+    // A variant-tracked product whose size/colour matches no variant row would
+    // silently bypass stock control — refuse rather than oversell.
+    const unresolved = items.find((i: any) => variantTrackedIds.includes(i.productId) && !resolveVariantId(i));
+    if (unresolved) {
+        return NextResponse.json({
+            error: `"${unresolved.name}" (${[unresolved.size, unresolved.color].filter(Boolean).join(' / ') || 'no variant selected'}) does not match a stocked variant. Re-add it from the product list.`,
+        }, { status: 409 });
+    }
+
     let totalGHS = 0;
     const reservationItems = items.map((i: any) => {
         const price = priceMap[i.productId] ?? 0;
         totalGHS += price * (i.quantity ?? 1);
         return {
             product_id: i.productId,
-            variant_id: i.variantId ?? null,
+            variant_id: resolveVariantId(i),
             quantity: i.quantity ?? 1,
         };
     });
@@ -69,7 +105,12 @@ export async function POST(req: NextRequest) {
     // Persist the verified unit prices back onto the session — the confirmation
     // receipt renders line items from session.items, so stale client prices there
     // would print a receipt that doesn't add up to what was charged.
-    const pricedItems = items.map((i: any) => ({ ...i, price: priceMap[i.productId] ?? i.price ?? 0 }));
+    // The resolved variantId rides along so the webhook decrements variant stock.
+    const pricedItems = items.map((i: any) => ({
+        ...i,
+        price: priceMap[i.productId] ?? i.price ?? 0,
+        variantId: resolveVariantId(i),
+    }));
 
     // Re-validate the staff-entered coupon / gift card against the DB. The till
     // only ever sends a code; its worth is computed here against the

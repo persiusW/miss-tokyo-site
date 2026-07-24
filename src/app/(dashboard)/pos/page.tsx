@@ -94,7 +94,23 @@ export default function POSPage() {
             .limit(40);
         if (q.trim()) dbQuery = dbQuery.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
         const { data } = await dbQuery;
-        setProducts((data ?? []).map((p: any) => ({ ...p, inventory_count: p.inventory_count ?? 0 })));
+        const rows = (data ?? []).map((p: any) => ({ ...p, inventory_count: p.inventory_count ?? 0 }));
+
+        // Show stock net of live holds. The raw count lets two tills each see
+        // "2 left" for the same last-2 units and both promise them. One batched
+        // call — per-product RPCs would be 40 round trips on every keystroke.
+        const trackedIds = rows.filter((p: any) => p.track_inventory && !p.track_variant_inventory).map((p: any) => p.id);
+        if (trackedIds.length > 0) {
+            const { data: avail } = await supabase.rpc('fn_available_stock_bulk', { p_product_ids: trackedIds });
+            if (Array.isArray(avail)) {
+                const availMap = new Map(avail.map((a: any) => [a.product_id, a.available]));
+                for (const p of rows) {
+                    const net = availMap.get(p.id);
+                    if (typeof net === 'number') p.inventory_count = net;
+                }
+            }
+        }
+        setProducts(rows);
     }, []);
 
     useEffect(() => { searchProducts(query); }, [query, searchProducts]);
@@ -228,6 +244,38 @@ export default function POSPage() {
         const customer = customerMode === 'search' ? selectedContact! : newCustomer;
         setSending(true);
         try {
+            // Same real-time stock gate the storefront runs before payment, so a
+            // till and a customer can't both be promised the last unit. Nets off
+            // live holds; pre-order items are exempt.
+            const checkItems = cart.map(i => ({
+                productId: i.productId,
+                variantId: i.variantId,
+                size: i.size ?? undefined,
+                color: i.color ?? undefined,
+                quantity: i.quantity,
+            }));
+            const stockRes = await fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`);
+            const stockData = await stockRes.json();
+            if (Array.isArray(stockData?.results)) {
+                const issues: string[] = [];
+                stockData.results.forEach((result: any, idx: number) => {
+                    const line = cart[idx];
+                    if (!line) return;
+                    if (!result.isActive) {
+                        issues.push(`"${line.name}" is no longer available.`);
+                    } else if (!result.preorderEnabled && result.available < line.quantity) {
+                        issues.push(result.available === 0
+                            ? `"${line.name}"${line.size ? ` (${line.size})` : ''} is sold out.`
+                            : `"${line.name}"${line.size ? ` (${line.size})` : ''} only has ${result.available} left.`);
+                    }
+                });
+                if (issues.length > 0) {
+                    toast.error(issues.join(' '));
+                    setSending(false);
+                    return;
+                }
+            }
+
             const sessionRes = await fetch('/api/pos/session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

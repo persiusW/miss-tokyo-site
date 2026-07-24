@@ -3,7 +3,7 @@ export const maxDuration = 60; // 1 minute — safe window for Paystack webhook 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { revalidateTag } from "next/cache";
-import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
+import { confirmSale, fallbackDecrementFromItems, decrementDirect } from "@/lib/inventory";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMS, sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
@@ -264,38 +264,28 @@ async function handlePosPayment(
             .in("id", productIds);
         const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
 
+        // Single atomic decrement per line. The previous read-modify-write lost
+        // updates whenever two orders for the same product settled together, and
+        // skipped variant-tracked products entirely when variantId was absent.
         await Promise.allSettled(items.map(async (item: any) => {
             const product = productMap.get(item.productId);
             if (!product || product.track_inventory === false) return;
             const qty = item.quantity ?? 1;
-            if (product.track_variant_inventory && item.variantId) {
-                // Deduct variant stock
-                const { data: variant } = await supabaseAdmin
-                    .from("product_variants")
-                    .select("inventory_count")
-                    .eq("id", item.variantId)
-                    .single();
-                if (variant && typeof variant.inventory_count === "number") {
-                    await supabaseAdmin
-                        .from("product_variants")
-                        .update({ inventory_count: Math.max(0, variant.inventory_count - qty) })
-                        .eq("id", item.variantId);
-                }
-                // Also deduct product-level stock
-                if (typeof product.inventory_count === "number") {
-                    await supabaseAdmin
-                        .from("products")
-                        .update({ inventory_count: Math.max(0, product.inventory_count - qty) })
-                        .eq("id", item.productId);
-                }
-            } else if (!product.track_variant_inventory && typeof product.inventory_count === "number") {
-                await supabaseAdmin
-                    .from("products")
-                    .update({ inventory_count: Math.max(0, product.inventory_count - qty) })
-                    .eq("id", item.productId);
-            } else {
-                console.warn("[POS webhook] inventory skip: track_variant_inventory=true but variantId missing", { productId: item.productId });
+
+            if (product.track_variant_inventory && !item.variantId) {
+                // send-link resolves this now; a session drafted before that fix
+                // could still arrive here. Decrement product level and shout.
+                console.error("[POS webhook] variant unresolved — variant stock NOT decremented", {
+                    posSessionId, productId: item.productId, size: item.size, color: item.color,
+                });
             }
+
+            await decrementDirect(
+                item.productId,
+                product.track_variant_inventory ? (item.variantId ?? null) : null,
+                qty,
+                "pos settlement",
+            );
         }));
 
         revalidateTag("products", "max");
@@ -589,17 +579,15 @@ export async function POST(req: Request) {
                         console.log(`[webhook] fallback stock decrement applied for order ${orderId} (no reservation row)`);
                     }
                 } else if (productId) {
-                    // Legacy single-product path (no orderId in metadata)
+                    // Legacy single-product path (no orderId in metadata).
+                    // Goes through the inventory lib so the decrement is atomic.
                     const { data: product } = await supabaseAdmin
                         .from("products")
-                        .select("inventory_count, track_inventory")
+                        .select("track_inventory")
                         .eq("id", productId)
                         .single();
                     if (product?.track_inventory !== false) {
-                        await supabaseAdmin
-                            .from("products")
-                            .update({ inventory_count: Math.max(0, (product?.inventory_count ?? 0) - 1) })
-                            .eq("id", productId);
+                        await decrementDirect(productId, null, 1, "legacy single-product charge");
                     }
                 }
 
