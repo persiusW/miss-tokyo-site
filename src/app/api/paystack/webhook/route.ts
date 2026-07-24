@@ -132,15 +132,18 @@ async function trackDiscountUsage(
             .ilike("code", code)
             .maybeSingle();
         if (coupon) {
-            // Atomic increment — avoids lost updates when two charges settle
-            // concurrently. Falls back to read-modify-write if the DB function
-            // hasn't been deployed yet.
-            const { error: rpcErr } = await supabaseAdmin.rpc("fn_increment_coupon_usage", { p_coupon_id: coupon.id });
+            // Claim a use only if it stays within usage_limit. The old call
+            // incremented unconditionally, so concurrent redemptions of a
+            // last-use coupon all succeeded and pushed used_count past the cap.
+            const { data: claimed, error: rpcErr } = await supabaseAdmin
+                .rpc("fn_claim_coupon_use", { p_coupon_id: coupon.id });
+
             if (rpcErr) {
-                await supabaseAdmin
-                    .from("coupons")
-                    .update({ used_count: (coupon.used_count || 0) + 1 })
-                    .eq("id", coupon.id);
+                console.error("[webhook] fn_claim_coupon_use failed:", rpcErr.message, { code });
+            } else if (claimed === false) {
+                // Already at its limit — the order still stands (the customer has
+                // paid the discounted amount), but this needs a human to see it.
+                console.error("[webhook] coupon over-redeemed: limit already reached at settlement", { code, orderId });
             }
             return;
         }
@@ -157,17 +160,29 @@ async function trackDiscountUsage(
             // initialize (signature-verified) — debit exactly what was applied to the
             // order, never the full remaining balance.
             const balanceBefore = Number(card.remaining_value);
-            const amountUsed = Math.min(balanceBefore, discountAmount > 0 ? discountAmount : balanceBefore);
-            const newBalance = parseFloat(Math.max(0, balanceBefore - amountUsed).toFixed(2));
+            const requested = Math.min(balanceBefore, discountAmount > 0 ? discountAmount : balanceBefore);
 
-            await supabaseAdmin
-                .from("gift_cards")
-                .update({
-                    remaining_value: newBalance,
-                    ...(newBalance === 0 ? { is_active: false, status: "redeemed" } : {}),
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("id", card.id);
+            // Conditional debit under the row lock. Reading the balance and
+            // writing balance - amount as two statements let two settlements
+            // spend the same money twice.
+            const { data: debited, error: redeemErr } = await supabaseAdmin
+                .rpc("fn_redeem_gift_card", { p_card_id: card.id, p_amount: requested });
+
+            const amountUsed = Number(debited) || 0;
+
+            if (redeemErr) {
+                console.error("[webhook] fn_redeem_gift_card failed:", redeemErr.message, { code });
+                return;
+            }
+            if (amountUsed <= 0) {
+                // The card was spent by a concurrent order between apply and
+                // settlement. The customer has already paid the discounted
+                // amount, so this is a shortfall someone must reconcile.
+                console.error("[webhook] gift card could not fund this order — balance already spent", {
+                    code, orderId, requested, balanceBefore,
+                });
+                return;
+            }
 
             // Audit trail — mirrors the admin redeem route's record
             await supabaseAdmin.from("gift_card_redemptions").insert({
@@ -175,7 +190,7 @@ async function trackDiscountUsage(
                 order_id: orderId || null,
                 amount_used: amountUsed,
                 balance_before: balanceBefore,
-                balance_after: newBalance,
+                balance_after: parseFloat(Math.max(0, balanceBefore - amountUsed).toFixed(2)),
                 redeemed_by: null,
             });
         }
