@@ -59,7 +59,32 @@ Grep for those. They should never appear; if they do, that is money to reconcile
 
 ---
 
-## Proposed — holds, to stop the quote being made at all
+## IMPLEMENTED on `feat/discount-holds`
+
+The proposal below was built as specified. Migration
+`20260724020000_discount_holds.sql`:
+
+- `discount_holds` table (TTL'd, one live hold per code per basket)
+- `fn_available_gift_card_value` / `fn_available_coupon_uses` — value net of live holds
+- `fn_hold_discount` — locks the card/coupon row, checks availability, inserts the
+  hold, and **raises** if it cannot cover, so callers fail closed like stock
+- `fn_release_discount_holds`
+
+`validateDiscountCode` now quotes against available value rather than the printed
+balance, and returns `codeId` so the value can be held. `/api/pos/send-link` holds
+for `POS_HOLD_MINUTES` alongside the stock reservation (rolling both back if the
+hold is refused); `/api/paystack/initialize` holds for 30 minutes alongside its
+reservation. Settlement writes the ledger then releases; POS cancel releases
+immediately; anything else lapses on TTL, since every read filters
+`expires_at > NOW()`.
+
+Every call degrades gracefully: if the migration has not been applied, the RPCs
+report "does not exist" and the code falls back to the previous no-hold
+behaviour rather than blocking a sale.
+
+---
+
+## Original proposal — holds, to stop the quote being made at all
 
 The real fix mirrors `online_reservations` / `pos_reservations`.
 

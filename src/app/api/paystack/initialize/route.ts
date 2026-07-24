@@ -2,9 +2,9 @@ export const maxDuration = 30; // 30 seconds — headroom for Paystack API hands
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { reserveStock, type ReserveItem } from "@/lib/inventory";
+import { reserveStock, releaseReservation, type ReserveItem } from "@/lib/inventory";
 import { normAttr } from "@/lib/utils/normAttr";
-import { validateDiscountCode, type ValidatedDiscount } from "@/lib/discountValidation";
+import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
 
 export async function POST(request: Request) {
     try {
@@ -441,6 +441,20 @@ export async function POST(request: Request) {
                         : `"${name}" is no longer available.`;
                     return NextResponse.json({ error: friendlyError }, { status: 409 });
                 }
+            }
+        }
+
+        // Hold the discount alongside the stock, for the same 30-minute window
+        // the online reservation uses. Without this, two customers can both be
+        // quoted the same gift-card value and only one can be funded.
+        if (validatedDiscount && validatedDiscount.amount > 0) {
+            const held = await holdDiscount(validatedDiscount, { orderId }, 30);
+            if (!held) {
+                await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+                await releaseReservation(orderId);
+                return NextResponse.json({
+                    error: `"${validatedDiscount.code}" has just been used and no longer covers this order. Remove it and try again.`,
+                }, { status: 409 });
             }
         }
 
