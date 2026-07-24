@@ -8,7 +8,7 @@ import { Resend } from 'resend';
 import { sendSMS } from '@/lib/sms';
 import { validateDiscountCode, holdDiscount } from '@/lib/discountValidation';
 import { normAttr } from '@/lib/utils/normAttr';
-import { settlePosSession, POS_HOLD_MINUTES } from '@/lib/posSettlement';
+import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
@@ -158,13 +158,16 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', sessionId);
 
-    // Atomic inventory reservation via DB function. The hold window is passed
-    // explicitly from POS_HOLD_MINUTES so the DB and the customer's message can
-    // never quote different numbers.
+    // Staff-configurable in Settings. Resolved once and used for both the
+    // reservation TTL and the customer's message, so the DB and what the
+    // customer is told can never quote different windows.
+    const holdMinutes = await getPosHoldMinutes();
+
+    // Atomic inventory reservation via DB function
     const { error: reserveError } = await supabaseAdmin.rpc('fn_reserve_pos_stock', {
         p_session_id: sessionId,
         p_items: reservationItems,
-        p_ttl_mins: POS_HOLD_MINUTES,
+        p_ttl_mins: holdMinutes,
     });
 
     if (reserveError) {
@@ -292,7 +295,7 @@ export async function POST(req: NextRequest) {
                 ${validatedDiscount ? `<p><strong>Discount (${validatedDiscount.code}):</strong> -GH&#8373;${discountAmount.toFixed(2)}</p>` : ''}
                 <p><strong>Total:</strong> GH&#8373;${amountWithFee.toFixed(2)}</p>
                 <p><a href="${previewUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;">Review &amp; Pay &mdash; GH&#8373;${amountWithFee.toFixed(2)}</a></p>
-                <p style="color:#999;font-size:12px;">This link expires in ${POS_HOLD_MINUTES} minutes.</p>
+                <p style="color:#999;font-size:12px;">This link expires in ${holdMinutes} minutes.</p>
             `,
         }),
 
@@ -300,7 +303,7 @@ export async function POST(req: NextRequest) {
         session.customer_phone
             ? sendSMS({
                 to: session.customer_phone,
-                message: `Hi ${firstName}, your Miss Tokyo order (GH${String.fromCharCode(8373)}${amountWithFee.toFixed(2)}) is ready. Review and pay here: ${previewUrl} (expires in ${POS_HOLD_MINUTES} mins)`,
+                message: `Hi ${firstName}, your Miss Tokyo order (GH${String.fromCharCode(8373)}${amountWithFee.toFixed(2)}) is ready. Review and pay here: ${previewUrl} (expires in ${holdMinutes} mins)`,
             })
             : Promise.resolve(null),
     ]);

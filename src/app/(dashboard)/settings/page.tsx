@@ -46,6 +46,7 @@ type StoreSettings = {
     platform_fee_percentage: number;
     platform_fee_label: string;
     show_fee_at_checkout: boolean;
+    pos_hold_minutes: 15 | 30 | 45;
     enable_gift_cards: boolean;
     enable_gallery: boolean;
     enable_craft: boolean;
@@ -85,6 +86,7 @@ const DEFAULT_STORE: StoreSettings = {
     shop_show_title: true,
     shop_image_stretch: false,
     platform_fee_percentage: 0,
+    pos_hold_minutes: 15,
     platform_fee_label: "Service Charge",
     show_fee_at_checkout: false,
     enable_gift_cards: true,
@@ -331,6 +333,9 @@ function StoreTab() {
                         shop_show_title: sData.shop_show_title ?? true,
                         shop_image_stretch: sData.shop_image_stretch ?? false,
                         platform_fee_percentage: Number(sData.platform_fee_percentage) ?? 0,
+                        pos_hold_minutes: ([15, 30, 45].includes(Number(sData.pos_hold_minutes))
+                            ? Number(sData.pos_hold_minutes)
+                            : 15) as 15 | 30 | 45,
                         platform_fee_label: sData.platform_fee_label || "Service Charge",
                         show_fee_at_checkout: sData.show_fee_at_checkout ?? false,
                         enable_gift_cards: sData.enable_gift_cards ?? true,
@@ -514,6 +519,26 @@ function StoreTab() {
 
                     </div>{/* end right column */}
                 </div>{/* end grid */}
+
+                {/* Point of Sale */}
+                <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    {secTitle("Point of Sale")}
+                    {subLabel("How long a POS payment link holds stock for the customer. The same window is quoted in their email and SMS, so the two can never disagree.")}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14 }}>
+                        <div>
+                            <label className="ac-label">Payment Link Hold</label>
+                            <select
+                                value={form.pos_hold_minutes}
+                                onChange={(e) => setForm(p => ({ ...p, pos_hold_minutes: Number(e.target.value) as 15 | 30 | 45 }))}
+                                className="ac-select" style={{ marginTop: 6 }}>
+                                <option value={15}>15 minutes</option>
+                                <option value={30}>30 minutes</option>
+                                <option value={45}>45 minutes</option>
+                            </select>
+                            {subLabel("Stock is released automatically when the link expires unpaid.")}
+                        </div>
+                    </div>
+                </div>
 
                 {/* Platform Fees */}
                 <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
