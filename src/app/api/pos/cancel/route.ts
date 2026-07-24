@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { releaseDiscountHolds } from '@/lib/discountValidation';
 
 export async function POST(req: NextRequest) {
     const serverClient = await createClient();
@@ -39,6 +40,9 @@ export async function POST(req: NextRequest) {
 
     // Explicit reservation delete (FK cascade only fires on row delete, not status update)
     await supabaseAdmin.from('pos_reservations').delete().eq('pos_session_id', sessionId);
+    // Free any held coupon use / gift-card value straight away rather than
+    // making the next customer wait out the hold's TTL
+    await releaseDiscountHolds({ posSessionId: sessionId });
     await supabaseAdmin.from('pos_sessions').update({ status: 'cancelled' }).eq('id', sessionId);
 
     return NextResponse.json({ ok: true });

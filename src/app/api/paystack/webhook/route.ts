@@ -9,6 +9,7 @@ import { sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { activateAndDeliverGiftCard } from "@/lib/giftCardDelivery";
 import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
+import { releaseDiscountHolds } from "@/lib/discountValidation";
 import { settlePosSession } from "@/lib/posSettlement";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
@@ -328,7 +329,8 @@ export async function POST(req: Request) {
 
                     const [emailResult, , smsResult, pushResult] = await Promise.allSettled([
                         emailAlreadySent ? Promise.resolve() : sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
-                        isAlreadyProcessed ? Promise.resolve() : trackDiscountUsage(discount_code, discount_tag, Number(discount_amount) || 0, orderId),
+                        isAlreadyProcessed ? Promise.resolve() : trackDiscountUsage(discount_code, discount_tag, Number(discount_amount) || 0, orderId)
+                            .then(() => releaseDiscountHolds({ orderId })),
                         (emailAlreadySent || !phone) ? Promise.resolve() : sendSMSLogged("webhook:order-confirmed", {
                             to: phone,
                             message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),
@@ -386,7 +388,8 @@ export async function POST(req: Request) {
                         console.log('Webhook triggered email for order:', newOrder.id);
                         const [emailResult, , smsResult, pushResult] = await Promise.allSettled([
                             sendOrderConfirmation({ ...confirmEmailOpts, orderRef, amount: amountGHS }),
-                            isAlreadyProcessed ? Promise.resolve() : trackDiscountUsage(discount_code, discount_tag, Number(discount_amount) || 0, newOrder.id),
+                            isAlreadyProcessed ? Promise.resolve() : trackDiscountUsage(discount_code, discount_tag, Number(discount_amount) || 0, newOrder.id)
+                                .then(() => releaseDiscountHolds({ orderId: newOrder.id })),
                             (!phone) ? Promise.resolve() : sendSMSLogged("webhook:order-confirmed-fallback", {
                                 to: phone,
                                 message: buildOrderSms(orderRef, fullName?.split(" ")[0] || "there", isFirstTimeBuyer),

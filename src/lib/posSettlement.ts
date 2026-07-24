@@ -16,6 +16,7 @@ import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { buildShippingAddress } from "@/lib/geo";
 import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
+import { releaseDiscountHolds } from "@/lib/discountValidation";
 
 /** How long a POS basket holds stock, and what the customer is told. */
 export const POS_HOLD_MINUTES = 15;
@@ -209,7 +210,9 @@ export async function settlePosSession(
         ),
         // Redeem the coupon / debit the gift card. Safe unguarded: the
         // status-gated claim above means only one caller reaches this line.
-        trackDiscountUsage(posDiscountCode || undefined, posDiscountTag, posDiscountAmount, newOrder.id),
+        // Write the ledger, then drop the hold — the value is now spent, not reserved
+        trackDiscountUsage(posDiscountCode || undefined, posDiscountTag, posDiscountAmount, newOrder.id)
+            .then(() => releaseDiscountHolds({ posSessionId })),
     ]);
 
     if (emailResult.status === "rejected") console.error(`${logPrefix} sendOrderConfirmation failed:`, emailResult.reason);

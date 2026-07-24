@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { Resend } from 'resend';
 import { sendSMS } from '@/lib/sms';
-import { validateDiscountCode } from '@/lib/discountValidation';
+import { validateDiscountCode, holdDiscount } from '@/lib/discountValidation';
 import { normAttr } from '@/lib/utils/normAttr';
 import { settlePosSession, POS_HOLD_MINUTES } from '@/lib/posSettlement';
 
@@ -172,6 +172,20 @@ export async function POST(req: NextRequest) {
             ? 'One or more items are out of stock'
             : reserveError.message;
         return NextResponse.json({ error: msg }, { status: 409 });
+    }
+
+    // Hold the discount for the same window as the stock, so a second till
+    // cannot be quoted value this basket is already relying on.
+    if (validatedDiscount) {
+        const held = await holdDiscount(validatedDiscount, { posSessionId: sessionId }, POS_HOLD_MINUTES);
+        if (!held) {
+            // Release the stock we just took — this sale is not going ahead
+            await supabaseAdmin.from('pos_reservations').delete().eq('pos_session_id', sessionId);
+            await supabaseAdmin.from('pos_sessions').update({ status: 'draft' }).eq('id', sessionId);
+            return NextResponse.json({
+                error: `"${validatedDiscount.code}" was just used on another sale and no longer covers this one. Remove it and try again.`,
+            }, { status: 409 });
+        }
     }
 
     const baseUrlForCompleted = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://misstokyo.shop';
