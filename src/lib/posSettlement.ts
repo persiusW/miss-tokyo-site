@@ -17,8 +17,30 @@ import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { buildShippingAddress } from "@/lib/geo";
 import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
 
-/** How long a POS basket holds stock, and what the customer is told. */
-export const POS_HOLD_MINUTES = 15;
+/** The only windows staff can choose, and the fallback when unset. */
+export const POS_HOLD_OPTIONS = [15, 30, 45] as const;
+export const DEFAULT_POS_HOLD_MINUTES = 15;
+
+/**
+ * How long a POS basket holds stock — and, necessarily, the number the customer
+ * is told. One value drives the reservation TTL and the email/SMS copy, so the
+ * two can never quote different windows.
+ *
+ * Anything outside POS_HOLD_OPTIONS is ignored in favour of the default, so a
+ * stray DB value cannot leave stock held for an arbitrary stretch.
+ */
+export async function getPosHoldMinutes(): Promise<number> {
+    const { data } = await supabaseAdmin
+        .from("store_settings")
+        .select("pos_hold_minutes")
+        .eq("id", "default")
+        .maybeSingle();
+
+    const configured = Number(data?.pos_hold_minutes);
+    return (POS_HOLD_OPTIONS as readonly number[]).includes(configured)
+        ? configured
+        : DEFAULT_POS_HOLD_MINUTES;
+}
 
 export type PosSettlementResult =
     | { settled: false; reason: "already_settled" }
