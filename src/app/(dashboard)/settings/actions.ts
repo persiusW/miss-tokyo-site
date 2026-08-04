@@ -120,14 +120,27 @@ export async function removeTeamMember(userId: string) {
 
     // Demote role to 'customer' so they lose dashboard access without destroying
     // their account or triggering FK constraint failures on orders/pos_sessions/logs.
-    const { error: demoteError } = await supabaseAdmin
+    const { data: demoted, error: demoteError } = await supabaseAdmin
         .from("profiles")
         .update({ role: "customer" })
-        .eq("id", userId);
+        .eq("id", userId)
+        .select("id, role");
 
     if (demoteError) {
         console.error("Failed to demote user ID", userId, demoteError);
         return { success: false, error: "Failed to remove team member." };
+    }
+
+    // A DB trigger can rewrite the row without raising, and a missing row
+    // updates nothing — both come back as a silent success from PostgREST.
+    // Confirm the demotion actually landed before telling the caller it did.
+    if (!demoted?.length) {
+        console.error("Demote matched no profile row for user ID", userId);
+        return { success: false, error: "That account no longer exists." };
+    }
+    if (demoted[0].role !== "customer") {
+        console.error("Demote was reverted for user ID", userId, "role is still", demoted[0].role);
+        return { success: false, error: "The database blocked this change. Please try again shortly." };
     }
 
     // Force sign-out so the removed member's session ends immediately.
