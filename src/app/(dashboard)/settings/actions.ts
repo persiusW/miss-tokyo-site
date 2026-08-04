@@ -143,8 +143,14 @@ export async function removeTeamMember(userId: string) {
         return { success: false, error: "The database blocked this change. Please try again shortly." };
     }
 
-    // Force sign-out so the removed member's session ends immediately.
-    await supabaseAdmin.auth.admin.signOut(userId, "global");
+    // No session revoke here on purpose. auth.admin.signOut() takes an access
+    // token, not a user id — passing the id threw "invalid JWT" on every call
+    // and the result was discarded, so it never did anything. GoTrue exposes no
+    // admin "revoke this user's sessions" endpoint (both /admin/users/:id/logout
+    // and /admin/users/:id/sessions return 404 on this version). Access is gated
+    // by a fresh profiles.role read in the dashboard layout on every request, so
+    // the demotion above locks them out on their next navigation regardless of
+    // whether their access token is still valid.
 
     // LOG ACTIVITY
     after(() => logActivity({
