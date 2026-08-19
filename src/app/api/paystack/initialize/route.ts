@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { reserveStock, releaseReservation, type ReserveItem } from "@/lib/inventory";
 import { normAttr } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
+import { DELIVERY_DEFAULTS, parseDeliverySettings, resolveDeliveryFee, zoneLabel } from "@/lib/delivery";
 
 export async function POST(request: Request) {
     try {
@@ -271,6 +272,31 @@ export async function POST(request: Request) {
         const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
         const amountWithFee = parseFloat((amountInGHS + platformFeeAmount).toFixed(2));
 
+        // Own guarded select. Bolting these columns onto the platform-fee
+        // query above would mean an unapplied migration takes the fee path
+        // down with it; here a failure just yields the disabled defaults.
+        let deliverySettings = DELIVERY_DEFAULTS;
+        try {
+            const { data: deliveryRow } = await supabaseAdmin
+                .from("store_settings")
+                .select("delivery_fees_enabled, delivery_fee_accra, delivery_fee_outside")
+                .eq("id", "default")
+                .maybeSingle();
+            deliverySettings = parseDeliverySettings(deliveryRow);
+        } catch (err) {
+            console.warn("[Paystack init] delivery settings unavailable, charging no delivery fee:", err);
+        }
+
+        // The client sends the zone; the amount is computed here.
+        const deliveryZone: string | null = clientMetadata?.delivery_zone ?? null;
+        const deliveryFee = resolveDeliveryFee({
+            settings: deliverySettings,
+            country: clientMetadata?.country,
+            deliveryMethod: clientMetadata?.deliveryMethod,
+            zone: deliveryZone,
+        });
+        const amountWithDelivery = parseFloat((amountWithFee + deliveryFee).toFixed(2));
+
         const paystackSecret = process.env.PAYSTACK_SECRET_KEY || "";
         if (!paystackSecret) {
             return NextResponse.json({
@@ -298,7 +324,9 @@ export async function POST(request: Request) {
                     region: clientMetadata.region || null,
                 } : null,
                 delivery_method: clientMetadata?.deliveryMethod || "delivery",
-                total_amount: amountWithFee,
+                total_amount: amountWithDelivery,
+                delivery_fee: deliveryFee,
+                delivery_zone: deliveryFee > 0 ? deliveryZone : null,
                 status: "pending",
                 has_preorder: hasPreorder,
                 is_mixed_order: isMixedOrder,
@@ -323,7 +351,7 @@ export async function POST(request: Request) {
 
         const orderId = pendingOrder.id;
 
-        const amountInPesewas = Math.round(amountWithFee * 100);
+        const amountInPesewas = Math.round(amountWithDelivery * 100);
         const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
         const siteUrl = rawSiteUrl.replace(/\/+$/, "");
 
@@ -331,7 +359,7 @@ export async function POST(request: Request) {
         // minimum subaccount payout (~GHS 5). Below that, the 2.5% allocation
         // rounds to less than 1 pesewa and Paystack returns "No active channel".
         const paystackSplitCode = process.env.PAYSTACK_SPLIT_CODE;
-        const splitPayload = (paystackSplitCode && amountWithFee >= 5) ? { split_code: paystackSplitCode } : {};
+        const splitPayload = (paystackSplitCode && amountWithDelivery >= 5) ? { split_code: paystackSplitCode } : {};
 
         // --- SUBACCOUNT (ACCT_xxx) — commented out while testing split groups ---
         // const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
@@ -480,6 +508,9 @@ export async function POST(request: Request) {
                     // Override client-supplied fee values with server-calculated ones
                     platform_fee_amount: platformFeeAmount > 0 ? platformFeeAmount : undefined,
                     platform_fee_label: platformFeeLabel,
+                    delivery_fee: deliveryFee > 0 ? deliveryFee : undefined,
+                    delivery_zone: deliveryFee > 0 ? deliveryZone ?? undefined : undefined,
+                    delivery_label: deliveryFee > 0 ? zoneLabel(deliveryZone) : undefined,
                     // Override client-supplied discount fields with server-validated values —
                     // the webhook settles gift cards/coupons from these
                     discount_code: discountCode ?? undefined,

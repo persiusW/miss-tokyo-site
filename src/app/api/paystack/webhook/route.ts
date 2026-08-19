@@ -86,6 +86,7 @@ export async function POST(req: Request) {
                 orderId, requestId, productId, fullName, phone, address, country, region,
                 whatsapp, instagram, snapchat, deliveryMethod, cartItems,
                 platform_fee_amount, platform_fee_label,
+                delivery_fee, delivery_label,
                 discount_code, discount_amount, discount_tag,
                 auto_discount_ids,
             } = metadata;
@@ -261,6 +262,8 @@ export async function POST(req: Request) {
                 items: parsedItems,
                 feeAmount: Number(platform_fee_amount) || undefined,
                 feeLabel: platform_fee_label || undefined,
+                deliveryFee: Number(delivery_fee) || undefined,
+                deliveryLabel: delivery_label || undefined,
                 setupLink,
                 isFirstTimeBuyer,
                 discountCode: discount_code || undefined,
