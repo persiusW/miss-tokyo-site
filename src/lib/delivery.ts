@@ -91,8 +91,12 @@ export function resolveDeliveryFee(args: {
     if (deliveryMethod != null && norm(deliveryMethod) !== "delivery") return 0;
     if (norm(country) !== "ghana") return 0;
 
-    const rate = zone === "accra" ? settings.accra
-        : zone === "outside" ? settings.outside
+    // Normalised like country and deliveryMethod above. The zone arrives from
+    // client metadata on the storefront path, so "Accra" or " accra " must
+    // resolve to the Accra rate rather than silently to free delivery.
+    const z = norm(zone);
+    const rate = z === "accra" ? settings.accra
+        : z === "outside" ? settings.outside
         : 0;
 
     if (!Number.isFinite(rate) || rate <= 0) return 0;

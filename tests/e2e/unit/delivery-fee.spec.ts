@@ -69,6 +69,15 @@ test.describe("resolveDeliveryFee", () => {
         })).toBe(35);
     });
 
+    test("zone matching ignores case and space", () => {
+        expect(resolveDeliveryFee({
+            settings: ON, country: "Ghana", deliveryMethod: "delivery", zone: " Accra ",
+        })).toBe(35);
+        expect(resolveDeliveryFee({
+            settings: ON, country: "Ghana", deliveryMethod: "delivery", zone: "OUTSIDE",
+        })).toBe(20);
+    });
+
     test("charges nothing for an unrecognised zone rather than guessing", () => {
         expect(resolveDeliveryFee({
             settings: ON, country: "Ghana", deliveryMethod: "delivery", zone: "kumasi",
