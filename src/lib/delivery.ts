@@ -56,6 +56,10 @@ export function parseDeliverySettings(row: unknown): DeliveryFeeSettings {
     if (!("delivery_fees_enabled" in r)) return DELIVERY_DEFAULTS;
 
     const num = (v: unknown, fallback: number): number => {
+        // Number(null) and Number("") are both 0, which is finite — so a null
+        // or blank rate would resolve to free delivery rather than to the
+        // configured default. Treat absence as absence.
+        if (v === null || v === undefined || v === "") return fallback;
         const n = Number(v);
         return Number.isFinite(n) ? n : fallback;
     };
