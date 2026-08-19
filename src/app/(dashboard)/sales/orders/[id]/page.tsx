@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "@/lib/toast";
 import { updateOrderStatus, updateFulfillmentStatus } from "../actions";
+import { zoneLabel } from "@/lib/delivery";
 
 type Order = {
     id: string;
@@ -14,6 +15,8 @@ type Order = {
     customer_phone?: string;
     delivery_method?: string;
     total_amount: number;
+    delivery_fee?: number | null;
+    delivery_zone?: string | null;
     status: string;
     payment_status?: string | null;
     fulfillment_status?: string | null;
@@ -177,7 +180,7 @@ export default function OrderDetailPage() {
 
     useEffect(() => {
         Promise.all([
-            supabase.from("orders").select("id, customer_email, customer_name, customer_phone, delivery_method, total_amount, status, payment_status, fulfillment_status, paystack_reference, created_at, shipping_address, items, discount_code, discount_amount, auto_discount_title, auto_discount_amount, customer_metadata, assigned_rider_id").eq("id", id).single(),
+            supabase.from("orders").select("id, customer_email, customer_name, customer_phone, delivery_method, total_amount, status, payment_status, fulfillment_status, paystack_reference, created_at, shipping_address, items, delivery_fee, delivery_zone, discount_code, discount_amount, auto_discount_title, auto_discount_amount, customer_metadata, assigned_rider_id").eq("id", id).single(),
             supabase.from("business_settings").select("business_name, email, contact, address").eq("id", "default").single(),
             supabase.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
         ]).then(async ([{ data: ord }, { data: biz }, { data: ss }]) => {
@@ -607,7 +610,7 @@ export default function OrderDetailPage() {
                             <>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
                                     <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Subtotal</span>
-                                    <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-ink)" }}>GH₵ {(Number(order.total_amount) + Number(order.discount_amount ?? 0) + Number(order.auto_discount_amount ?? 0)).toFixed(2)}</span>
+                                    <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-ink)" }}>GH₵ {(Number(order.total_amount) - Number(order.delivery_fee ?? 0) + Number(order.discount_amount ?? 0) + Number(order.auto_discount_amount ?? 0)).toFixed(2)}</span>
                                 </div>
                                 {order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0 && (
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
@@ -622,6 +625,12 @@ export default function OrderDetailPage() {
                                     </div>
                                 )}
                             </>
+                        )}
+                        {Number(order.delivery_fee ?? 0) > 0 && (
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Delivery ({zoneLabel(order.delivery_zone)})</span>
+                                <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-ink)" }}>GH₵ {Number(order.delivery_fee).toFixed(2)}</span>
+                            </div>
                         )}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
                             <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Amount Paid</span>
@@ -830,7 +839,7 @@ export default function OrderDetailPage() {
                         <>
                             <div style={{ display: "flex", justifyContent: "space-between", color: "#666" }}>
                                 <span>Subtotal</span>
-                                <span>GH₵ {(Number(order.total_amount ?? 0) + Number(order.discount_amount ?? 0) + Number(order.auto_discount_amount ?? 0)).toFixed(2)}</span>
+                                <span>GH₵ {(Number(order.total_amount ?? 0) - Number(order.delivery_fee ?? 0) + Number(order.discount_amount ?? 0) + Number(order.auto_discount_amount ?? 0)).toFixed(2)}</span>
                             </div>
                             {order.auto_discount_title && Number(order.auto_discount_amount ?? 0) > 0 && (
                                 <div style={{ display: "flex", justifyContent: "space-between", color: "#059669" }}>
@@ -845,6 +854,12 @@ export default function OrderDetailPage() {
                                 </div>
                             )}
                         </>
+                    )}
+                    {Number(order.delivery_fee ?? 0) > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "#666" }}>
+                            <span>Delivery ({zoneLabel(order.delivery_zone)})</span>
+                            <span>GH₵ {Number(order.delivery_fee ?? 0).toFixed(2)}</span>
+                        </div>
                     )}
                     <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 15, borderTop: "1px solid #e5e5e5", paddingTop: 8 }}>
                         <span>Total Paid</span>
