@@ -14,6 +14,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { decrementDirect } from "@/lib/inventory";
 import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
+import { zoneLabel } from "@/lib/delivery";
 import { buildShippingAddress } from "@/lib/geo";
 import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
 import { releaseDiscountHolds } from "@/lib/discountValidation";
@@ -97,6 +98,8 @@ export async function settlePosSession(
             ),
             items: posSession.items,
             total_amount: posSession.total_amount,
+            delivery_fee: Number(posSession.delivery_fee) || 0,
+            delivery_zone: posSession.delivery_zone ?? null,
             discount_code: posDiscountCode,
             discount_amount: posDiscountAmount,
             status: "paid",
@@ -217,6 +220,8 @@ export async function settlePosSession(
             items,
             feeAmount: Number(eventMeta?.platform_fee_amount) || undefined,
             feeLabel: eventMeta?.platform_fee_label || undefined,
+            deliveryFee: Number(posSession.delivery_fee) || undefined,
+            deliveryLabel: posSession.delivery_zone ? zoneLabel(posSession.delivery_zone) : undefined,
             setupLink,
             isFirstTimeBuyer,
             discountCode: posDiscountCode || undefined,

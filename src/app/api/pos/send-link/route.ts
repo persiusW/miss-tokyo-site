@@ -9,6 +9,7 @@ import { sendSMS } from '@/lib/sms';
 import { validateDiscountCode, holdDiscount } from '@/lib/discountValidation';
 import { normAttr } from '@/lib/utils/normAttr';
 import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
+import { DELIVERY_DEFAULTS, parseDeliverySettings, resolveDeliveryFee } from '@/lib/delivery';
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
@@ -127,8 +128,6 @@ export async function POST(req: NextRequest) {
     const discountAmount = validatedDiscount?.amount ?? 0;
     const discountedSubtotal = parseFloat(Math.max(0, totalGHS - discountAmount).toFixed(2));
 
-    const fullyCovered = discountedSubtotal <= 0;
-
     // Fetch platform fee settings — same as regular checkout
     const { data: storeFeeSettings } = await supabaseAdmin
         .from('store_settings')
@@ -142,7 +141,34 @@ export async function POST(req: NextRequest) {
         ? parseFloat((discountedSubtotal * feePct / 100).toFixed(2))
         : 0;
     const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
-    const amountWithFee = parseFloat((discountedSubtotal + platformFeeAmount).toFixed(2));
+
+    // Own guarded select — a missing column must not take the platform-fee
+    // path above down with it.
+    let deliverySettings = DELIVERY_DEFAULTS;
+    try {
+        const { data: deliveryRow } = await supabaseAdmin
+            .from('store_settings')
+            .select('delivery_fees_enabled, delivery_fee_accra, delivery_fee_outside')
+            .eq('id', 'default')
+            .maybeSingle();
+        deliverySettings = parseDeliverySettings(deliveryRow);
+    } catch (err) {
+        console.warn('[POS send-link] delivery settings unavailable, charging no delivery fee:', err);
+    }
+
+    const deliveryFee = resolveDeliveryFee({
+        settings: deliverySettings,
+        country: session.customer_country,
+        deliveryMethod: session.delivery_method,
+        zone: session.delivery_zone,
+    });
+
+    const amountWithFee = parseFloat((discountedSubtotal + platformFeeAmount + deliveryFee).toFixed(2));
+
+    // Must be computed from the final chargeable amount, not from the goods
+    // subtotal. A gift card covering every item still leaves a delivery fee to
+    // collect, and settling here would ship that delivery for nothing.
+    const fullyCovered = amountWithFee <= 0;
 
     const amountPesewas = Math.round(amountWithFee * 100);
 
@@ -151,6 +177,8 @@ export async function POST(req: NextRequest) {
         .from('pos_sessions')
         .update({
             total_amount: amountWithFee,
+            delivery_fee: deliveryFee,
+            delivery_zone: deliveryFee > 0 ? session.delivery_zone : null,
             items: pricedItems,
             discount_code: validatedDiscount?.code ?? null,
             discount_amount: discountAmount,
