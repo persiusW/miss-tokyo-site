@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
     DELIVERY_DEFAULTS,
     parseDeliverySettings,
+    parseZone,
     resolveDeliveryFee,
     zoneForRegion,
     zoneLabel,
@@ -144,5 +145,20 @@ test.describe("zoneLabel", () => {
     test("an unknown zone labels as Delivery", () => {
         expect(zoneLabel(null)).toBe("Delivery");
         expect(zoneLabel("moon")).toBe("Delivery");
+    });
+});
+
+test.describe("parseZone", () => {
+    test("canonicalises both zones regardless of case and space", () => {
+        expect(parseZone("accra")).toBe("accra");
+        expect(parseZone(" Accra ")).toBe("accra");
+        expect(parseZone("OUTSIDE")).toBe("outside");
+    });
+
+    test("returns null for anything else rather than guessing", () => {
+        expect(parseZone("kumasi")).toBe(null);
+        expect(parseZone("")).toBe(null);
+        expect(parseZone(null)).toBe(null);
+        expect(parseZone(undefined)).toBe(null);
     });
 });

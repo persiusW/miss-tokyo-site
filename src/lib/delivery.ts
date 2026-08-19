@@ -39,6 +39,16 @@ export function zoneForRegion(region?: string | null): DeliveryZone {
     return norm(region) === ACCRA_REGION ? "accra" : "outside";
 }
 
+/**
+ * Canonicalises a zone that arrived from an untrusted source (client
+ * metadata, a stored column). Returns null rather than guessing, so callers
+ * can distinguish "no zone" from a valid one.
+ */
+export function parseZone(zone: string | null | undefined): DeliveryZone | null {
+    const z = norm(zone);
+    return z === "accra" || z === "outside" ? z : null;
+}
+
 export function zoneLabel(zone: string | null | undefined): string {
     if (zone === "accra") return "Within Accra";
     if (zone === "outside") return "Outside Accra";

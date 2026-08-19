@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { reserveStock, releaseReservation, type ReserveItem } from "@/lib/inventory";
 import { normAttr } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
-import { DELIVERY_DEFAULTS, parseDeliverySettings, resolveDeliveryFee, zoneLabel } from "@/lib/delivery";
+import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
 
 export async function POST(request: Request) {
     try {
@@ -287,14 +287,23 @@ export async function POST(request: Request) {
             console.warn("[Paystack init] delivery settings unavailable, charging no delivery fee:", err);
         }
 
-        // The client sends the zone; the amount is computed here.
-        const deliveryZone: string | null = clientMetadata?.delivery_zone ?? null;
-        const deliveryFee = resolveDeliveryFee({
+        // The client sends a zone, but a tampered payload could claim the
+        // cheaper one. Derive a zone from the region it also sent and charge
+        // whichever costs more: a deliberate downgrade cannot underpay, while
+        // a customer can still voluntarily pick the dearer Accra rate for an
+        // address the region dropdown does not capture well.
+        const claimedZone = parseZone(clientMetadata?.delivery_zone);
+        const regionZone = zoneForRegion(clientMetadata?.region);
+        const feeArgs = {
             settings: deliverySettings,
             country: clientMetadata?.country,
             deliveryMethod: clientMetadata?.deliveryMethod,
-            zone: deliveryZone,
-        });
+        };
+        const claimedFee = resolveDeliveryFee({ ...feeArgs, zone: claimedZone });
+        const regionFee = resolveDeliveryFee({ ...feeArgs, zone: regionZone });
+        const deliveryFee = Math.max(claimedFee, regionFee);
+        const deliveryZone: string | null =
+            deliveryFee <= 0 ? null : (claimedFee >= regionFee ? claimedZone : regionZone);
         const amountWithDelivery = parseFloat((amountWithFee + deliveryFee).toFixed(2));
 
         const paystackSecret = process.env.PAYSTACK_SECRET_KEY || "";
