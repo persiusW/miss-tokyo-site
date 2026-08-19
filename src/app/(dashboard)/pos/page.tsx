@@ -1,11 +1,20 @@
 // src/app/(dashboard)/pos/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import type { PosProduct, PosItem, PosDeliveryMethod, PosAppliedDiscount } from '@/types/pos';
 import { GHANA_REGIONS, COUNTRIES, DEFAULT_COUNTRY, DEFAULT_REGION } from '@/lib/geo';
+import {
+    DELIVERY_DEFAULTS,
+    parseDeliverySettings,
+    resolveDeliveryFee,
+    zoneForRegion,
+    zoneLabel,
+    type DeliveryFeeSettings,
+    type DeliveryZone,
+} from '@/lib/delivery';
 
 type Contact = { id: string | null; name: string; email: string; phone: string | null };
 type CustomerMode = 'search' | 'new';
@@ -78,6 +87,10 @@ export default function POSPage() {
     const [deliveryAddress, setDeliveryAddress] = useState('');
     const [deliveryCountry, setDeliveryCountry] = useState(DEFAULT_COUNTRY);
     const [deliveryRegion, setDeliveryRegion] = useState(DEFAULT_REGION);
+    const [deliveryZone, setDeliveryZone] = useState<DeliveryZone>(zoneForRegion(DEFAULT_REGION));
+    const [deliverySettings, setDeliverySettings] = useState<DeliveryFeeSettings>(DELIVERY_DEFAULTS);
+    // Set once staff taps a zone button; from then on it survives region changes.
+    const zoneTouched = useRef(false);
     const [discountInput, setDiscountInput] = useState('');
     const [appliedDiscount, setAppliedDiscount] = useState<PosAppliedDiscount | null>(null);
     const [checkingCode, setCheckingCode] = useState(false);
@@ -143,6 +156,17 @@ export default function POSPage() {
         return () => clearTimeout(t);
     }, [contactSearch]);
 
+    // Own select, same reason as storefront checkout: a missing column must
+    // not take any other till query down with it.
+    useEffect(() => {
+        supabase
+            .from('store_settings')
+            .select('delivery_fees_enabled, delivery_fee_accra, delivery_fee_outside')
+            .eq('id', 'default')
+            .maybeSingle()
+            .then((res: { data: unknown }) => setDeliverySettings(parseDeliverySettings(res.data)));
+    }, []);
+
     const addToCart = (product: PosProduct, size: string | null, color: string | null) => {
         setCart(prev => {
             const exists = prev.find(i => i.productId === product.id && i.size === size && i.color === color);
@@ -160,7 +184,19 @@ export default function POSPage() {
     const removeItem = (idx: number) => setCart(prev => prev.filter((_, n) => n !== idx));
     const cartTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
     const discountAmount = Math.min(appliedDiscount?.discount_amount ?? 0, cartTotal);
-    const payableTotal = Math.max(0, cartTotal - discountAmount);
+    const deliveryFee = resolveDeliveryFee({
+        settings: deliverySettings,
+        country: deliveryCountry,
+        deliveryMethod,
+        zone: deliveryZone,
+    });
+    // Delivery is charged on top of the discounted goods. Coupon lookups keep
+    // using cartTotal below — a delivery charge must not enlarge what a coupon
+    // is allowed to discount.
+    const payableTotal = parseFloat(Math.max(0, cartTotal - discountAmount + deliveryFee).toFixed(2));
+    const showZonePicker = deliverySettings.enabled
+        && deliveryCountry === 'Ghana'
+        && deliveryMethod === 'delivery';
 
     // Preview only — send-link recomputes the code's worth server-side and is
     // the value actually charged.
@@ -289,6 +325,7 @@ export default function POSPage() {
                     customer_region: deliveryMethod === 'delivery' ? deliveryRegion.trim() : null,
                     contact_id: customerMode === 'search' ? (selectedContact?.id ?? undefined) : undefined,
                     delivery_method: deliveryMethod,
+                    delivery_zone: deliveryMethod === 'delivery' ? deliveryZone : null,
                     discount_code: appliedDiscount?.code ?? null,
                     items: cart,
                     notes,
@@ -347,6 +384,7 @@ export default function POSPage() {
         setCustomerPhone('');
         setDeliveryMethod('pickup'); setDeliveryAddress('');
         setDeliveryCountry(DEFAULT_COUNTRY); setDeliveryRegion(DEFAULT_REGION);
+        zoneTouched.current = false; setDeliveryZone(zoneForRegion(DEFAULT_REGION));
         setAppliedDiscount(null); setDiscountInput('');
         setNotes(''); setContactSearch('');
     };
@@ -423,6 +461,12 @@ export default function POSPage() {
                                         <span style={{ fontSize: 11, fontFamily: "var(--f-mono)", color: "var(--ac-accent)" }}>-GH₵{discountAmount.toFixed(2)}</span>
                                     </div>
                                 </>
+                            )}
+                            {deliveryFee > 0 && (
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>Delivery ({zoneLabel(deliveryZone)})</span>
+                                    <span style={{ fontSize: 11, fontFamily: "var(--f-mono)", color: "var(--ac-ink-3)" }}>GH₵{deliveryFee.toFixed(2)}</span>
+                                </div>
                             )}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 700, color: "var(--ac-ink)" }}>Total</span>
@@ -543,14 +587,19 @@ export default function POSPage() {
                                         const next = e.target.value;
                                         setDeliveryCountry(next);
                                         // Ghana picks from a fixed list; elsewhere it is free text
-                                        setDeliveryRegion(next === 'Ghana' ? DEFAULT_REGION : '');
+                                        const nextRegion = next === 'Ghana' ? DEFAULT_REGION : '';
+                                        setDeliveryRegion(nextRegion);
+                                        if (!zoneTouched.current) setDeliveryZone(zoneForRegion(nextRegion));
                                     }}
                                     style={inputStyle}>
                                     {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
                                 {deliveryCountry === 'Ghana' ? (
                                     <select value={deliveryRegion}
-                                        onChange={e => setDeliveryRegion(e.target.value)}
+                                        onChange={e => {
+                                            setDeliveryRegion(e.target.value);
+                                            if (!zoneTouched.current) setDeliveryZone(zoneForRegion(e.target.value));
+                                        }}
                                         style={inputStyle}>
                                         {GHANA_REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
                                     </select>
@@ -559,6 +608,18 @@ export default function POSPage() {
                                         value={deliveryRegion}
                                         onChange={e => setDeliveryRegion(e.target.value)}
                                         style={inputStyle} />
+                                )}
+                                {showZonePicker && (
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                        <button onClick={() => { zoneTouched.current = true; setDeliveryZone('accra'); }}
+                                            style={{ flex: 1, padding: "6px 10px", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", cursor: "pointer", borderRadius: "var(--r-sm)", ...(deliveryZone === 'accra' ? modeActive : modeInactive) }}>
+                                            Within Accra · GH₵{deliverySettings.accra.toFixed(2)}
+                                        </button>
+                                        <button onClick={() => { zoneTouched.current = true; setDeliveryZone('outside'); }}
+                                            style={{ flex: 1, padding: "6px 10px", fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", cursor: "pointer", borderRadius: "var(--r-sm)", ...(deliveryZone === 'outside' ? modeActive : modeInactive) }}>
+                                            Outside Accra · GH₵{deliverySettings.outside.toFixed(2)}
+                                        </button>
+                                    </div>
                                 )}
                             </>
                         )}

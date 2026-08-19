@@ -37,6 +37,8 @@ export interface PosSession {
     customer_region: string | null;
     contact_id: string | null;
     delivery_method: PosDeliveryMethod;
+    delivery_fee?: number;
+    delivery_zone?: string | null;
     items: PosItem[];
     // Server-verified at send-link time; never accepted from the till client
     discount_code: string | null;

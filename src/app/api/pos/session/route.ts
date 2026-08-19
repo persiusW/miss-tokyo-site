@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
         customer_region,
         contact_id,
         delivery_method,
+        delivery_zone,
         discount_code,
         items,
         notes,
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
         customer_region?: string;
         contact_id?: string;
         delivery_method?: PosDeliveryMethod;
+        delivery_zone?: string | null;
         discount_code?: string | null;
         items: PosItem[];
         notes?: string;
@@ -70,6 +72,9 @@ export async function POST(req: NextRequest) {
         customer_region: fulfilment === 'delivery' ? (customer_region || null) : null,
         contact_id: contact_id ?? null,
         delivery_method: fulfilment,
+        // Only the zone is stored. Its price is resolved server-side in
+        // send-link, exactly as the discount code is.
+        delivery_zone: fulfilment === 'delivery' ? (delivery_zone || null) : null,
         items,
         // Only the code is stored here. Its value is resolved server-side in
         // send-link — a client-supplied discount amount is never trusted.
