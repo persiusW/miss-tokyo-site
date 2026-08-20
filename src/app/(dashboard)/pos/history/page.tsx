@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { PosStatus } from '@/types/pos';
 import { toast } from '@/lib/toast';
 
@@ -34,34 +35,55 @@ const STATUS_BADGE: Record<PosStatus, string> = {
 
 type FilterTab = 'all' | PosStatus;
 
+const PAGE_SIZE = 50;
+
 export default function POSHistoryPage() {
     const [sessions, setSessions] = useState<SessionRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<FilterTab>('all');
+    const [page, setPage] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
     const [selected, setSelected] = useState<SessionRow | null>(null);
     const [cancelling, setCancelling] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [userRole, setUserRole] = useState<'admin' | 'owner' | 'sales_staff' | null>(null);
 
-    const fetchSessions = useCallback(async (userId: string, role: string) => {
+    const fetchSessions = useCallback(async (userId: string, role: string, tab: FilterTab, pageNum: number) => {
         setLoading(true);
         const isStaff = role === 'sales_staff';
+        const from = (pageNum - 1) * PAGE_SIZE;
 
-        let query = supabase
+        // Filters first: .range() returns a transform builder that has no .eq().
+        let filters = supabase
             .from('pos_sessions')
-            .select('id, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by')
+            .select(
+                'id, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by',
+                { count: 'exact' },
+            );
+
+        // The status filter belongs in the query, not in a client-side pass over
+        // the page — filtering after the fetch would only ever search the rows
+        // this page happened to contain.
+        if (tab !== 'all') filters = filters.eq('status', tab);
+        if (isStaff) filters = filters.eq('created_by', userId);
+
+        const { data: rows, count, error: fetchError } = await filters
             .order('created_at', { ascending: false })
-            .limit(100);
+            .range(from, from + PAGE_SIZE - 1);
 
-        if (isStaff) query = query.eq('created_by', userId);
-
-        const { data: rows, error: fetchError } = await query;
         if (fetchError) {
+            // Asking for a page past the end (rows cancelled or filtered away
+            // between renders) — fall back to the first page rather than an error.
+            if (fetchError.code === 'PGRST103' && pageNum > 1) {
+                setPage(1);
+                return;
+            }
             toast.error('Failed to load sessions');
             setLoading(false);
             return;
         }
         const sessionList = rows ?? [];
+        setTotalCount(count ?? 0);
 
         let nameMap: Record<string, string> = {};
         const staffIds = [...new Set(sessionList.map((r: any) => r.created_by).filter(Boolean))];
@@ -88,12 +110,16 @@ export default function POSHistoryPage() {
             const role = (profile?.role as 'admin' | 'owner' | 'sales_staff') ?? 'sales_staff';
             setCurrentUserId(user.id);
             setUserRole(role);
-            fetchSessions(user.id, role);
         })();
-    }, [fetchSessions]);
+    }, []);
 
-    const refetch = () => { if (currentUserId && userRole) fetchSessions(currentUserId, userRole); };
-    const filtered = filter === 'all' ? sessions : sessions.filter(s => s.status === filter);
+    useEffect(() => {
+        if (!currentUserId || !userRole) return;
+        fetchSessions(currentUserId, userRole, filter, page);
+    }, [currentUserId, userRole, filter, page, fetchSessions]);
+
+    const refetch = () => { if (currentUserId && userRole) fetchSessions(currentUserId, userRole, filter, page); };
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
     const handleCancel = async (sessionId: string) => {
         if (!confirm('Cancel this POS session?')) return;
@@ -137,7 +163,7 @@ export default function POSHistoryPage() {
 
             <div className="ac-tabs" style={{ marginBottom: 24 }}>
                 {tabs.map(t => (
-                    <button key={t.key} onClick={() => setFilter(t.key)} className={`ac-tab ${filter === t.key ? 'active' : ''}`}>
+                    <button key={t.key} onClick={() => { setFilter(t.key); setPage(1); }} className={`ac-tab ${filter === t.key ? 'active' : ''}`}>
                         {t.label}
                     </button>
                 ))}
@@ -146,7 +172,7 @@ export default function POSHistoryPage() {
             <div className="ac-card flush">
                 {loading ? (
                     <div className="ac-empty"><p className="ac-empty-title">Loading...</p></div>
-                ) : filtered.length === 0 ? (
+                ) : sessions.length === 0 ? (
                     <div className="ac-empty"><p className="ac-empty-title">No sessions found.</p></div>
                 ) : (
                     <div className="ac-table-wrap">
@@ -164,7 +190,7 @@ export default function POSHistoryPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map(s => (
+                                {sessions.map(s => (
                                     <tr key={s.id} onClick={() => setSelected(s)} style={{ cursor: "pointer" }}>
                                         <td style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-3)" }}>{s.id.slice(0, 8).toUpperCase()}</td>
                                         <td>
@@ -183,6 +209,21 @@ export default function POSHistoryPage() {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+                {totalPages > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderTop: "1px solid var(--ac-line)" }}>
+                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>
+                            Page {page} of {totalPages} · {totalCount} session{totalCount !== 1 ? 's' : ''}
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading} className="ac-btn ac-btn-ghost ac-btn-sm">
+                                <ChevronLeft size={13} /> Prev
+                            </button>
+                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages || loading} className="ac-btn ac-btn-ghost ac-btn-sm">
+                                Next <ChevronRight size={13} />
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
