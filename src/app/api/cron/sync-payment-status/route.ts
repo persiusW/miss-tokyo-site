@@ -5,6 +5,7 @@ import { revalidateTag } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { confirmSale, releaseReservation } from "@/lib/inventory";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
+import { zoneLabel } from "@/lib/delivery";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 const PAYSTACK_VERIFY = "https://api.paystack.co/transaction/verify";
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
     const ghostCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: pendingOrders, error } = await supabaseAdmin
         .from("orders")
-        .select("id, created_at, customer_email, customer_name, customer_phone, total_amount, items, customer_metadata, paystack_reference, discount_code, discount_amount, delivery_method, payment_status")
+        .select("id, created_at, customer_email, customer_name, customer_phone, total_amount, items, customer_metadata, paystack_reference, discount_code, discount_amount, delivery_method, delivery_fee, delivery_zone, payment_status")
         .or(`payment_status.eq.pending,and(payment_status.eq.processing,created_at.lt.${stuckCutoff})`)
         .not("paystack_reference", "is", null)
         .neq("paystack_reference", "")
@@ -122,6 +123,8 @@ export async function GET(req: Request) {
                         items,
                         orderRef,
                         amount: amountGHS,
+                        deliveryFee: Number(order.delivery_fee) || undefined,
+                        deliveryLabel: order.delivery_zone ? zoneLabel(order.delivery_zone) : undefined,
                         discountCode: order.discount_code ?? undefined,
                         discountAmount: Number(order.discount_amount) || undefined,
                     }).catch(e =>
