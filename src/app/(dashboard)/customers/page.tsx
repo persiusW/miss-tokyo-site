@@ -22,6 +22,19 @@ const PAGE_SIZE = 50;
 // PostgREST caps a single response; walk the view in chunks for a full export.
 const EXPORT_CHUNK = 1000;
 
+// PostgREST's or() takes a comma-separated list, so these characters would be
+// read as syntax rather than as text to match.
+function sanitiseSearch(raw: string): string {
+    return raw.trim().replace(/[%,()]/g, "");
+}
+
+/** Search across the WHOLE directory, not the loaded page. */
+function applySearch<T>(query: T, search: string): T {
+    const q = sanitiseSearch(search);
+    if (!q) return query;
+    return (query as any).or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`);
+}
+
 const SOURCE_LABELS: Record<Source, string> = {
     order: "Order",
     custom_request: "Custom Request",
@@ -62,17 +75,29 @@ export default function CustomersPage() {
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [exporting, setExporting] = useState(false);
+    const [searchInput, setSearchInput] = useState("");
+    const [search, setSearch] = useState("");
 
-    const fetchContacts = useCallback(async (pageNum: number) => {
+    useEffect(() => {
+        const t = setTimeout(() => setSearch(searchInput), 300);
+        return () => clearTimeout(t);
+    }, [searchInput]);
+
+    const fetchContacts = useCallback(async (pageNum: number, term: string) => {
         setLoading(true);
         const from = (pageNum - 1) * PAGE_SIZE;
         try {
             // contact_directory unions orders / custom_requests / newsletter_subs
             // / contacts and dedupes by email in Postgres, so one page is one
             // query. The browser used to download all four tables in full.
-            const { data, count, error } = await supabase
+            // Search filters the whole view server-side, so a match on page 9
+            // is found from page 1 — it is not a filter over the loaded rows.
+            let query = supabase
                 .from("contact_directory")
-                .select("id, name, email, phone, source, created_at, is_manual", { count: "exact" })
+                .select("id, name, email, phone, source, created_at, is_manual", { count: "exact" });
+            query = applySearch(query, term);
+
+            const { data, count, error } = await query
                 .order("created_at", { ascending: false })
                 .range(from, from + PAGE_SIZE - 1);
 
@@ -96,7 +121,10 @@ export default function CustomersPage() {
         }
     }, []);
 
-    useEffect(() => { fetchContacts(page); }, [fetchContacts, page]);
+    useEffect(() => { fetchContacts(page, search); }, [fetchContacts, page, search]);
+
+    // A new search invalidates the page number the old result set produced.
+    useEffect(() => { setPage(1); }, [search]);
 
     const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
@@ -138,7 +166,7 @@ export default function CustomersPage() {
             setAddForm({ name: "", email: "", phone: "" });
             setShowAddModal(false);
             toast.success("Contact added.");
-            fetchContacts(page);
+            fetchContacts(page, search);
         }
     };
 
@@ -148,9 +176,11 @@ export default function CustomersPage() {
         try {
             const all: Contact[] = [];
             for (let offset = 0; ; offset += EXPORT_CHUNK) {
-                const { data, error } = await supabase
+                let q = supabase
                     .from("contact_directory")
-                    .select("id, name, email, phone, source, created_at, is_manual")
+                    .select("id, name, email, phone, source, created_at, is_manual");
+                q = applySearch(q, search);
+                const { data, error } = await q
                     .order("created_at", { ascending: false })
                     .range(offset, offset + EXPORT_CHUNK - 1);
                 if (error) throw error;
@@ -158,8 +188,9 @@ export default function CustomersPage() {
                 all.push(...batch);
                 if (batch.length < EXPORT_CHUNK) break;
             }
-            downloadCSV(all, `miss-tokyo-contacts-${new Date().toISOString().slice(0, 10)}.csv`);
-            toast.success(`Exported ${all.length.toLocaleString()} contacts.`);
+            const suffix = search.trim() ? "-filtered" : "";
+            downloadCSV(all, `miss-tokyo-contacts${suffix}-${new Date().toISOString().slice(0, 10)}.csv`);
+            toast.success(`Exported ${all.length.toLocaleString()} contact${all.length !== 1 ? "s" : ""}.`);
         } catch (err: any) {
             console.error(err);
             toast.error(err.message || "Export failed.");
@@ -196,7 +227,7 @@ export default function CustomersPage() {
             toast.success(`${manualIds.length} contact(s) deleted.`);
         }
 
-        fetchContacts(page);
+        fetchContacts(page, search);
     };
 
     const SOURCE_CLASS: Record<Source, string> = {
@@ -214,20 +245,37 @@ export default function CustomersPage() {
                     <h1 className="ac-page-h1">Customers</h1>
                     <p className="ac-page-sub">
                         Unified clientele across orders, requests &amp; subscriptions.
-                        {!loading && <span style={{ fontFamily: "var(--f-mono)", fontSize: 11 }}>{totalCount.toLocaleString()} contacts</span>}
+                        {!loading && <span style={{ fontFamily: "var(--f-mono)", fontSize: 11 }}>{totalCount.toLocaleString()} contact{totalCount !== 1 ? "s" : ""}</span>}
                     </p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button className="ac-btn ac-btn-ghost" type="button"
                         onClick={handleExportAll} disabled={exporting}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M12 4v12"/><path d="m6 10 6 6 6-6"/><path d="M4 20h16"/></svg>
-                        {exporting ? "Exporting…" : "Export All"}
+                        {exporting ? "Exporting…" : (search.trim() ? "Export Matches" : "Export All")}
                     </button>
                     <button className="ac-btn ac-btn-primary" type="button" onClick={() => setShowAddModal(true)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
                         Add Contact
                     </button>
                 </div>
+            </div>
+
+            {/* Search — queries the whole directory, not the current page */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <input
+                    type="search"
+                    className="ac-input"
+                    style={{ maxWidth: 340 }}
+                    placeholder="Search name, email or phone…"
+                    value={searchInput}
+                    onChange={e => setSearchInput(e.target.value)}
+                />
+                {search.trim() && !loading && (
+                    <span style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>
+                        {totalCount.toLocaleString()} match{totalCount !== 1 ? "es" : ""} across all contacts
+                    </span>
+                )}
             </div>
 
             {/* Table card */}
@@ -263,7 +311,9 @@ export default function CustomersPage() {
                             {loading ? (
                                 <tr><td colSpan={6} className="ac-table-empty">Aggregating clientele data…</td></tr>
                             ) : contacts.length === 0 ? (
-                                <tr><td colSpan={6} className="ac-table-empty">No contacts found.</td></tr>
+                                <tr><td colSpan={6} className="ac-table-empty">
+                                    {search.trim() ? `No contacts match “${search.trim()}”.` : "No contacts found."}
+                                </td></tr>
                             ) : contacts.map((contact) => (
                                 <tr
                                     key={contact.id}
