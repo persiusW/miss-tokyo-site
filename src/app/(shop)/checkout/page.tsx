@@ -312,12 +312,20 @@ export default function CheckoutPage() {
     const afterAutoDiscount = Math.max(0, subtotal - autoDiscount);
     const discountedSubtotal = Math.max(0, afterAutoDiscount - discountAmount);
     const feeAmount = parseFloat((discountedSubtotal * (feeSettings.platform_fee_percentage / 100)).toFixed(2));
-    const deliveryFee = resolveDeliveryFee({
+    // Mirrors /api/paystack/initialize exactly: the zone the customer picked and
+    // the zone derived from their region are both priced, and the dearer of the
+    // two is what's quoted here AND what the server will actually charge — so
+    // the summary and the Pay button never show a figure Paystack won't honour.
+    const deliveryFeeArgs = {
         settings: deliverySettings,
         country: form.country,
         deliveryMethod: form.deliveryMethod,
-        zone: form.deliveryZone,
-    });
+    };
+    const regionZone = zoneForRegion(form.region);
+    const claimedFee = resolveDeliveryFee({ ...deliveryFeeArgs, zone: form.deliveryZone });
+    const regionFee = resolveDeliveryFee({ ...deliveryFeeArgs, zone: regionZone });
+    const deliveryFee = Math.max(claimedFee, regionFee);
+    const chargedZone: DeliveryZone = claimedFee >= regionFee ? form.deliveryZone : regionZone;
     // Delivery is added after the platform-fee percentage, so the percentage is
     // never levied on the delivery charge.
     const finalTotal = parseFloat((discountedSubtotal + feeAmount + deliveryFee).toFixed(2));
@@ -812,7 +820,7 @@ export default function CheckoutPage() {
 
                     {deliveryFee > 0 && (
                         <div className="flex justify-between items-center text-sm">
-                            <span className="text-neutral-500 uppercase tracking-widest text-xs">Delivery ({zoneLabel(form.deliveryZone)})</span>
+                            <span className="text-neutral-500 uppercase tracking-widest text-xs">Delivery ({zoneLabel(chargedZone)})</span>
                             <span>GHS {deliveryFee.toFixed(2)}</span>
                         </div>
                     )}
