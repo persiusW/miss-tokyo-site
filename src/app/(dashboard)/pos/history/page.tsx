@@ -85,7 +85,7 @@ export default function POSHistoryPage() {
         const sessionList = rows ?? [];
         setTotalCount(count ?? 0);
 
-        let nameMap: Record<string, string> = {};
+        const nameMap: Record<string, string> = {};
         const staffIds = [...new Set(sessionList.map((r: any) => r.created_by).filter(Boolean))];
         if (staffIds.length > 0) {
             const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', staffIds);
