@@ -10,6 +10,7 @@ import { validateDiscountCode, holdDiscount } from '@/lib/discountValidation';
 import { normAttr } from '@/lib/utils/normAttr';
 import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/delivery';
+import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
@@ -261,7 +262,10 @@ export async function POST(req: NextRequest) {
     const splitPayload = (paystackSplitCode && amountWithFee >= 5) ? { split_code: paystackSplitCode } : {};
 
     const paystackBody = {
-        email: session.customer_email,
+        // Paystack rejects an initialize call with no email, so a walk-in who
+        // gave none is initialised against the store's own mailbox. The session
+        // row keeps its null — this substitution never leaves this payload.
+        email: session.customer_email || POS_FALLBACK_EMAIL,
         amount: amountPesewas,
         currency: 'GHS',
         channels: ['mobile_money', 'card', 'bank', 'bank_transfer', 'ussd'],
@@ -311,21 +315,23 @@ export async function POST(req: NextRequest) {
     // { ok: false } on an mNotify failure rather than throwing, so the result has
     // to be inspected — a bare .catch() reports success for undelivered texts.
     const [emailSettled, smsSettled] = await Promise.allSettled([
-        // Email
-        getResend().emails.send({
-            from: 'Miss Tokyo <info@info.misstokyo.shop>',
-            to: session.customer_email,
-            subject: 'Your Miss Tokyo payment link',
-            html: `
-                <p>Hi ${firstName},</p>
-                <p>Your Miss Tokyo order is ready. Review your items and complete payment below.</p>
-                <p><strong>Items:</strong> ${itemList}</p>
-                ${validatedDiscount ? `<p><strong>Discount (${validatedDiscount.code}):</strong> -GH&#8373;${discountAmount.toFixed(2)}</p>` : ''}
-                <p><strong>Total:</strong> GH&#8373;${amountWithFee.toFixed(2)}</p>
-                <p><a href="${previewUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;">Review &amp; Pay &mdash; GH&#8373;${amountWithFee.toFixed(2)}</a></p>
-                <p style="color:#999;font-size:12px;">This link expires in ${holdMinutes} minutes.</p>
-            `,
-        }),
+        // Email — skipped for a walk-in with no address; SMS carries the link
+        session.customer_email
+            ? getResend().emails.send({
+                from: 'Miss Tokyo <info@info.misstokyo.shop>',
+                to: session.customer_email,
+                subject: 'Your Miss Tokyo payment link',
+                html: `
+                    <p>Hi ${firstName},</p>
+                    <p>Your Miss Tokyo order is ready. Review your items and complete payment below.</p>
+                    <p><strong>Items:</strong> ${itemList}</p>
+                    ${validatedDiscount ? `<p><strong>Discount (${validatedDiscount.code}):</strong> -GH&#8373;${discountAmount.toFixed(2)}</p>` : ''}
+                    <p><strong>Total:</strong> GH&#8373;${amountWithFee.toFixed(2)}</p>
+                    <p><a href="${previewUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;">Review &amp; Pay &mdash; GH&#8373;${amountWithFee.toFixed(2)}</a></p>
+                    <p style="color:#999;font-size:12px;">This link expires in ${holdMinutes} minutes.</p>
+                `,
+            })
+            : Promise.resolve(null),
 
         // SMS
         session.customer_phone
@@ -336,14 +342,17 @@ export async function POST(req: NextRequest) {
             : Promise.resolve(null),
     ]);
 
-    let emailSent = false;
+    let emailStatus: 'sent' | 'failed' | 'no_email' = 'no_email';
     let emailError: string | null = null;
-    if (emailSettled.status === 'fulfilled') {
-        const resendError = (emailSettled.value as { error?: { message?: string } } | undefined)?.error;
-        emailSent = !resendError;
-        emailError = resendError?.message ?? null;
-    } else {
-        emailError = String((emailSettled.reason as Error)?.message ?? emailSettled.reason);
+    if (session.customer_email) {
+        if (emailSettled.status === 'fulfilled') {
+            const resendError = (emailSettled.value as { error?: { message?: string } } | undefined)?.error;
+            emailStatus = resendError ? 'failed' : 'sent';
+            emailError = resendError?.message ?? null;
+        } else {
+            emailStatus = 'failed';
+            emailError = String((emailSettled.reason as Error)?.message ?? emailSettled.reason);
+        }
     }
     if (emailError) console.error('[pos/send-link] email error:', emailError);
 
@@ -369,6 +378,6 @@ export async function POST(req: NextRequest) {
         discount: validatedDiscount ? { code: validatedDiscount.code, amount: discountAmount, label: validatedDiscount.label } : null,
         // Per-channel outcome so the till can tell staff what actually reached
         // the customer instead of always claiming both were delivered
-        delivery: { email: emailSent, emailError, sms: smsStatus, smsError },
+        delivery: { email: emailStatus, emailError, sms: smsStatus, smsError },
     });
 }
