@@ -11,7 +11,7 @@ import { toast } from '@/lib/toast';
 type SessionRow = {
     id: string;
     customer_name: string;
-    customer_email: string;
+    customer_email: string | null;
     customer_phone: string | null;
     total_amount: number;
     status: PosStatus;
@@ -195,7 +195,7 @@ export default function POSHistoryPage() {
                                         <td style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-3)" }}>{s.id.slice(0, 8).toUpperCase()}</td>
                                         <td>
                                             <div style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{s.customer_name}</div>
-                                            <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{s.customer_email}</div>
+                                            <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{s.customer_email ?? s.customer_phone ?? '—'}</div>
                                         </td>
                                         <td style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>{s.items.length} item{s.items.length !== 1 ? 's' : ''}</td>
                                         <td className="r" style={{ fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 500 }}>GH₵{Number(s.total_amount).toFixed(2)}</td>
@@ -245,7 +245,7 @@ export default function POSHistoryPage() {
                         <div>
                             <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)", marginBottom: 4 }}>Customer</p>
                             <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ac-ink)" }}>{selected.customer_name}</p>
-                            <p style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>{selected.customer_email}</p>
+                            <p style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>{selected.customer_email ?? 'No email on file'}</p>
                             {selected.customer_phone && <p style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>{selected.customer_phone}</p>}
                         </div>
                         <div>
