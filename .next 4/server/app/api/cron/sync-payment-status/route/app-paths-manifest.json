@@ -1,3 +1,0 @@
-{
-  "/api/cron/sync-payment-status/route": "app/api/cron/sync-payment-status/route.js"
-}

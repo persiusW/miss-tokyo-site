@@ -54,3 +54,5 @@ docs/superpowers/
 # Playwright auth storage state (contains live session tokens — never commit)
 tests/fixtures/.auth/
 tests/reports/
+/.next*/
+/.next*/
