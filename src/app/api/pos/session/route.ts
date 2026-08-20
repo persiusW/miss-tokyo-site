@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import type { PosItem, PosDeliveryMethod } from '@/types/pos';
+import { POS_FALLBACK_EMAIL, isNotNullViolation, normaliseEmail } from '@/lib/posContact';
 
 export async function POST(req: NextRequest) {
     // Auth check
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     }: {
         sessionId?: string;
         customer_name: string;
-        customer_email: string;
+        customer_email?: string | null;
         customer_phone?: string;
         customer_address?: string;
         customer_country?: string;
@@ -46,8 +47,18 @@ export async function POST(req: NextRequest) {
         notes?: string;
     } = await req.json();
 
-    if (!customer_name || !customer_email) {
-        return NextResponse.json({ error: 'customer_name and customer_email are required' }, { status: 400 });
+    if (!customer_name) {
+        return NextResponse.json({ error: 'customer_name is required' }, { status: 400 });
+    }
+
+    // Walk-ins frequently have no email. The payment link still has to reach
+    // them somehow, so one contact channel is required — not specifically email.
+    const email = normaliseEmail(customer_email);
+    const phone = customer_phone?.trim() || null;
+    if (!email && !phone) {
+        return NextResponse.json({
+            error: 'A phone number or an email address is required — the payment link needs somewhere to go',
+        }, { status: 400 });
     }
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -64,8 +75,8 @@ export async function POST(req: NextRequest) {
     const payload = {
         created_by: user.id,
         customer_name,
-        customer_email,
-        customer_phone: customer_phone ?? null,
+        customer_email: email,
+        customer_phone: phone,
         customer_address: customer_address ?? null,
         // Only meaningful for delivery — mirrors the storefront address fields
         customer_country: fulfilment === 'delivery' ? (customer_country || null) : null,
@@ -106,16 +117,37 @@ export async function POST(req: NextRequest) {
             .update(payload)
             .eq('id', sessionId);
 
+        // Until the DROP NOT NULL migration is applied, a null email is rejected
+        // outright. Storing the store's own address beats refusing the sale.
+        if (isNotNullViolation(error, 'customer_email')) {
+            console.warn('[pos/session] customer_email is still NOT NULL — storing the fallback address. Apply 20260820000000_pos_optional_customer_email.sql.');
+            const { error: retryError } = await supabaseAdmin
+                .from('pos_sessions')
+                .update({ ...payload, customer_email: POS_FALLBACK_EMAIL })
+                .eq('id', sessionId);
+            if (retryError) return NextResponse.json({ error: retryError.message }, { status: 500 });
+            return NextResponse.json({ sessionId });
+        }
+
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
         return NextResponse.json({ sessionId });
     }
 
     // Create new draft
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
         .from('pos_sessions')
         .insert(payload)
         .select('id')
         .single();
+
+    if (isNotNullViolation(error, 'customer_email')) {
+        console.warn('[pos/session] customer_email is still NOT NULL — storing the fallback address. Apply 20260820000000_pos_optional_customer_email.sql.');
+        ({ data, error } = await supabaseAdmin
+            .from('pos_sessions')
+            .insert({ ...payload, customer_email: POS_FALLBACK_EMAIL })
+            .select('id')
+            .single());
+    }
 
     if (error || !data) return NextResponse.json({ error: error?.message ?? 'Insert failed' }, { status: 500 });
     return NextResponse.json({ sessionId: data.id });

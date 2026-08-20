@@ -14,6 +14,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { decrementDirect } from "@/lib/inventory";
 import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
+import { POS_FALLBACK_EMAIL, isNotNullViolation } from "@/lib/posContact";
 import { zoneLabel } from "@/lib/delivery";
 import { buildShippingAddress } from "@/lib/geo";
 import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
@@ -84,34 +85,50 @@ export async function settlePosSession(
     const posDiscountAmount = Number(posSession.discount_amount) || 0;
     const posDiscountTag: string | undefined = posSession.discount_tag ?? undefined;
 
-    const { data: newOrder } = await supabaseAdmin
+    const orderPayload = {
+        customer_email: posSession.customer_email,
+        customer_name: posSession.customer_name,
+        customer_phone: posSession.customer_phone,
+        // Canonical { text, country, region } — every reader looks for `text`
+        shipping_address: buildShippingAddress(
+            posSession.customer_address,
+            posSession.customer_country,
+            posSession.customer_region,
+        ),
+        items: posSession.items,
+        total_amount: posSession.total_amount,
+        delivery_fee: Number(posSession.delivery_fee) || 0,
+        delivery_zone: posSession.delivery_zone ?? null,
+        discount_code: posDiscountCode,
+        discount_amount: posDiscountAmount,
+        status: "paid",
+        payment_status: "paid",
+        paystack_reference: paystackRef || posSession.paystack_reference,
+        delivery_method: deliveryMethod,
+        source: "pos",
+        notes: posSession.notes,
+        customer_id: posSession.contact_id,
+    };
+
+    let { data: newOrder, error: orderError } = await supabaseAdmin
         .from("orders")
-        .insert({
-            customer_email: posSession.customer_email,
-            customer_name: posSession.customer_name,
-            customer_phone: posSession.customer_phone,
-            // Canonical { text, country, region } — every reader looks for `text`
-            shipping_address: buildShippingAddress(
-                posSession.customer_address,
-                posSession.customer_country,
-                posSession.customer_region,
-            ),
-            items: posSession.items,
-            total_amount: posSession.total_amount,
-            delivery_fee: Number(posSession.delivery_fee) || 0,
-            delivery_zone: posSession.delivery_zone ?? null,
-            discount_code: posDiscountCode,
-            discount_amount: posDiscountAmount,
-            status: "paid",
-            payment_status: "paid",
-            paystack_reference: paystackRef || posSession.paystack_reference,
-            delivery_method: deliveryMethod,
-            source: "pos",
-            notes: posSession.notes,
-            customer_id: posSession.contact_id,
-        })
+        .insert(orderPayload)
         .select("id")
         .single();
+
+    // orders.customer_email may still be NOT NULL. Recording the sale under the
+    // store's own address beats losing the order entirely — the payment has
+    // already been taken by this point.
+    if (isNotNullViolation(orderError, "customer_email")) {
+        console.warn(`${logPrefix} orders.customer_email is NOT NULL — recording this walk-in under the store address`, { posSessionId });
+        ({ data: newOrder, error: orderError } = await supabaseAdmin
+            .from("orders")
+            .insert({ ...orderPayload, customer_email: POS_FALLBACK_EMAIL })
+            .select("id")
+            .single());
+    }
+
+    if (orderError) console.error(`${logPrefix} order insert failed:`, orderError);
 
     await supabaseAdmin
         .from("pos_sessions")
@@ -205,35 +222,42 @@ export async function settlePosSession(
             const greeting = smsTpl.greeting ? injectSmsVars(smsTpl.greeting, vars) + " " : "";
             return greeting + injectSmsVars(smsTpl.body_text, vars);
         }
+        if (!posSession.customer_email) {
+            return `Hi ${firstName}, your ${bizName} order #${orderRef} for GH${String.fromCharCode(8373)} ${amountGHS.toFixed(2)} is confirmed. Keep this message as your receipt. Thank you!`;
+        }
         return isFirstTimeBuyer
             ? `Hi ${firstName}, your ${bizName} order #${orderRef} is confirmed! Check your email for your receipt and to set up your account. Thank you!`
             : `Hi ${firstName}, your ${bizName} order #${orderRef} is confirmed! Check your email for the full receipt. Thank you!`;
     })();
 
     const [emailResult, smsResult, pushResult, discountResult] = await Promise.allSettled([
-        sendOrderConfirmation({
-            customerEmail: posSession.customer_email,
-            orderRef,
-            amount: amountGHS,
-            bizName,
-            bizAddress: biz?.address || "",
-            items,
-            feeAmount: Number(eventMeta?.platform_fee_amount) || undefined,
-            feeLabel: eventMeta?.platform_fee_label || undefined,
-            deliveryFee: Number(posSession.delivery_fee) || undefined,
-            deliveryLabel: posSession.delivery_zone ? zoneLabel(posSession.delivery_zone) : undefined,
-            setupLink,
-            isFirstTimeBuyer,
-            discountCode: posDiscountCode || undefined,
-            discountAmount: posDiscountAmount > 0 ? posDiscountAmount : undefined,
-            ...pickupMeta,
-        }),
+        // A walk-in who gave no email gets no receipt email — the confirmation
+        // SMS below is their receipt.
+        posSession.customer_email
+            ? sendOrderConfirmation({
+                customerEmail: posSession.customer_email,
+                orderRef,
+                amount: amountGHS,
+                bizName,
+                bizAddress: biz?.address || "",
+                items,
+                feeAmount: Number(eventMeta?.platform_fee_amount) || undefined,
+                feeLabel: eventMeta?.platform_fee_label || undefined,
+                deliveryFee: Number(posSession.delivery_fee) || undefined,
+                deliveryLabel: posSession.delivery_zone ? zoneLabel(posSession.delivery_zone) : undefined,
+                setupLink,
+                isFirstTimeBuyer,
+                discountCode: posDiscountCode || undefined,
+                discountAmount: posDiscountAmount > 0 ? posDiscountAmount : undefined,
+                ...pickupMeta,
+            })
+            : Promise.resolve(),
         posSession.customer_phone
             ? sendSMS({ to: posSession.customer_phone, message: smsMessage })
             : Promise.resolve(),
         sendAdminPushNotifications(
             "New Order Received!",
-            `POS order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${posSession.customer_name || posSession.customer_email} has been paid.`,
+            `POS order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${posSession.customer_name || posSession.customer_email || posSession.customer_phone || "a walk-in customer"} has been paid.`,
         ),
         // Redeem the coupon / debit the gift card. Safe unguarded: the
         // status-gated claim above means only one caller reaches this line.
@@ -242,7 +266,11 @@ export async function settlePosSession(
             .then(() => releaseDiscountHolds({ posSessionId })),
     ]);
 
-    if (emailResult.status === "rejected") console.error(`${logPrefix} sendOrderConfirmation failed:`, emailResult.reason);
+    if (emailResult.status === "rejected") {
+        console.error(`${logPrefix} sendOrderConfirmation failed:`, emailResult.reason);
+    } else if (!posSession.customer_email) {
+        console.warn(`${logPrefix} no customer email on session — confirmation email skipped`, { posSessionId });
+    }
     if (smsResult.status === "rejected") {
         console.error(`${logPrefix} sendSMS failed:`, smsResult.reason);
     } else if (!posSession.customer_phone) {
