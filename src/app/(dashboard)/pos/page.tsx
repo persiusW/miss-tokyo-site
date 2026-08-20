@@ -269,10 +269,10 @@ export default function POSPage() {
             if (!selectedContact) { toast.error('Please select a customer'); return; }
         } else {
             if (!newCustomer.name.trim()) { toast.error('Customer name is required'); return; }
-            if (!newCustomer.email.trim()) { toast.error('Customer email is required'); return; }
         }
-        // The link is sent by email AND SMS — without a phone the text is silently skipped
-        if (!customerPhone.trim()) { toast.error('Customer phone is required — the link is sent by SMS too'); return; }
+        // Phone is the one channel every sale must have: email is optional, so
+        // for a walk-in without one the SMS is the only way the link travels.
+        if (!customerPhone.trim()) { toast.error('Customer phone is required — the link is sent by SMS'); return; }
         if (customerPhone.replace(/\D/g, '').length < 9) { toast.error('That phone number looks incomplete'); return; }
         if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
             toast.error('Delivery address is required');
@@ -318,7 +318,7 @@ export default function POSPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     customer_name: customer.name,
-                    customer_email: customer.email,
+                    customer_email: customer.email?.trim() || null,
                     customer_phone: customerPhone.trim(),
                     customer_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
                     customer_country: deliveryMethod === 'delivery' ? deliveryCountry : null,
@@ -353,13 +353,21 @@ export default function POSPage() {
 
             // Report what actually reached the customer. A failed SMS still leaves
             // a usable link on screen for staff to share manually.
-            const emailOk = delivery?.email !== false;
+            const emailStatus = delivery?.email as 'sent' | 'failed' | 'no_email' | undefined;
             const smsOk = delivery?.sms === 'sent';
-            if (emailOk && smsOk) {
+            // A walk-in with no address is not a failed send — SMS is the whole
+            // delivery in that case, so don't cry about an email nobody asked for.
+            if (emailStatus === 'no_email') {
+                if (smsOk) {
+                    toast.success('Payment link sent by SMS');
+                } else {
+                    toast.error(`No email on file and the SMS failed${delivery?.smsError ? `: ${delivery.smsError}` : ''}. Share the link below.`);
+                }
+            } else if (emailStatus === 'sent' && smsOk) {
                 toast.success('Payment link sent by email and SMS');
-            } else if (emailOk && !smsOk) {
+            } else if (emailStatus === 'sent' && !smsOk) {
                 toast.error(`Email sent, but SMS failed${delivery?.smsError ? `: ${delivery.smsError}` : ''}. Share the link below.`);
-            } else if (!emailOk && smsOk) {
+            } else if (emailStatus !== 'sent' && smsOk) {
                 toast.error(`SMS sent, but email failed${delivery?.emailError ? `: ${delivery.emailError}` : ''}.`);
             } else {
                 toast.error('Link created but neither email nor SMS went out. Share the link below.');
@@ -521,7 +529,7 @@ export default function POSPage() {
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                             {[
                                 { key: 'name', placeholder: 'Full Name *', type: 'text' },
-                                { key: 'email', placeholder: 'Email *', type: 'email' },
+                                { key: 'email', placeholder: 'Email (optional)', type: 'email' },
                             ].map(f => (
                                 <input key={f.key} type={f.type} placeholder={f.placeholder}
                                     value={(newCustomer as any)[f.key]}
