@@ -26,7 +26,7 @@ export async function GET(
 
     // Batch-fetch product image + SKU so the customer preview page has full details
     const productIds = [...new Set(rawItems.map((i: any) => i.productId).filter(Boolean))];
-    let productMap: Record<string, { image_url: string | null; sku: string | null }> = {};
+    const productMap: Record<string, { image_url: string | null; sku: string | null }> = {};
     if (productIds.length > 0) {
         const { data: products } = await supabaseAdmin
             .from('products')
