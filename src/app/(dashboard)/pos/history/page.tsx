@@ -37,18 +37,36 @@ type FilterTab = 'all' | PosStatus;
 
 const PAGE_SIZE = 50;
 
+type StaffOption = { id: string; name: string };
+
+/** Local calendar day → the timestamptz bounds that day covers. */
+function dayStart(d: string) { return new Date(`${d}T00:00:00`).toISOString(); }
+function dayEnd(d: string)   { return new Date(`${d}T23:59:59.999`).toISOString(); }
+
 export default function POSHistoryPage() {
     const [sessions, setSessions] = useState<SessionRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<FilterTab>('all');
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [staffFilter, setStaffFilter] = useState<string>('all');
+    const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
     const [selected, setSelected] = useState<SessionRow | null>(null);
     const [cancelling, setCancelling] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [userRole, setUserRole] = useState<'admin' | 'owner' | 'sales_staff' | null>(null);
 
-    const fetchSessions = useCallback(async (userId: string, role: string, tab: FilterTab, pageNum: number) => {
+    const fetchSessions = useCallback(async (
+        userId: string,
+        role: string,
+        tab: FilterTab,
+        pageNum: number,
+        staff: string,
+        from_: string,
+        to_: string,
+    ) => {
         setLoading(true);
         const isStaff = role === 'sales_staff';
         const from = (pageNum - 1) * PAGE_SIZE;
@@ -65,7 +83,12 @@ export default function POSHistoryPage() {
         // the page — filtering after the fetch would only ever search the rows
         // this page happened to contain.
         if (tab !== 'all') filters = filters.eq('status', tab);
+        // Sales staff only ever see their own sales, so the staff picker is
+        // theirs by definition and is not offered to them.
         if (isStaff) filters = filters.eq('created_by', userId);
+        else if (staff !== 'all') filters = filters.eq('created_by', staff);
+        if (from_) filters = filters.gte('created_at', dayStart(from_));
+        if (to_)   filters = filters.lte('created_at', dayEnd(to_));
 
         const { data: rows, count, error: fetchError } = await filters
             .order('created_at', { ascending: false })
@@ -110,15 +133,34 @@ export default function POSHistoryPage() {
             const role = (profile?.role as 'admin' | 'owner' | 'sales_staff') ?? 'sales_staff';
             setCurrentUserId(user.id);
             setUserRole(role);
+
+            if (role !== 'sales_staff') {
+                const { data: staff } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email')
+                    .in('role', ['admin', 'owner', 'sales_staff'])
+                    .order('full_name');
+                setStaffOptions((staff ?? []).map((p: any) => ({
+                    id: p.id,
+                    name: p.full_name?.trim() || p.email || 'Unnamed',
+                })));
+            }
         })();
     }, []);
 
     useEffect(() => {
         if (!currentUserId || !userRole) return;
-        fetchSessions(currentUserId, userRole, filter, page);
-    }, [currentUserId, userRole, filter, page, fetchSessions]);
+        fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo);
+    }, [currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo, fetchSessions]);
 
-    const refetch = () => { if (currentUserId && userRole) fetchSessions(currentUserId, userRole, filter, page); };
+    // Any filter change invalidates the current page number — page 7 of the old
+    // result set is meaningless against the new one.
+    useEffect(() => { setPage(1); }, [staffFilter, dateFrom, dateTo]);
+
+    const refetch = () => {
+        if (currentUserId && userRole) fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo);
+    };
+    const filtersActive = staffFilter !== 'all' || Boolean(dateFrom) || Boolean(dateTo);
     const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
     const handleCancel = async (sessionId: string) => {
@@ -169,11 +211,47 @@ export default function POSHistoryPage() {
                 ))}
             </div>
 
+            {/* Staff + date filters — all applied server-side alongside the tab */}
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginBottom: 20 }}>
+                {userRole !== 'sales_staff' && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <label className="ac-label" htmlFor="pos-staff-filter">Staff</label>
+                        <select id="pos-staff-filter" className="ac-input" style={{ minWidth: 190 }}
+                            value={staffFilter} onChange={e => setStaffFilter(e.target.value)}>
+                            <option value="all">All staff</option>
+                            {staffOptions.map(o => (
+                                <option key={o.id} value={o.id}>{o.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="pos-date-from">From</label>
+                    <input id="pos-date-from" type="date" className="ac-input" style={{ minWidth: 150 }}
+                        value={dateFrom} max={dateTo || undefined}
+                        onChange={e => setDateFrom(e.target.value)} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="pos-date-to">To</label>
+                    <input id="pos-date-to" type="date" className="ac-input" style={{ minWidth: 150 }}
+                        value={dateTo} min={dateFrom || undefined}
+                        onChange={e => setDateTo(e.target.value)} />
+                </div>
+                {filtersActive && (
+                    <button type="button" className="ac-btn ac-btn-ghost ac-btn-sm"
+                        onClick={() => { setStaffFilter('all'); setDateFrom(''); setDateTo(''); }}>
+                        Clear filters
+                    </button>
+                )}
+            </div>
+
             <div className="ac-card flush">
                 {loading ? (
                     <div className="ac-empty"><p className="ac-empty-title">Loading...</p></div>
                 ) : sessions.length === 0 ? (
-                    <div className="ac-empty"><p className="ac-empty-title">No sessions found.</p></div>
+                    <div className="ac-empty">
+                        <p className="ac-empty-title">{filtersActive ? 'No sessions match these filters.' : 'No sessions found.'}</p>
+                    </div>
                 ) : (
                     <div className="ac-table-wrap">
                         <table className="ac-table">
