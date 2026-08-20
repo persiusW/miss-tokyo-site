@@ -16,7 +16,7 @@ import {
     type DeliveryZone,
 } from '@/lib/delivery';
 
-type Contact = { id: string | null; name: string; email: string; phone: string | null };
+type Contact = { id: string | null; name: string; email: string | null; phone: string | null };
 type CustomerMode = 'search' | 'new';
 
 function ProductCard({ product, onAdd }: { product: PosProduct; onAdd: (p: PosProduct, size: string | null, color: string | null) => void }) {
@@ -142,14 +142,21 @@ export default function POSPage() {
             ]);
             const seen = new Set<string>();
             const results: Contact[] = [];
+            const identity = (c: { email: string | null; phone: string | null; name: string }) =>
+                c.email?.trim() || c.phone?.trim() || c.name;
             for (const c of (contactsRes.data ?? [])) {
-                if (!seen.has(c.email)) { seen.add(c.email); results.push(c); }
+                const key = identity(c);
+                if (!seen.has(key)) { seen.add(key); results.push(c); }
             }
             for (const o of (ordersRes.data ?? [])) {
-                if (!seen.has(o.customer_email)) {
-                    seen.add(o.customer_email);
-                    results.push({ id: null, name: o.customer_name, email: o.customer_email, phone: o.customer_phone ?? null });
-                }
+                const contact: Contact = {
+                    id: null,
+                    name: o.customer_name,
+                    email: o.customer_email ?? null,
+                    phone: o.customer_phone ?? null,
+                };
+                const key = identity(contact);
+                if (!seen.has(key)) { seen.add(key); results.push(contact); }
             }
             setContacts(results.slice(0, 8));
         }, 300);
@@ -510,10 +517,10 @@ export default function POSPage() {
                             {contacts.length > 0 && !selectedContact && (
                                 <div style={{ border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", overflow: "hidden", maxHeight: 120, overflowY: "auto" }}>
                                     {contacts.map(c => (
-                                        <button key={c.email} onClick={() => { setSelectedContact(c); setContactSearch(c.name); setContacts([]); setCustomerPhone(c.phone ?? ''); }}
+                                        <button key={c.email ?? c.phone ?? c.name} onClick={() => { setSelectedContact(c); setContactSearch(c.name); setContacts([]); setCustomerPhone(c.phone ?? ''); }}
                                             style={{ width: "100%", textAlign: "left", padding: "8px 10px", background: "var(--ac-panel-2)", border: "none", borderBottom: "1px solid var(--ac-line)", cursor: "pointer" }}>
                                             <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ac-ink)" }}>{c.name}</p>
-                                            <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>{c.email}</p>
+                                            <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>{c.email ?? c.phone ?? 'No email on file'}</p>
                                         </button>
                                     ))}
                                 </div>
@@ -521,7 +528,7 @@ export default function POSPage() {
                             {selectedContact && (
                                 <div style={{ padding: "8px 10px", background: "var(--ac-panel-2)", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)" }}>
                                     <p style={{ fontSize: 12, fontWeight: 600, color: "var(--ac-ink)" }}>{selectedContact.name}</p>
-                                    <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>{selectedContact.email}</p>
+                                    <p style={{ fontSize: 10, color: "var(--ac-ink-4)" }}>{selectedContact.email ?? selectedContact.phone ?? 'No email on file'}</p>
                                 </div>
                             )}
                         </div>
