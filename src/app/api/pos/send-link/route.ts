@@ -9,7 +9,7 @@ import { sendSMS } from '@/lib/sms';
 import { validateDiscountCode, holdDiscount } from '@/lib/discountValidation';
 import { normAttr } from '@/lib/utils/normAttr';
 import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
-import { DELIVERY_DEFAULTS, parseDeliverySettings, resolveDeliveryFee } from '@/lib/delivery';
+import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/delivery';
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
         .update({
             total_amount: amountWithFee,
             delivery_fee: deliveryFee,
-            delivery_zone: deliveryFee > 0 ? session.delivery_zone : null,
+            delivery_zone: deliveryFee > 0 ? parseZone(session.delivery_zone) : null,
             items: pricedItems,
             discount_code: validatedDiscount?.code ?? null,
             discount_amount: discountAmount,
