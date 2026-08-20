@@ -30,7 +30,8 @@ export interface PosSession {
     id: string;
     created_by: string;
     customer_name: string;
-    customer_email: string;
+    // Null for a walk-in who gave no address — phone is the other channel
+    customer_email: string | null;
     customer_phone: string | null;
     customer_address: string | null;
     customer_country: string | null;
