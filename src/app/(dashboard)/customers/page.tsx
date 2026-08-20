@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 type Source = "order" | "custom_request" | "newsletter" | "manual";
 
 type Contact = {
@@ -15,6 +16,24 @@ type Contact = {
     created_at: string;
     is_manual: boolean;
 };
+
+const PAGE_SIZE = 50;
+
+// PostgREST caps a single response; walk the view in chunks for a full export.
+const EXPORT_CHUNK = 1000;
+
+// PostgREST's or() takes a comma-separated list, so these characters would be
+// read as syntax rather than as text to match.
+function sanitiseSearch(raw: string): string {
+    return raw.trim().replace(/[%,()]/g, "");
+}
+
+/** Search across the WHOLE directory, not the loaded page. */
+function applySearch<T>(query: T, search: string): T {
+    const q = sanitiseSearch(search);
+    if (!q) return query;
+    return (query as any).or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`);
+}
 
 const SOURCE_LABELS: Record<Source, string> = {
     order: "Order",
@@ -53,83 +72,46 @@ export default function CustomersPage() {
     const [addForm, setAddForm] = useState({ name: "", email: "", phone: "" });
     const [addStatus, setAddStatus] = useState<"idle" | "saving" | "error">("idle");
     const [deleting, setDeleting] = useState(false);
+    const [page, setPage] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const [exporting, setExporting] = useState(false);
+    const [searchInput, setSearchInput] = useState("");
+    const [search, setSearch] = useState("");
 
-    const fetchContacts = useCallback(async () => {
+    useEffect(() => {
+        const t = setTimeout(() => setSearch(searchInput), 300);
+        return () => clearTimeout(t);
+    }, [searchInput]);
+
+    const fetchContacts = useCallback(async (pageNum: number, term: string) => {
         setLoading(true);
+        const from = (pageNum - 1) * PAGE_SIZE;
         try {
-            const [ordersRes, customReqsRes, newslettersRes, manualRes] = await Promise.all([
-                supabase.from("orders").select("id, customer_email, customer_name, customer_phone, created_at"),
-                supabase.from("custom_requests").select("id, customer_email, customer_name, created_at"),
-                supabase.from("newsletter_subs").select("id, email, created_at"),
-                supabase.from("contacts").select("*"),
-            ]);
+            // contact_directory unions orders / custom_requests / newsletter_subs
+            // / contacts and dedupes by email in Postgres, so one page is one
+            // query. The browser used to download all four tables in full.
+            // Search filters the whole view server-side, so a match on page 9
+            // is found from page 1 — it is not a filter over the loaded rows.
+            let query = supabase
+                .from("contact_directory")
+                .select("id, name, email, phone, source, created_at, is_manual", { count: "exact" });
+            query = applySearch(query, term);
 
-            const aggregated: Contact[] = [];
+            const { data, count, error } = await query
+                .order("created_at", { ascending: false })
+                .range(from, from + PAGE_SIZE - 1);
 
-            (ordersRes.data || []).forEach((o: any) => {
-                aggregated.push({
-                    id: `order-${o.id}`,
-                    name: o.customer_name || "",
-                    email: o.customer_email || "",
-                    phone: o.customer_phone || "",
-                    source: "order",
-                    created_at: o.created_at,
-                    is_manual: false,
-                });
-            });
-
-            (customReqsRes.data || []).forEach((c: any) => {
-                aggregated.push({
-                    id: `req-${c.id}`,
-                    name: c.customer_name || "",
-                    email: c.customer_email || "",
-                    phone: "",
-                    source: "custom_request",
-                    created_at: c.created_at,
-                    is_manual: false,
-                });
-            });
-
-            (newslettersRes.data || []).forEach((n: any) => {
-                aggregated.push({
-                    id: `nl-${n.id}`,
-                    name: "",
-                    email: n.email || "",
-                    phone: "",
-                    source: "newsletter",
-                    created_at: n.created_at,
-                    is_manual: false,
-                });
-            });
-
-            (manualRes.data || []).forEach((m: any) => {
-                aggregated.push({
-                    id: m.id,
-                    name: m.name || "",
-                    email: m.email || "",
-                    phone: m.phone || "",
-                    source: "manual",
-                    created_at: m.created_at,
-                    is_manual: true,
-                });
-            });
-
-            // Sort newest first, then dedupe by email keeping richest record (prefer one with name/phone)
-            aggregated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-            const emailMap = new Map<string, Contact>();
-            for (const c of aggregated) {
-                const existing = emailMap.get(c.email);
-                if (!existing) {
-                    emailMap.set(c.email, c);
-                } else {
-                    // Merge richer fields onto the first-seen record
-                    if (!existing.name && c.name) existing.name = c.name;
-                    if (!existing.phone && c.phone) existing.phone = c.phone;
+            if (error) {
+                // Page past the end — rows deleted since the count was taken.
+                if (error.code === "PGRST103" && pageNum > 1) {
+                    setPage(1);
+                    return;
                 }
+                throw error;
             }
 
-            setContacts(Array.from(emailMap.values()));
+            setContacts((data ?? []) as Contact[]);
+            setTotalCount(count ?? 0);
             setSelected(new Set());
         } catch (err: any) {
             console.error(err);
@@ -139,7 +121,12 @@ export default function CustomersPage() {
         }
     }, []);
 
-    useEffect(() => { fetchContacts(); }, [fetchContacts]);
+    useEffect(() => { fetchContacts(page, search); }, [fetchContacts, page, search]);
+
+    // A new search invalidates the page number the old result set produced.
+    useEffect(() => { setPage(1); }, [search]);
+
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
     // --- Selection helpers ---
     const allIds = contacts.map(c => c.id);
@@ -179,7 +166,36 @@ export default function CustomersPage() {
             setAddForm({ name: "", email: "", phone: "" });
             setShowAddModal(false);
             toast.success("Contact added.");
-            fetchContacts();
+            fetchContacts(page, search);
+        }
+    };
+
+    // --- Export All (walks the whole directory, not just this page) ---
+    const handleExportAll = async () => {
+        setExporting(true);
+        try {
+            const all: Contact[] = [];
+            for (let offset = 0; ; offset += EXPORT_CHUNK) {
+                let q = supabase
+                    .from("contact_directory")
+                    .select("id, name, email, phone, source, created_at, is_manual");
+                q = applySearch(q, search);
+                const { data, error } = await q
+                    .order("created_at", { ascending: false })
+                    .range(offset, offset + EXPORT_CHUNK - 1);
+                if (error) throw error;
+                const batch = (data ?? []) as Contact[];
+                all.push(...batch);
+                if (batch.length < EXPORT_CHUNK) break;
+            }
+            const suffix = search.trim() ? "-filtered" : "";
+            downloadCSV(all, `miss-tokyo-contacts${suffix}-${new Date().toISOString().slice(0, 10)}.csv`);
+            toast.success(`Exported ${all.length.toLocaleString()} contact${all.length !== 1 ? "s" : ""}.`);
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || "Export failed.");
+        } finally {
+            setExporting(false);
         }
     };
 
@@ -211,10 +227,8 @@ export default function CustomersPage() {
             toast.success(`${manualIds.length} contact(s) deleted.`);
         }
 
-        fetchContacts();
+        fetchContacts(page, search);
     };
-
-    const selectedContacts = contacts.filter(c => selected.has(c.id));
 
     const SOURCE_CLASS: Record<Source, string> = {
         order:          "ac-badge-ok",
@@ -231,14 +245,14 @@ export default function CustomersPage() {
                     <h1 className="ac-page-h1">Customers</h1>
                     <p className="ac-page-sub">
                         Unified clientele across orders, requests &amp; subscriptions.
-                        {!loading && <span style={{ fontFamily: "var(--f-mono)", fontSize: 11 }}>{contacts.length.toLocaleString()} contacts</span>}
+                        {!loading && <span style={{ fontFamily: "var(--f-mono)", fontSize: 11 }}>{totalCount.toLocaleString()} contact{totalCount !== 1 ? "s" : ""}</span>}
                     </p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button className="ac-btn ac-btn-ghost" type="button"
-                        onClick={() => downloadCSV(contacts, `miss-tokyo-contacts-${new Date().toISOString().slice(0, 10)}.csv`)}>
+                        onClick={handleExportAll} disabled={exporting}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M12 4v12"/><path d="m6 10 6 6 6-6"/><path d="M4 20h16"/></svg>
-                        Export All
+                        {exporting ? "Exporting…" : (search.trim() ? "Export Matches" : "Export All")}
                     </button>
                     <button className="ac-btn ac-btn-primary" type="button" onClick={() => setShowAddModal(true)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -247,12 +261,29 @@ export default function CustomersPage() {
                 </div>
             </div>
 
+            {/* Search — queries the whole directory, not the current page */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <input
+                    type="search"
+                    className="ac-input"
+                    style={{ maxWidth: 340 }}
+                    placeholder="Search name, email or phone…"
+                    value={searchInput}
+                    onChange={e => setSearchInput(e.target.value)}
+                />
+                {search.trim() && !loading && (
+                    <span style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>
+                        {totalCount.toLocaleString()} match{totalCount !== 1 ? "es" : ""} across all contacts
+                    </span>
+                )}
+            </div>
+
             {/* Table card */}
             <div className="ac-card flush">
                 {/* Bulk bar */}
                 {someSelected && (
                     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: "1px solid var(--ac-line)", background: "var(--ac-panel-2)" }}>
-                        <span className="ac-bulk-label">{selected.size} selected</span>
+                        <span className="ac-bulk-label">{selected.size} selected on this page</span>
                         <div style={{ flex: 1 }} />
                         <button className="ac-btn ac-btn-ghost ac-btn-sm" onClick={handleExportSelected} type="button">Export Selected</button>
                         <button className="ac-btn ac-btn-sm" onClick={handleDeleteSelected} disabled={deleting} type="button"
@@ -280,7 +311,9 @@ export default function CustomersPage() {
                             {loading ? (
                                 <tr><td colSpan={6} className="ac-table-empty">Aggregating clientele data…</td></tr>
                             ) : contacts.length === 0 ? (
-                                <tr><td colSpan={6} className="ac-table-empty">No contacts found.</td></tr>
+                                <tr><td colSpan={6} className="ac-table-empty">
+                                    {search.trim() ? `No contacts match “${search.trim()}”.` : "No contacts found."}
+                                </td></tr>
                             ) : contacts.map((contact) => (
                                 <tr
                                     key={contact.id}
@@ -310,6 +343,21 @@ export default function CustomersPage() {
                         </tbody>
                     </table>
                 </div>
+                {totalPages > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderTop: "1px solid var(--ac-line)" }}>
+                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>
+                            Page {page} of {totalPages} · {totalCount.toLocaleString()} contact{totalCount !== 1 ? "s" : ""}
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading} className="ac-btn ac-btn-ghost ac-btn-sm" type="button">
+                                <ChevronLeft size={13} /> Prev
+                            </button>
+                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages || loading} className="ac-btn ac-btn-ghost ac-btn-sm" type="button">
+                                Next <ChevronRight size={13} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Add Contact Modal */}
