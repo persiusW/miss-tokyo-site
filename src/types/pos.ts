@@ -60,6 +60,8 @@ export interface PosSessionPublic {
     status: PosStatus;
     expires_at: string | null;
     total_amount: number;
+    delivery_fee: number;
+    delivery_zone: string | null;
     discount_code: string | null;
     discount_amount: number;
     items: Array<{

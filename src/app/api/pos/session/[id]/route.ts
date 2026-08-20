@@ -11,7 +11,10 @@ export async function GET(
 
     const { data, error } = await supabaseAdmin
         .from('pos_sessions')
-        .select('id, status, expires_at, total_amount, discount_code, discount_amount, items, paystack_reference')
+        // select('*') rather than a column list: this page is the customer's
+        // only route to paying, so a column that has not been migrated yet must
+        // not 404 it. The payload below is still built field by field.
+        .select('*')
         .eq('id', id)
         .single();
 
@@ -52,6 +55,8 @@ export async function GET(
         status: data.status,
         expires_at: data.expires_at,
         total_amount: data.total_amount,
+        delivery_fee: Number(data.delivery_fee) || 0,
+        delivery_zone: data.delivery_zone ?? null,
         discount_code: data.discount_code ?? null,
         discount_amount: Number(data.discount_amount) || 0,
         items,
