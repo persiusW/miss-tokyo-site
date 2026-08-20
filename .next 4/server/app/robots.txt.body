@@ -1,9 +1,0 @@
-User-Agent: *
-Allow: /
-Disallow: /api/
-Disallow: /checkout/
-Disallow: /overview/
-Disallow: /catalog/
-Disallow: /seo/
-
-Sitemap: http://localhost:3000/sitemap.xml

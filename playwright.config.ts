@@ -74,5 +74,14 @@ export default defineConfig({
                 storageState: "tests/fixtures/.auth/admin.json",
             },
         },
+
+        // ── 5. Pure unit tests — no browser, no server ───────────────────────────────
+        // Plain assertions over pure modules. Kept in tests/e2e/unit so the
+        // shared testDir applies; the regex keeps them out of every other
+        // project.
+        {
+            name: "unit",
+            testMatch: /\/unit\/.*\.spec\.ts/,
+        },
     ],
 });

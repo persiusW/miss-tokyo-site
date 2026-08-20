@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 34, "column": 0}, "map": {"version":3,"sources":["file:///Users/persiusaddo/Documents/GitHub/miss-tokyo-site/src/app/%28shop%29/account/page.tsx"],"sourcesContent":["import { redirect } from \"next/navigation\";\n\nexport default function AccountPage() {\n    redirect(\"/account/orders\");\n}\n"],"names":[],"mappings":";;;;AAAA;AAAA;;AAEe,SAAS;IACpB,IAAA,iMAAQ,EAAC;AACb"}}]
-}

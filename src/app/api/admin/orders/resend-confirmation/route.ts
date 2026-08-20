@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { sendSMSOrThrow, injectSmsVars } from "@/lib/sms";
+import { zoneLabel } from "@/lib/delivery";
 
 export async function POST(req: NextRequest) {
     const serverClient = await createClient();
@@ -57,6 +58,8 @@ export async function POST(req: NextRequest) {
             bizName,
             bizAddress,
             items,
+            deliveryFee: Number(order.delivery_fee) || undefined,
+            deliveryLabel: order.delivery_zone ? zoneLabel(order.delivery_zone) : undefined,
             discountCode: order.discount_code || undefined,
             discountAmount: Number(order.discount_amount) || undefined,
             ...pickupMeta,

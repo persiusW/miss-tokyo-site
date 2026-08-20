@@ -6,6 +6,15 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { evaluateAutoDiscounts, type AutoDiscountResult } from "@/lib/autoDiscount";
 import { GHANA_REGIONS, COUNTRIES } from "@/lib/geo";
+import {
+    DELIVERY_DEFAULTS,
+    parseDeliverySettings,
+    resolveDeliveryFee,
+    zoneForRegion,
+    zoneLabel,
+    type DeliveryFeeSettings,
+    type DeliveryZone,
+} from "@/lib/delivery";
 import Image from "next/image";
 
 // ── Static data ───────────────────────────────────────────────────────────────
@@ -48,6 +57,7 @@ export default function CheckoutPage() {
         platform_fee_label: "Service Charge",
         show_fee_at_checkout: false,
     });
+    const [deliverySettings, setDeliverySettings] = useState<DeliveryFeeSettings>(DELIVERY_DEFAULTS);
 
     // Form State
     const [form, setForm] = useState({
@@ -58,6 +68,7 @@ export default function CheckoutPage() {
         region: "Greater Accra",
         address: "",
         deliveryMethod: "delivery" as "delivery" | "pickup",
+        deliveryZone: "accra" as DeliveryZone,
         whatsappSameAsPhone: true,
         whatsapp: "",
         instagram: "",
@@ -66,6 +77,11 @@ export default function CheckoutPage() {
 
     // Validation errors
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    // Set once the customer taps a zone button. From then on their choice
+    // survives region changes — otherwise picking a region would silently
+    // overwrite a deliberate selection.
+    const zoneTouched = useRef(false);
 
     // Automatic discounts
     const [autoDiscountResult, setAutoDiscountResult] = useState<AutoDiscountResult | null>(null);
@@ -81,7 +97,11 @@ export default function CheckoutPage() {
         Promise.all([
             supabase.from("store_settings").select("enable_store_pickup, platform_fee_percentage, platform_fee_label, show_fee_at_checkout").eq("id", "default").single(),
             supabase.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
-        ]).then(([{ data: store }, { data: ss }]) => {
+            // Own select on purpose — if these columns do not exist yet this
+            // one query returns an error and the rest of checkout is unharmed.
+            supabase.from("store_settings").select("delivery_fees_enabled, delivery_fee_accra, delivery_fee_outside").eq("id", "default").maybeSingle(),
+        ]).then(([{ data: store }, { data: ss }, { data: deliveryRow }]) => {
+            setDeliverySettings(parseDeliverySettings(deliveryRow));
             if (store) {
                 // pickup enabled if BOTH store_settings toggle AND site_settings.pickup_enabled are true
                 const pickupOn = (store.enable_store_pickup || false) && (ss?.pickup_enabled ?? true);
@@ -198,7 +218,16 @@ export default function CheckoutPage() {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         const checked = (e.target as HTMLInputElement).checked;
-        setForm(p => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+        if (name === "deliveryZone") zoneTouched.current = true;
+        setForm(p => {
+            const next = { ...p, [name]: type === "checkbox" ? checked : value };
+            // A region change re-derives the zone, unless the customer has
+            // already chosen one by hand.
+            if (name === "region" && !zoneTouched.current) {
+                next.deliveryZone = zoneForRegion(value);
+            }
+            return next;
+        });
         if (errors[name]) setErrors(p => ({ ...p, [name]: "" }));
     };
 
@@ -283,7 +312,26 @@ export default function CheckoutPage() {
     const afterAutoDiscount = Math.max(0, subtotal - autoDiscount);
     const discountedSubtotal = Math.max(0, afterAutoDiscount - discountAmount);
     const feeAmount = parseFloat((discountedSubtotal * (feeSettings.platform_fee_percentage / 100)).toFixed(2));
-    const finalTotal = parseFloat((discountedSubtotal + feeAmount).toFixed(2));
+    // Mirrors /api/paystack/initialize exactly: the zone the customer picked and
+    // the zone derived from their region are both priced, and the dearer of the
+    // two is what's quoted here AND what the server will actually charge — so
+    // the summary and the Pay button never show a figure Paystack won't honour.
+    const deliveryFeeArgs = {
+        settings: deliverySettings,
+        country: form.country,
+        deliveryMethod: form.deliveryMethod,
+    };
+    const regionZone = zoneForRegion(form.region);
+    const claimedFee = resolveDeliveryFee({ ...deliveryFeeArgs, zone: form.deliveryZone });
+    const regionFee = resolveDeliveryFee({ ...deliveryFeeArgs, zone: regionZone });
+    const deliveryFee = Math.max(claimedFee, regionFee);
+    const chargedZone: DeliveryZone = claimedFee >= regionFee ? form.deliveryZone : regionZone;
+    // Delivery is added after the platform-fee percentage, so the percentage is
+    // never levied on the delivery charge.
+    const finalTotal = parseFloat((discountedSubtotal + feeAmount + deliveryFee).toFixed(2));
+    const showZonePicker = deliverySettings.enabled
+        && form.country === "Ghana"
+        && form.deliveryMethod === "delivery";
 
     // ── Submit ─────────────────────────────────────────────────────────────────
 
@@ -357,6 +405,9 @@ export default function CheckoutPage() {
                     ...(form.instagram.trim() ? { instagram: form.instagram.trim() } : {}),
                     ...(form.snapchat.trim() ? { snapchat: form.snapchat.trim() } : {}),
                     deliveryMethod: form.deliveryMethod,
+                    // The zone only. /api/paystack/initialize resolves the
+                    // amount itself — a client-supplied fee is never trusted.
+                    delivery_zone: form.deliveryZone,
                     platform_fee_amount: feeAmount,
                     platform_fee_label: feeSettings.platform_fee_label,
                     ...(appliedDiscount && !allItemsCovered ? {
@@ -495,6 +546,28 @@ export default function CheckoutPage() {
                                 </label>
                             )}
                         </div>
+                        {showZonePicker && (
+                            <div className="mt-5">
+                                <label className="block text-xs uppercase tracking-widest font-semibold mb-3">Delivery Zone</label>
+                                <div className="flex flex-wrap gap-4">
+                                    <label className="cursor-pointer">
+                                        <input type="radio" name="deliveryZone" value="accra" checked={form.deliveryZone === "accra"} onChange={handleChange} className="sr-only peer" />
+                                        <span className="block px-6 py-3 text-xs uppercase tracking-widest border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors">
+                                            Within Accra · GHS {deliverySettings.accra.toFixed(2)}
+                                        </span>
+                                    </label>
+                                    <label className="cursor-pointer">
+                                        <input type="radio" name="deliveryZone" value="outside" checked={form.deliveryZone === "outside"} onChange={handleChange} className="sr-only peer" />
+                                        <span className="block px-6 py-3 text-xs uppercase tracking-widest border border-neutral-200 peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-colors">
+                                            Outside Accra · GHS {deliverySettings.outside.toFixed(2)}
+                                        </span>
+                                    </label>
+                                </div>
+                                <p className="mt-2 text-[11px] text-neutral-500">
+                                    Outside Accra covers Kumasi, Takoradi, Akosombo and every other region.
+                                </p>
+                            </div>
+                        )}
                         {/* Inline pickup instructions — shown when pickup is selected */}
                         {form.deliveryMethod === "pickup" && pickupDetails && pickupDetails.instructions && (
                             <div className="mt-3 bg-neutral-50 border border-neutral-200 p-4">
@@ -742,6 +815,13 @@ export default function CheckoutPage() {
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-neutral-500 uppercase tracking-widest text-xs">Shipping &amp; Handling</span>
                             <span>GHS {feeAmount.toFixed(2)}</span>
+                        </div>
+                    )}
+
+                    {deliveryFee > 0 && (
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-neutral-500 uppercase tracking-widest text-xs">Delivery ({zoneLabel(chargedZone)})</span>
+                            <span>GHS {deliveryFee.toFixed(2)}</span>
                         </div>
                     )}
 

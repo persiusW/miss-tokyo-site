@@ -75,6 +75,8 @@ export async function sendOrderConfirmation(opts: {
     items?: any[];
     feeAmount?: number;
     feeLabel?: string;
+    deliveryFee?: number;
+    deliveryLabel?: string;
     setupLink?: string;
     isFirstTimeBuyer?: boolean;
     discountCode?: string;
@@ -89,22 +91,25 @@ export async function sendOrderConfirmation(opts: {
 
     const {
         customerEmail, orderRef, amount, bizName, bizAddress,
-        items = [], feeAmount, feeLabel, setupLink, isFirstTimeBuyer,
+        items = [], feeAmount, feeLabel, deliveryFee, deliveryLabel, setupLink, isFirstTimeBuyer,
         discountCode, discountAmount,
         isPickup, pickupInstructions, pickupAddress, pickupPhone, pickupWait,
     } = opts;
 
     const hasDiscount = discountAmount && discountAmount > 0;
     const hasFee = feeAmount && feeAmount > 0;
+    const hasDelivery = deliveryFee && deliveryFee > 0;
     const regularItems = items.filter(i => !i.isPreOrder);
     const preorderItems = items.filter(i => i.isPreOrder);
-    const subtotal = hasFee ? amount - feeAmount! : amount;
+    // `amount` is what was charged: goods, less discounts, plus the platform
+    // fee and delivery. Both add-ons come back off to state the goods subtotal.
+    const subtotal = parseFloat((amount - (feeAmount ?? 0) - (deliveryFee ?? 0)).toFixed(2));
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
 
     const discountRow = hasDiscount ? `
       <tr style="border-bottom: 1px solid #f5f5f5;">
         <td style="padding: 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Subtotal</td>
-        <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${(amount + discountAmount!).toFixed(2)}</td>
+        <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${(amount + discountAmount! - (deliveryFee ?? 0)).toFixed(2)}</td>
       </tr>
       <tr style="border-bottom: 1px solid #f5f5f5;">
         <td style="padding: 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Discount${discountCode ? ` (${discountCode})` : ""}</td>
@@ -119,6 +124,12 @@ export async function sendOrderConfirmation(opts: {
       <tr style="border-bottom: 1px solid #f5f5f5;">
         <td style="padding: 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">${feeLabel || "Service Charge"}</td>
         <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${feeAmount!.toFixed(2)}</td>
+      </tr>` : "";
+
+    const deliveryRow = hasDelivery ? `
+      <tr style="border-bottom: 1px solid #f5f5f5;">
+        <td style="padding: 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373;">Delivery${deliveryLabel ? ` (${deliveryLabel})` : ""}</td>
+        <td style="padding: 10px 0; font-size: 13px; text-align: right;">GH&#8373; ${deliveryFee!.toFixed(2)}</td>
       </tr>` : "";
 
     const firstTimeBuyerBlock = isFirstTimeBuyer && setupLink ? `
@@ -187,6 +198,7 @@ export async function sendOrderConfirmation(opts: {
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 32px;">
       ${discountRow}
       ${feeRow}
+      ${deliveryRow}
       <tr style="border-bottom: 1px solid #f5f5f5;">
         <td style="padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #737373; font-weight: 700;">Total Paid</td>
         <td style="padding: 12px 0; font-size: 15px; text-align: right; font-weight: 700;">GH&#8373; ${amount.toFixed(2)}</td>

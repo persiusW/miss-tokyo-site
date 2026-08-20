@@ -1,3 +1,0 @@
-module.exports=[58057,a=>{"use strict";var b=a.i(7997);function c(){return(0,b.jsxs)("div",{className:"min-h-[60vh] flex flex-col items-center justify-center text-center px-6",children:[(0,b.jsx)("p",{className:"font-serif text-2xl tracking-widest uppercase mb-4",children:"Product Not Found"}),(0,b.jsx)("p",{className:"text-neutral-500 text-sm mb-8",children:"This item may no longer be available or the link may have changed."}),(0,b.jsx)("a",{href:"/shop",className:"text-xs uppercase tracking-widest border-b border-black pb-1 hover:text-neutral-600 transition-colors",children:"Continue Shopping"})]})}a.s(["default",()=>c,"revalidate",0,300])}];
-
-//# sourceMappingURL=src_app_%28shop%29_products_%5Bslug%5D_not-found_tsx_700d1496._.js.map

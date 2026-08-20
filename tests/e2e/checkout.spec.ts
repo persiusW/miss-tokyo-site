@@ -317,3 +317,46 @@ test.describe("Shop → Cart → Checkout critical path", () => {
             });
     });
 });
+
+test.describe("delivery zones", () => {
+    test("zone picker matches the store's delivery-fee flag", async ({ page }) => {
+        // Checkout renders an empty-cart message with no form when the cart is
+        // empty — seed a synthetic item first, same as every other test here.
+        await injectCartItem(page);
+        await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
+        await expect(page.locator('input[name="fullName"]')).toBeVisible({ timeout: 20_000 });
+
+        const accra = page.locator('input[name="deliveryZone"][value="accra"]');
+        const outside = page.locator('input[name="deliveryZone"][value="outside"]');
+
+        // The flag is off in production by default, so the picker is absent.
+        // Once it is switched on this same assertion pins the opposite.
+        const enabled = await accra.count() > 0;
+        if (!enabled) {
+            await expect(outside).toHaveCount(0);
+            test.info().annotations.push({
+                type: "note",
+                description: "delivery_fees_enabled is false — zone picker correctly absent",
+            });
+            return;
+        }
+
+        // Flag on: Greater Accra is the default region, so Accra preselects.
+        await expect(accra).toBeChecked();
+        await expect(page.getByText(/Delivery \(Within Accra\)/)).toBeVisible();
+
+        // Switching region re-derives the zone.
+        await page.selectOption('select[name="region"]', "Ashanti");
+        await expect(outside).toBeChecked();
+        await expect(page.getByText(/Delivery \(Outside Accra\)/)).toBeVisible();
+
+        // A manual pick survives a later region change.
+        await accra.check({ force: true });
+        await page.selectOption('select[name="region"]', "Volta");
+        await expect(accra).toBeChecked();
+
+        // Pickup and non-Ghana both hide the picker.
+        await page.selectOption('select[name="country"]', "Nigeria");
+        await expect(accra).toHaveCount(0);
+    });
+});

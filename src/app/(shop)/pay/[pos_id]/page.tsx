@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { PosSessionPublic } from '@/types/pos';
+import { zoneLabel } from '@/lib/delivery';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://misstokyo.shop';
 const EXPIRE_TOKEN = process.env.POS_EXPIRE_TOKEN ?? '';
@@ -129,6 +130,14 @@ export default async function PosPaymentPage({ params }: { params: Promise<{ pos
                                 Discount{session.discount_code ? ` (${session.discount_code})` : ""}
                             </span>
                             <span className="text-xs text-green-600">-GH&#8373;{Number(session.discount_amount).toFixed(2)}</span>
+                        </div>
+                    )}
+                    {Number(session.delivery_fee) > 0 && (
+                        <div className="flex justify-between items-center px-4 py-3">
+                            <span className="text-[11px] uppercase tracking-widest text-neutral-500">
+                                Delivery ({zoneLabel(session.delivery_zone)})
+                            </span>
+                            <span className="text-xs">GH&#8373;{Number(session.delivery_fee).toFixed(2)}</span>
                         </div>
                     )}
                     <div className="flex justify-between items-center px-4 py-3 bg-neutral-50">

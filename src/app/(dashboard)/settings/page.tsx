@@ -20,6 +20,7 @@ import { ReviewsTab } from "./ReviewsTab";
 import { AssetsTab } from "./AssetsTab";
 import { AboutPageTab } from "./AboutPageTab";
 import { GiftCardsTab } from "./GiftCardsTab";
+import { DELIVERY_DEFAULTS, parseDeliverySettings, type DeliveryFeeSettings } from "@/lib/delivery";
 
 type BusinessSettings = {
     business_name: string;
@@ -314,6 +315,11 @@ function StoreTab() {
     const [saved, setSaved] = useState(false);
     const [allCategories, setAllCategories] = useState<{ id: string; name: string; is_wholesale: boolean }[]>([]);
     const [wholesaleCatIds, setWholesaleCatIds] = useState<Set<string>>(new Set());
+    // Delivery lives outside `form` on purpose. `form` is upserted wholesale, so
+    // a column that has not been migrated yet would fail the save of every other
+    // store setting with it. These three round-trip through their own update.
+    const [delivery, setDelivery] = useState<DeliveryFeeSettings>(DELIVERY_DEFAULTS);
+    const [deliveryAvailable, setDeliveryAvailable] = useState(false);
 
     useEffect(() => {
         supabase.from("store_settings").select("*").eq("id", "default").single()
@@ -353,6 +359,12 @@ function StoreTab() {
                         wholesale_tier_3_max: sData.wholesale_tier_3_max ?? 24,
                     });
                 }
+                // The row above is already select("*"), so no second query is
+                // needed — but the card stays hidden until the columns exist.
+                if (sData && "delivery_fees_enabled" in sData) {
+                    setDelivery(parseDeliverySettings(sData));
+                    setDeliveryAvailable(true);
+                }
                 setLoading(false);
             });
 
@@ -373,6 +385,20 @@ function StoreTab() {
             { id: "default", ...form },
             { onConflict: "id" }
         );
+
+        // Own update, so a delivery column that is missing cannot take the save
+        // of every other store setting down with it.
+        if (deliveryAvailable) {
+            const { error: deliveryError } = await supabase.from("store_settings").update({
+                delivery_fees_enabled: delivery.enabled,
+                delivery_fee_accra: delivery.accra,
+                delivery_fee_outside: delivery.outside,
+            }).eq("id", "default");
+            if (deliveryError) {
+                console.warn("[settings] delivery fees not saved:", deliveryError);
+                toast.error("Delivery fees could not be saved. Other settings were saved.");
+            }
+        }
 
         // Update categories wholesale status
         for (const cat of allCategories) {
@@ -571,6 +597,41 @@ function StoreTab() {
                         </div>
                     </label>
                 </div>
+
+                {/* Delivery Fees */}
+                {deliveryAvailable && (
+                    <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                        {secTitle("Delivery Fees")}
+                        {subLabel("Two flat rates, chosen by the customer at checkout and by staff at the till. Within Accra is the dearer zone \u2014 that is door-to-door dispatch, while outside Accra is a bus parcel drop-off.")}
+                        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                            <input type="checkbox" className="ac-checkbox" checked={delivery.enabled}
+                                onChange={(e) => setDelivery(p => ({ ...p, enabled: e.target.checked }))} />
+                            <div>
+                                <span className="ac-label">Charge Delivery</span>
+                                {subLabel("Takes effect on the next order. While off, no delivery is charged anywhere and checkout looks exactly as it did before.")}
+                            </div>
+                        </label>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, paddingTop: 12, borderTop: "1px solid var(--ac-line)" }}>
+                            <div>
+                                <label className="ac-label">Within Accra (GH₵)</label>
+                                <input type="number" min="0" step="1"
+                                    value={delivery.accra}
+                                    onChange={(e) => setDelivery(p => ({ ...p, accra: parseFloat(e.target.value) || 0 }))}
+                                    className="ac-input" style={{ marginTop: 6 }} placeholder="35" />
+                                {subLabel("Charged when the customer is in Greater Accra.")}
+                            </div>
+                            <div>
+                                <label className="ac-label">Outside Accra (GH₵)</label>
+                                <input type="number" min="0" step="1"
+                                    value={delivery.outside}
+                                    onChange={(e) => setDelivery(p => ({ ...p, outside: parseFloat(e.target.value) || 0 }))}
+                                    className="ac-input" style={{ marginTop: 6 }} placeholder="20" />
+                                {subLabel("Charged for every other region. A rate of 0 charges nothing for that zone.")}
+                            </div>
+                        </div>
+                        {subLabel("Store pickup and deliveries outside Ghana are never charged a delivery fee.")}
+                    </div>
+                )}
 
                 {/* Feature Toggles */}
                 <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
