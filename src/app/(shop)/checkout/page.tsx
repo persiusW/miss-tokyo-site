@@ -567,10 +567,38 @@ export default function CheckoutPage() {
     if (!mounted) return null;
 
     if (items.length === 0) {
+        // Reconciling can empty the cart. Falling through to the plain "your
+        // cart is empty" page would drop the one thing the customer needs to
+        // know: their items were taken out, and why.
+        const emptiedByUs = removedLines.length > 0;
         return (
             <div className="pt-32 pb-32 px-6 flex flex-col justify-center items-center text-center">
                 <h1 className="font-serif text-3xl tracking-widest uppercase mb-4">Checkout</h1>
-                <p className="text-neutral-500 mb-8 italic">Your cart is currently empty.</p>
+                {emptiedByUs ? (
+                    <>
+                        <p className="text-neutral-700 mb-2 max-w-md">
+                            {removedLines.length === 1
+                                ? `"${removedLines[0].name}" sold out while it was in your cart, so it has been removed.`
+                                : `${removedLines.length} items sold out while they were in your cart and have been removed.`}
+                        </p>
+                        <p className="text-neutral-500 mb-8 italic">Your cart is now empty. Nothing has been charged.</p>
+                        <div className="w-full max-w-md space-y-3 mb-8">
+                            {removedLines.map(line => (
+                                <div key={line.id} className="flex items-center gap-3 bg-red-50 border border-red-200 p-3 text-left">
+                                    <div className="flex-1">
+                                        <p className="font-medium text-sm text-red-700 line-through">{line.name}</p>
+                                        <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {line.size} · Qty: {line.quantity}</p>
+                                    </div>
+                                    <span className="text-[10px] text-red-600 uppercase tracking-widest">
+                                        {line.reason === "sold_out" ? "Sold out" : "Unavailable"}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                ) : (
+                    <p className="text-neutral-500 mb-8 italic">Your cart is currently empty.</p>
+                )}
                 <a href="/shop" className="text-xs uppercase font-semibold tracking-widest border-b border-black pb-1 hover:text-neutral-500 transition-colors">Return to Shop</a>
             </div>
         );
