@@ -17,6 +17,10 @@ import {
 } from '@/lib/delivery';
 
 type Contact = { id: string | null; name: string; email: string | null; phone: string | null };
+
+// The picker is a grid, not a paginated table; cap it and say so when the
+// catalogue has more matches than fit.
+const PRODUCT_RESULT_LIMIT = 60;
 type CustomerMode = 'search' | 'new';
 
 function ProductCard({ product, onAdd }: { product: PosProduct; onAdd: (p: PosProduct, size: string | null, color: string | null) => void }) {
@@ -99,15 +103,23 @@ export default function POSPage() {
     const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
     const [completedOrderRef, setCompletedOrderRef] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [productMatchCount, setProductMatchCount] = useState(0);
 
     const searchProducts = useCallback(async (q: string) => {
+        // Filters before limit(): a transform builder has no .or().
         let dbQuery = supabase
             .from('products')
-            .select('id, name, slug, sku, price_ghs, image_urls, inventory_count, track_inventory, track_variant_inventory, available_sizes, available_colors')
-            .eq('is_active', true)
-            .limit(40);
-        if (q.trim()) dbQuery = dbQuery.or(`name.ilike.%${q}%,sku.ilike.%${q}%`);
-        const { data } = await dbQuery;
+            .select(
+                'id, name, slug, sku, price_ghs, image_urls, inventory_count, track_inventory, track_variant_inventory, available_sizes, available_colors',
+                { count: 'exact' },
+            )
+            .eq('is_active', true);
+        const term = q.trim().replace(/[%,()]/g, '');
+        if (term) dbQuery = dbQuery.or(`name.ilike.%${term}%,sku.ilike.%${term}%`);
+        // Ordered so the same search always shows the same products — without
+        // it the truncated window was whatever Postgres returned first.
+        const { data, count } = await dbQuery.order('name').limit(PRODUCT_RESULT_LIMIT);
+        setProductMatchCount(count ?? 0);
         const rows = (data ?? []).map((p: any) => ({ ...p, inventory_count: p.inventory_count ?? 0 }));
 
         // Show stock net of live holds. The raw count lets two tills each see
@@ -422,6 +434,11 @@ export default function POSPage() {
                             onChange={e => setQuery(e.target.value)}
                             style={{ ...inputStyle, paddingLeft: 34 }} />
                     </div>
+                    {productMatchCount > products.length && (
+                        <p style={{ fontSize: 10, color: "var(--ac-ink-4)", marginTop: 6 }}>
+                            Showing {products.length} of {productMatchCount} matches — keep typing to narrow it down.
+                        </p>
+                    )}
                 </div>
                 <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, alignContent: "start", background: "var(--ac-bg)" }}>
                     {products.map(p => (
