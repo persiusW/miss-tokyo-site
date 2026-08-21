@@ -4,6 +4,8 @@ import { getStockStatus, type ReserveItem } from "@/lib/inventory";
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const raw = searchParams.get("items");
+    // The caller's own pending order, so its hold does not count against it.
+    const excludeOrderId = searchParams.get("excludeOrderId") ?? undefined;
 
     if (!raw) {
         return NextResponse.json({ error: "items param required" }, { status: 400 });
@@ -23,6 +25,6 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "too many items (max 100)" }, { status: 400 });
     }
 
-    const results = await getStockStatus(items);
+    const results = await getStockStatus(items, { excludeOrderId });
     return NextResponse.json({ results }, { headers: { "Cache-Control": "private, no-store" } });
 }

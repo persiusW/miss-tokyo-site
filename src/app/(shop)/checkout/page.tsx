@@ -39,6 +39,8 @@ type AppliedDiscount = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+const PENDING_ORDER_KEY = "miss-tokyo-pending-order";
+
 export default function CheckoutPage() {
     const items = useCart(s => s.items);
     const totalAmount = useCart(s => s.totalAmount);
@@ -198,7 +200,14 @@ export default function CheckoutPage() {
         // be reconsidered against the stale result that caused it.
         const key = items.map(i => `${i.id}:${i.quantity}`).join("|");
 
-        fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`)
+        // Exclude this customer's own pending hold, if they have just come back
+        // from Paystack without completing payment.
+        const pendingOrderId = typeof window !== "undefined"
+            ? sessionStorage.getItem(PENDING_ORDER_KEY)
+            : null;
+        const excludeParam = pendingOrderId ? `&excludeOrderId=${encodeURIComponent(pendingOrderId)}` : "";
+
+        fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}${excludeParam}`)
             .then(r => r.json())
             .then(data => {
                 if (!data.results) return;
@@ -472,7 +481,11 @@ export default function CheckoutPage() {
                 brand: (i as { brand?: string }).brand ?? null,
                 quantity: i.quantity,
             }));
-            const stockRes = await fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`);
+            // Same exclusion as the on-load check: a retry after backing out of
+            // Paystack must not be blocked by the hold that first attempt left.
+            const retryOrderId = sessionStorage.getItem(PENDING_ORDER_KEY);
+            const retryParam = retryOrderId ? `&excludeOrderId=${encodeURIComponent(retryOrderId)}` : "";
+            const stockRes = await fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}${retryParam}`);
             const stockData = await stockRes.json();
             if (stockData.results) {
                 const issues: string[] = [];
@@ -549,6 +562,12 @@ export default function CheckoutPage() {
                 // Store any OOS-excluded items so the success page can display them
                 if (data.oosItems?.length) {
                     sessionStorage.setItem("checkout_oos", JSON.stringify(data.oosItems));
+                }
+                // Remember which order is holding this customer's stock. Coming
+                // back from Paystack without paying, that hold would otherwise
+                // net their own items down to zero and read as "sold out".
+                if (data.orderId) {
+                    sessionStorage.setItem(PENDING_ORDER_KEY, data.orderId);
                 }
                 window.location.href = data.authorizationUrl;
             } else if (res.status === 409) {
