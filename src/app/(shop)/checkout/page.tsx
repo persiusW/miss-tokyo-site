@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useCart, getEffectivePrice } from "@/store/useCart";
+import { useCart, getEffectivePrice, type CartItem } from "@/store/useCart";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { evaluateAutoDiscounts, type AutoDiscountResult } from "@/lib/autoDiscount";
@@ -42,6 +42,9 @@ type AppliedDiscount = {
 export default function CheckoutPage() {
     const items = useCart(s => s.items);
     const totalAmount = useCart(s => s.totalAmount);
+    const removeItem = useCart(s => s.removeItem);
+    const updateQuantity = useCart(s => s.updateQuantity);
+    const addItem = useCart(s => s.addItem);
     const [mounted, setMounted] = useState(false);
     const [loading, setLoading] = useState(false);
     const [stockChecking, setStockChecking] = useState(false);
@@ -92,6 +95,25 @@ export default function CheckoutPage() {
     const [codeLoading, setCodeLoading] = useState(false);
     const [codeError, setCodeError] = useState("");
 
+    // What the last availability check said each cart line can still have, so
+    // the + button clamps instead of letting someone ask for stock that is gone.
+    const [availableById, setAvailableById] = useState<Record<string, number>>({});
+    // Lines checkout took out of the cart for the customer. They are no longer
+    // in `items`, so the summary renders them from here; they do not survive a
+    // refresh, which is intended — the cart is the record, this is the notice.
+    const [removedLines, setRemovedLines] = useState<Array<{
+        id: string; name: string; size?: string; imageUrl?: string;
+        quantity: number; reason: "sold_out" | "unavailable";
+        item: CartItem;
+    }>>([]);
+    // Lines whose quantity was cut down to what is actually in stock.
+    const [clampedLines, setClampedLines] = useState<Record<string, { from: number; to: number }>>({});
+    const [undoEnabled, setUndoEnabled] = useState(false);
+    const [discountNeedsRecheck, setDiscountNeedsRecheck] = useState(false);
+    // One reconcile per cart signature — removing an item changes `items`, which
+    // re-runs the check, which must not act on the same line twice.
+    const reconciledKey = useRef<string>("");
+
     useEffect(() => {
         setMounted(true);
         Promise.all([
@@ -100,8 +122,12 @@ export default function CheckoutPage() {
             // Own select on purpose — if these columns do not exist yet this
             // one query returns an error and the rest of checkout is unharmed.
             supabase.from("store_settings").select("delivery_fees_enabled, delivery_fee_accra, delivery_fee_outside").eq("id", "default").maybeSingle(),
-        ]).then(([{ data: store }, { data: ss }, { data: deliveryRow }]) => {
+            // Own select again: this column may not be migrated in yet, and a
+            // missing one must not take the rest of checkout down.
+            supabase.from("store_settings").select("checkout_undo_removed_enabled").eq("id", "default").maybeSingle(),
+        ]).then(([{ data: store }, { data: ss }, { data: deliveryRow }, { data: undoRow }]) => {
             setDeliverySettings(parseDeliverySettings(deliveryRow));
+            setUndoEnabled(undoRow?.checkout_undo_removed_enabled === true);
             if (store) {
                 // pickup enabled if BOTH store_settings toggle AND site_settings.pickup_enabled are true
                 const pickupOn = (store.enable_store_pickup || false) && (ss?.pickup_enabled ?? true);
@@ -167,24 +193,81 @@ export default function CheckoutPage() {
             quantity: i.quantity,
         }));
 
+        // Signature of what we are about to reconcile. Acting on a line changes
+        // `items`, which re-runs this effect — without the guard a removal would
+        // be reconsidered against the stale result that caused it.
+        const key = items.map(i => `${i.id}:${i.quantity}`).join("|");
+
         fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`)
             .then(r => r.json())
             .then(data => {
                 if (!data.results) return;
+
+                const availability: Record<string, number> = {};
+                const toRemove: typeof removedLines = [];
+                const toClamp: Record<string, { from: number; to: number }> = {};
                 const issues: string[] = [];
                 const issueIds = new Set<string>();
+
                 // results are returned in the same order as checkItems / items
                 data.results.forEach((result: any, idx: number) => {
                     const cartItem = items[idx];
                     if (!cartItem) return;
-                    if (!result.isActive) {
-                        issues.push(`"${cartItem.name}" is no longer available.`);
-                        issueIds.add(cartItem.id); // cart item id, not productId
-                    } else if (!cartItem.isPreOrder && result.available < cartItem.quantity) {
-                        issues.push(`"${cartItem.name}" (${cartItem.size}) only has ${result.available} unit${result.available === 1 ? "" : "s"} left.`);
-                        issueIds.add(cartItem.id);
+
+                    // Pre-orders are sold ahead of stock, so no cap applies.
+                    availability[cartItem.id] = cartItem.isPreOrder
+                        ? Number.MAX_SAFE_INTEGER
+                        : Math.max(0, Number(result.available) || 0);
+
+                    if (cartItem.isPreOrder) return;
+
+                    if (!result.isActive || availability[cartItem.id] === 0) {
+                        // Nothing to sell: take it out rather than leaving a
+                        // total the customer cannot actually pay.
+                        toRemove.push({
+                            id: cartItem.id,
+                            name: cartItem.name,
+                            size: cartItem.size,
+                            imageUrl: cartItem.imageUrl,
+                            quantity: cartItem.quantity,
+                            reason: result.isActive ? "sold_out" : "unavailable",
+                            item: cartItem,
+                        });
+                    } else if (availability[cartItem.id] < cartItem.quantity) {
+                        // Part of the line is still sellable — keep that part.
+                        toClamp[cartItem.id] = { from: cartItem.quantity, to: availability[cartItem.id] };
                     }
                 });
+
+                setAvailableById(availability);
+
+                if (reconciledKey.current !== key && (toRemove.length > 0 || Object.keys(toClamp).length > 0)) {
+                    reconciledKey.current = key;
+
+                    toRemove.forEach(line => removeItem(line.id));
+                    Object.entries(toClamp).forEach(([id, { to }]) => updateQuantity(id, to));
+
+                    setRemovedLines(prev => [
+                        ...prev.filter(p => !toRemove.some(r => r.id === p.id)),
+                        ...toRemove,
+                    ]);
+                    setClampedLines(prev => ({ ...prev, ...toClamp }));
+
+                    const notices: string[] = [];
+                    if (toRemove.length === 1) notices.push(`"${toRemove[0].name}" is no longer available and has been removed.`);
+                    else if (toRemove.length > 1) notices.push(`${toRemove.length} items are no longer available and have been removed.`);
+                    for (const [, { to }] of Object.entries(toClamp)) {
+                        notices.push(`Another item was reduced to ${to} — that is all we have left.`);
+                    }
+                    if (notices.length > 0) toast.error(notices.join(" "));
+
+                    // The cart total just moved, so a code with a minimum spend
+                    // may no longer qualify. Say so now rather than at Paystack.
+                    setDiscountNeedsRecheck(true);
+                }
+
+                // Anything still short after reconciling (pre-orders aside) is
+                // reported the old way rather than silently altered.
                 if (issues.length > 0) { setStockError(issues.join(" ")); setStockIssueIds(issueIds); }
                 else { setStockError(null); setStockIssueIds(new Set()); }
             })
@@ -303,6 +386,39 @@ export default function CheckoutPage() {
         setAppliedDiscount(null);
         setCodeError("");
     };
+
+    // A code validated against the old subtotal may no longer qualify once
+    // items are removed or reduced — a minimum-spend coupon being the usual
+    // case. Re-check immediately and say so, rather than letting Paystack be
+    // the one to break the news.
+    useEffect(() => {
+        if (!discountNeedsRecheck) return;
+        setDiscountNeedsRecheck(false);
+        if (!appliedDiscount) return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/checkout/validate-code", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ code: appliedDiscount.code, subtotal: remainingSubtotal }),
+                });
+                const data = await res.json();
+                if (cancelled) return;
+                if (data.valid) {
+                    setAppliedDiscount(data as AppliedDiscount);
+                } else {
+                    setAppliedDiscount(null);
+                    setCodeError(data.error || `"${appliedDiscount.code}" no longer applies to your updated cart.`);
+                    toast.error(`"${appliedDiscount.code}" no longer applies to your updated cart.`);
+                }
+            } catch {
+                // Leave the code in place; the server revalidates at payment.
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [discountNeedsRecheck, appliedDiscount, remainingSubtotal]);
 
     // ── Fee calculations ───────────────────────────────────────────────────────
 
@@ -676,13 +792,92 @@ export default function CheckoutPage() {
                                     </div>
                                     <div className="flex-1">
                                         <h3 className={`font-medium text-sm ${hasIssue ? "text-red-700" : "text-neutral-900"}`}>{item.name}</h3>
-                                        <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size} · Qty: {item.quantity}</p>
+                                        <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {item.size}</p>
+
+                                        {/* Quantity controls — every change re-runs the
+                                            availability check, the discounts and the total. */}
+                                        <div className="flex items-center gap-2 mt-1.5">
+                                            <button
+                                                type="button"
+                                                aria-label={`Reduce quantity of ${item.name}`}
+                                                onClick={() => item.quantity > 1
+                                                    ? updateQuantity(item.id, item.quantity - 1)
+                                                    : removeItem(item.id)}
+                                                className="w-6 h-6 border border-neutral-300 text-neutral-600 text-xs leading-none hover:border-black hover:text-black transition-colors"
+                                            >−</button>
+                                            <span className="text-xs tabular-nums w-5 text-center">{item.quantity}</span>
+                                            <button
+                                                type="button"
+                                                aria-label={`Increase quantity of ${item.name}`}
+                                                disabled={item.quantity >= (availableById[item.id] ?? Number.MAX_SAFE_INTEGER)}
+                                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                className="w-6 h-6 border border-neutral-300 text-neutral-600 text-xs leading-none hover:border-black hover:text-black transition-colors disabled:opacity-30 disabled:hover:border-neutral-300"
+                                            >+</button>
+                                            <button
+                                                type="button"
+                                                aria-label={`Remove ${item.name} from cart`}
+                                                onClick={() => removeItem(item.id)}
+                                                className="ml-auto text-[10px] uppercase tracking-widest text-neutral-400 hover:text-red-500 transition-colors"
+                                            >Remove</button>
+                                        </div>
+
+                                        {clampedLines[item.id] && (
+                                            <p className="text-[10px] text-amber-600 mt-1 font-medium">
+                                                Reduced from {clampedLines[item.id].from} — only {clampedLines[item.id].to} left
+                                            </p>
+                                        )}
+                                        {item.quantity >= (availableById[item.id] ?? Number.MAX_SAFE_INTEGER) && !clampedLines[item.id] && !item.isPreOrder && (
+                                            <p className="text-[10px] text-neutral-400 mt-1">That is all we have in stock</p>
+                                        )}
                                         {hasIssue && <p className="text-[10px] text-red-500 mt-0.5 font-medium">Out of stock</p>}
                                     </div>
                                     <p className={`font-medium text-sm ${hasIssue ? "text-red-400 line-through" : ""}`}>GHS {(getEffectivePrice(item) * item.quantity).toFixed(2)}</p>
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Removed for unavailability — shown so the total is never
+                    seen to change without explanation. */}
+                {removedLines.length > 0 && (
+                    <div className="space-y-4">
+                        {removedLines.map(line => (
+                            <div key={line.id} className="flex gap-4 items-center rounded-sm bg-red-50 border border-red-200 p-3">
+                                <div className="w-16 h-16 bg-white overflow-hidden flex-shrink-0 border border-red-200 relative opacity-60">
+                                    {line.imageUrl ? (
+                                        <Image src={line.imageUrl} alt={line.name} fill className="object-cover grayscale" sizes="64px" />
+                                    ) : (
+                                        <div className="w-full h-full bg-neutral-100" />
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-medium text-sm text-red-700 line-through">{line.name}</h3>
+                                    <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Size: {line.size} · Qty: {line.quantity}</p>
+                                    <p className="text-[10px] text-red-600 mt-0.5 font-medium">
+                                        {line.reason === "sold_out" ? "Removed — just sold out" : "Removed — no longer available"}
+                                    </p>
+                                    {undoEnabled ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                // Re-adding re-runs the availability check, so this
+                                                // can never restore something genuinely sold out.
+                                                addItem(line.item);
+                                                setRemovedLines(prev => prev.filter(l => l.id !== line.id));
+                                                reconciledKey.current = "";
+                                            }}
+                                            className="text-[10px] uppercase tracking-widest text-neutral-500 hover:text-black transition-colors mt-1 underline"
+                                        >Undo</button>
+                                    ) : (
+                                        <p className="text-[10px] text-neutral-400 mt-1">You can add it again from the product page if it returns.</p>
+                                    )}
+                                </div>
+                                <p className="font-medium text-sm text-red-400 line-through">
+                                    GHS {(getEffectivePrice(line.item) * line.quantity).toFixed(2)}
+                                </p>
+                            </div>
+                        ))}
                     </div>
                 )}
 
