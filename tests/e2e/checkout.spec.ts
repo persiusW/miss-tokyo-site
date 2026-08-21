@@ -267,18 +267,25 @@ test.describe("Shop → Cart → Checkout critical path", () => {
         await expect(page.getByText(/email.*required/i)).toBeVisible();
     });
 
-    // ── 7b. Stock guard blocks payment ────────────────────────────────────────
+    // ── 7b. Unavailable items are reconciled, not left blocking ───────────────
     // Tests 7 and 8 stub /api/inventory/check so they can exercise the form.
-    // This one deliberately does NOT, so the guard itself stays covered: an item
-    // the catalogue cannot supply must stop checkout before Paystack is reached.
-    test("checkout blocks payment when the cart item is unavailable", async ({ page }) => {
+    // This one deliberately does NOT: the synthetic product is genuinely absent
+    // from the catalogue, so checkout must take it out of the cart and say so
+    // rather than leaving the customer stuck behind a disabled button.
+    test("checkout removes an unavailable cart item and explains why", async ({ page }) => {
         await injectCartItem(page); // synthetic product — genuinely not in the catalogue
         await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
         await expect(page.locator('input[name="fullName"]')).toBeVisible({ timeout: 20_000 });
 
-        const submitBtn = page.getByRole("button", { name: /pay|place order|checkout|continue/i }).first();
-        await expect(submitBtn).toBeDisabled({ timeout: 20_000 });
-        await expect(page.getByText(/no longer available|only has|sold out/i).first()).toBeVisible();
+        // This cart holds only the synthetic item, so reconciling empties it.
+        // The customer must still be told what happened and that they were not
+        // charged — not dropped on a bare "your cart is empty" page.
+        await expect(page.getByText(/sold out while it was in your cart|no longer available/i).first())
+            .toBeVisible({ timeout: 20_000 });
+        await expect(page.getByText(/cart is now empty\. nothing has been charged/i)).toBeVisible();
+
+        // The removed line is still listed, struck through, with its reason.
+        await expect(page.getByText(/sold out|unavailable/i).first()).toBeVisible();
     });
 
     // ── 8. Happy-path form fill (stops before Paystack redirect) ──────────────
