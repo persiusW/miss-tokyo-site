@@ -410,6 +410,41 @@ export async function fallbackDecrementFromItems(
 }
 
 /**
+ * Signed stock adjustment for admin edits. Positive restocks, negative removes.
+ *
+ * The admin form used to post the counts it had loaded when the page opened,
+ * which silently reverted every sale that settled while the form was on screen.
+ * A delta carries only what the staff member actually changed, so a concurrent
+ * sale survives the save.
+ */
+export async function adjustStock(
+    productId: string,
+    variantId: string | null,
+    delta: number,
+): Promise<void> {
+    if (!delta) return;
+    const { error } = await supabaseAdmin.rpc("fn_adjust_stock", {
+        p_product_id: productId,
+        p_variant_id: variantId,
+        p_delta: delta,
+    });
+    if (error) throw new Error(error.message);
+}
+
+/**
+ * Recomputes products.inventory_count from the variant rows.
+ *
+ * Run after a save adds or removes variants. Also repairs products stranded at
+ * the 9999 "not tracked" sentinel, which read as unlimited stock.
+ */
+export async function syncProductStockFromVariants(productId: string): Promise<void> {
+    const { error } = await supabaseAdmin.rpc("fn_sync_product_stock_from_variants", {
+        p_product_id: productId,
+    });
+    if (error) console.error("[inventory] stock sync failed:", error.message, { productId });
+}
+
+/**
  * Direct decrement without a reservation. POS webhook only.
  * Do not use for new online checkout paths.
  */

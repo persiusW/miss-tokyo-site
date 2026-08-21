@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
@@ -105,6 +105,12 @@ export default function EditProductForm({ id, product, categories, storeData, ex
     const [trackVariantInventory, setTrackVariantInventory] = useState(product.track_variant_inventory ?? false);
     const [variantData, setVariantData] = useState<VariantStore>(() => buildVariantStore(existingVariants));
 
+    // What stock looked like when this page rendered. Saving sends the
+    // difference between these numbers and what is on screen, so a sale that
+    // settles while the form is open is not overwritten on save.
+    const variantBaseline = useRef<VariantStore>(buildVariantStore(existingVariants));
+    const productBaseline = useRef<number>(Number(product.inventory_count ?? 0));
+
     // ── Categories ────────────────────────────────────────────────────────────
     const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(
         Array.isArray(product.category_ids) ? product.category_ids : []
@@ -193,7 +199,13 @@ export default function EditProductForm({ id, product, categories, storeData, ex
                     compare_at_price_ghs: formData.compare_at_price_ghs !== "" ? Number(formData.compare_at_price_ghs) : null,
                     is_sale: formData.is_sale,
                     discount_value: formData.is_sale ? Number(formData.discount_value) : 0,
-                    inventory_count: trackInventory && !trackVariantInventory ? Number(formData.inventory_count) : 9999,
+                    // 9999 is the "not tracked" sentinel and is only correct when
+                    // tracking is off. Sending it for a variant-tracked product
+                    // left that product reading as unlimited stock.
+                    inventory_count: trackInventory ? Number(formData.inventory_count) : 9999,
+                    // What the page loaded. The API applies only the difference,
+                    // so sales that settled while this form was open survive.
+                    inventory_baseline: productBaseline.current,
                     track_inventory: trackInventory,
                     track_variant_inventory: trackVariantInventory,
                     description: formData.description,
@@ -216,6 +228,7 @@ export default function EditProductForm({ id, product, categories, storeData, ex
                             brand: c.brand || null,
                             sku: variantData[c.key]?.sku || null,
                             inventory_count: variantData[c.key]?.inventory_count ?? 0,
+                            baseline: variantBaseline.current[c.key]?.inventory_count ?? 0,
                         }))
                         : undefined,
                 }),
