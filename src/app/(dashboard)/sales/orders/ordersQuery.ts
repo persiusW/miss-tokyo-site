@@ -17,7 +17,7 @@ export const ORDER_TABS: { key: OrderTab; label: string }[] = [
 ];
 
 const ORDER_FIELDS =
-    "id, customer_name, customer_email, customer_phone, total_amount, status, payment_status, paystack_reference, shipping_address, delivery_method, created_at, has_preorder, is_mixed_order, customer_metadata";
+    "id, ref, customer_name, customer_email, customer_phone, total_amount, status, payment_status, paystack_reference, shipping_address, delivery_method, created_at, has_preorder, is_mixed_order, customer_metadata";
 
 // Online orders only — pure pre-orders live on the pre-orders page.
 const ONLINE_FILTER = "has_preorder.eq.false,is_mixed_order.eq.true";
@@ -39,11 +39,14 @@ function applyTabStatus<T>(query: T, tab: OrderTab): T {
 }
 
 function applySearch<T>(query: T, search: string): T {
-    const q = search.trim().replace(/[%,()]/g, "");
+    // A leading # is how the ref is written on receipts and in the UI.
+    const q = search.trim().replace(/^#/, "").replace(/[%,()]/g, "");
     if (!q) return query;
-    // Text columns only — id is a uuid and can't take ilike.
+    // `ref` is the generated uppercase 8-char prefix of the id — the ref shown
+    // on screen. Before it existed this search could not match an order by the
+    // one identifier staff actually read out (id is a uuid and takes no ilike).
     return (query as any).or(
-        `customer_name.ilike.%${q}%,customer_email.ilike.%${q}%,customer_phone.ilike.%${q}%,paystack_reference.ilike.%${q}%`
+        `ref.ilike.${q.toUpperCase()}%,customer_name.ilike.%${q}%,customer_email.ilike.%${q}%,customer_phone.ilike.%${q}%,paystack_reference.ilike.%${q}%`
     );
 }
 
