@@ -11,14 +11,31 @@ export async function POST(request: Request) {
     try {
         const {
             productId,
-            email,
+            email: rawEmail,
             cartItems,
             metadata: clientMetadata,
         } = await request.json();
 
-        if (!email) {
-            return NextResponse.json({ error: "Email is required" }, { status: 400 });
+        // Three callers reach this route and only the storefront checkout
+        // validates the address it sends: /checkout/direct checks nothing but
+        // emptiness, and dashboard Pay Links takes whatever staff typed. A
+        // malformed address reaches Paystack and comes back as HTTP 400
+        // "Invalid Email Address Passed", which cancels the order below.
+        // Same shape as the storefront's own check, so nothing a customer can
+        // already type through checkout is newly rejected.
+        const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return NextResponse.json(
+                { error: "A valid email address is required to process payment." },
+                { status: 400 },
+            );
         }
+
+        // Lower-casing is not cosmetic. This value is written to
+        // orders.customer_email, and the orders RLS policy compares it with
+        // auth.users.email, which Supabase always stores lower-cased. An order
+        // saved as "Name@gmail.com" is invisible to its own owner's account.
+        const emailForLog = `${email.slice(0, 3)}***@${email.split("@")[1] ?? ""}`;
 
         const cartArr: any[] = Array.isArray(cartItems) ? cartItems : [];
 
@@ -32,11 +49,20 @@ export async function POST(request: Request) {
         let amountInGHS = 0;
         if (cartArr.length > 0 || productId) {
             // Priority 2: Recalculate Cart Total or Single Product server-side
-            const { data: userProfile } = await supabaseAdmin
+            // Case-insensitive on purpose. The incoming address is now
+            // lower-cased, but profiles rows written before that still carry
+            // whatever was typed — an exact match would miss a wholesaler
+            // stored as "Name@x.com" and quietly charge them retail.
+            // ilike treats _ and % as wildcards, so the row is confirmed in JS
+            // rather than trusted from the pattern alone.
+            const { data: profileMatches } = await supabaseAdmin
                 .from("profiles")
-                .select("role")
-                .eq("email", email)
-                .maybeSingle();
+                .select("role, email")
+                .ilike("email", email)
+                .limit(5);
+            const userProfile = (profileMatches ?? []).find(
+                (p: any) => (p.email ?? "").toLowerCase() === email,
+            );
 
             const isWholesaler = !!(userProfile?.role && ["admin", "owner", "wholesale", "wholesaler"].includes(userProfile.role.toLowerCase()));
 
@@ -535,7 +561,11 @@ export async function POST(request: Request) {
 
         if (!response.ok) {
             const errText = await response.text();
-            console.error(`[Paystack init] HTTP ${response.status}: ${errText}`);
+            // Sanitised context alongside Paystack's own body — enough to tell
+            // which request failed without putting an address in the logs.
+            console.error(
+                `[Paystack init] HTTP ${response.status}: ${errText} — email=${emailForLog} amount=${amountInPesewas}`,
+            );
             if (orderId) {
                 await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
             }

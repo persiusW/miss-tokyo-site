@@ -56,3 +56,6 @@ tests/fixtures/.auth/
 tests/reports/
 /.next*/
 /.next*/
+
+# Customer-data backups taken before repair scripts — PII, never commit
+docs/data-backups/
