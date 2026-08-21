@@ -275,7 +275,11 @@ test.describe("Shop → Cart → Checkout critical path", () => {
     test("checkout removes an unavailable cart item and explains why", async ({ page }) => {
         await injectCartItem(page); // synthetic product — genuinely not in the catalogue
         await page.goto(ROUTES.checkout, { waitUntil: "domcontentloaded", timeout: 60_000 });
-        await expect(page.locator('input[name="fullName"]')).toBeVisible({ timeout: 20_000 });
+
+        // Deliberately does NOT wait for the form first: reconciling can empty
+        // the cart before the form paints, and then the empty state replaces it.
+        // Waiting on the form made this a race that only passed when the
+        // availability check happened to be slow.
 
         // This cart holds only the synthetic item, so reconciling empties it.
         // The customer must still be told what happened and that they were not
