@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { logActivity } from "@/lib/utils/logActivity";
+import { adjustStock, syncProductStockFromVariants } from "@/lib/inventory";
 
 export async function POST(req: NextRequest) {
     // Auth check — only admin/owner can create products
@@ -102,15 +103,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: `Variant insert failed: ${insertErr.message}` }, { status: 500 });
         }
 
-        // Sync product-level inventory_count to variant sum
-        const variantSum = toInsert.reduce((sum: number, v: { inventory_count: number }) => sum + (v.inventory_count ?? 0), 0);
-        const { error: syncErr } = await supabaseAdmin
-            .from("products")
-            .update({ inventory_count: variantSum })
-            .eq("id", data.id);
-        if (syncErr) {
-            console.error("[admin/products POST] inventory_count sync failed:", syncErr.message);
-        }
+        // Sync product-level inventory_count to variant sum. The product was
+        // inserted with the 9999 sentinel; leaving it there would read as
+        // unlimited stock for a product that does track inventory.
+        await syncProductStockFromVariants(data.id);
     }
 
     revalidatePath("/", "page");
@@ -196,7 +192,30 @@ export async function PATCH(req: NextRequest) {
         wholesale_price_tier_2,
         wholesale_price_tier_3,
         variants,
+        inventory_baseline,
     } = fields;
+
+    // Stock is never written as an absolute value from this form.
+    //
+    // The form loads inventory_count when the page opens; posting that number
+    // back reverted every sale that settled while the form was on screen, so
+    // stock climbed on its own and the same unit sold twice. Instead the form
+    // sends what it loaded (inventory_baseline) alongside what the staff member
+    // typed, and only the difference is applied — see the adjustStock call
+    // below. `inventory_count` stays out of updateFields entirely for tracked
+    // products; the 9999 sentinel is still written when tracking is off, which
+    // is the one case where the column is a flag rather than a count.
+    const productStockDelta =
+        track_inventory && !track_variant_inventory && Number.isFinite(Number(inventory_baseline))
+            ? Number(inventory_count) - Number(inventory_baseline)
+            : 0;
+
+    // No baseline means an older client (or another caller) that still posts an
+    // absolute count. Honour it rather than silently ignoring the edit.
+    const absoluteStockWrite =
+        track_inventory && !track_variant_inventory && !Number.isFinite(Number(inventory_baseline))
+            ? { inventory_count: Number(inventory_count) }
+            : {};
 
     const updateFields = {
         name,
@@ -206,7 +225,7 @@ export async function PATCH(req: NextRequest) {
         compare_at_price_ghs: compare_at_price_ghs != null && compare_at_price_ghs !== "" ? Number(compare_at_price_ghs) : null,
         is_sale: is_sale ?? false,
         discount_value: discount_value != null ? Number(discount_value) : 0,
-        inventory_count: track_inventory ? Number(inventory_count) : 9999,
+        ...(track_inventory ? absoluteStockWrite : { inventory_count: 9999 }),
         track_inventory: track_inventory ?? true,
         track_variant_inventory: track_variant_inventory ?? false,
         description,
@@ -233,6 +252,16 @@ export async function PATCH(req: NextRequest) {
     if (error) {
         console.error("[admin/products PATCH]", error);
         return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
+    }
+
+    // Product-level stock for a product that does not track by variant.
+    if (productStockDelta !== 0) {
+        try {
+            await adjustStock(id, null, productStockDelta);
+        } catch (e: any) {
+            console.error("[admin/products PATCH] stock adjust failed:", e?.message, { id, productStockDelta });
+            return NextResponse.json({ error: "Stock update failed. Nothing was changed." }, { status: 500 });
+        }
     }
 
     if (variants && variants.length > 0) {
