@@ -7,11 +7,11 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { PosStatus } from '@/types/pos';
 import { toast } from '@/lib/toast';
+import { buildSearchClause, isMissingColumn, sanitiseTerm } from '@/lib/refSearch';
 
 type SessionRow = {
     id: string;
     customer_name: string;
-    ref: string | null;
     customer_email: string | null;
     customer_phone: string | null;
     total_amount: number;
@@ -39,11 +39,6 @@ type FilterTab = 'all' | PosStatus;
 const PAGE_SIZE = 50;
 
 type StaffOption = { id: string; name: string };
-
-/** PostgREST reads %,() as or() syntax, and # is how a ref is written. */
-function sanitiseSearch(raw: string): string {
-    return raw.trim().replace(/^#/, '').replace(/[%,()]/g, '');
-}
 
 /** Local calendar day → the timestamptz bounds that day covers. */
 function dayStart(d: string) { return new Date(`${d}T00:00:00`).toISOString(); }
@@ -84,7 +79,7 @@ export default function POSHistoryPage() {
         let filters = supabase
             .from('pos_sessions')
             .select(
-                'id, ref, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by',
+                'id, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by',
                 { count: 'exact' },
             );
 
@@ -100,17 +95,23 @@ export default function POSHistoryPage() {
         if (to_)   filters = filters.lte('created_at', dayEnd(to_));
 
         // Searches the whole filtered set server-side, not the loaded page.
-        // `ref` is the generated 8-char id prefix shown in the Ref column.
-        const q = sanitiseSearch(term);
-        if (q) {
-            filters = filters.or(
-                `ref.ilike.${q.toUpperCase()}%,customer_name.ilike.%${q}%,customer_email.ilike.%${q}%,customer_phone.ilike.%${q}%`,
-            );
-        }
+        // `ref` is the generated 8-char id prefix shown in the Ref column; a
+        // deploy can precede its migration, and naming a missing column fails
+        // the whole or(), so fall back to searching without it.
+        const q = sanitiseTerm(term);
+        const textCols = ['customer_name', 'customer_email', 'customer_phone'];
+        const run = (includeRef: boolean) => {
+            const withSearch = q ? filters.or(buildSearchClause(q, textCols, { includeRef })) : filters;
+            return withSearch
+                .order('created_at', { ascending: false })
+                .range(from, from + PAGE_SIZE - 1);
+        };
 
-        const { data: rows, count, error: fetchError } = await filters
-            .order('created_at', { ascending: false })
-            .range(from, from + PAGE_SIZE - 1);
+        let { data: rows, count, error: fetchError } = await run(true);
+        if (q && isMissingColumn(fetchError, 'ref')) {
+            console.warn('[POSHistory] `ref` column missing — searching without it. Apply 20260821010000_searchable_display_refs.sql.');
+            ({ data: rows, count, error: fetchError } = await run(false));
+        }
 
         if (fetchError) {
             // Asking for a page past the end (rows cancelled or filtered away
@@ -299,7 +300,7 @@ export default function POSHistoryPage() {
                             <tbody>
                                 {sessions.map(s => (
                                     <tr key={s.id} onClick={() => setSelected(s)} style={{ cursor: "pointer" }}>
-                                        <td style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-3)" }}>{s.ref ?? s.id.slice(0, 8).toUpperCase()}</td>
+                                        <td style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-3)" }}>{s.id.slice(0, 8).toUpperCase()}</td>
                                         <td>
                                             <div style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{s.customer_name}</div>
                                             <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{s.customer_email ?? s.customer_phone ?? '—'}</div>

@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { buildSearchClause, isMissingColumn, sanitiseTerm } from "@/lib/refSearch";
 
 type Result = {
     id: string;
@@ -27,11 +28,6 @@ type Result = {
 
 const GROUP_ORDER: Result["group"][] = ["Orders", "Products", "Customers"];
 const PER_GROUP = 5;
-
-// PostgREST reads %,() as or() syntax; # is how a ref is written on a receipt.
-function sanitise(raw: string): string {
-    return raw.trim().replace(/^#/, "").replace(/[%,()]/g, "");
-}
 
 function money(n: unknown): string {
     const v = Number(n);
@@ -67,19 +63,24 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
     }, [term]);
 
     const search = useCallback(async (raw: string) => {
-        const q = sanitise(raw);
+        const q = sanitiseTerm(raw);
         if (q.length < 2) { setResults([]); setLoading(false); return; }
 
         const mine = ++runId.current;
         setLoading(true);
 
-        const [orders, products, contacts] = await Promise.all([
-            supabase
-                .from("orders")
-                .select("id, ref, customer_name, customer_email, total_amount, status")
-                .or(`ref.ilike.${q.toUpperCase()}%,customer_name.ilike.%${q}%,customer_email.ilike.%${q}%,customer_phone.ilike.%${q}%,paystack_reference.ilike.%${q}%`)
-                .order("created_at", { ascending: false })
-                .limit(PER_GROUP),
+        // `ref` may not be migrated in yet; naming a missing column fails the
+        // whole or(), so the orders leg retries without it.
+        const orderTextCols = ["customer_name", "customer_email", "customer_phone", "paystack_reference"];
+        const ordersQuery = (includeRef: boolean) => supabase
+            .from("orders")
+            .select("id, customer_name, customer_email, total_amount, status")
+            .or(buildSearchClause(q, orderTextCols, { includeRef }))
+            .order("created_at", { ascending: false })
+            .limit(PER_GROUP);
+
+        const [ordersFirst, products, contacts] = await Promise.all([
+            ordersQuery(true),
             supabase
                 .from("products")
                 .select("id, name, sku, price_ghs")
@@ -94,6 +95,10 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
                 .limit(PER_GROUP),
         ]);
 
+        const orders = isMissingColumn(ordersFirst.error, "ref")
+            ? await ordersQuery(false)
+            : ordersFirst;
+
         if (mine !== runId.current) return;
 
         const next: Result[] = [];
@@ -101,7 +106,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
             next.push({
                 id: `order-${o.id}`,
                 group: "Orders",
-                title: `#${o.ref ?? String(o.id).slice(0, 8).toUpperCase()} · ${o.customer_name || "No name"}`,
+                title: `#${String(o.id).slice(0, 8).toUpperCase()} · ${o.customer_name || "No name"}`,
                 subtitle: `${money(o.total_amount)} · ${o.status ?? ""}`.trim(),
                 href: `/sales/orders/${o.id}`,
             });
@@ -173,7 +178,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
 
     if (!open) return null;
 
-    const q = sanitise(term);
+    const q = sanitiseTerm(term);
 
     return (
         <div

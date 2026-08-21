@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { buildSearchClause, isMissingColumn, sanitiseTerm } from "@/lib/refSearch";
 
 export const ORDERS_PAGE_SIZE = 100;
 
@@ -16,8 +17,10 @@ export const ORDER_TABS: { key: OrderTab; label: string }[] = [
     { key: "all-orders", label: "All" },
 ];
 
+const ORDER_TEXT_COLUMNS = ["customer_name", "customer_email", "customer_phone", "paystack_reference"];
+
 const ORDER_FIELDS =
-    "id, ref, customer_name, customer_email, customer_phone, total_amount, status, payment_status, paystack_reference, shipping_address, delivery_method, created_at, has_preorder, is_mixed_order, customer_metadata";
+    "id, customer_name, customer_email, customer_phone, total_amount, status, payment_status, paystack_reference, shipping_address, delivery_method, created_at, has_preorder, is_mixed_order, customer_metadata";
 
 // Online orders only — pure pre-orders live on the pre-orders page.
 const ONLINE_FILTER = "has_preorder.eq.false,is_mixed_order.eq.true";
@@ -38,16 +41,13 @@ function applyTabStatus<T>(query: T, tab: OrderTab): T {
     }
 }
 
-function applySearch<T>(query: T, search: string): T {
-    // A leading # is how the ref is written on receipts and in the UI.
-    const q = search.trim().replace(/^#/, "").replace(/[%,()]/g, "");
+function applySearch<T>(query: T, search: string, includeRef = true): T {
+    const q = sanitiseTerm(search);
     if (!q) return query;
     // `ref` is the generated uppercase 8-char prefix of the id — the ref shown
     // on screen. Before it existed this search could not match an order by the
     // one identifier staff actually read out (id is a uuid and takes no ilike).
-    return (query as any).or(
-        `ref.ilike.${q.toUpperCase()}%,customer_name.ilike.%${q}%,customer_email.ilike.%${q}%,customer_phone.ilike.%${q}%,paystack_reference.ilike.%${q}%`
-    );
+    return (query as any).or(buildSearchClause(q, ORDER_TEXT_COLUMNS, { includeRef }));
 }
 
 export type OrdersPage = {
@@ -75,33 +75,47 @@ export async function fetchOrdersPage(
     const to = from + ORDERS_PAGE_SIZE - 1;
 
     // List query for the active tab. A search on Inbox spans all statuses.
-    let listQuery = supabaseAdmin
-        .from("orders")
-        .select(ORDER_FIELDS, { count: "exact" })
-        .or(ONLINE_FILTER);
-    if (!(tab === "all" && searchActive)) {
-        listQuery = applyTabStatus(listQuery, tab);
-    }
-    listQuery = applySearch(listQuery, search);
-    listQuery = listQuery.order("created_at", { ascending: false }).range(from, to);
+    const buildList = (includeRef: boolean) => {
+        let lq = supabaseAdmin
+            .from("orders")
+            .select(ORDER_FIELDS, { count: "exact" })
+            .or(ONLINE_FILTER);
+        if (!(tab === "all" && searchActive)) lq = applyTabStatus(lq, tab);
+        lq = applySearch(lq, search, includeRef);
+        return lq.order("created_at", { ascending: false }).range(from, to);
+    };
 
     // Per-tab counts (head-only, cheap). Counts respect the active search so the
     // badges reflect what a tab would show for the current query.
-    const countFor = (t: OrderTab) => {
+    const countFor = (t: OrderTab, includeRef: boolean) => {
         let cq = supabaseAdmin
             .from("orders")
             .select("id", { count: "exact", head: true })
             .or(ONLINE_FILTER);
         cq = applyTabStatus(cq, t);
-        cq = applySearch(cq, search);
+        cq = applySearch(cq, search, includeRef);
         return cq;
     };
 
     const tabKeys = ORDER_TABS.map(t => t.key);
-    const [{ data: orders, count }, ...countResults] = await Promise.all([
-        listQuery,
-        ...tabKeys.map(countFor),
-    ]);
+
+    // A deploy can land before the migration that adds `ref`. Naming a missing
+    // column fails the whole or(), so fall back to searching without it rather
+    // than taking every order search down.
+    const runAll = async (includeRef: boolean) => {
+        const [list, ...counts] = await Promise.all([
+            buildList(includeRef),
+            ...tabKeys.map(k => countFor(k, includeRef)),
+        ]);
+        return { list, counts };
+    };
+
+    let { list, counts: countResults } = await runAll(true);
+    if (searchActive && isMissingColumn((list as any).error, "ref")) {
+        console.warn("[orders] `ref` column missing — searching without it. Apply 20260821010000_searchable_display_refs.sql.");
+        ({ list, counts: countResults } = await runAll(false));
+    }
+    const { data: orders, count } = list as any;
 
     const tabCounts = {} as Record<OrderTab, number>;
     tabKeys.forEach((k, i) => {
