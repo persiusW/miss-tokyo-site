@@ -320,6 +320,8 @@ function StoreTab() {
     // store setting with it. These three round-trip through their own update.
     const [delivery, setDelivery] = useState<DeliveryFeeSettings>(DELIVERY_DEFAULTS);
     const [deliveryAvailable, setDeliveryAvailable] = useState(false);
+    const [undoRemoved, setUndoRemoved] = useState(false);
+    const [undoRemovedAvailable, setUndoRemovedAvailable] = useState(false);
 
     useEffect(() => {
         supabase.from("store_settings").select("*").eq("id", "default").single()
@@ -365,6 +367,12 @@ function StoreTab() {
                     setDelivery(parseDeliverySettings(sData));
                     setDeliveryAvailable(true);
                 }
+                // Same pattern: the card stays hidden until the column exists,
+                // so an un-migrated database shows no broken control.
+                if (sData && "checkout_undo_removed_enabled" in sData) {
+                    setUndoRemoved(sData.checkout_undo_removed_enabled === true);
+                    setUndoRemovedAvailable(true);
+                }
                 setLoading(false);
             });
 
@@ -385,6 +393,18 @@ function StoreTab() {
             { id: "default", ...form },
             { onConflict: "id" }
         );
+
+        // Own update, same reasoning as delivery below: a column that is not
+        // migrated in yet must not take the whole save down with it.
+        if (undoRemovedAvailable) {
+            const { error: undoError } = await supabase.from("store_settings")
+                .update({ checkout_undo_removed_enabled: undoRemoved })
+                .eq("id", "default");
+            if (undoError) {
+                console.warn("[settings] checkout undo setting not saved:", undoError);
+                toast.error("Checkout undo setting could not be saved. Other settings were saved.");
+            }
+        }
 
         // Own update, so a delivery column that is missing cannot take the save
         // of every other store setting down with it.
@@ -597,6 +617,22 @@ function StoreTab() {
                         </div>
                     </label>
                 </div>
+
+                {/* Checkout behaviour */}
+                {undoRemovedAvailable && (
+                    <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                        {secTitle("Checkout")}
+                        {subLabel("When an item in a customer's cart is no longer available, checkout removes it automatically and shows it struck through, so the total they see is always one they can actually pay.")}
+                        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                            <input type="checkbox" className="ac-checkbox" checked={undoRemoved}
+                                onChange={(e) => setUndoRemoved(e.target.checked)} />
+                            <div>
+                                <span className="ac-label">Offer Undo on removed items</span>
+                                {subLabel("Stock is also held for 15 minutes by other in-progress checkouts, so an item can be removed and then genuinely become available again. Undo lets the customer put it back; it re-checks stock, so it can never restore something truly sold out. Leave off to keep checkout simple.")}
+                            </div>
+                        </label>
+                    </div>
+                )}
 
                 {/* Delivery Fees */}
                 {deliveryAvailable && (
