@@ -120,6 +120,9 @@ function Receipt({ order, orderRef }: { order: Order; orderRef: string }) {
         });
         // Read and clear OOS items stored before Paystack redirect
         try {
+            // The hold this order placed is settled or on its way to being
+            // settled, so the marker has done its job.
+            sessionStorage.removeItem("miss-tokyo-pending-order");
             const stored = sessionStorage.getItem("checkout_oos");
             if (stored) {
                 setOosItems(JSON.parse(stored) as string[]);

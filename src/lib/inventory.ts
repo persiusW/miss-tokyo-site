@@ -148,8 +148,17 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
 
 /**
  * Batch stock status for multiple items. Used by GET /api/inventory/check.
+ *
+ * `excludeOrderId` is the caller's own pending order. Availability nets off
+ * every live hold, so a customer who reached Paystack and came back without
+ * paying was told their own item had sold out — they were competing with their
+ * own reservation. Adding that order's quantities back keeps everyone else's
+ * holds counting while the customer's own does not count against them.
  */
-export async function getStockStatus(items: ReserveItem[]): Promise<StockStatus[]> {
+export async function getStockStatus(
+    items: ReserveItem[],
+    opts: { excludeOrderId?: string } = {},
+): Promise<StockStatus[]> {
     if (!items.length) return [];
 
     const pIds = [...new Set(items.map(i => i.productId))];
@@ -195,6 +204,12 @@ export async function getStockStatus(items: ReserveItem[]): Promise<StockStatus[
             .map(x => ({ productId: x.item.productId, variantId: resolve(x.item, x.product) })),
     );
 
+    // Quantities held by the caller's own still-pending order, keyed the same
+    // way as netAvailable. Only a *pending* order qualifies: once it is paid the
+    // reservation rows are deliberately kept for a late webhook to settle, and
+    // adding those back would advertise stock that is already sold.
+    const ownHolds = await getOwnHolds(opts.excludeOrderId);
+
     return items.map(item => {
         const product = productMap.get(item.productId) as any;
         if (!product) {
@@ -206,19 +221,65 @@ export async function getStockStatus(items: ReserveItem[]): Promise<StockStatus[
             : (product.inventory_count ?? 0);
 
         const resolvedVariantId = resolve(item, product);
+        const mapKey = `${item.productId}|${resolvedVariantId ?? "null"}`;
         const net = rawAvailable === 9999
             ? rawAvailable
-            : (netAvailable?.get(`${item.productId}|${resolvedVariantId ?? "null"}`) ?? rawAvailable);
+            : (netAvailable?.get(mapKey) ?? rawAvailable);
+
+        // Never report more than physically exists, however the holds add up.
+        const withOwn = rawAvailable === 9999
+            ? net
+            : Math.min(rawAvailable, net + (ownHolds.get(mapKey) ?? 0));
 
         return {
             productId: item.productId,
             variantId: item.variantId ?? resolvedVariantId,
-            available: Math.max(0, net),
+            available: Math.max(0, withOwn),
             isActive: product.is_active ?? true,
             preorderEnabled: product.preorder_enabled ?? false,
         };
     });
 }
+
+/**
+ * Live reservation quantities belonging to one still-pending order, keyed
+ * product|variant. Empty for anything else — a missing id, an order that is no
+ * longer pending, or an expired hold.
+ */
+async function getOwnHolds(orderId?: string): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    if (!orderId) return out;
+
+    const { data: order } = await supabaseAdmin
+        .from("orders")
+        .select("id, status")
+        .eq("id", orderId)
+        .maybeSingle();
+    if (!order || order.status !== "pending") return out;
+
+    const { data: rows } = await supabaseAdmin
+        .from("online_reservations")
+        .select("product_id, variant_id, quantity, expires_at")
+        .eq("order_id", orderId);
+
+    const now = Date.now();
+    for (const r of rows ?? []) {
+        if (new Date(r.expires_at).getTime() < now) continue;
+        const key = `${r.product_id}|${r.variant_id ?? "null"}`;
+        out.set(key, (out.get(key) ?? 0) + (Number(r.quantity) || 0));
+    }
+    return out;
+}
+
+/**
+ * How long an online checkout holds stock while the customer is on Paystack.
+ *
+ * The DB function defaults to 30, which meant a customer who opened Paystack
+ * and backed out could not buy their own item for half an hour — their own
+ * hold counted against them. Passing it explicitly keeps that window short
+ * without a migration.
+ */
+export const ONLINE_HOLD_MINUTES = 5;
 
 /**
  * Atomic reservation. Acquires row-level DB lock via fn_reserve_online_stock.
@@ -235,6 +296,7 @@ export async function reserveStock(orderId: string, items: ReserveItem[]): Promi
     const { error } = await supabaseAdmin.rpc("fn_reserve_online_stock", {
         p_order_id: orderId,
         p_items: rpcItems,
+        p_ttl_mins: ONLINE_HOLD_MINUTES,
     });
 
     if (error) throw new Error(error.message);

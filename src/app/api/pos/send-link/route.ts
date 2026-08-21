@@ -268,7 +268,10 @@ export async function POST(req: NextRequest) {
         email: session.customer_email || POS_FALLBACK_EMAIL,
         amount: amountPesewas,
         currency: 'GHS',
-        channels: ['mobile_money', 'card', 'bank', 'bank_transfer', 'ussd'],
+        // Same channel set as storefront checkout: 'bank' and 'ussd' are
+        // Nigeria-only and leave the GHS payment page blank beside the channel
+        // list. Mobile money first makes it the default.
+        channels: ['mobile_money', 'card', 'bank_transfer'],
         ...splitPayload,
         metadata: {
             pos_session_id: sessionId,

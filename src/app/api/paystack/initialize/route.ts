@@ -532,7 +532,13 @@ export async function POST(request: Request) {
                 amount: amountInPesewas,
                 currency: "GHS",
                 callback_url: `${siteUrl}/checkout/success`,
-                channels: ["mobile_money", "card", "bank", "bank_transfer", "ussd"],
+                // GHS supports mobile money, card and bank transfer. "bank"
+            // (direct debit) and "ussd" are Nigeria-only, and offering a
+            // channel Paystack cannot render for this currency left the
+            // checkout pane blank next to the channel list — a payment page
+            // that looks broken, which is where dropped orders come from.
+            // Mobile money leads, so it is the channel selected by default.
+            channels: ["mobile_money", "card", "bank_transfer"],
                 ...splitPayload,
                 metadata: {
                     ...clientMetadata,
