@@ -475,7 +475,7 @@ export default function CheckoutPage() {
                     <p className="text-neutral-500">Please provide your details to complete the order.</p>
                 </header>
 
-                <form onSubmit={handleCheckout} className="space-y-8">
+                <form id="checkout-form" onSubmit={handleCheckout} className="space-y-8">
 
                     {/* Name + Email */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -650,23 +650,12 @@ export default function CheckoutPage() {
                         </div>
                     </div>
 
-                    {stockError && (
-                        <p className="text-xs text-red-600 text-center font-medium py-2">{stockError}</p>
-                    )}
-                    {stockChecking && (
-                        <p className="text-[10px] text-neutral-400 uppercase tracking-widest text-center">Checking stock availability...</p>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={loading || stockChecking || !!stockError}
-                        className="w-full py-5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors mt-8 disabled:opacity-50 mt-12 block text-center"
-                    >
-                        {loading ? "Processing..." : stockChecking ? "Checking availability..." : `Pay GHS ${finalTotal.toFixed(2)}`}
-                    </button>
                 </form>
             </div>
 
+            {/* ── Pay: after the summary in the DOM so a phone shows the
+                 summary first. The button submits the form above through its
+                 `form` attribute, so it needs no wrapper of its own. ── */}
             {/* ── RIGHT: Order Summary ── */}
             <div className="bg-neutral-50 p-8 md:p-12 border border-neutral-100 h-fit space-y-8">
                 <h2 className="font-serif text-xl tracking-widest uppercase">Order Summary</h2>
@@ -830,6 +819,25 @@ export default function CheckoutPage() {
                         <span className="font-medium text-lg">GHS {finalTotal.toFixed(2)}</span>
                     </div>
                 </div>
+            </div>
+
+            {/* ── Pay ── */}
+            <div className="lg:col-start-1">
+                {stockError && (
+                    <p className="text-xs text-red-600 text-center font-medium py-2">{stockError}</p>
+                )}
+                {stockChecking && (
+                    <p className="text-[10px] text-neutral-400 uppercase tracking-widest text-center">Checking stock availability...</p>
+                )}
+
+                <button
+                    type="submit"
+                    form="checkout-form"
+                    disabled={loading || stockChecking || !!stockError}
+                    className="w-full py-5 bg-black text-white text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors disabled:opacity-50 block text-center"
+                >
+                    {loading ? "Processing..." : stockChecking ? "Checking availability..." : `Pay GHS ${finalTotal.toFixed(2)}`}
+                </button>
             </div>
         </div>
     );
