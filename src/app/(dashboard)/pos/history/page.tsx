@@ -11,6 +11,7 @@ import { toast } from '@/lib/toast';
 type SessionRow = {
     id: string;
     customer_name: string;
+    ref: string | null;
     customer_email: string | null;
     customer_phone: string | null;
     total_amount: number;
@@ -39,6 +40,11 @@ const PAGE_SIZE = 50;
 
 type StaffOption = { id: string; name: string };
 
+/** PostgREST reads %,() as or() syntax, and # is how a ref is written. */
+function sanitiseSearch(raw: string): string {
+    return raw.trim().replace(/^#/, '').replace(/[%,()]/g, '');
+}
+
 /** Local calendar day → the timestamptz bounds that day covers. */
 function dayStart(d: string) { return new Date(`${d}T00:00:00`).toISOString(); }
 function dayEnd(d: string)   { return new Date(`${d}T23:59:59.999`).toISOString(); }
@@ -53,6 +59,8 @@ export default function POSHistoryPage() {
     const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [searchInput, setSearchInput] = useState('');
+    const [search, setSearch] = useState('');
     const [selected, setSelected] = useState<SessionRow | null>(null);
     const [cancelling, setCancelling] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -66,6 +74,7 @@ export default function POSHistoryPage() {
         staff: string,
         from_: string,
         to_: string,
+        term: string,
     ) => {
         setLoading(true);
         const isStaff = role === 'sales_staff';
@@ -75,7 +84,7 @@ export default function POSHistoryPage() {
         let filters = supabase
             .from('pos_sessions')
             .select(
-                'id, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by',
+                'id, ref, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by',
                 { count: 'exact' },
             );
 
@@ -89,6 +98,15 @@ export default function POSHistoryPage() {
         else if (staff !== 'all') filters = filters.eq('created_by', staff);
         if (from_) filters = filters.gte('created_at', dayStart(from_));
         if (to_)   filters = filters.lte('created_at', dayEnd(to_));
+
+        // Searches the whole filtered set server-side, not the loaded page.
+        // `ref` is the generated 8-char id prefix shown in the Ref column.
+        const q = sanitiseSearch(term);
+        if (q) {
+            filters = filters.or(
+                `ref.ilike.${q.toUpperCase()}%,customer_name.ilike.%${q}%,customer_email.ilike.%${q}%,customer_phone.ilike.%${q}%`,
+            );
+        }
 
         const { data: rows, count, error: fetchError } = await filters
             .order('created_at', { ascending: false })
@@ -149,18 +167,23 @@ export default function POSHistoryPage() {
     }, []);
 
     useEffect(() => {
+        const t = setTimeout(() => setSearch(searchInput), 300);
+        return () => clearTimeout(t);
+    }, [searchInput]);
+
+    useEffect(() => {
         if (!currentUserId || !userRole) return;
-        fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo);
-    }, [currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo, fetchSessions]);
+        fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo, search);
+    }, [currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo, search, fetchSessions]);
 
     // Any filter change invalidates the current page number — page 7 of the old
     // result set is meaningless against the new one.
-    useEffect(() => { setPage(1); }, [staffFilter, dateFrom, dateTo]);
+    useEffect(() => { setPage(1); }, [staffFilter, dateFrom, dateTo, search]);
 
     const refetch = () => {
-        if (currentUserId && userRole) fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo);
+        if (currentUserId && userRole) fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo, search);
     };
-    const filtersActive = staffFilter !== 'all' || Boolean(dateFrom) || Boolean(dateTo);
+    const filtersActive = staffFilter !== 'all' || Boolean(dateFrom) || Boolean(dateTo) || Boolean(search.trim());
     const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
     const handleCancel = async (sessionId: string) => {
@@ -213,6 +236,12 @@ export default function POSHistoryPage() {
 
             {/* Staff + date filters — all applied server-side alongside the tab */}
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginBottom: 20 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="pos-search">Search</label>
+                    <input id="pos-search" type="search" className="ac-input" style={{ minWidth: 260 }}
+                        placeholder="Ref, name, email or phone…"
+                        value={searchInput} onChange={e => setSearchInput(e.target.value)} />
+                </div>
                 {userRole !== 'sales_staff' && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         <label className="ac-label" htmlFor="pos-staff-filter">Staff</label>
@@ -239,7 +268,7 @@ export default function POSHistoryPage() {
                 </div>
                 {filtersActive && (
                     <button type="button" className="ac-btn ac-btn-ghost ac-btn-sm"
-                        onClick={() => { setStaffFilter('all'); setDateFrom(''); setDateTo(''); }}>
+                        onClick={() => { setStaffFilter('all'); setDateFrom(''); setDateTo(''); setSearchInput(''); setSearch(''); }}>
                         Clear filters
                     </button>
                 )}
@@ -270,7 +299,7 @@ export default function POSHistoryPage() {
                             <tbody>
                                 {sessions.map(s => (
                                     <tr key={s.id} onClick={() => setSelected(s)} style={{ cursor: "pointer" }}>
-                                        <td style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-3)" }}>{s.id.slice(0, 8).toUpperCase()}</td>
+                                        <td style={{ fontFamily: "var(--f-mono)", fontSize: 11, color: "var(--ac-ink-3)" }}>{s.ref ?? s.id.slice(0, 8).toUpperCase()}</td>
                                         <td>
                                             <div style={{ fontWeight: 500, color: "var(--ac-ink)" }}>{s.customer_name}</div>
                                             <div style={{ fontSize: 11, color: "var(--ac-ink-4)" }}>{s.customer_email ?? s.customer_phone ?? '—'}</div>
