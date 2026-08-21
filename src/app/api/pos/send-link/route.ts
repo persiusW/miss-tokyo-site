@@ -15,6 +15,8 @@ import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
 export async function POST(req: NextRequest) {
+    const startedAt = Date.now();
+
     // Auth
     const serverClient = await createClient();
     const { data: { user } } = await serverClient.auth.getUser();
@@ -269,6 +271,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Could not create the order. Nothing was charged — try again.' }, { status: 500 });
         }
 
+        console.log(`[pos/send-link] gift-card settle in ${Date.now() - startedAt}ms`);
+
         return NextResponse.json({
             paymentUrl: `${baseUrlForCompleted}/pay/${sessionId}`,
             sessionId,
@@ -402,6 +406,11 @@ export async function POST(req: NextRequest) {
         }
     }
     if (smsError) console.error('[pos/send-link] sms error:', smsError);
+
+    // How long staff actually waited. Vercel's runtime logs carry no duration
+    // field, so without this there is no way to tell a slow till from a slow
+    // provider after the fact.
+    console.log(`[pos/send-link] complete in ${Date.now() - startedAt}ms (email=${emailStatus} sms=${smsStatus})`);
 
     // Return the preview URL — staff copies/shares this, not the raw Paystack URL
     return NextResponse.json({
