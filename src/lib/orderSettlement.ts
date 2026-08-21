@@ -54,12 +54,25 @@ export async function ensureCustomerAccount(
     customerEmail: string,
     fullName?: string | null,
 ): Promise<{ userId: string; setupLink?: string; isNewUser: boolean }> {
-    // O(1) lookup via indexed profiles.email — avoids listUsers() full-table scan
-    const { data: existingProfile } = await supabaseAdmin
+    // Supabase auth always stores the address lower-cased, so that is the only
+    // form worth matching on. Orders and profiles written before this was
+    // normalised still carry whatever the customer typed.
+    const email = (customerEmail ?? "").trim().toLowerCase();
+    if (!email) return { userId: "", isNewUser: false };
+
+    // Case-insensitive lookup. The old exact match missed a profile stored as
+    // "Name@gmail.com", fell through to createUser, and got back "already
+    // registered" — leaving the order with no linked account and, worse, no
+    // setup link in the confirmation email. ilike treats _ and % as wildcards,
+    // so the row is confirmed in JS rather than trusted from the pattern.
+    const { data: profileMatches } = await supabaseAdmin
         .from("profiles")
-        .select("id")
-        .eq("email", customerEmail)
-        .maybeSingle();
+        .select("id, email")
+        .ilike("email", email)
+        .limit(5);
+    const existingProfile = (profileMatches ?? []).find(
+        (p: { email: string | null }) => (p.email ?? "").toLowerCase() === email,
+    );
 
     if (existingProfile) {
         if (fullName) {
@@ -67,29 +80,43 @@ export async function ensureCustomerAccount(
                 .from("profiles")
                 .upsert({ id: existingProfile.id, full_name: fullName }, { onConflict: "id" });
         }
-        return { userId: existingProfile.id, isNewUser: false };
+        // An account that exists is not necessarily an account the customer can
+        // get into: most are created here at settlement and never signed into,
+        // which is why they end up asking for password resets. Give those a
+        // setup link too.
+        const setupLink = await buildSetupLinkIfNeverSignedIn(existingProfile.id, email);
+        return { userId: existingProfile.id, setupLink, isNewUser: false };
     }
 
     const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
-        email: customerEmail,
+        email,
         email_confirm: true,
     });
 
-    if (error || !newUser?.user) {
-        console.error("[settlement] Failed to create auth user:", error);
-        return { userId: "", isNewUser: false };
+    let userId = newUser?.user?.id ?? "";
+
+    if (error || !userId) {
+        // The auth user can exist without a profiles row to find it by — a
+        // profile that was never written, or one holding a different address.
+        // Recover the id instead of losing the link, and never let this fail
+        // the order: the payment has already been taken.
+        userId = await findAuthUserIdByEmail(email);
+        if (!userId) {
+            console.error("[settlement] Failed to create auth user:", error?.message ?? error);
+            return { userId: "", isNewUser: false };
+        }
+        console.warn(`[settlement] auth user already existed without a matching profile — relinked ${email.slice(0, 3)}***`);
     }
 
-    const userId = newUser.user.id;
     await supabaseAdmin
         .from("profiles")
-        .upsert({ id: userId, email: customerEmail, full_name: fullName || null }, { onConflict: "id" });
+        .upsert({ id: userId, email, full_name: fullName || null }, { onConflict: "id" });
 
     let setupLink: string | undefined;
     try {
         const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
             type: "recovery",
-            email: customerEmail,
+            email,
             options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop"}/account` },
         });
         setupLink = (linkData as any)?.properties?.action_link || undefined;
@@ -98,6 +125,45 @@ export async function ensureCustomerAccount(
     }
 
     return { userId, setupLink, isNewUser: true };
+}
+
+/** Finds an auth user id by address. Paginated, so only used as a fallback. */
+async function findAuthUserIdByEmail(email: string): Promise<string> {
+    try {
+        for (let page = 1; page <= 20; page++) {
+            const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+            if (error || !data?.users?.length) return "";
+            const hit = data.users.find(u => (u.email ?? "").toLowerCase() === email);
+            if (hit) return hit.id;
+            if (data.users.length < 200) return "";
+        }
+    } catch {
+        // Non-fatal — the order matters more than the account link.
+    }
+    return "";
+}
+
+/**
+ * A recovery link for a customer who has an account but has never signed in.
+ * Those accounts are created here at settlement and have no password, so
+ * without a link the only way in is the forgot-password flow — which is what
+ * customers were resorting to. Returns undefined for anyone who has signed in
+ * before; they already know their way in.
+ */
+async function buildSetupLinkIfNeverSignedIn(userId: string, email: string): Promise<string | undefined> {
+    try {
+        const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (!data?.user || data.user.last_sign_in_at) return undefined;
+
+        const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+            type: "recovery",
+            email,
+            options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop"}/account` },
+        });
+        return (linkData as any)?.properties?.action_link || undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 // ── Discount redemption ───────────────────────────────────────────────────────
