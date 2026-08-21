@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { Theme } from "./AdminShellClient";
+import CommandPalette from "./CommandPalette";
 
 type Props = {
     user: { name: string; initials: string; role: string };
@@ -49,6 +51,26 @@ function getCrumbs(pathname: string): string[] {
 }
 
 export function AdminTopbar({ user, onMenu, theme, onTheme }: Props) {
+    const [paletteOpen, setPaletteOpen] = useState(false);
+    const [modKey, setModKey] = useState("⌘");
+
+    // The badge has to match the keyboard the user actually has.
+    useEffect(() => {
+        const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+        setModKey(mac ? "⌘" : "Ctrl+");
+    }, []);
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                setPaletteOpen(o => !o);
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
+
     const pathname = usePathname();
     const crumbs = getCrumbs(pathname);
 
@@ -73,14 +95,16 @@ export function AdminTopbar({ user, onMenu, theme, onTheme }: Props) {
 
             <div className="admin-topbar-spacer" />
 
-            {/* Global search */}
-            <div className="admin-search">
+            {/* Global search — opens the ⌘K palette */}
+            <button type="button" className="admin-search" onClick={() => setPaletteOpen(true)}
+                style={{ cursor: "text", textAlign: "left" }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
                 </svg>
-                <input placeholder="Search orders, products…" />
-                <kbd>⌘K</kbd>
-            </div>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--ac-ink-4)" }}>Search orders, products…</span>
+                <kbd>{modKey}K</kbd>
+            </button>
+            <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
             {/* Theme toggle */}
             <div className="ac-theme-toggle">

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { PosStatus } from '@/types/pos';
 import { toast } from '@/lib/toast';
+import { buildSearchClause, isMissingColumn, sanitiseTerm } from '@/lib/refSearch';
 
 type SessionRow = {
     id: string;
@@ -53,6 +54,8 @@ export default function POSHistoryPage() {
     const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [searchInput, setSearchInput] = useState('');
+    const [search, setSearch] = useState('');
     const [selected, setSelected] = useState<SessionRow | null>(null);
     const [cancelling, setCancelling] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -66,33 +69,56 @@ export default function POSHistoryPage() {
         staff: string,
         from_: string,
         to_: string,
+        term: string,
     ) => {
         setLoading(true);
         const isStaff = role === 'sales_staff';
         const from = (pageNum - 1) * PAGE_SIZE;
 
-        // Filters first: .range() returns a transform builder that has no .eq().
-        let filters = supabase
-            .from('pos_sessions')
-            .select(
-                'id, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by',
-                { count: 'exact' },
-            );
+        // Rebuilt per attempt: a PostgrestFilterBuilder mutates in place, so a
+        // retry that reused one builder would still carry the first attempt's
+        // or() clause and fail exactly the same way.
+        const buildQuery = (includeRef: boolean) => {
+            // Filters first: .range() returns a transform builder with no .eq().
+            let q = supabase
+                .from('pos_sessions')
+                .select(
+                    'id, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by',
+                    { count: 'exact' },
+                );
 
-        // The status filter belongs in the query, not in a client-side pass over
-        // the page — filtering after the fetch would only ever search the rows
-        // this page happened to contain.
-        if (tab !== 'all') filters = filters.eq('status', tab);
-        // Sales staff only ever see their own sales, so the staff picker is
-        // theirs by definition and is not offered to them.
-        if (isStaff) filters = filters.eq('created_by', userId);
-        else if (staff !== 'all') filters = filters.eq('created_by', staff);
-        if (from_) filters = filters.gte('created_at', dayStart(from_));
-        if (to_)   filters = filters.lte('created_at', dayEnd(to_));
+            // The status filter belongs in the query, not in a client-side pass
+            // over the page — filtering after the fetch would only ever search
+            // the rows this page happened to contain.
+            if (tab !== 'all') q = q.eq('status', tab);
+            // Sales staff only ever see their own sales, so the staff picker is
+            // theirs by definition and is not offered to them.
+            if (isStaff) q = q.eq('created_by', userId);
+            else if (staff !== 'all') q = q.eq('created_by', staff);
+            if (from_) q = q.gte('created_at', dayStart(from_));
+            if (to_)   q = q.lte('created_at', dayEnd(to_));
 
-        const { data: rows, count, error: fetchError } = await filters
-            .order('created_at', { ascending: false })
-            .range(from, from + PAGE_SIZE - 1);
+            // Searches the whole filtered set server-side, not the loaded page.
+            const searchTerm = sanitiseTerm(term);
+            if (searchTerm) {
+                q = q.or(buildSearchClause(
+                    searchTerm,
+                    ['customer_name', 'customer_email', 'customer_phone'],
+                    { includeRef },
+                ));
+            }
+
+            return q.order('created_at', { ascending: false }).range(from, from + PAGE_SIZE - 1);
+        };
+
+        // `ref` is the generated 8-char id prefix shown in the Ref column. A
+        // deploy can precede its migration, and naming a missing column fails
+        // the whole or(), so retry without it rather than losing search.
+        let { data: rows, count, error: fetchError } = await buildQuery(true);
+        if (isMissingColumn(fetchError, 'ref')) {
+            console.warn('[POSHistory] `ref` column missing — searching without it. Apply 20260821010000_searchable_display_refs.sql.');
+            ({ data: rows, count, error: fetchError } = await buildQuery(false));
+        }
 
         if (fetchError) {
             // Asking for a page past the end (rows cancelled or filtered away
@@ -149,18 +175,23 @@ export default function POSHistoryPage() {
     }, []);
 
     useEffect(() => {
+        const t = setTimeout(() => setSearch(searchInput), 300);
+        return () => clearTimeout(t);
+    }, [searchInput]);
+
+    useEffect(() => {
         if (!currentUserId || !userRole) return;
-        fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo);
-    }, [currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo, fetchSessions]);
+        fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo, search);
+    }, [currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo, search, fetchSessions]);
 
     // Any filter change invalidates the current page number — page 7 of the old
     // result set is meaningless against the new one.
-    useEffect(() => { setPage(1); }, [staffFilter, dateFrom, dateTo]);
+    useEffect(() => { setPage(1); }, [staffFilter, dateFrom, dateTo, search]);
 
     const refetch = () => {
-        if (currentUserId && userRole) fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo);
+        if (currentUserId && userRole) fetchSessions(currentUserId, userRole, filter, page, staffFilter, dateFrom, dateTo, search);
     };
-    const filtersActive = staffFilter !== 'all' || Boolean(dateFrom) || Boolean(dateTo);
+    const filtersActive = staffFilter !== 'all' || Boolean(dateFrom) || Boolean(dateTo) || Boolean(search.trim());
     const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
     const handleCancel = async (sessionId: string) => {
@@ -213,6 +244,12 @@ export default function POSHistoryPage() {
 
             {/* Staff + date filters — all applied server-side alongside the tab */}
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginBottom: 20 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="pos-search">Search</label>
+                    <input id="pos-search" type="search" className="ac-input" style={{ minWidth: 260 }}
+                        placeholder="Ref, name, email or phone…"
+                        value={searchInput} onChange={e => setSearchInput(e.target.value)} />
+                </div>
                 {userRole !== 'sales_staff' && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         <label className="ac-label" htmlFor="pos-staff-filter">Staff</label>
@@ -239,7 +276,7 @@ export default function POSHistoryPage() {
                 </div>
                 {filtersActive && (
                     <button type="button" className="ac-btn ac-btn-ghost ac-btn-sm"
-                        onClick={() => { setStaffFilter('all'); setDateFrom(''); setDateTo(''); }}>
+                        onClick={() => { setStaffFilter('all'); setDateFrom(''); setDateTo(''); setSearchInput(''); setSearch(''); }}>
                         Clear filters
                     </button>
                 )}

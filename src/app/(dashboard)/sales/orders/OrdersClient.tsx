@@ -483,7 +483,7 @@ export function OrdersClient({
                             type="text"
                             value={search}
                             onChange={e => onSearchChange(e.target.value)}
-                            placeholder="Search name, email, phone or reference"
+                            placeholder="Search order ref, name, email, phone…"
                             className="ac-input-line"
                             style={{ width: 260, fontSize: 11 }}
                         />

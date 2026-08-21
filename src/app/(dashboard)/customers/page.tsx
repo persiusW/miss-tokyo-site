@@ -77,13 +77,22 @@ export default function CustomersPage() {
     const [exporting, setExporting] = useState(false);
     const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
+    const [sourceFilter, setSourceFilter] = useState<"all" | Source>("all");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
 
     useEffect(() => {
         const t = setTimeout(() => setSearch(searchInput), 300);
         return () => clearTimeout(t);
     }, [searchInput]);
 
-    const fetchContacts = useCallback(async (pageNum: number, term: string) => {
+    const fetchContacts = useCallback(async (
+        pageNum: number,
+        term: string,
+        source: "all" | Source,
+        from_: string,
+        to_: string,
+    ) => {
         setLoading(true);
         const from = (pageNum - 1) * PAGE_SIZE;
         try {
@@ -96,6 +105,9 @@ export default function CustomersPage() {
                 .from("contact_directory")
                 .select("id, name, email, phone, source, created_at, is_manual", { count: "exact" });
             query = applySearch(query, term);
+            if (source !== "all") query = query.eq("source", source);
+            if (from_) query = query.gte("created_at", new Date(`${from_}T00:00:00`).toISOString());
+            if (to_)   query = query.lte("created_at", new Date(`${to_}T23:59:59.999`).toISOString());
 
             const { data, count, error } = await query
                 .order("created_at", { ascending: false })
@@ -121,12 +133,15 @@ export default function CustomersPage() {
         }
     }, []);
 
-    useEffect(() => { fetchContacts(page, search); }, [fetchContacts, page, search]);
+    useEffect(() => {
+        fetchContacts(page, search, sourceFilter, dateFrom, dateTo);
+    }, [fetchContacts, page, search, sourceFilter, dateFrom, dateTo]);
 
-    // A new search invalidates the page number the old result set produced.
-    useEffect(() => { setPage(1); }, [search]);
+    // A new search or filter invalidates the page the old result set produced.
+    useEffect(() => { setPage(1); }, [search, sourceFilter, dateFrom, dateTo]);
 
     const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+    const filtersActive = Boolean(search.trim()) || sourceFilter !== "all" || Boolean(dateFrom) || Boolean(dateTo);
 
     // --- Selection helpers ---
     const allIds = contacts.map(c => c.id);
@@ -166,7 +181,7 @@ export default function CustomersPage() {
             setAddForm({ name: "", email: "", phone: "" });
             setShowAddModal(false);
             toast.success("Contact added.");
-            fetchContacts(page, search);
+            fetchContacts(page, search, sourceFilter, dateFrom, dateTo);
         }
     };
 
@@ -180,6 +195,9 @@ export default function CustomersPage() {
                     .from("contact_directory")
                     .select("id, name, email, phone, source, created_at, is_manual");
                 q = applySearch(q, search);
+                if (sourceFilter !== "all") q = q.eq("source", sourceFilter);
+                if (dateFrom) q = q.gte("created_at", new Date(`${dateFrom}T00:00:00`).toISOString());
+                if (dateTo)   q = q.lte("created_at", new Date(`${dateTo}T23:59:59.999`).toISOString());
                 const { data, error } = await q
                     .order("created_at", { ascending: false })
                     .range(offset, offset + EXPORT_CHUNK - 1);
@@ -188,7 +206,8 @@ export default function CustomersPage() {
                 all.push(...batch);
                 if (batch.length < EXPORT_CHUNK) break;
             }
-            const suffix = search.trim() ? "-filtered" : "";
+            const narrowed = Boolean(search.trim()) || sourceFilter !== "all" || Boolean(dateFrom) || Boolean(dateTo);
+            const suffix = narrowed ? "-filtered" : "";
             downloadCSV(all, `miss-tokyo-contacts${suffix}-${new Date().toISOString().slice(0, 10)}.csv`);
             toast.success(`Exported ${all.length.toLocaleString()} contact${all.length !== 1 ? "s" : ""}.`);
         } catch (err: any) {
@@ -227,7 +246,7 @@ export default function CustomersPage() {
             toast.success(`${manualIds.length} contact(s) deleted.`);
         }
 
-        fetchContacts(page, search);
+        fetchContacts(page, search, sourceFilter, dateFrom, dateTo);
     };
 
     const SOURCE_CLASS: Record<Source, string> = {
@@ -252,7 +271,7 @@ export default function CustomersPage() {
                     <button className="ac-btn ac-btn-ghost" type="button"
                         onClick={handleExportAll} disabled={exporting}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M12 4v12"/><path d="m6 10 6 6 6-6"/><path d="M4 20h16"/></svg>
-                        {exporting ? "Exporting…" : (search.trim() ? "Export Matches" : "Export All")}
+                        {exporting ? "Exporting…" : (filtersActive ? "Export Matches" : "Export All")}
                     </button>
                     <button className="ac-btn ac-btn-primary" type="button" onClick={() => setShowAddModal(true)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -261,18 +280,49 @@ export default function CustomersPage() {
                 </div>
             </div>
 
-            {/* Search — queries the whole directory, not the current page */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                <input
-                    type="search"
-                    className="ac-input"
-                    style={{ maxWidth: 340 }}
-                    placeholder="Search name, email or phone…"
-                    value={searchInput}
-                    onChange={e => setSearchInput(e.target.value)}
-                />
-                {search.trim() && !loading && (
-                    <span style={{ fontSize: 11, color: "var(--ac-ink-3)" }}>
+            {/* Search + filters — every one queries the whole directory, never the page */}
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginBottom: 16 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="contact-search">Search</label>
+                    <input
+                        id="contact-search"
+                        type="search"
+                        className="ac-input"
+                        style={{ minWidth: 280 }}
+                        placeholder="Search name, email or phone…"
+                        value={searchInput}
+                        onChange={e => setSearchInput(e.target.value)}
+                    />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="contact-source">Source</label>
+                    <select id="contact-source" className="ac-input" style={{ minWidth: 170 }}
+                        value={sourceFilter} onChange={e => setSourceFilter(e.target.value as "all" | Source)}>
+                        <option value="all">All sources</option>
+                        <option value="order">Order</option>
+                        <option value="custom_request">Custom Request</option>
+                        <option value="newsletter">Newsletter</option>
+                        <option value="manual">Manual</option>
+                    </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="contact-from">Added from</label>
+                    <input id="contact-from" type="date" className="ac-input" style={{ minWidth: 150 }}
+                        value={dateFrom} max={dateTo || undefined} onChange={e => setDateFrom(e.target.value)} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="contact-to">Added to</label>
+                    <input id="contact-to" type="date" className="ac-input" style={{ minWidth: 150 }}
+                        value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)} />
+                </div>
+                {filtersActive && (
+                    <button type="button" className="ac-btn ac-btn-ghost ac-btn-sm"
+                        onClick={() => { setSearchInput(""); setSearch(""); setSourceFilter("all"); setDateFrom(""); setDateTo(""); }}>
+                        Clear filters
+                    </button>
+                )}
+                {filtersActive && !loading && (
+                    <span style={{ fontSize: 11, color: "var(--ac-ink-3)", paddingBottom: 9 }}>
                         {totalCount.toLocaleString()} match{totalCount !== 1 ? "es" : ""} across all contacts
                     </span>
                 )}
@@ -312,7 +362,7 @@ export default function CustomersPage() {
                                 <tr><td colSpan={6} className="ac-table-empty">Aggregating clientele data…</td></tr>
                             ) : contacts.length === 0 ? (
                                 <tr><td colSpan={6} className="ac-table-empty">
-                                    {search.trim() ? `No contacts match “${search.trim()}”.` : "No contacts found."}
+                                    {filtersActive ? "No contacts match these filters." : "No contacts found."}
                                 </td></tr>
                             ) : contacts.map((contact) => (
                                 <tr

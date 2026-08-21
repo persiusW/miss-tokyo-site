@@ -39,9 +39,11 @@ type ProductsClientProps = {
     page: number;
     pageSize: number;
     query: string;
+    status: string;
+    stock: string;
 };
 
-export default function ProductsClient({ initialProducts, totalCount, page, pageSize, query }: ProductsClientProps) {
+export default function ProductsClient({ initialProducts, totalCount, page, pageSize, query, status, stock }: ProductsClientProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -63,17 +65,21 @@ export default function ProductsClient({ initialProducts, totalCount, page, page
     // Re-fetch the current page from the server (after mutations)
     const fetchProducts = useCallback(() => { router.refresh(); }, [router]);
 
-    const buildUrl = (next: { q?: string; page?: number }) => {
+    const buildUrl = (next: { q?: string; page?: number; status?: string; stock?: string }) => {
         const params = new URLSearchParams();
         const q = next.q ?? searchQuery;
         const p = next.page ?? 1;
+        const st = next.status ?? status;
+        const sk = next.stock ?? stock;
         if (q.trim()) params.set("q", q.trim());
+        if (st && st !== "all") params.set("status", st);
+        if (sk && sk !== "all") params.set("stock", sk);
         if (p > 1) params.set("page", String(p));
         const qs = params.toString();
         return `/catalog/products${qs ? `?${qs}` : ""}`;
     };
 
-    const navigate = (next: { q?: string; page?: number }) => {
+    const navigate = (next: { q?: string; page?: number; status?: string; stock?: string }) => {
         startTransition(() => router.push(buildUrl(next)));
     };
 
@@ -290,6 +296,35 @@ export default function ProductsClient({ initialProducts, totalCount, page, page
             )}
 
             <div className="ac-card flush">
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginBottom: 20 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="product-status">Status</label>
+                    <select id="product-status" className="ac-input" style={{ minWidth: 160 }}
+                        value={status} onChange={e => navigate({ status: e.target.value, page: 1 })}>
+                        <option value="all">All products</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="preorder">Pre-order</option>
+                    </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label className="ac-label" htmlFor="product-stock">Stock</label>
+                    <select id="product-stock" className="ac-input" style={{ minWidth: 160 }}
+                        value={stock} onChange={e => navigate({ stock: e.target.value, page: 1 })}>
+                        <option value="all">Any stock level</option>
+                        <option value="in">In stock</option>
+                        <option value="low">Low stock</option>
+                        <option value="out">Out of stock</option>
+                    </select>
+                </div>
+                {(status !== "all" || stock !== "all" || query.trim()) && (
+                    <button type="button" className="ac-btn ac-btn-ghost ac-btn-sm"
+                        onClick={() => { setSearchQuery(""); navigate({ q: "", status: "all", stock: "all", page: 1 }); }}>
+                        Clear filters
+                    </button>
+                )}
+            </div>
+
                 <div className="ac-table-wrap">
                 <table className="ac-table">
                     <thead>
