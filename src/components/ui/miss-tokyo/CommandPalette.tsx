@@ -231,7 +231,10 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
                                         key={r.id}
                                         data-idx={idx}
                                         type="button"
-                                        onMouseEnter={() => setActive(idx)}
+                                        // onMouseMove, not onMouseEnter: a row rendering
+                                        // under a stationary cursor would otherwise steal
+                                        // the selection from the keyboard.
+                                        onMouseMove={() => setActive(idx)}
                                         onClick={() => go(r)}
                                         style={{
                                             display: "block", width: "100%", textAlign: "left",

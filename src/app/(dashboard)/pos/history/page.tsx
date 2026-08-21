@@ -75,42 +75,49 @@ export default function POSHistoryPage() {
         const isStaff = role === 'sales_staff';
         const from = (pageNum - 1) * PAGE_SIZE;
 
-        // Filters first: .range() returns a transform builder that has no .eq().
-        let filters = supabase
-            .from('pos_sessions')
-            .select(
-                'id, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by',
-                { count: 'exact' },
-            );
+        // Rebuilt per attempt: a PostgrestFilterBuilder mutates in place, so a
+        // retry that reused one builder would still carry the first attempt's
+        // or() clause and fail exactly the same way.
+        const buildQuery = (includeRef: boolean) => {
+            // Filters first: .range() returns a transform builder with no .eq().
+            let q = supabase
+                .from('pos_sessions')
+                .select(
+                    'id, customer_name, customer_email, customer_phone, total_amount, status, items, notes, expires_at, paid_at, created_at, paystack_reference, order_id, created_by',
+                    { count: 'exact' },
+                );
 
-        // The status filter belongs in the query, not in a client-side pass over
-        // the page — filtering after the fetch would only ever search the rows
-        // this page happened to contain.
-        if (tab !== 'all') filters = filters.eq('status', tab);
-        // Sales staff only ever see their own sales, so the staff picker is
-        // theirs by definition and is not offered to them.
-        if (isStaff) filters = filters.eq('created_by', userId);
-        else if (staff !== 'all') filters = filters.eq('created_by', staff);
-        if (from_) filters = filters.gte('created_at', dayStart(from_));
-        if (to_)   filters = filters.lte('created_at', dayEnd(to_));
+            // The status filter belongs in the query, not in a client-side pass
+            // over the page — filtering after the fetch would only ever search
+            // the rows this page happened to contain.
+            if (tab !== 'all') q = q.eq('status', tab);
+            // Sales staff only ever see their own sales, so the staff picker is
+            // theirs by definition and is not offered to them.
+            if (isStaff) q = q.eq('created_by', userId);
+            else if (staff !== 'all') q = q.eq('created_by', staff);
+            if (from_) q = q.gte('created_at', dayStart(from_));
+            if (to_)   q = q.lte('created_at', dayEnd(to_));
 
-        // Searches the whole filtered set server-side, not the loaded page.
-        // `ref` is the generated 8-char id prefix shown in the Ref column; a
-        // deploy can precede its migration, and naming a missing column fails
-        // the whole or(), so fall back to searching without it.
-        const q = sanitiseTerm(term);
-        const textCols = ['customer_name', 'customer_email', 'customer_phone'];
-        const run = (includeRef: boolean) => {
-            const withSearch = q ? filters.or(buildSearchClause(q, textCols, { includeRef })) : filters;
-            return withSearch
-                .order('created_at', { ascending: false })
-                .range(from, from + PAGE_SIZE - 1);
+            // Searches the whole filtered set server-side, not the loaded page.
+            const searchTerm = sanitiseTerm(term);
+            if (searchTerm) {
+                q = q.or(buildSearchClause(
+                    searchTerm,
+                    ['customer_name', 'customer_email', 'customer_phone'],
+                    { includeRef },
+                ));
+            }
+
+            return q.order('created_at', { ascending: false }).range(from, from + PAGE_SIZE - 1);
         };
 
-        let { data: rows, count, error: fetchError } = await run(true);
-        if (q && isMissingColumn(fetchError, 'ref')) {
+        // `ref` is the generated 8-char id prefix shown in the Ref column. A
+        // deploy can precede its migration, and naming a missing column fails
+        // the whole or(), so retry without it rather than losing search.
+        let { data: rows, count, error: fetchError } = await buildQuery(true);
+        if (isMissingColumn(fetchError, 'ref')) {
             console.warn('[POSHistory] `ref` column missing — searching without it. Apply 20260821010000_searchable_display_refs.sql.');
-            ({ data: rows, count, error: fetchError } = await run(false));
+            ({ data: rows, count, error: fetchError } = await buildQuery(false));
         }
 
         if (fetchError) {
