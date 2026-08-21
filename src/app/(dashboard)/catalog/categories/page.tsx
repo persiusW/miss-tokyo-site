@@ -90,6 +90,7 @@ export default function CategoriesPage() {
     const [editPreorderWeeks, setEditPreorderWeeks] = useState("");
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [search, setSearch] = useState("");
+    const [visibility, setVisibility] = useState<"all" | "active" | "inactive" | "featured" | "wholesale" | "preorder">("all");
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
     const fetchCategories = async () => {
@@ -315,6 +316,15 @@ export default function CategoriesPage() {
                             style={{ paddingLeft: 32, width: 200 }}
                         />
                     </div>
+                    <select className="ac-input" style={{ minWidth: 150 }}
+                        value={visibility} onChange={e => setVisibility(e.target.value as typeof visibility)}>
+                        <option value="all">All categories</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="featured">Featured</option>
+                        <option value="wholesale">Wholesale</option>
+                        <option value="preorder">Pre-order</option>
+                    </select>
                     {/* View toggle */}
                     <div style={{ display: "flex", border: "1px solid var(--ac-line)", borderRadius: "var(--r-sm)", overflow: "hidden" }}>
                         <button
@@ -428,10 +438,23 @@ export default function CategoriesPage() {
             )}
 
             {(() => {
+                // The full set is loaded (36 categories today, and reordering
+                // needs them all), so filtering here still searches everything —
+                // unlike a paginated list, where it would only see one page.
                 const q = search.trim().toLowerCase();
-                const filtered = q
-                    ? categories.filter(c => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q) || (c.description ?? "").toLowerCase().includes(q))
-                    : categories;
+                const filtered = categories.filter(c => {
+                    if (q && !(
+                        c.name.toLowerCase().includes(q) ||
+                        c.slug.toLowerCase().includes(q) ||
+                        (c.description ?? "").toLowerCase().includes(q)
+                    )) return false;
+                    if (visibility === "active")    return c.is_active !== false;
+                    if (visibility === "inactive")  return c.is_active === false;
+                    if (visibility === "featured")  return Boolean(c.is_featured);
+                    if (visibility === "wholesale") return Boolean(c.is_wholesale);
+                    if (visibility === "preorder")  return Boolean(c.preorder_enabled);
+                    return true;
+                });
 
                 if (loading) return (
                     <div className="ac-card"><div className="ac-empty"><div className="ac-empty-title">Loading…</div></div></div>
