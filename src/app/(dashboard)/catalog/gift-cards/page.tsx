@@ -51,6 +51,8 @@ const EMPTY_FORM: IssueForm = {
 
 const PRESET_VALUES = [50, 100, 200, 300, 500];
 
+const PAGE_SIZE = 50;
+
 const STATUS_BADGE: Record<string, string> = {
     active:          "ac-badge-ok",
     redeemed:        "ac-badge-inactive",
@@ -71,6 +73,9 @@ export default function GiftCardsPage() {
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState("");
     const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [page, setPage] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
 
     const [showIssueModal, setShowIssueModal] = useState(false);
     const [form, setForm] = useState<IssueForm>(EMPTY_FORM);
@@ -84,15 +89,22 @@ export default function GiftCardsPage() {
 
     const fetchCards = useCallback(async () => {
         setLoading(true);
-        let q = supabase.from("gift_cards").select("*").order("created_at", { ascending: false });
+        const from = (page - 1) * PAGE_SIZE;
+        // Filters before range(): a transform builder has no .eq()/.or().
+        let q = supabase.from("gift_cards").select("*", { count: "exact" });
         if (statusFilter) q = q.eq("status", statusFilter);
-        if (search) {
-            q = q.or(`code.ilike.%${search}%,recipient_email.ilike.%${search}%,purchased_by_email.ilike.%${search}%`);
+        const term = debouncedSearch.trim().replace(/[%,()]/g, "");
+        if (term) {
+            q = q.or(`code.ilike.%${term}%,recipient_email.ilike.%${term}%,purchased_by_email.ilike.%${term}%`);
         }
-        const { data } = await q;
+        const { data, count, error } = await q
+            .order("created_at", { ascending: false })
+            .range(from, from + PAGE_SIZE - 1);
+        if (error?.code === "PGRST103" && page > 1) { setPage(1); return; }
         if (data) setCards(data);
+        setTotalCount(count ?? 0);
         setLoading(false);
-    }, [statusFilter, search]);
+    }, [statusFilter, debouncedSearch, page]);
 
     const fetchStats = useCallback(async () => {
         const { data: all } = await supabase
@@ -108,6 +120,13 @@ export default function GiftCardsPage() {
             redeemedMonth: all.filter(c => c.status === "redeemed" && new Date(c.created_at) >= monthStart).length,
         });
     }, []);
+
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(search), 300);
+        return () => clearTimeout(t);
+    }, [search]);
+
+    useEffect(() => { setPage(1); }, [statusFilter, debouncedSearch]);
 
     useEffect(() => { fetchCards(); }, [fetchCards]);
     useEffect(() => { fetchStats(); }, [fetchStats]);
@@ -276,6 +295,17 @@ export default function GiftCardsPage() {
                         </tbody>
                     </table>
                 </div>
+                {Math.ceil(totalCount / PAGE_SIZE) > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderTop: "1px solid var(--ac-line)" }}>
+                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>
+                            Page {page} of {Math.ceil(totalCount / PAGE_SIZE)} · {totalCount} card{totalCount !== 1 ? "s" : ""}
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading} className="ac-btn ac-btn-ghost ac-btn-sm">Prev</button>
+                            <button type="button" onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(totalCount / PAGE_SIZE) || loading} className="ac-btn ac-btn-ghost ac-btn-sm">Next</button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* ── Issue Modal ─────────────────────────────────────────────── */}
