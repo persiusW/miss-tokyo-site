@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/abandoned-cart",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-stock",
+      "schedule": "0 3 * * *"
     }
   ]
 }
