@@ -4,7 +4,7 @@
 // or product_variants.inventory_count directly in route handlers.
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { normAttr } from "@/lib/utils/normAttr";
+import { normAttr, variantKey, hasVariantAttrs } from "@/lib/utils/normAttr";
 
 export type ReserveItem = {
     productId: string;
@@ -99,7 +99,7 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
                 .in("product_id", variantTrackedIds);
 
             for (const v of variants ?? []) {
-                const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+                const key = variantKey(v.product_id, v);
                 variantStockMap[key] = (v as any).inventory_count ?? 0;
                 variantIdMap[key] = (v as any).id;
             }
@@ -110,8 +110,8 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
     // green-lights stock another in-flight order already holds, and the buyer
     // only discovers it when reservation fails at payment time.
     const resolve = (item: ReserveItem, product: any) => {
-        const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
-        return product.track_variant_inventory && item.size ? (variantIdMap[key] ?? null) : null;
+        const key = variantKey(item.productId, item);
+        return product.track_variant_inventory && hasVariantAttrs(item) ? (variantIdMap[key] ?? null) : null;
     };
     const netAvailable = await availabilityMap(
         items
@@ -127,8 +127,8 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
         }
         if (product.preorder_enabled) continue;
 
-        const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
-        const rawStock = product.track_variant_inventory && item.size
+        const key = variantKey(item.productId, item);
+        const rawStock = product.track_variant_inventory && hasVariantAttrs(item)
             ? (variantStockMap[key] ?? 0)
             : (product.inventory_count ?? 0);
 
@@ -184,16 +184,16 @@ export async function getStockStatus(
             .in("product_id", variantTrackedIds);
 
         for (const v of variants ?? []) {
-            const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+            const key = variantKey(v.product_id, v);
             variantStockMap[key] = (v as any).inventory_count ?? 0;
             variantIdMap[key] = (v as any).id;
         }
     }
 
     const keyFor = (item: ReserveItem) =>
-        `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
+        variantKey(item.productId, item);
     const resolve = (item: ReserveItem, product: any) =>
-        product?.track_variant_inventory && item.size ? (variantIdMap[keyFor(item)] ?? null) : null;
+        product?.track_variant_inventory && hasVariantAttrs(item) ? (variantIdMap[keyFor(item)] ?? null) : null;
 
     // Same netting as checkStock — the cart drawer and PDP must not advertise
     // units that are already held by an in-flight order.
@@ -216,7 +216,7 @@ export async function getStockStatus(
             return { productId: item.productId, variantId: item.variantId, available: 0, isActive: false, preorderEnabled: false };
         }
 
-        const rawAvailable = product.track_variant_inventory && item.size
+        const rawAvailable = product.track_variant_inventory && hasVariantAttrs(item)
             ? (variantStockMap[keyFor(item)] ?? 0)
             : (product.inventory_count ?? 0);
 
@@ -465,7 +465,7 @@ export async function fallbackDecrementFromItems(
             .select("id, product_id, size, color, brand")
             .in("product_id", [...variantTrackedPIds]);
         for (const v of variants ?? []) {
-            const k = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+            const k = variantKey(v.product_id, v);
             variantIdLookup[k] = v.id;
         }
     }
@@ -476,7 +476,7 @@ export async function fallbackDecrementFromItems(
         const qty = item.quantity ?? 1;
 
         if (product.track_variant_inventory) {
-            const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
+            const lookupKey = variantKey(item.productId, item);
             const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
             await decrementStock(item.productId, resolvedVariantId, qty);
         } else {
