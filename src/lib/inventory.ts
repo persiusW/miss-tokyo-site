@@ -25,7 +25,30 @@ export type StockStatus = {
 
 export type StockCheckResult =
     | { ok: true }
-    | { ok: false; code: "INSUFFICIENT_STOCK" | "PRODUCT_UNAVAILABLE"; item: string; available: number };
+    | { ok: false; code: "INSUFFICIENT_STOCK" | "PRODUCT_UNAVAILABLE" | "VARIANT_UNAVAILABLE"; item: string; available: number };
+
+/**
+ * Whether a line on a variant-tracked product actually points at a variant row.
+ *
+ * This is the check that was missing, and it is the whole oversell. When the
+ * lookup missed, `resolve()` returned null, the availability key collapsed to
+ * product level, and fn_combined_available_stock handed back the product
+ * roll-up — every colour's stock pooled into one number. A line for a colour
+ * with no variant row at all read as fully in stock, reserved against the
+ * roll-up, and decremented the roll-up alone.
+ *
+ * 109 paid lines went through that path. A variant-tracked product must resolve
+ * to a row or be refused; there is no safe fallback to the roll-up, because the
+ * roll-up is the sum of colours the customer is not buying.
+ */
+function variantResolutionFailed(
+    item: { size?: string; color?: string; brand?: string },
+    product: { track_variant_inventory?: boolean } | undefined,
+    resolvedVariantId: string | null,
+): boolean {
+    if (!product?.track_variant_inventory) return false;
+    return resolvedVariantId === null;
+}
 
 /**
  * The single sanctioned way to reduce stock.
@@ -43,6 +66,110 @@ async function decrementStock(productId: string, variantId: string | null, quant
         p_quantity: quantity,
     });
     if (error) console.error("[inventory] fn_decrement_stock failed:", error.message, { productId, variantId, quantity });
+}
+
+/** One settlement line, in the shape the ledger functions expect. */
+export type SaleLine = { product_id: string; variant_id: string | null; quantity: number };
+
+/**
+ * Records a settlement in the stock ledger.
+ *
+ * Keyed on (order, product, variant), so the two callers that can both settle
+ * one payment — the webhook and the verify route — write the same keys and the
+ * second one is suppressed instead of taking the stock twice. That race used to
+ * be invisible: the webhook's idempotency check was a plain read while verify's
+ * was an atomic claim, so both could pass, and the duplicate decrement looked
+ * exactly like a second sale.
+ *
+ * Throws on failure. A throw is now safe to let through: the caller retries,
+ * finds the reservation gone, falls back to the order items, and produces the
+ * same keys — so the retry settles correctly instead of double-counting.
+ */
+async function recordSale(orderId: string, lines: SaleLine[]): Promise<number> {
+    const items = lines.filter(l => l.product_id && (l.quantity ?? 0) > 0);
+    if (!items.length) return 0;
+
+    const { data, error } = await supabaseAdmin.rpc("fn_record_sale", {
+        p_order_id: orderId,
+        p_items: items,
+    });
+
+    if (error) {
+        // Deploy ordering must never cost a decrement. If this build reaches
+        // production ahead of its migration the function is simply absent, and
+        // throwing here would stop every settlement from taking stock down —
+        // the exact failure this whole change exists to end. Fall back to the
+        // per-line decrement the previous release used.
+        if (isMissingFunction(error)) {
+            console.warn("[inventory] fn_record_sale missing — run the stock ledger migration. Decrementing without it.", { orderId });
+            await Promise.allSettled(
+                items.map(l => decrementStock(l.product_id, l.variant_id, l.quantity)),
+            );
+            return items.length;
+        }
+        console.error("[inventory] fn_record_sale failed:", error.message, { orderId });
+        throw new Error(error.message);
+    }
+    return Number(data) || 0;
+}
+
+/**
+ * Whether a PostgREST error means the RPC does not exist yet.
+ * PGRST202 is "no function matches"; 42883 is Postgres' undefined_function.
+ */
+function isMissingFunction(error: { code?: string; message?: string } | null): boolean {
+    if (!error) return false;
+    return error.code === "PGRST202"
+        || error.code === "42883"
+        || /could not find the function|does not exist/i.test(error.message ?? "");
+}
+
+/**
+ * Resolves cart/order lines to current variant IDs by (size, colour, brand).
+ *
+ * Stored lines carry the attributes the customer chose, not a variant UUID —
+ * and any UUID they do carry goes stale the moment a product re-save recreates
+ * its variant rows. 265 paid lines in production point at variant IDs that no
+ * longer exist. Matching on attributes through variantKey is the durable route;
+ * the stored UUID is only a last resort.
+ */
+async function resolveSaleLines(
+    items: Array<{ productId: string; size?: string; color?: string; brand?: string; variantId?: string | null; quantity?: number }>,
+): Promise<SaleLine[]> {
+    const pIds = [...new Set(items.map(i => i.productId).filter(Boolean))];
+    if (!pIds.length) return [];
+
+    const { data: products } = await supabaseAdmin
+        .from("products")
+        .select("id, track_inventory, track_variant_inventory")
+        .in("id", pIds);
+    const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
+
+    const variantTracked = new Set<string>(
+        (products ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string),
+    );
+
+    const lookup: Record<string, string> = {};
+    if (variantTracked.size > 0) {
+        const { data: variants } = await supabaseAdmin
+            .from("product_variants")
+            .select("id, product_id, size, color, brand")
+            .in("product_id", [...variantTracked]);
+        for (const v of variants ?? []) lookup[variantKey(v.product_id, v)] = v.id;
+    }
+
+    const out: SaleLine[] = [];
+    for (const item of items) {
+        const product = productMap.get(item.productId) as any;
+        if (!product || product.track_inventory === false) continue;
+
+        const variantId = product.track_variant_inventory
+            ? (lookup[variantKey(item.productId, item)] ?? item.variantId ?? null)
+            : null;
+
+        out.push({ product_id: item.productId, variant_id: variantId, quantity: item.quantity ?? 1 });
+    }
+    return out;
 }
 
 /**
@@ -128,6 +255,16 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
         if (product.preorder_enabled) continue;
 
         const key = variantKey(item.productId, item);
+        const resolvedVariantId = resolve(item, product);
+
+        // A variant-tracked line that reaches no variant row is refused rather
+        // than quietly falling through to the product roll-up. The roll-up is
+        // every colour added together, so that fallback sold colours that had
+        // no stock — and colours that had no row at all.
+        if (variantResolutionFailed(item, product, resolvedVariantId)) {
+            return { ok: false, code: "VARIANT_UNAVAILABLE", item: item.productId, available: 0 };
+        }
+
         const rawStock = product.track_variant_inventory && hasVariantAttrs(item)
             ? (variantStockMap[key] ?? 0)
             : (product.inventory_count ?? 0);
@@ -135,7 +272,7 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
         // 9999 is the "not tracked" sentinel — never gate on it
         if (rawStock === 9999) continue;
 
-        const netKey = `${item.productId}|${resolve(item, product) ?? "null"}`;
+        const netKey = `${item.productId}|${resolvedVariantId ?? "null"}`;
         const stock = netAvailable?.get(netKey) ?? rawStock;
 
         if (item.quantity > stock) {
@@ -216,11 +353,31 @@ export async function getStockStatus(
             return { productId: item.productId, variantId: item.variantId, available: 0, isActive: false, preorderEnabled: false };
         }
 
+        const resolvedVariantId = resolve(item, product);
+
+        // Explicit rather than incidental. This used to come out at zero only
+        // because the raw variant lookup missed and Math.min clamped it — while
+        // the availability map underneath was quietly reporting the product
+        // roll-up for the very same line. Refusing here states the rule the
+        // reservation function now enforces: a variant-tracked line that names
+        // no variant row has no stock, and the roll-up is not a stand-in.
+        if (variantResolutionFailed(item, product, resolvedVariantId)) {
+            console.warn("[inventory] variant unresolved — reporting sold out", {
+                productId: item.productId, size: item.size, color: item.color, brand: item.brand,
+            });
+            return {
+                productId: item.productId,
+                variantId: item.variantId ?? null,
+                available: 0,
+                isActive: product.is_active ?? true,
+                preorderEnabled: product.preorder_enabled ?? false,
+            };
+        }
+
         const rawAvailable = product.track_variant_inventory && hasVariantAttrs(item)
             ? (variantStockMap[keyFor(item)] ?? 0)
             : (product.inventory_count ?? 0);
 
-        const resolvedVariantId = resolve(item, product);
         const mapKey = `${item.productId}|${resolvedVariantId ?? "null"}`;
         const net = rawAvailable === 9999
             ? rawAvailable
@@ -333,13 +490,17 @@ export async function confirmSale(orderId: string): Promise<boolean> {
         console.warn(`[confirmSale] Late webhook for order ${orderId}: reservation expired but payment confirmed — processing sale`);
     }
 
-    // One atomic call per reservation row. fn_decrement_stock takes the variant
-    // down (when present) and the product-level count together, so the two can
-    // never drift apart.
-    await Promise.all(
-        (reservations as any[]).map(r =>
-            decrementStock(r.product_id, r.variant_id ?? null, r.quantity),
-        ),
+    // Through the ledger, keyed on (order, product, variant). The reservation
+    // rows already carry resolved variant IDs, so these are the authoritative
+    // keys — a later fallback for the same order recomputes them identically
+    // and is suppressed rather than decrementing a second time.
+    await recordSale(
+        orderId,
+        (reservations as any[]).map(r => ({
+            product_id: r.product_id,
+            variant_id: r.variant_id ?? null,
+            quantity: r.quantity,
+        })),
     );
 
     return true;
@@ -441,48 +602,107 @@ export async function releaseSupersededAttempts(opts: {
  * online checkout fallbacks — keeps inventory writes inside this file.
  */
 export async function fallbackDecrementFromItems(
+    orderId: string | null,
     items: Array<{ productId: string; size?: string; color?: string; brand?: string; variantId?: string | null; quantity?: number }>,
 ): Promise<void> {
     if (!items?.length) return;
 
-    const pIds = [...new Set(items.map(i => i.productId).filter(Boolean))];
-    if (pIds.length === 0) return;
+    const lines = await resolveSaleLines(items);
+    if (!lines.length) return;
 
-    const { data: products } = await supabaseAdmin
-        .from("products")
-        .select("id, inventory_count, track_inventory, track_variant_inventory")
-        .in("id", pIds);
-    const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
-
-    const variantTrackedPIds = new Set<string>(
-        (products ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
-    );
-
-    const variantIdLookup: Record<string, string> = {};
-    if (variantTrackedPIds.size > 0) {
-        const { data: variants } = await supabaseAdmin
-            .from("product_variants")
-            .select("id, product_id, size, color, brand")
-            .in("product_id", [...variantTrackedPIds]);
-        for (const v of variants ?? []) {
-            const k = variantKey(v.product_id, v);
-            variantIdLookup[k] = v.id;
-        }
+    // With an order id this goes through the ledger under the same keys
+    // confirmSale would have used, so the webhook and the verify route can both
+    // reach here for one payment and only the first takes the stock.
+    if (orderId) {
+        await recordSale(orderId, lines);
+        return;
     }
 
-    await Promise.allSettled(items.map(async (item) => {
-        const product = productMap.get(item.productId) as any;
-        if (!product || product.track_inventory === false) return;
-        const qty = item.quantity ?? 1;
+    // No order context — the legacy single-product charge. Nothing to key on,
+    // so this stays an unguarded decrement, recorded as such in the ledger.
+    await Promise.allSettled(
+        lines.map(l => decrementStock(l.product_id, l.variant_id, l.quantity)),
+    );
+}
 
-        if (product.track_variant_inventory) {
-            const lookupKey = variantKey(item.productId, item);
-            const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
-            await decrementStock(item.productId, resolvedVariantId, qty);
-        } else {
-            await decrementStock(item.productId, null, qty);
+/**
+ * Brings an order's stock position in line with what its status says.
+ *
+ * Cancelling or refunding a paid order used to leave its stock taken forever —
+ * there was no restock path anywhere in the codebase, and none could be written
+ * safely, because without a ledger nothing could tell a cancelled-after-payment
+ * order from one abandoned before payment. 555 cancelled and 13 refunded orders
+ * accumulated that way.
+ *
+ * The ledger answers that question directly, so this is now a comparison rather
+ * than a guess: it reads what this order actually took and writes only the
+ * difference. Idempotent by construction — clicking Refund twice, or a status
+ * flipping back and forth, converges instead of compounding.
+ *
+ * `shouldHold` is true while the order legitimately holds stock (paid and not
+ * cancelled), false once it has given it back.
+ */
+export async function syncOrderStockPosition(
+    orderId: string,
+    items: Array<{ productId: string; size?: string; color?: string; brand?: string; variantId?: string | null; quantity?: number }>,
+    shouldHold: boolean,
+    note?: string,
+): Promise<number> {
+    const lines = await resolveSaleLines(items ?? []);
+
+    const { data, error } = await supabaseAdmin.rpc("fn_sync_order_stock_position", {
+        p_order_id: orderId,
+        p_items: lines,
+        p_should_hold: shouldHold,
+        p_note: note ?? null,
+    });
+    if (error) {
+        // Before the migration lands there is no ledger to reconcile against,
+        // so there is nothing this could correctly do. Staying quiet is right:
+        // the status change itself already succeeded.
+        if (isMissingFunction(error)) {
+            console.warn("[inventory] fn_sync_order_stock_position missing — run the stock ledger migration. Stock not reconciled.", { orderId });
+            return 0;
         }
-    }));
+        console.error("[inventory] fn_sync_order_stock_position failed:", error.message, { orderId, shouldHold });
+        throw new Error(error.message);
+    }
+    return Number(data) || 0;
+}
+
+/**
+ * Whether an order in this state should be holding stock.
+ * Anything cancelled, refunded or failed has given its units back.
+ */
+export function orderShouldHoldStock(status?: string | null, paymentStatus?: string | null): boolean {
+    const released = new Set(["cancelled", "refunded", "failed"]);
+    if (released.has((status ?? "").toLowerCase())) return false;
+    if (released.has((paymentStatus ?? "").toLowerCase())) return false;
+    return (paymentStatus ?? "").toLowerCase() === "paid";
+}
+
+/**
+ * Reads an order and reconciles its stock position against its current status.
+ * The single entry point for "this order changed state, fix the stock".
+ */
+export async function reconcileOrderStock(orderId: string, note?: string): Promise<number> {
+    const { data: order } = await supabaseAdmin
+        .from("orders")
+        .select("id, status, payment_status, items")
+        .eq("id", orderId)
+        .maybeSingle();
+
+    if (!order) return 0;
+
+    const items = Array.isArray(order.items) ? (order.items as any[]) : [];
+    if (!items.length) return 0;
+
+    return syncOrderStockPosition(
+        orderId,
+        items,
+        orderShouldHoldStock(order.status, order.payment_status),
+        note ?? `status=${order.status} payment=${order.payment_status}`,
+    );
 }
 
 /**

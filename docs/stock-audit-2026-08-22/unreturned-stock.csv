@@ -1,0 +1,3 @@
+order_ref,source,status,payment_status,placed,changed,units,items,units_still_subtracted
+37CEE84E,pos,delivered,cancelled,2026-08-22 17:12,17:26,2,New York basic top x1 | Amazon pants x1,2
+2650970D,storefront,refunded,refunded,2026-08-21 07:43,08:10,1,Gigi Purse x1,1

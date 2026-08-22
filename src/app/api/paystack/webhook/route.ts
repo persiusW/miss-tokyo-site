@@ -214,7 +214,7 @@ export async function POST(req: Request) {
                     // reservation was never created). Decrement via the inventory lib's
                     // sanctioned fallback path (keeps inventory writes in one place).
                     if (!stockDecremented && orderItemsFromDB.length > 0) {
-                        await fallbackDecrementFromItems(orderItemsFromDB);
+                        await fallbackDecrementFromItems(orderId, orderItemsFromDB);
                         console.log(`[webhook] fallback stock decrement applied for order ${orderId} (no reservation row)`);
                     }
                 } else if (productId) {

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { logActivity } from "@/lib/utils/logActivity";
 import { revalidatePath } from "next/cache";
+import { reconcileOrderStock } from "@/lib/inventory";
 
 // Keep status and fulfillment_status in sync so tab filtering is always consistent.
 // OrdersClient filters by `status`; order detail page updates `fulfillment_status`.
@@ -68,6 +69,26 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
     if (error) {
         console.error("Failed to update order:", error);
         return { success: false, error: error.message };
+    }
+
+    // Cancelling or refunding used to leave the stock taken. Reconciling against
+    // the ledger gives it back — and gives back exactly what this order took,
+    // never a guess. Orders that settled before the ledger existed are skipped
+    // by the DB function rather than double-counted.
+    //
+    // Deliberately not fatal: the status change is what the staff member asked
+    // for, and a stock reconciliation failure must not make the button look
+    // broken. The nightly drift report catches anything that does not land.
+    try {
+        const moved = await reconcileOrderStock(
+            orderId,
+            `${oldData.status} -> ${newStatus} by ${user.id}`,
+        );
+        if (moved > 0) {
+            console.log(`[orders] stock reconciled for ${orderId}: ${moved} movement(s) on ${oldData.status} -> ${newStatus}`);
+        }
+    } catch (e) {
+        console.error(`[orders] stock reconciliation failed for ${orderId}:`, e);
     }
 
     revalidatePath(`/sales/orders/${orderId}`, "page");
@@ -173,6 +194,16 @@ export async function bulkUpdateOrderStatus(orderIds: string[], newStatus: strin
         : "UPDATE_STATUS";
 
     revalidatePath("/sales/orders", "page");
+
+    // Same reconciliation the single-order path does. Deferred rather than
+    // awaited: a bulk cancel can span hundreds of orders and the staff member
+    // should not wait on the ledger to redraw the list.
+    after(() => Promise.allSettled(
+        orderIds.map(orderId =>
+            reconcileOrderStock(orderId, `bulk -> ${newStatus} by ${user.id}`)
+                .catch(e => console.error(`[orders] bulk stock reconciliation failed for ${orderId}:`, e))
+        )
+    ));
 
     after(() => Promise.allSettled(
         orderIds.map(orderId =>
