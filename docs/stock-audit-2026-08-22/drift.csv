@@ -1,0 +1,4 @@
+product,product_rollup,variant_sum,delta,is_active,note
+Fashion ARM REST BAG,0,1,-1,true,live — variant row overstated by 1
+MT CUTE CLASSIC BAG,0,7,-7,false,deactivated — 7 phantom units if reactivated
+Suede tote bag,6,7,-1,false,deactivated — 1 phantom unit if reactivated
