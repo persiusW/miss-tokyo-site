@@ -292,6 +292,18 @@ export default function POSPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cartTotal, appliedDiscount?.code, cart.length, lookupCode]);
 
+    // A 401 here means the sign-in behind this screen is gone, not that the sale
+    // is wrong. The till can keep rendering a signed-in shell after the session
+    // has lapsed, so staff saw a bare "Unauthorized" on a basket they had just
+    // rung up, with nothing telling them what to do about it.
+    //
+    // Deliberately no automatic redirect: the cart is React state and nothing
+    // persists it, so navigating away would throw the basket out from under
+    // someone mid-sale. Tell them what happened and let them choose when.
+    const expiredSession = () => {
+        toast.error('Your sign-in has expired — nothing was recorded. Open the dashboard in a new tab and log in again, then send this sale.');
+    };
+
     const handleSend = async (mode: 'link' | 'cash' = 'link') => {
         if (cart.length === 0) { toast.error('Cart is empty'); return; }
         if (customerMode === 'search') {
@@ -371,6 +383,7 @@ export default function POSPage() {
                 }),
             });
             const { sessionId, error: sessionError } = await sessionRes.json();
+            if (sessionRes.status === 401) return expiredSession();
             if (!sessionRes.ok || !sessionId) throw new Error(sessionError ?? 'Failed to create session');
 
             const sendRes = await fetch('/api/pos/send-link', {
@@ -379,6 +392,7 @@ export default function POSPage() {
                 body: JSON.stringify({ sessionId, mode }),
             });
             const { paymentUrl: url, error: sendError, delivery, completed, orderRef } = await sendRes.json();
+            if (sendRes.status === 401) return expiredSession();
             if (!sendRes.ok || !url) throw new Error(sendError ?? 'Failed to send link');
 
             setPaymentUrl(url);
