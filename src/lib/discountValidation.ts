@@ -4,13 +4,18 @@
 // charged. Client-supplied discount amounts must never reach a Paystack charge.
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { computeDiscountSplit } from "@/lib/discountSplit";
 
 export type ValidatedDiscount = {
     type: "coupon" | "gift_card";
     code: string;
     discount_type: string;
-    /** GHS amount to subtract from the order total (already capped at the total). */
+    /** Total GHS to subtract — the two portions below added together. */
     amount: number;
+    /** Portion that comes off the products. The platform fee is charged on what remains. */
+    subtotalAmount: number;
+    /** Portion that comes off the delivery fee. */
+    deliveryAmount: number;
     label: string;
     /** coupons.id | gift_cards.id — needed to place a hold on it. */
     codeId: string;
@@ -51,6 +56,7 @@ async function couponUsesAvailable(
 export async function validateDiscountCode(
     code: string | undefined | null,
     orderAmount: number,
+    deliveryFee: number = 0,
 ): Promise<ValidatedDiscount | null> {
     if (!code || typeof code !== "string") return null;
     const normalized = code.trim().toUpperCase();
@@ -78,26 +84,20 @@ export async function validateDiscountCode(
         if (usesLeft !== null && usesLeft < 1) return null;
         if (coupon.min_order_value && orderAmount < Number(coupon.min_order_value)) return null;
 
-        let amount = 0;
-        let label = "Discount Applied";
-        switch (coupon.discount_type) {
-            case "percentage":
-                amount = parseFloat(((orderAmount * Number(coupon.discount_value)) / 100).toFixed(2));
-                label = `${Number(coupon.discount_value)}% Off`;
-                break;
-            case "fixed":
-                amount = parseFloat(Math.min(Number(coupon.discount_value), orderAmount).toFixed(2));
-                label = `GH₵ ${Number(coupon.discount_value).toFixed(2)} Off`;
-                break;
-            case "free_shipping":
-                label = "Free Shipping";
-                break;
-            case "bogo":
-                label = "Buy One, Get One Free (applied at dispatch)";
-                break;
-        }
+        const split = computeDiscountSplit({
+            discountType: coupon.discount_type,
+            value: Number(coupon.discount_value),
+            subtotal: orderAmount,
+            deliveryFee,
+        });
+        const label =
+            coupon.discount_type === "percentage"    ? `${Number(coupon.discount_value)}% Off`
+          : coupon.discount_type === "fixed"         ? `GH₵ ${Number(coupon.discount_value).toFixed(2)} Off`
+          : coupon.discount_type === "free_shipping" ? "Free Shipping"
+          : coupon.discount_type === "bogo"          ? "Buy One, Get One Free (applied at dispatch)"
+          : "Discount Applied";
 
-        return { type: "coupon", code: coupon.code, discount_type: coupon.discount_type, amount, label, codeId: coupon.id };
+        return { type: "coupon", code: coupon.code, discount_type: coupon.discount_type, ...split, label, codeId: coupon.id };
     }
 
     if (card) {
@@ -109,12 +109,16 @@ export async function validateDiscountCode(
         const spendable = await giftCardAvailable(card.id, Number(card.remaining_value));
         if (spendable <= 0) return null;
 
-        const amount = parseFloat(Math.min(spendable, orderAmount).toFixed(2));
+        // Stored value: spend it against the whole bill, delivery included,
+        // rather than capping at the products and discarding the rest.
+        const split = computeDiscountSplit({
+            discountType: "gift_card", value: spendable, subtotal: orderAmount, deliveryFee,
+        });
         return {
             type: "gift_card",
             code: card.code,
             discount_type: "gift_card",
-            amount,
+            ...split,
             label: `GH₵ ${spendable.toFixed(2)} Gift Card`,
             codeId: card.id,
         };

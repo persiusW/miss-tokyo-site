@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { computeDiscountSplit } from "@/lib/discountSplit";
 
 // PERF-15: cache DB lookups per code for 30 s — avoids repeated round-trips
 // when a customer types / re-submits the same code during checkout.
@@ -27,7 +28,7 @@ const lookupCode = unstable_cache(
 
 export async function POST(req: Request) {
     try {
-        const { code, subtotal } = await req.json();
+        const { code, subtotal, deliveryFee } = await req.json();
 
         if (!code || typeof code !== "string") {
             return NextResponse.json({ valid: false, error: "No code provided." }, { status: 400 });
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
 
         const normalized = code.trim().toUpperCase();
         const sub = Number(subtotal) || 0;
+        const fee = Number(deliveryFee) || 0;
 
         const { coupon, card } = await lookupCode(normalized);
 
@@ -53,37 +55,31 @@ export async function POST(req: Request) {
                 });
             }
 
-            let discount_amount = 0;
-            let label = "";
-
-            switch (coupon.discount_type) {
-                case "percentage":
-                    discount_amount = parseFloat(((sub * Number(coupon.discount_value)) / 100).toFixed(2));
-                    label = `${Number(coupon.discount_value)}% Off`;
-                    break;
-                case "fixed":
-                    discount_amount = parseFloat(Math.min(Number(coupon.discount_value), sub).toFixed(2));
-                    label = `GH₵ ${Number(coupon.discount_value).toFixed(2)} Off`;
-                    break;
-                case "free_shipping":
-                    discount_amount = 0;
-                    label = "Free Shipping";
-                    break;
-                case "bogo":
-                    discount_amount = 0;
-                    label = "Buy One, Get One Free (applied at dispatch)";
-                    break;
-                default:
-                    discount_amount = 0;
-                    label = "Discount Applied";
-            }
+            const split = computeDiscountSplit({
+                discountType: coupon.discount_type,
+                value: Number(coupon.discount_value),
+                subtotal: sub,
+                deliveryFee: fee,
+            });
+            const label =
+                coupon.discount_type === "percentage"    ? `${Number(coupon.discount_value)}% Off`
+              : coupon.discount_type === "fixed"         ? `GH\u20b5 ${Number(coupon.discount_value).toFixed(2)} Off`
+              : coupon.discount_type === "free_shipping" ? "Free Shipping"
+              : coupon.discount_type === "bogo"          ? "Buy One, Get One Free (applied at dispatch)"
+              : "Discount Applied";
 
             return NextResponse.json({
                 valid: true,
                 type: "coupon",
                 code: coupon.code,
                 discount_type: coupon.discount_type,
-                discount_amount,
+                discount_amount: split.amount,
+                subtotal_amount: split.subtotalAmount,
+                delivery_amount: split.deliveryAmount,
+                // The customer can still change region after applying a code, so
+                // the page re-splits this against the live delivery fee rather
+                // than trusting a figure computed before the address was known.
+                raw_value: Number(coupon.discount_value),
                 label,
             });
         }
@@ -93,13 +89,21 @@ export async function POST(req: Request) {
             if (!card.is_active || Number(card.remaining_value) <= 0) {
                 return NextResponse.json({ valid: false, error: "This gift card has already been used or is inactive." });
             }
-            const discount_amount = parseFloat(Math.min(Number(card.remaining_value), sub).toFixed(2));
+            const split = computeDiscountSplit({
+                discountType: "gift_card",
+                value: Number(card.remaining_value),
+                subtotal: sub,
+                deliveryFee: fee,
+            });
             return NextResponse.json({
                 valid: true,
                 type: "gift_card",
                 code: card.code,
                 discount_type: "gift_card",
-                discount_amount,
+                discount_amount: split.amount,
+                subtotal_amount: split.subtotalAmount,
+                delivery_amount: split.deliveryAmount,
+                raw_value: Number(card.remaining_value),
                 label: `GH₵ ${Number(card.remaining_value).toFixed(2)} Gift Card`,
             });
         }
