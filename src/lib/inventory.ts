@@ -549,6 +549,79 @@ export async function fallbackDecrementFromItems(
 }
 
 /**
+ * Brings an order's stock position in line with what its status says.
+ *
+ * Cancelling or refunding a paid order used to leave its stock taken forever —
+ * there was no restock path anywhere in the codebase, and none could be written
+ * safely, because without a ledger nothing could tell a cancelled-after-payment
+ * order from one abandoned before payment. 555 cancelled and 13 refunded orders
+ * accumulated that way.
+ *
+ * The ledger answers that question directly, so this is now a comparison rather
+ * than a guess: it reads what this order actually took and writes only the
+ * difference. Idempotent by construction — clicking Refund twice, or a status
+ * flipping back and forth, converges instead of compounding.
+ *
+ * `shouldHold` is true while the order legitimately holds stock (paid and not
+ * cancelled), false once it has given it back.
+ */
+export async function syncOrderStockPosition(
+    orderId: string,
+    items: Array<{ productId: string; size?: string; color?: string; brand?: string; variantId?: string | null; quantity?: number }>,
+    shouldHold: boolean,
+    note?: string,
+): Promise<number> {
+    const lines = await resolveSaleLines(items ?? []);
+
+    const { data, error } = await supabaseAdmin.rpc("fn_sync_order_stock_position", {
+        p_order_id: orderId,
+        p_items: lines,
+        p_should_hold: shouldHold,
+        p_note: note ?? null,
+    });
+    if (error) {
+        console.error("[inventory] fn_sync_order_stock_position failed:", error.message, { orderId, shouldHold });
+        throw new Error(error.message);
+    }
+    return Number(data) || 0;
+}
+
+/**
+ * Whether an order in this state should be holding stock.
+ * Anything cancelled, refunded or failed has given its units back.
+ */
+export function orderShouldHoldStock(status?: string | null, paymentStatus?: string | null): boolean {
+    const released = new Set(["cancelled", "refunded", "failed"]);
+    if (released.has((status ?? "").toLowerCase())) return false;
+    if (released.has((paymentStatus ?? "").toLowerCase())) return false;
+    return (paymentStatus ?? "").toLowerCase() === "paid";
+}
+
+/**
+ * Reads an order and reconciles its stock position against its current status.
+ * The single entry point for "this order changed state, fix the stock".
+ */
+export async function reconcileOrderStock(orderId: string, note?: string): Promise<number> {
+    const { data: order } = await supabaseAdmin
+        .from("orders")
+        .select("id, status, payment_status, items")
+        .eq("id", orderId)
+        .maybeSingle();
+
+    if (!order) return 0;
+
+    const items = Array.isArray(order.items) ? (order.items as any[]) : [];
+    if (!items.length) return 0;
+
+    return syncOrderStockPosition(
+        orderId,
+        items,
+        orderShouldHoldStock(order.status, order.payment_status),
+        note ?? `status=${order.status} payment=${order.payment_status}`,
+    );
+}
+
+/**
  * Signed stock adjustment for admin edits. Positive restocks, negative removes.
  *
  * The admin form used to post the counts it had loaded when the page opened,
