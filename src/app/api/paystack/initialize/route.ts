@@ -2,7 +2,7 @@ export const maxDuration = 30; // 30 seconds — headroom for Paystack API hands
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { reserveStock, releaseReservation, type ReserveItem } from "@/lib/inventory";
+import { reserveStock, releaseReservation, releaseSupersededAttempts, type ReserveItem } from "@/lib/inventory";
 import { normAttr } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
@@ -14,6 +14,7 @@ export async function POST(request: Request) {
             email: rawEmail,
             cartItems,
             metadata: clientMetadata,
+            previousOrderId,
         } = await request.json();
 
         // Three callers reach this route and only the storefront checkout
@@ -404,6 +405,20 @@ export async function POST(request: Request) {
         //     bearer: "subaccount",
         //     transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
         // } : {};
+
+        // A retry after an abandoned attempt must not be blocked by that
+        // attempt's own hold. Released before reserving, never after — the new
+        // reservation has to be able to take those units.
+        try {
+            await releaseSupersededAttempts({
+                email,
+                currentOrderId: orderId,
+                previousOrderId: typeof previousOrderId === "string" ? previousOrderId : null,
+            });
+        } catch (e) {
+            // Non-fatal: worst case the customer hits the old "sold out" refusal.
+            console.error("[checkout] could not release superseded attempts:", e);
+        }
 
         // Atomically reserve stock before redirecting to Paystack.
         // Throws if any item is unavailable; cancels the pending order if so.

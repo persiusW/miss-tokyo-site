@@ -521,6 +521,9 @@ export default function CheckoutPage() {
         setLoading(true);
         try {
             const payload = {
+                // Which attempt this one supersedes, so its hold can be freed
+                // before the new reservation is taken.
+                previousOrderId: sessionStorage.getItem(PENDING_ORDER_KEY) || undefined,
                 email: form.email,
                 amount: finalTotal,
                 cartItems: items,
