@@ -480,13 +480,23 @@ export async function POST(request: Request) {
                 let friendlyError = "One or more items are no longer available. Please update your cart and try again.";
                 const uuidMatch = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(err.message ?? "");
                 const availMatch = /available:\s*(\d+)/i.exec(err.message ?? "");
+                // The reservation function now refuses a line it cannot tie to a
+                // variant row rather than measuring it against the pooled product
+                // roll-up. "Sold out" would be misleading — the option itself is
+                // the problem — so say that, and never leak the raw message.
+                const unresolvedVariant = /variant not recognised/i.test(err.message ?? "");
                 if (uuidMatch) {
                     const pid = uuidMatch[1];
                     const productName = dbProductMap[pid]?.name;
                     const available = availMatch ? parseInt(availMatch[1]) : null;
                     const problemItem = cartArr.find((i: any) => i.productId === pid);
                     const sizeLabel = problemItem?.size ? ` in size ${problemItem.size}` : "";
-                    if (productName) {
+                    if (productName && unresolvedVariant) {
+                        console.error("[checkout] variant unresolved at reservation", {
+                            productId: pid, size: problemItem?.size, color: problemItem?.color, brand: problemItem?.brand,
+                        });
+                        friendlyError = `The option you picked for "${productName}" is no longer available. Please choose another size or colour.`;
+                    } else if (productName) {
                         if (available === 0) {
                             friendlyError = `"${productName}"${sizeLabel} just sold out. Please remove it from your cart.`;
                         } else if (available !== null) {

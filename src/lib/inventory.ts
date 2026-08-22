@@ -25,7 +25,30 @@ export type StockStatus = {
 
 export type StockCheckResult =
     | { ok: true }
-    | { ok: false; code: "INSUFFICIENT_STOCK" | "PRODUCT_UNAVAILABLE"; item: string; available: number };
+    | { ok: false; code: "INSUFFICIENT_STOCK" | "PRODUCT_UNAVAILABLE" | "VARIANT_UNAVAILABLE"; item: string; available: number };
+
+/**
+ * Whether a line on a variant-tracked product actually points at a variant row.
+ *
+ * This is the check that was missing, and it is the whole oversell. When the
+ * lookup missed, `resolve()` returned null, the availability key collapsed to
+ * product level, and fn_combined_available_stock handed back the product
+ * roll-up — every colour's stock pooled into one number. A line for a colour
+ * with no variant row at all read as fully in stock, reserved against the
+ * roll-up, and decremented the roll-up alone.
+ *
+ * 109 paid lines went through that path. A variant-tracked product must resolve
+ * to a row or be refused; there is no safe fallback to the roll-up, because the
+ * roll-up is the sum of colours the customer is not buying.
+ */
+function variantResolutionFailed(
+    item: { size?: string; color?: string; brand?: string },
+    product: { track_variant_inventory?: boolean } | undefined,
+    resolvedVariantId: string | null,
+): boolean {
+    if (!product?.track_variant_inventory) return false;
+    return resolvedVariantId === null;
+}
 
 /**
  * The single sanctioned way to reduce stock.
@@ -208,6 +231,16 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
         if (product.preorder_enabled) continue;
 
         const key = variantKey(item.productId, item);
+        const resolvedVariantId = resolve(item, product);
+
+        // A variant-tracked line that reaches no variant row is refused rather
+        // than quietly falling through to the product roll-up. The roll-up is
+        // every colour added together, so that fallback sold colours that had
+        // no stock — and colours that had no row at all.
+        if (variantResolutionFailed(item, product, resolvedVariantId)) {
+            return { ok: false, code: "VARIANT_UNAVAILABLE", item: item.productId, available: 0 };
+        }
+
         const rawStock = product.track_variant_inventory && hasVariantAttrs(item)
             ? (variantStockMap[key] ?? 0)
             : (product.inventory_count ?? 0);
@@ -215,7 +248,7 @@ export async function checkStock(items: ReserveItem[]): Promise<StockCheckResult
         // 9999 is the "not tracked" sentinel — never gate on it
         if (rawStock === 9999) continue;
 
-        const netKey = `${item.productId}|${resolve(item, product) ?? "null"}`;
+        const netKey = `${item.productId}|${resolvedVariantId ?? "null"}`;
         const stock = netAvailable?.get(netKey) ?? rawStock;
 
         if (item.quantity > stock) {
@@ -296,11 +329,31 @@ export async function getStockStatus(
             return { productId: item.productId, variantId: item.variantId, available: 0, isActive: false, preorderEnabled: false };
         }
 
+        const resolvedVariantId = resolve(item, product);
+
+        // Explicit rather than incidental. This used to come out at zero only
+        // because the raw variant lookup missed and Math.min clamped it — while
+        // the availability map underneath was quietly reporting the product
+        // roll-up for the very same line. Refusing here states the rule the
+        // reservation function now enforces: a variant-tracked line that names
+        // no variant row has no stock, and the roll-up is not a stand-in.
+        if (variantResolutionFailed(item, product, resolvedVariantId)) {
+            console.warn("[inventory] variant unresolved — reporting sold out", {
+                productId: item.productId, size: item.size, color: item.color, brand: item.brand,
+            });
+            return {
+                productId: item.productId,
+                variantId: item.variantId ?? null,
+                available: 0,
+                isActive: product.is_active ?? true,
+                preorderEnabled: product.preorder_enabled ?? false,
+            };
+        }
+
         const rawAvailable = product.track_variant_inventory && hasVariantAttrs(item)
             ? (variantStockMap[keyFor(item)] ?? 0)
             : (product.inventory_count ?? 0);
 
-        const resolvedVariantId = resolve(item, product);
         const mapKey = `${item.productId}|${resolvedVariantId ?? "null"}`;
         const net = rawAvailable === 9999
             ? rawAvailable
