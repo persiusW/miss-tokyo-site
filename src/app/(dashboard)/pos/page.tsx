@@ -102,6 +102,9 @@ export default function POSPage() {
     const [sending, setSending] = useState(false);
     const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
     const [completedOrderRef, setCompletedOrderRef] = useState<string | null>(null);
+    // Cash is irreversible once recorded, so the button arms on the first tap
+    // and fires on the second. A native confirm() would block the whole till.
+    const [cashArmed, setCashArmed] = useState(false);
     const [copied, setCopied] = useState(false);
     const [productMatchCount, setProductMatchCount] = useState(0);
 
@@ -282,17 +285,27 @@ export default function POSPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cartTotal, appliedDiscount?.code, cart.length, lookupCode]);
 
-    const handleSend = async () => {
+    const handleSend = async (mode: 'link' | 'cash' = 'link') => {
         if (cart.length === 0) { toast.error('Cart is empty'); return; }
         if (customerMode === 'search') {
             if (!selectedContact) { toast.error('Please select a customer'); return; }
         } else {
             if (!newCustomer.name.trim()) { toast.error('Customer name is required'); return; }
         }
-        // Phone is the one channel every sale must have: email is optional, so
-        // for a walk-in without one the SMS is the only way the link travels.
-        if (!customerPhone.trim()) { toast.error('Customer phone is required — the link is sent by SMS'); return; }
-        if (customerPhone.replace(/\D/g, '').length < 9) { toast.error('That phone number looks incomplete'); return; }
+        const emailOnFile = (customerMode === 'search' ? selectedContact?.email : newCustomer.email)?.trim();
+        if (mode === 'cash') {
+            // Cash is settled on the spot, so there is no link to chase later —
+            // but the customer still needs their order number, by either channel.
+            if (!customerPhone.trim() && !emailOnFile) {
+                toast.error('Add an email or phone number so the customer gets their order number');
+                return;
+            }
+        } else {
+            // Phone is the one channel every link sale must have: email is optional,
+            // so for a walk-in without one the SMS is the only way the link travels.
+            if (!customerPhone.trim()) { toast.error('Customer phone is required — the link is sent by SMS'); return; }
+        }
+        if (customerPhone.trim() && customerPhone.replace(/\D/g, '').length < 9) { toast.error('That phone number looks incomplete'); return; }
         if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
             toast.error('Delivery address is required');
             return;
@@ -338,7 +351,7 @@ export default function POSPage() {
                 body: JSON.stringify({
                     customer_name: customer.name,
                     customer_email: customer.email?.trim() || null,
-                    customer_phone: customerPhone.trim(),
+                    customer_phone: customerPhone.trim() || null,
                     customer_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
                     customer_country: deliveryMethod === 'delivery' ? deliveryCountry : null,
                     customer_region: deliveryMethod === 'delivery' ? deliveryRegion.trim() : null,
@@ -356,17 +369,20 @@ export default function POSPage() {
             const sendRes = await fetch('/api/pos/send-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId }),
+                body: JSON.stringify({ sessionId, mode }),
             });
             const { paymentUrl: url, error: sendError, delivery, completed, orderRef } = await sendRes.json();
             if (!sendRes.ok || !url) throw new Error(sendError ?? 'Failed to send link');
 
             setPaymentUrl(url);
 
-            // Gift card covered the basket — the sale is already done, no link to chase
+            // Cash taken at the till, or a gift card covering the basket — either
+            // way the sale is already done and there is no link to chase.
             if (completed) {
                 setCompletedOrderRef(orderRef ?? null);
-                toast.success(`Paid in full by gift card — order ${orderRef ?? ''} created`);
+                toast.success(mode === 'cash'
+                    ? `Cash received — order ${orderRef ?? ''} created`
+                    : `Paid in full by gift card — order ${orderRef ?? ''} created`);
                 return;
             }
 
@@ -687,11 +703,30 @@ export default function POSPage() {
                             </button>
                         </div>
                     ) : (
-                        <button onClick={handleSend} disabled={sending || cart.length === 0}
+                        <><button onClick={() => handleSend('link')} disabled={sending || cart.length === 0}
                             style={{ width: "100%", padding: "14px 0", background: "var(--ac-ink)", color: "var(--ac-bg)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".2em", fontWeight: 900, border: "none", cursor: (sending || cart.length === 0) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (sending || cart.length === 0) ? 0.4 : 1, borderRadius: "var(--r-sm)" }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                             {sending ? 'Sending...' : `Send Link — GH₵${payableTotal.toFixed(2)}`}
                         </button>
+                        {/* Walk-in paying at the counter. Same sale, no payment link. */}
+                        <button onClick={() => {
+                            if (!cashArmed) {
+                                setCashArmed(true);
+                                setTimeout(() => setCashArmed(false), 4000);
+                                return;
+                            }
+                            setCashArmed(false);
+                            handleSend('cash');
+                        }}
+                            disabled={sending || cart.length === 0}
+                            style={{ width: "100%", marginTop: 8, padding: "14px 0", background: cashArmed ? "var(--ac-ink)" : "transparent", color: cashArmed ? "var(--ac-bg)" : "var(--ac-ink)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".2em", fontWeight: 900, border: "1px solid var(--ac-ink)", cursor: (sending || cart.length === 0) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (sending || cart.length === 0) ? 0.4 : 1, borderRadius: "var(--r-sm)" }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
+                            {sending
+                                ? 'Recording...'
+                                : cashArmed
+                                    ? `Tap again to confirm GH₵${payableTotal.toFixed(2)}`
+                                    : `Cash Received — GH₵${payableTotal.toFixed(2)}`}
+                        </button></>
                     )}
                 </div>
             </div>

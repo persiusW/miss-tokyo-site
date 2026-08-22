@@ -1,7 +1,7 @@
 // src/app/api/pos/send-link/route.ts
 export const maxDuration = 30;
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { Resend } from 'resend';
@@ -11,6 +11,7 @@ import { normAttr } from '@/lib/utils/normAttr';
 import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
 import { parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/delivery';
 import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
+import { logActivity } from '@/lib/utils/logActivity';
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
@@ -26,8 +27,15 @@ export async function POST(req: NextRequest) {
     // round trip and lets the session row load alongside the role check rather
     // than after it.
     let sessionId: string | undefined;
+    // 'cash' settles at the till with no gateway leg. Everything before the
+    // settle — stock reservation, discount hold, delivery fee, totals — is the
+    // same work a link sale does, so cash branches at the end rather than
+    // duplicating this route.
+    let mode: 'link' | 'cash' = 'link';
     try {
-        ({ sessionId } = await req.json());
+        const body = await req.json();
+        sessionId = body?.sessionId;
+        if (body?.mode === 'cash') mode = 'cash';
     } catch {
         sessionId = undefined;
     }
@@ -206,6 +214,16 @@ export async function POST(req: NextRequest) {
     // collect, and settling here would ship that delivery for nothing.
     const fullyCovered = amountWithFee <= 0;
 
+    // A cash sale is over the moment it is recorded — there is no payment link
+    // to chase later, so the order number has to reach the customer now. The
+    // till enforces this too; this is the guard that actually holds.
+    if (mode === 'cash' && !session.customer_email && !session.customer_phone) {
+        return NextResponse.json(
+            { error: 'Add an email or phone number so the customer gets their order number.' },
+            { status: 400 },
+        );
+    }
+
     const amountPesewas = Math.round(amountWithFee * 100);
 
     // Update total_amount with server-verified value (fee-inclusive).
@@ -261,8 +279,15 @@ export async function POST(req: NextRequest) {
     // Paystack entirely and settle the sale here. Stock is already held by the
     // reservation above, and settlePosSession is the same path a paid link takes:
     // it creates the order, decrements stock, debits the card and sends the receipt.
-    if (fullyCovered) {
-        const result = await settlePosSession(sessionId, { logPrefix: '[POS gift-card]' });
+    if (fullyCovered || mode === 'cash') {
+        const paidByCash = mode === 'cash' && !fullyCovered;
+        const result = await settlePosSession(sessionId, {
+            logPrefix: paidByCash ? '[POS cash]' : '[POS gift-card]',
+            paymentMethod: paidByCash ? 'cash' : 'gift_card',
+            // Cash leaves no gateway record, so the staff member who took the
+            // money is the only trail end-of-day counting can follow.
+            recordedBy: paidByCash ? user.id : null,
+        });
 
         if (!result.settled) {
             return NextResponse.json({ error: 'This sale has already been completed.' }, { status: 409 });
@@ -271,7 +296,21 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Could not create the order. Nothing was charged — try again.' }, { status: 500 });
         }
 
-        console.log(`[pos/send-link] gift-card settle in ${Date.now() - startedAt}ms`);
+        if (paidByCash) {
+            await supabaseAdmin.from('pos_sessions').update({ payment_method: 'cash' }).eq('id', sessionId);
+            // Telemetry, not the audit trail — orders.recorded_by is that. Kept
+            // off the response path so the till is not waiting on it.
+            after(() => logActivity({
+                userId: user.id,
+                userRole: profile.role,
+                actionType: 'CREATE',
+                resource: 'cash_sale',
+                resourceId: result.orderId ?? sessionId,
+                details: { orderRef: result.orderRef, total: amountWithFee, sessionId },
+            }));
+        }
+
+        console.log(`[pos/send-link] ${paidByCash ? 'cash' : 'gift-card'} settle in ${Date.now() - startedAt}ms`);
 
         return NextResponse.json({
             paymentUrl: `${baseUrlForCompleted}/pay/${sessionId}`,

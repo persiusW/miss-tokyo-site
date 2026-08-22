@@ -72,6 +72,14 @@ export default async function DashboardOverviewPage() {
             sub: "Paid · Processing · Fulfilled",
         },
         {
+            // Cash is the only revenue nobody else is holding — it is in the
+            // drawer and has to be counted by hand at close.
+            label: "Cash Taken",
+            prefix: "GH₵",
+            value: stats.cashRevenue.toFixed(2),
+            sub: `${stats.cashOrderCount} till sale${stats.cashOrderCount === 1 ? "" : "s"} · count at close`,
+        },
+        {
             label: "Unfulfilled",
             value: String(stats.pendingCount + stats.processingCount),
             sub: `${stats.pendingCount} Pending · ${stats.processingCount} Processing`,

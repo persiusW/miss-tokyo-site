@@ -1,6 +1,6 @@
 import { fetchOrderStats } from "@/lib/utils/metrics";
 import { OrdersClient } from "./OrdersClient";
-import { fetchOrdersPage, type OrderTab, ORDER_TABS } from "./ordersQuery";
+import { fetchOrdersPage, type OrderTab, type PaymentFilter, ORDER_TABS, PAYMENT_FILTERS } from "./ordersQuery";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -8,7 +8,7 @@ export const revalidate = 0;
 export default async function OrdersPage({
     searchParams,
 }: {
-    searchParams: Promise<{ tab?: string; q?: string; page?: string }>;
+    searchParams: Promise<{ tab?: string; q?: string; page?: string; payment?: string; from?: string; to?: string }>;
 }) {
     const sp = await searchParams;
     const validTabs = ORDER_TABS.map(t => t.key);
@@ -16,8 +16,18 @@ export default async function OrdersPage({
     const search = sp.q ?? "";
     const page = Math.max(1, Number(sp.page) || 1);
 
+    const validPayments = PAYMENT_FILTERS.map(p => p.key);
+    const payment: PaymentFilter = validPayments.includes(sp.payment as PaymentFilter)
+        ? (sp.payment as PaymentFilter)
+        : "all";
+    // Only YYYY-MM-DD is accepted; anything else is dropped rather than passed
+    // to the query, so a hand-edited URL cannot break the page.
+    const isDate = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    const dateFrom = isDate(sp.from) ? sp.from! : "";
+    const dateTo = isDate(sp.to) ? sp.to! : "";
+
     const [ordersPage, stats] = await Promise.all([
-        fetchOrdersPage(tab, search, page),
+        fetchOrdersPage(tab, search, page, { payment, dateFrom, dateTo }),
         fetchOrderStats(),
     ]);
 
@@ -34,7 +44,7 @@ export default async function OrdersPage({
                     <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Total Revenue</span>
                     <span className="text-3xl font-serif">GH₵ {stats.totalRevenue.toFixed(2)}</span>
                     <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">
-                        PAID · PROCESSING · FULFILLED
+                        GH₵ {stats.cashRevenue.toFixed(2)} CASH · GH₵ {stats.gatewayRevenue.toFixed(2)} CARD
                     </span>
                 </div>
                 <div className="bg-white border border-neutral-200 p-6">
@@ -64,6 +74,9 @@ export default async function OrdersPage({
                 orders={ordersPage.orders}
                 tab={ordersPage.tab}
                 search={ordersPage.search}
+                payment={ordersPage.payment}
+                dateFrom={ordersPage.dateFrom}
+                dateTo={ordersPage.dateTo}
                 page={ordersPage.page}
                 pageSize={ordersPage.pageSize}
                 totalCount={ordersPage.totalCount}
