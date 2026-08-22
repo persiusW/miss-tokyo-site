@@ -30,6 +30,7 @@ type Order = {
     auto_discount_amount?: number | null;
     customer_metadata?: { whatsapp?: string; instagram?: string; snapchat?: string } | null;
     assigned_rider_id?: string | null;
+    notes?: string | null;
 };
 
 type AssignedRider = {
@@ -193,7 +194,7 @@ export default function OrderDetailPage() {
 
     useEffect(() => {
         Promise.all([
-            supabase.from("orders").select("id, customer_email, customer_name, customer_phone, delivery_method, total_amount, status, payment_status, fulfillment_status, paystack_reference, created_at, shipping_address, items, delivery_fee, delivery_zone, discount_code, discount_amount, auto_discount_title, auto_discount_amount, customer_metadata, assigned_rider_id").eq("id", id).single(),
+            supabase.from("orders").select("id, customer_email, customer_name, customer_phone, delivery_method, total_amount, status, payment_status, fulfillment_status, paystack_reference, created_at, shipping_address, items, delivery_fee, delivery_zone, discount_code, discount_amount, auto_discount_title, auto_discount_amount, customer_metadata, assigned_rider_id, notes").eq("id", id).single(),
             supabase.from("business_settings").select("business_name, email, contact, address").eq("id", "default").single(),
             supabase.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
         ]).then(async ([{ data: ord }, { data: biz }, { data: ss }]) => {
@@ -594,6 +595,21 @@ export default function OrderDetailPage() {
                         )}
                     </div>
 
+                    {/* Staff notes — written at the till and, until now, only ever
+                        visible in POS History. Shown here whenever the order has
+                        one, so whoever is packing sees what the seller wrote. */}
+                    {order.notes?.trim() && (
+                        <div className="ac-card">
+                            <div className="ac-card-head">
+                                <h2 className="ac-card-title">Staff Notes</h2>
+                            </div>
+                            <div style={{ padding: "14px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                <p style={{ fontSize: 13, lineHeight: 1.6, color: "var(--ac-ink)", whiteSpace: "pre-wrap", margin: 0 }}>
+                                    {order.notes}
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* RIGHT: Payment + Status */}
