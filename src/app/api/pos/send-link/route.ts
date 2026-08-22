@@ -9,32 +9,77 @@ import { sendSMS } from '@/lib/sms';
 import { validateDiscountCode, holdDiscount } from '@/lib/discountValidation';
 import { normAttr } from '@/lib/utils/normAttr';
 import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
-import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/delivery';
+import { parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/delivery';
 import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
 export async function POST(req: NextRequest) {
+    const startedAt = Date.now();
+
     // Auth
     const serverClient = await createClient();
     const { data: { user } } = await serverClient.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: profile } = await supabaseAdmin
-        .from('profiles').select('role').eq('id', user.id).single();
+    // The body is already buffered by the runtime, so reading it here costs no
+    // round trip and lets the session row load alongside the role check rather
+    // than after it.
+    let sessionId: string | undefined;
+    try {
+        ({ sessionId } = await req.json());
+    } catch {
+        sessionId = undefined;
+    }
+
+    // None of these five reads depends on another. They used to run one after
+    // the next — five serial Supabase round trips before any work began, which
+    // was most of what staff waited on. The guards below still fire in the same
+    // order as before: 403 ahead of 400, 400 ahead of 404.
+    const [profileRes, sessionRes, storeFeeRes, deliveryRow, holdMinutes] = await Promise.all([
+        supabaseAdmin.from('profiles').select('role').eq('id', user.id).single(),
+
+        sessionId
+            ? supabaseAdmin.from('pos_sessions').select('*').eq('id', sessionId).single()
+            : Promise.resolve({ data: null }),
+
+        // Platform fee — same source as regular checkout
+        supabaseAdmin
+            .from('store_settings')
+            .select('platform_fee_percentage, platform_fee_label')
+            .eq('id', 'default')
+            .maybeSingle(),
+
+        // Own guarded read — a missing column must not take the platform-fee
+        // read down with it. A null here means "no settings", which
+        // parseDeliverySettings turns into DELIVERY_DEFAULTS (fees off).
+        Promise.resolve(
+            supabaseAdmin
+                .from('store_settings')
+                .select('delivery_fees_enabled, delivery_fee_accra, delivery_fee_outside')
+                .eq('id', 'default')
+                .maybeSingle()
+        )
+            .then(({ data }) => data as unknown)
+            .catch((err) => {
+                console.warn('[POS send-link] delivery settings unavailable, charging no delivery fee:', err);
+                return null;
+            }),
+
+        // Staff-configurable in Settings. Resolved once and used for both the
+        // reservation TTL and the customer's message, so the DB and what the
+        // customer is told can never quote different windows.
+        getPosHoldMinutes(),
+    ]);
+
+    const profile = profileRes.data;
     if (!profile || !['admin', 'owner', 'sales_staff'].includes(profile.role)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { sessionId } = await req.json();
     if (!sessionId) return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
 
-    // Fetch session
-    const { data: session } = await supabaseAdmin
-        .from('pos_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .single();
+    const session = sessionRes.data;
 
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     if (!['draft', 'pending_payment'].includes(session.status)) {
@@ -46,10 +91,20 @@ export async function POST(req: NextRequest) {
 
     // Server-side price recalculation — never trust stored item prices
     const productIds = [...new Set(items.map((i: any) => i.productId))];
-    const { data: dbProducts } = await supabaseAdmin
-        .from('products')
-        .select('id, price_ghs, is_sale, discount_value, track_variant_inventory')
-        .in('id', productIds);
+
+    // Both reads are keyed on the same product ids, so the variants no longer
+    // wait on the products to come back first. The variant rows of a product
+    // that does not track variant inventory are simply never looked up.
+    const [{ data: dbProducts }, { data: allVariants }] = await Promise.all([
+        supabaseAdmin
+            .from('products')
+            .select('id, price_ghs, is_sale, discount_value, track_variant_inventory')
+            .in('id', productIds),
+        supabaseAdmin
+            .from('product_variants')
+            .select('id, product_id, size, color, brand')
+            .in('product_id', productIds),
+    ]);
 
     const priceMap: Record<string, number> = {};
     for (const p of (dbProducts ?? [])) {
@@ -69,14 +124,8 @@ export async function POST(req: NextRequest) {
         .map((p: any) => p.id);
 
     const variantLookup: Record<string, string> = {};
-    if (variantTrackedIds.length > 0) {
-        const { data: variants } = await supabaseAdmin
-            .from('product_variants')
-            .select('id, product_id, size, color, brand')
-            .in('product_id', variantTrackedIds);
-        for (const v of (variants ?? [])) {
-            variantLookup[`${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`] = v.id;
-        }
+    for (const v of (allVariants ?? [])) {
+        variantLookup[`${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`] = v.id;
     }
 
     const resolveVariantId = (i: any): string | null => {
@@ -129,12 +178,8 @@ export async function POST(req: NextRequest) {
     const discountAmount = validatedDiscount?.amount ?? 0;
     const discountedSubtotal = parseFloat(Math.max(0, totalGHS - discountAmount).toFixed(2));
 
-    // Fetch platform fee settings — same as regular checkout
-    const { data: storeFeeSettings } = await supabaseAdmin
-        .from('store_settings')
-        .select('platform_fee_percentage, platform_fee_label')
-        .eq('id', 'default')
-        .maybeSingle();
+    // Platform fee settings — read up front alongside the session
+    const storeFeeSettings = storeFeeRes.data;
 
     // Fee is charged on the post-discount subtotal, matching storefront checkout
     const feePct = Number(storeFeeSettings?.platform_fee_percentage) || 0;
@@ -143,19 +188,9 @@ export async function POST(req: NextRequest) {
         : 0;
     const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
 
-    // Own guarded select — a missing column must not take the platform-fee
-    // path above down with it.
-    let deliverySettings = DELIVERY_DEFAULTS;
-    try {
-        const { data: deliveryRow } = await supabaseAdmin
-            .from('store_settings')
-            .select('delivery_fees_enabled, delivery_fee_accra, delivery_fee_outside')
-            .eq('id', 'default')
-            .maybeSingle();
-        deliverySettings = parseDeliverySettings(deliveryRow);
-    } catch (err) {
-        console.warn('[POS send-link] delivery settings unavailable, charging no delivery fee:', err);
-    }
+    // Read up front under its own guard; a null row (missing settings, or a
+    // column that does not exist yet) resolves to DELIVERY_DEFAULTS — fees off.
+    const deliverySettings = parseDeliverySettings(deliveryRow);
 
     const deliveryFee = resolveDeliveryFee({
         settings: deliverySettings,
@@ -173,7 +208,12 @@ export async function POST(req: NextRequest) {
 
     const amountPesewas = Math.round(amountWithFee * 100);
 
-    // Update total_amount with server-verified value (fee-inclusive)
+    // Update total_amount with server-verified value (fee-inclusive).
+    // Deliberately still serial with the reservation below: fn_reserve_pos_stock
+    // updates this same pos_sessions row (status, expires_at) while holding
+    // FOR UPDATE locks on products/variants, so issuing both at once would put
+    // a second writer on the row the reservation is waiting to take. Not worth
+    // one round trip on a payment path that has had deadlocks before.
     await supabaseAdmin
         .from('pos_sessions')
         .update({
@@ -186,11 +226,6 @@ export async function POST(req: NextRequest) {
             discount_tag: validatedDiscount?.type ?? null,
         })
         .eq('id', sessionId);
-
-    // Staff-configurable in Settings. Resolved once and used for both the
-    // reservation TTL and the customer's message, so the DB and what the
-    // customer is told can never quote different windows.
-    const holdMinutes = await getPosHoldMinutes();
 
     // Atomic inventory reservation via DB function
     const { error: reserveError } = await supabaseAdmin.rpc('fn_reserve_pos_stock', {
@@ -235,6 +270,8 @@ export async function POST(req: NextRequest) {
         if (!result.orderId) {
             return NextResponse.json({ error: 'Could not create the order. Nothing was charged — try again.' }, { status: 500 });
         }
+
+        console.log(`[pos/send-link] gift-card settle in ${Date.now() - startedAt}ms`);
 
         return NextResponse.json({
             paymentUrl: `${baseUrlForCompleted}/pay/${sessionId}`,
@@ -372,6 +409,11 @@ export async function POST(req: NextRequest) {
         }
     }
     if (smsError) console.error('[pos/send-link] sms error:', smsError);
+
+    // How long staff actually waited. Vercel's runtime logs carry no duration
+    // field, so without this there is no way to tell a slow till from a slow
+    // provider after the fact.
+    console.log(`[pos/send-link] complete in ${Date.now() - startedAt}ms (email=${emailStatus} sms=${smsStatus})`);
 
     // Return the preview URL — staff copies/shares this, not the raw Paystack URL
     return NextResponse.json({
