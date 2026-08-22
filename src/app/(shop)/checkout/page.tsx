@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { evaluateAutoDiscounts, type AutoDiscountResult } from "@/lib/autoDiscount";
 import { GHANA_REGIONS, COUNTRIES } from "@/lib/geo";
+import { computeDiscountSplit } from "@/lib/discountSplit";
 import {
     DELIVERY_DEFAULTS,
     parseDeliverySettings,
@@ -34,6 +35,9 @@ type AppliedDiscount = {
     type: "coupon" | "gift_card";
     discount_type: string;
     discount_amount: number;
+    /** Percent for a percentage coupon, GHS for every other type. Kept so the
+     *  split can be recomputed when the customer changes region after applying. */
+    raw_value?: number;
     label: string;
 };
 
@@ -375,7 +379,7 @@ export default function CheckoutPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 // Validate against the uncovered portion of the cart only
-                body: JSON.stringify({ code: discountInput.trim(), subtotal: remainingSubtotal }),
+                body: JSON.stringify({ code: discountInput.trim(), subtotal: remainingSubtotal, deliveryFee }),
             });
             const data = await res.json();
             if (data.valid) {
@@ -411,7 +415,7 @@ export default function CheckoutPage() {
                 const res = await fetch("/api/checkout/validate-code", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ code: appliedDiscount.code, subtotal: remainingSubtotal }),
+                    body: JSON.stringify({ code: appliedDiscount.code, subtotal: remainingSubtotal, deliveryFee }),
                 });
                 const data = await res.json();
                 if (cancelled) return;
@@ -432,15 +436,15 @@ export default function CheckoutPage() {
     // ── Fee calculations ───────────────────────────────────────────────────────
 
     const subtotal = mounted ? totalAmount() : 0;
-    const discountAmount = appliedDiscount?.discount_amount ?? 0;
     // autoDiscount, allItemsCovered, remainingSubtotal computed above (after fetchAutoDiscounts)
     const afterAutoDiscount = Math.max(0, subtotal - autoDiscount);
-    const discountedSubtotal = Math.max(0, afterAutoDiscount - discountAmount);
-    const feeAmount = parseFloat((discountedSubtotal * (feeSettings.platform_fee_percentage / 100)).toFixed(2));
-    // Mirrors /api/paystack/initialize exactly: the zone the customer picked and
-    // the zone derived from their region are both priced, and the dearer of the
-    // two is what's quoted here AND what the server will actually charge — so
-    // the summary and the Pay button never show a figure Paystack won't honour.
+
+    // Delivery is priced BEFORE the code is applied, because a gift card or a
+    // fixed coupon now spends against it. Mirrors /api/paystack/initialize
+    // exactly: the zone the customer picked and the zone derived from their
+    // region are both priced, and the dearer of the two is what's quoted here
+    // AND what the server will actually charge — so the summary and the Pay
+    // button never show a figure Paystack won't honour.
     const deliveryFeeArgs = {
         settings: deliverySettings,
         country: form.country,
@@ -451,9 +455,27 @@ export default function CheckoutPage() {
     const regionFee = resolveDeliveryFee({ ...deliveryFeeArgs, zone: regionZone });
     const deliveryFee = Math.max(claimedFee, regionFee);
     const chargedZone: DeliveryZone = claimedFee >= regionFee ? form.deliveryZone : regionZone;
+
+    // Same rule the server charges by — one shared function, so this preview
+    // cannot drift from the amount Paystack is asked for. Recomputed here rather
+    // than trusting the figure the code was validated at, because the customer
+    // can change region afterwards and move the delivery fee under it.
+    const discountSplit = appliedDiscount
+        ? computeDiscountSplit({
+            discountType: appliedDiscount.discount_type,
+            value: appliedDiscount.raw_value ?? appliedDiscount.discount_amount,
+            subtotal: afterAutoDiscount,
+            deliveryFee,
+        })
+        : { amount: 0, subtotalAmount: 0, deliveryAmount: 0 };
+
+    const discountAmount = discountSplit.amount;
+    const discountedSubtotal = Math.max(0, afterAutoDiscount - discountSplit.subtotalAmount);
+    const feeAmount = parseFloat((discountedSubtotal * (feeSettings.platform_fee_percentage / 100)).toFixed(2));
+    const payableDelivery = parseFloat(Math.max(0, deliveryFee - discountSplit.deliveryAmount).toFixed(2));
     // Delivery is added after the platform-fee percentage, so the percentage is
     // never levied on the delivery charge.
-    const finalTotal = parseFloat((discountedSubtotal + feeAmount + deliveryFee).toFixed(2));
+    const finalTotal = parseFloat((discountedSubtotal + feeAmount + payableDelivery).toFixed(2));
     const showZonePicker = deliverySettings.enabled
         && form.country === "Ghana"
         && form.deliveryMethod === "delivery";
@@ -1055,7 +1077,17 @@ export default function CheckoutPage() {
                     {deliveryFee > 0 && (
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-neutral-500 uppercase tracking-widest text-xs">Delivery ({zoneLabel(chargedZone)})</span>
-                            <span>GHS {deliveryFee.toFixed(2)}</span>
+                            {/* A code that reaches the delivery fee shows the fee
+                                struck through, so the customer can see what their
+                                gift card or free-shipping coupon actually did. */}
+                            {discountSplit.deliveryAmount > 0 ? (
+                                <span>
+                                    <span className="line-through text-neutral-400 mr-2">GHS {deliveryFee.toFixed(2)}</span>
+                                    <span>{payableDelivery > 0 ? `GHS ${payableDelivery.toFixed(2)}` : "Free"}</span>
+                                </span>
+                            ) : (
+                                <span>GHS {deliveryFee.toFixed(2)}</span>
+                            )}
                         </div>
                     )}
 

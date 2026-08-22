@@ -262,43 +262,9 @@ export async function POST(request: Request) {
             }
         }
 
-        // Validate the discount code server-side — the client's discount_amount is
-        // NEVER trusted; the code is re-checked against the DB and its value
-        // recomputed against the server-calculated total.
-        let validatedDiscount: ValidatedDiscount | null = null;
-        if (clientMetadata?.discount_code && !couponBlocked) {
-            validatedDiscount = await validateDiscountCode(clientMetadata.discount_code, amountInGHS);
-            const claimedAmount = Number(clientMetadata?.discount_amount) || 0;
-            const serverAmount = validatedDiscount?.amount ?? 0;
-            if (Math.abs(claimedAmount - serverAmount) > 0.02) {
-                console.warn(`[Paystack init] discount mismatch for code "${clientMetadata.discount_code}": client claimed ${claimedAmount}, server computed ${serverAmount}. Using server value.`);
-            }
-            if (serverAmount > 0) {
-                amountInGHS = Math.max(0, parseFloat((amountInGHS - serverAmount).toFixed(2)));
-            }
-        }
-        const discountCode = validatedDiscount?.code ?? null;
-        const discountAmount = validatedDiscount?.amount ?? 0;
-        const discountTag = validatedDiscount?.type ?? null;
-
-        if (amountInGHS <= 0) {
-            return NextResponse.json({ error: "Invalid amount calculation" }, { status: 400 });
-        }
-
-        // Apply platform fee server-side — never trust client-supplied fee amounts
-        const { data: storeFeeSettings } = await supabaseAdmin
-            .from("store_settings")
-            .select("platform_fee_percentage, platform_fee_label")
-            .eq("id", "default")
-            .maybeSingle();
-
-        const feePct = Number(storeFeeSettings?.platform_fee_percentage) || 0;
-        const platformFeeAmount = feePct > 0
-            ? parseFloat((amountInGHS * feePct / 100).toFixed(2))
-            : 0;
-        const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
-        const amountWithFee = parseFloat((amountInGHS + platformFeeAmount).toFixed(2));
-
+        // Delivery is resolved BEFORE the discount, because a gift card or a
+        // fixed coupon now spends against it. It used to be added afterwards,
+        // which is precisely why nothing could ever reach it.
         // Own guarded select. Bolting these columns onto the platform-fee
         // query above would mean an unapplied migration takes the fee path
         // down with it; here a failure just yields the disabled defaults.
@@ -331,7 +297,64 @@ export async function POST(request: Request) {
         const deliveryFee = Math.max(claimedFee, regionFee);
         const deliveryZone: string | null =
             deliveryFee <= 0 ? null : (claimedFee >= regionFee ? claimedZone : regionZone);
-        const amountWithDelivery = parseFloat((amountWithFee + deliveryFee).toFixed(2));
+
+        // Validate the discount code server-side — the client's discount_amount is
+        // NEVER trusted; the code is re-checked against the DB and its value
+        // recomputed against the server-calculated total.
+        let validatedDiscount: ValidatedDiscount | null = null;
+        if (clientMetadata?.discount_code && !couponBlocked) {
+            validatedDiscount = await validateDiscountCode(clientMetadata.discount_code, amountInGHS, deliveryFee);
+            const claimedAmount = Number(clientMetadata?.discount_amount) || 0;
+            const serverAmount = validatedDiscount?.amount ?? 0;
+            if (Math.abs(claimedAmount - serverAmount) > 0.02) {
+                console.warn(`[Paystack init] discount mismatch for code "${clientMetadata.discount_code}": client claimed ${claimedAmount}, server computed ${serverAmount}. Using server value.`);
+            }
+            if (serverAmount > 0) {
+                // Only the products portion comes off here. The delivery portion is
+                // applied to the fee further down, so the platform fee keeps being
+                // charged on goods alone.
+                amountInGHS = Math.max(0, parseFloat((amountInGHS - (validatedDiscount?.subtotalAmount ?? 0)).toFixed(2)));
+            }
+        }
+        const discountCode = validatedDiscount?.code ?? null;
+        const discountAmount = validatedDiscount?.amount ?? 0;
+        const discountTag = validatedDiscount?.type ?? null;
+
+        // A discount covering the whole basket is a valid order, not a bad
+        // calculation. This used to refuse it outright, so a gift card worth
+        // more than the goods failed checkout with a raw-sounding error while
+        // the till has always handled the same case. Delivery may still be
+        // payable, so the real emptiness test comes after it is applied.
+        if (amountInGHS < 0 || !Number.isFinite(amountInGHS)) {
+            return NextResponse.json({ error: "We could not price this order. Please refresh and try again." }, { status: 400 });
+        }
+
+        // Apply platform fee server-side — never trust client-supplied fee amounts
+        const { data: storeFeeSettings } = await supabaseAdmin
+            .from("store_settings")
+            .select("platform_fee_percentage, platform_fee_label")
+            .eq("id", "default")
+            .maybeSingle();
+
+        const feePct = Number(storeFeeSettings?.platform_fee_percentage) || 0;
+        const platformFeeAmount = feePct > 0
+            ? parseFloat((amountInGHS * feePct / 100).toFixed(2))
+            : 0;
+        const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
+        const amountWithFee = parseFloat((amountInGHS + platformFeeAmount).toFixed(2));
+
+        // Whatever the code put against shipping comes off here, so a fixed
+        // coupon or gift card larger than the basket spends its remainder on
+        // delivery instead of discarding it, and free_shipping actually waives.
+        const deliveryDiscount = Math.min(validatedDiscount?.deliveryAmount ?? 0, deliveryFee);
+        const payableDelivery = parseFloat(Math.max(0, deliveryFee - deliveryDiscount).toFixed(2));
+        const amountWithDelivery = parseFloat((amountWithFee + payableDelivery).toFixed(2));
+
+        if (amountWithDelivery <= 0) {
+            return NextResponse.json({
+                error: "This order is fully covered. Please contact us to complete it — no payment is needed.",
+            }, { status: 409 });
+        }
 
         const paystackSecret = process.env.PAYSTACK_SECRET_KEY || "";
         if (!paystackSecret) {

@@ -172,30 +172,6 @@ export async function POST(req: NextRequest) {
         variantId: resolveVariantId(i),
     }));
 
-    // Re-validate the staff-entered coupon / gift card against the DB. The till
-    // only ever sends a code; its worth is computed here against the
-    // server-calculated subtotal, exactly as /api/paystack/initialize does.
-    const validatedDiscount = await validateDiscountCode(session.discount_code, totalGHS);
-
-    if (session.discount_code && !validatedDiscount) {
-        return NextResponse.json({
-            error: `Code "${session.discount_code}" is no longer valid — it may have expired, been fully redeemed, or hit its usage limit. Remove it and try again.`,
-        }, { status: 409 });
-    }
-
-    const discountAmount = validatedDiscount?.amount ?? 0;
-    const discountedSubtotal = parseFloat(Math.max(0, totalGHS - discountAmount).toFixed(2));
-
-    // Platform fee settings — read up front alongside the session
-    const storeFeeSettings = storeFeeRes.data;
-
-    // Fee is charged on the post-discount subtotal, matching storefront checkout
-    const feePct = Number(storeFeeSettings?.platform_fee_percentage) || 0;
-    const platformFeeAmount = feePct > 0
-        ? parseFloat((discountedSubtotal * feePct / 100).toFixed(2))
-        : 0;
-    const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
-
     // Read up front under its own guard; a null row (missing settings, or a
     // column that does not exist yet) resolves to DELIVERY_DEFAULTS — fees off.
     const deliverySettings = parseDeliverySettings(deliveryRow);
@@ -207,7 +183,35 @@ export async function POST(req: NextRequest) {
         zone: session.delivery_zone,
     });
 
-    const amountWithFee = parseFloat((discountedSubtotal + platformFeeAmount + deliveryFee).toFixed(2));
+    // Re-validate the staff-entered coupon / gift card against the DB. The till
+    // only ever sends a code; its worth is computed here against the
+    // server-calculated subtotal, exactly as /api/paystack/initialize does.
+    const validatedDiscount = await validateDiscountCode(session.discount_code, totalGHS, deliveryFee);
+
+    if (session.discount_code && !validatedDiscount) {
+        return NextResponse.json({
+            error: `Code "${session.discount_code}" is no longer valid — it may have expired, been fully redeemed, or hit its usage limit. Remove it and try again.`,
+        }, { status: 409 });
+    }
+
+    const discountAmount = validatedDiscount?.amount ?? 0;
+    // Only the goods portion comes off the subtotal; the rest is spent on
+    // delivery below. Keeping them apart is what leaves the platform fee
+    // charged on goods alone.
+    const discountedSubtotal = parseFloat(Math.max(0, totalGHS - (validatedDiscount?.subtotalAmount ?? 0)).toFixed(2));
+    const payableDelivery = parseFloat(Math.max(0, deliveryFee - Math.min(validatedDiscount?.deliveryAmount ?? 0, deliveryFee)).toFixed(2));
+
+    // Platform fee settings — read up front alongside the session
+    const storeFeeSettings = storeFeeRes.data;
+
+    // Fee is charged on the post-discount subtotal, matching storefront checkout
+    const feePct = Number(storeFeeSettings?.platform_fee_percentage) || 0;
+    const platformFeeAmount = feePct > 0
+        ? parseFloat((discountedSubtotal * feePct / 100).toFixed(2))
+        : 0;
+    const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);
+
+    const amountWithFee = parseFloat((discountedSubtotal + platformFeeAmount + payableDelivery).toFixed(2));
 
     // Must be computed from the final chargeable amount, not from the goods
     // subtotal. A gift card covering every item still leaves a delivery fee to
