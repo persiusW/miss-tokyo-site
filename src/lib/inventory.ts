@@ -93,11 +93,35 @@ async function recordSale(orderId: string, lines: SaleLine[]): Promise<number> {
         p_order_id: orderId,
         p_items: items,
     });
+
     if (error) {
+        // Deploy ordering must never cost a decrement. If this build reaches
+        // production ahead of its migration the function is simply absent, and
+        // throwing here would stop every settlement from taking stock down —
+        // the exact failure this whole change exists to end. Fall back to the
+        // per-line decrement the previous release used.
+        if (isMissingFunction(error)) {
+            console.warn("[inventory] fn_record_sale missing — run the stock ledger migration. Decrementing without it.", { orderId });
+            await Promise.allSettled(
+                items.map(l => decrementStock(l.product_id, l.variant_id, l.quantity)),
+            );
+            return items.length;
+        }
         console.error("[inventory] fn_record_sale failed:", error.message, { orderId });
         throw new Error(error.message);
     }
     return Number(data) || 0;
+}
+
+/**
+ * Whether a PostgREST error means the RPC does not exist yet.
+ * PGRST202 is "no function matches"; 42883 is Postgres' undefined_function.
+ */
+function isMissingFunction(error: { code?: string; message?: string } | null): boolean {
+    if (!error) return false;
+    return error.code === "PGRST202"
+        || error.code === "42883"
+        || /could not find the function|does not exist/i.test(error.message ?? "");
 }
 
 /**
@@ -633,6 +657,13 @@ export async function syncOrderStockPosition(
         p_note: note ?? null,
     });
     if (error) {
+        // Before the migration lands there is no ledger to reconcile against,
+        // so there is nothing this could correctly do. Staying quiet is right:
+        // the status change itself already succeeded.
+        if (isMissingFunction(error)) {
+            console.warn("[inventory] fn_sync_order_stock_position missing — run the stock ledger migration. Stock not reconciled.", { orderId });
+            return 0;
+        }
         console.error("[inventory] fn_sync_order_stock_position failed:", error.message, { orderId, shouldHold });
         throw new Error(error.message);
     }
