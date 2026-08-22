@@ -19,8 +19,40 @@ export const ORDER_TABS: { key: OrderTab; label: string }[] = [
 
 const ORDER_TEXT_COLUMNS = ["customer_name", "customer_email", "customer_phone", "paystack_reference"];
 
-const ORDER_FIELDS =
+const ORDER_FIELDS_BASE =
     "id, customer_name, customer_email, customer_phone, total_amount, status, payment_status, paystack_reference, shipping_address, delivery_method, created_at, has_preorder, is_mixed_order, customer_metadata";
+
+// Requested separately so a deploy landing before the cash migration falls back
+// to the base list instead of failing every order query.
+const ORDER_FIELDS = `${ORDER_FIELDS_BASE}, payment_method`;
+
+export type PaymentFilter = "all" | "cash" | "paystack" | "gift_card";
+
+export const PAYMENT_FILTERS: { key: PaymentFilter; label: string }[] = [
+    { key: "all", label: "All payments" },
+    { key: "cash", label: "Cash" },
+    { key: "paystack", label: "Card / Mobile money" },
+    { key: "gift_card", label: "Gift card" },
+];
+
+/** Narrows to one payment method. Untouched when the filter is "all". */
+function applyPayment<T>(query: T, payment: PaymentFilter): T {
+    if (payment === "all") return query;
+    return (query as any).eq("payment_method", payment);
+}
+
+/**
+ * Inclusive calendar-day range on created_at.
+ *
+ * `to` is pushed to the end of that day: staff picking 22 Aug -> 22 Aug mean
+ * everything that happened that day, not the single instant of midnight.
+ */
+function applyDateRange<T>(query: T, from?: string, to?: string): T {
+    let q = query as any;
+    if (from) q = q.gte("created_at", new Date(`${from}T00:00:00.000Z`).toISOString());
+    if (to) q = q.lte("created_at", new Date(`${to}T23:59:59.999Z`).toISOString());
+    return q;
+}
 
 // Online orders only — pure pre-orders live on the pre-orders page.
 const ONLINE_FILTER = "has_preorder.eq.false,is_mixed_order.eq.true";
@@ -54,6 +86,9 @@ export type OrdersPage = {
     orders: any[];
     tab: OrderTab;
     search: string;
+    payment: PaymentFilter;
+    dateFrom: string;
+    dateTo: string;
     page: number;
     pageSize: number;
     totalCount: number;
@@ -69,31 +104,40 @@ export async function fetchOrdersPage(
     tab: OrderTab,
     search: string,
     page: number,
+    opts: { payment?: PaymentFilter; dateFrom?: string; dateTo?: string } = {},
 ): Promise<OrdersPage> {
+    const payment = opts.payment ?? "all";
+    const dateFrom = opts.dateFrom ?? "";
+    const dateTo = opts.dateTo ?? "";
     const searchActive = search.trim().length > 0;
     const from = (page - 1) * ORDERS_PAGE_SIZE;
     const to = from + ORDERS_PAGE_SIZE - 1;
 
     // List query for the active tab. A search on Inbox spans all statuses.
-    const buildList = (includeRef: boolean) => {
+    const buildList = (includeRef: boolean, includePaymentColumn: boolean) => {
         let lq = supabaseAdmin
             .from("orders")
-            .select(ORDER_FIELDS, { count: "exact" })
+            .select(includePaymentColumn ? ORDER_FIELDS : ORDER_FIELDS_BASE, { count: "exact" })
             .or(ONLINE_FILTER);
         if (!(tab === "all" && searchActive)) lq = applyTabStatus(lq, tab);
         lq = applySearch(lq, search, includeRef);
+        if (includePaymentColumn) lq = applyPayment(lq, payment);
+        lq = applyDateRange(lq, dateFrom, dateTo);
         return lq.order("created_at", { ascending: false }).range(from, to);
     };
 
     // Per-tab counts (head-only, cheap). Counts respect the active search so the
     // badges reflect what a tab would show for the current query.
-    const countFor = (t: OrderTab, includeRef: boolean) => {
+    const countFor = (t: OrderTab, includeRef: boolean, includePaymentColumn: boolean) => {
         let cq = supabaseAdmin
             .from("orders")
             .select("id", { count: "exact", head: true })
             .or(ONLINE_FILTER);
         cq = applyTabStatus(cq, t);
         cq = applySearch(cq, search, includeRef);
+        // Badges must agree with the list, so they carry the same filters.
+        if (includePaymentColumn) cq = applyPayment(cq, payment);
+        cq = applyDateRange(cq, dateFrom, dateTo);
         return cq;
     };
 
@@ -102,18 +146,25 @@ export async function fetchOrdersPage(
     // A deploy can land before the migration that adds `ref`. Naming a missing
     // column fails the whole or(), so fall back to searching without it rather
     // than taking every order search down.
-    const runAll = async (includeRef: boolean) => {
+    const runAll = async (includeRef: boolean, includePaymentColumn: boolean) => {
         const [list, ...counts] = await Promise.all([
-            buildList(includeRef),
-            ...tabKeys.map(k => countFor(k, includeRef)),
+            buildList(includeRef, includePaymentColumn),
+            ...tabKeys.map(k => countFor(k, includeRef, includePaymentColumn)),
         ]);
         return { list, counts };
     };
 
-    let { list, counts: countResults } = await runAll(true);
+    let { list, counts: countResults } = await runAll(true, true);
+
+    // Same guard as `ref` below: the cash migration may not have landed yet, and
+    // a missing column must not take the whole orders page down.
+    if (isMissingColumn((list as any).error, "payment_method")) {
+        console.warn("[orders] `payment_method` column missing — payment filter disabled. Apply 20260822090000_cash_payments.sql.");
+        ({ list, counts: countResults } = await runAll(true, false));
+    }
     if (searchActive && isMissingColumn((list as any).error, "ref")) {
         console.warn("[orders] `ref` column missing — searching without it. Apply 20260821010000_searchable_display_refs.sql.");
-        ({ list, counts: countResults } = await runAll(false));
+        ({ list, counts: countResults } = await runAll(false, true));
     }
     const { data: orders, count } = list as any;
 
@@ -126,6 +177,9 @@ export async function fetchOrdersPage(
         orders: orders ?? [],
         tab,
         search,
+        payment,
+        dateFrom,
+        dateTo,
         page,
         pageSize: ORDERS_PAGE_SIZE,
         totalCount: count ?? 0,

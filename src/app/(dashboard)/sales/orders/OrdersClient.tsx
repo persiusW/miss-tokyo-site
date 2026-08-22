@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { MoreHorizontal, Copy, Printer, Eye, Truck, X, Search, Store, ChevronLeft, ChevronRight } from "lucide-react";
 import { updateOrderStatus, bulkUpdateOrderStatus } from "./actions";
+import { PAYMENT_FILTERS, type PaymentFilter } from "./ordersQuery";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,8 @@ type Order = {
     has_preorder?: boolean;
     is_mixed_order?: boolean;
     customer_metadata?: Record<string, any> | null;
+    /** Absent until the cash migration lands — treat undefined as gateway-paid. */
+    payment_method?: string | null;
 };
 
 type Rider = {
@@ -208,6 +211,9 @@ type OrdersClientProps = {
     // component falls back to legacy client-side filtering over `orders`.
     tab?: Tab;
     search?: string;
+    payment?: PaymentFilter;
+    dateFrom?: string;
+    dateTo?: string;
     page?: number;
     pageSize?: number;
     totalCount?: number;
@@ -218,6 +224,9 @@ export function OrdersClient({
     orders: initialOrders,
     tab: tabProp,
     search: serverSearch = "",
+    payment: serverPayment = "all",
+    dateFrom: serverDateFrom = "",
+    dateTo: serverDateTo = "",
     page = 1,
     pageSize = 100,
     totalCount = 0,
@@ -232,6 +241,11 @@ export function OrdersClient({
     // and this search box mirrors it (navigation is debounced).
     const [clientTab, setClientTab] = useState<Tab>("all");
     const [search, setSearch] = useState(serverSearch);
+    // Dates are held locally while the staff member picks both ends, then
+    // pushed to the URL — navigating on the first pick would fire a query for
+    // a half-chosen range.
+    const [dateFrom, setDateFrom] = useState(serverDateFrom);
+    const [dateTo, setDateTo] = useState(serverDateTo);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
@@ -242,6 +256,8 @@ export function OrdersClient({
     // Re-sync when the server sends a new page (tab/search/page nav or router.refresh)
     useEffect(() => { setOrders(initialOrders); }, [initialOrders]);
     useEffect(() => { setSearch(serverSearch); }, [serverSearch]);
+    useEffect(() => { setDateFrom(serverDateFrom); }, [serverDateFrom]);
+    useEffect(() => { setDateTo(serverDateTo); }, [serverDateTo]);
 
     const activeTab: Tab = serverMode ? (tabProp ?? "all") : clientTab;
 
@@ -252,19 +268,29 @@ export function OrdersClient({
     const tabCounts: Record<Tab, number> = serverMode ? serverTabCounts! : computeLocalCounts(orders);
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-    const buildUrl = (next: { tab?: Tab; q?: string; page?: number }) => {
+    type NavParams = { tab?: Tab; q?: string; page?: number; payment?: PaymentFilter; from?: string; to?: string };
+
+    const buildUrl = (next: NavParams) => {
         const params = new URLSearchParams();
         const t = next.tab ?? activeTab;
         const q = next.q ?? search;
         const p = next.page ?? 1;
+        // Filters persist across tab, search and page navigation — losing the
+        // date range on page 2 would make the range useless for counting a day.
+        const pay = next.payment ?? serverPayment;
+        const df = next.from ?? dateFrom;
+        const dt = next.to ?? dateTo;
         if (t !== "all") params.set("tab", t);
         if (q.trim()) params.set("q", q.trim());
+        if (pay !== "all") params.set("payment", pay);
+        if (df) params.set("from", df);
+        if (dt) params.set("to", dt);
         if (p > 1) params.set("page", String(p));
         const qs = params.toString();
         return `/sales/orders${qs ? `?${qs}` : ""}`;
     };
 
-    const navigate = (next: { tab?: Tab; q?: string; page?: number }) => {
+    const navigate = (next: NavParams) => {
         startTransition(() => router.push(buildUrl(next)));
     };
 
@@ -496,6 +522,67 @@ export function OrdersClient({
                 </div>
             </div>
 
+            {/* Payment method + date range. Server mode only: both filters are
+                applied in the query, so client-filtered pages (pre-orders,
+                test-orders) have nothing to bind them to. */}
+            {serverMode && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "4px 4px 0" }}>
+                    <div style={{ display: "flex", gap: 0 }}>
+                        {PAYMENT_FILTERS.map(f => (
+                            <button
+                                key={f.key}
+                                onClick={() => { setSelected(new Set()); navigate({ payment: f.key, page: 1 }); }}
+                                className={`ac-tab ${serverPayment === f.key ? "active" : ""}`}
+                                style={{ fontSize: 10 }}
+                            >
+                                {f.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>From</span>
+                        <input
+                            type="date"
+                            value={dateFrom}
+                            max={dateTo || undefined}
+                            onChange={e => { setDateFrom(e.target.value); setSelected(new Set()); navigate({ from: e.target.value, page: 1 }); }}
+                            className="ac-input-line"
+                            style={{ fontSize: 11 }}
+                        />
+                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>To</span>
+                        <input
+                            type="date"
+                            value={dateTo}
+                            min={dateFrom || undefined}
+                            onChange={e => { setDateTo(e.target.value); setSelected(new Set()); navigate({ to: e.target.value, page: 1 }); }}
+                            className="ac-input-line"
+                            style={{ fontSize: 11 }}
+                        />
+                        {(dateFrom || dateTo) && (
+                            <button
+                                onClick={() => { setDateFrom(""); setDateTo(""); setSelected(new Set()); navigate({ from: "", to: "", page: 1 }); }}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", display: "inline-flex" }}
+                                title="Clear dates"
+                            >
+                                <X size={13} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Active filter summary — the tab counts already reflect these, so
+                say out loud what is narrowing them. */}
+            {serverMode && (serverPayment !== "all" || dateFrom || dateTo) && (
+                <div style={{ padding: "8px 4px", fontSize: 10, color: "var(--ac-ink-3)", textTransform: "uppercase", letterSpacing: ".08em" }}>
+                    {totalCount} order{totalCount !== 1 ? "s" : ""}
+                    {serverPayment !== "all" ? ` paid by ${PAYMENT_FILTERS.find(f => f.key === serverPayment)?.label.toLowerCase()}` : ""}
+                    {dateFrom ? ` from ${dateFrom}` : ""}
+                    {dateTo ? ` to ${dateTo}` : ""}
+                </div>
+            )}
+
             {/* Search context indicator */}
             {search && (
                 <div style={{ padding: "8px 4px", fontSize: 10, color: "var(--ac-ink-3)", textTransform: "uppercase", letterSpacing: ".08em" }}>
@@ -595,6 +682,14 @@ export function OrdersClient({
                                 <td style={{ color: "var(--ac-ink-2)" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                                         <span>{order.customer_name || order.customer_email || "—"}</span>
+                                        {/* Cash has no gateway record, so the row is the only place
+                                            it shows. Card sales stay unlabelled — they are the norm. */}
+                                        {order.payment_method === "cash" && (
+                                            <span className="ac-badge" title="Paid in cash at the till">Cash</span>
+                                        )}
+                                        {order.payment_method === "gift_card" && (
+                                            <span className="ac-badge" title="Covered by a gift card">Gift card</span>
+                                        )}
                                         {order.is_mixed_order ? (
                                             <>
                                                 <span className="ac-badge ac-badge-mixed">Mixed</span>
