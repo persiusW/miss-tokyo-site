@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import type { PosProduct, PosItem, PosDeliveryMethod, PosAppliedDiscount } from '@/types/pos';
+import { computeDiscountSplit } from '@/lib/discountSplit';
 import { GHANA_REGIONS, COUNTRIES, DEFAULT_COUNTRY, DEFAULT_REGION } from '@/lib/geo';
 import { useViewportHeight } from '@/hooks/useViewportHeight';
 import {
@@ -212,28 +213,41 @@ export default function POSPage() {
 
     const removeItem = (idx: number) => setCart(prev => prev.filter((_, n) => n !== idx));
     const cartTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-    const discountAmount = Math.min(appliedDiscount?.discount_amount ?? 0, cartTotal);
     const deliveryFee = resolveDeliveryFee({
         settings: deliverySettings,
         country: deliveryCountry,
         deliveryMethod,
         zone: deliveryZone,
     });
-    // Delivery is charged on top of the discounted goods. Coupon lookups keep
-    // using cartTotal below — a delivery charge must not enlarge what a coupon
-    // is allowed to discount.
-    const payableTotal = parseFloat(Math.max(0, cartTotal - discountAmount + deliveryFee).toFixed(2));
+
+    // The same rule send-link charges by, from the same module. The till used to
+    // cap a code at the goods and add delivery afterwards, so a GHC 900 coupon
+    // on a GHC 670 basket still showed GHC 35 of delivery to collect — while the
+    // server had already worked the order out as fully covered. Staff would ask
+    // for cash the order was never going to record.
+    const discountSplit = appliedDiscount
+        ? computeDiscountSplit({
+            discountType: appliedDiscount.discount_type,
+            value: appliedDiscount.raw_value ?? appliedDiscount.discount_amount,
+            subtotal: cartTotal,
+            deliveryFee,
+        })
+        : { amount: 0, subtotalAmount: 0, deliveryAmount: 0 };
+
+    const discountAmount = discountSplit.amount;
+    const payableDelivery = parseFloat(Math.max(0, deliveryFee - discountSplit.deliveryAmount).toFixed(2));
+    const payableTotal = parseFloat(Math.max(0, cartTotal - discountSplit.subtotalAmount + payableDelivery).toFixed(2));
     const showZonePicker = deliverySettings.enabled
         && deliveryCountry === 'Ghana'
         && deliveryMethod === 'delivery';
 
     // Preview only — send-link recomputes the code's worth server-side and is
     // the value actually charged.
-    const lookupCode = useCallback(async (code: string, subtotal: number): Promise<PosAppliedDiscount | string> => {
+    const lookupCode = useCallback(async (code: string, subtotal: number, fee: number): Promise<PosAppliedDiscount | string> => {
         const res = await fetch('/api/checkout/validate-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, subtotal }),
+            body: JSON.stringify({ code, subtotal, deliveryFee: fee }),
         });
         const data = await res.json();
         if (!data.valid) return data.error ?? 'Code not found or invalid.';
@@ -242,6 +256,7 @@ export default function POSPage() {
             type: data.type,
             discount_type: data.discount_type,
             discount_amount: Number(data.discount_amount) || 0,
+            raw_value: data.raw_value != null ? Number(data.raw_value) : undefined,
             label: data.label ?? 'Discount applied',
         };
     }, []);
@@ -252,7 +267,7 @@ export default function POSPage() {
         if (cart.length === 0) { toast.error('Add items before applying a code'); return; }
         setCheckingCode(true);
         try {
-            const result = await lookupCode(code, cartTotal);
+            const result = await lookupCode(code, cartTotal, deliveryFee);
             if (typeof result === 'string') { toast.error(result); return; }
             setAppliedDiscount(result);
             setDiscountInput('');
@@ -276,7 +291,7 @@ export default function POSPage() {
         if (cart.length === 0) { setAppliedDiscount(null); return; }
         const t = setTimeout(async () => {
             try {
-                const result = await lookupCode(appliedDiscount.code, cartTotal);
+                const result = await lookupCode(appliedDiscount.code, cartTotal, deliveryFee);
                 if (typeof result === 'string') {
                     setAppliedDiscount(null);
                     toast.error(`${appliedDiscount.code} no longer applies: ${result}`);
@@ -290,7 +305,7 @@ export default function POSPage() {
         return () => clearTimeout(t);
         // Re-price on basket value only; appliedDiscount.code identifies the code in play
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cartTotal, appliedDiscount?.code, cart.length, lookupCode]);
+    }, [cartTotal, deliveryFee, appliedDiscount?.code, cart.length, lookupCode]);
 
     // A 401 here means the sign-in behind this screen is gone, not that the sale
     // is wrong. The till can keep rendering a signed-in shell after the session
@@ -534,7 +549,17 @@ export default function POSPage() {
                             {deliveryFee > 0 && (
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                     <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-4)" }}>Delivery ({zoneLabel(deliveryZone)})</span>
-                                    <span style={{ fontSize: 11, fontFamily: "var(--f-mono)", color: "var(--ac-ink-3)" }}>GH₵{deliveryFee.toFixed(2)}</span>
+                                    {/* When the code reaches the fee, show what it
+                                        covered — staff must be able to see why the
+                                        amount to collect dropped. */}
+                                    {discountSplit.deliveryAmount > 0 ? (
+                                        <span style={{ fontSize: 11, fontFamily: "var(--f-mono)" }}>
+                                            <span style={{ textDecoration: "line-through", color: "var(--ac-ink-4)", marginRight: 6 }}>GH₵{deliveryFee.toFixed(2)}</span>
+                                            <span style={{ color: "var(--ac-accent)" }}>{payableDelivery > 0 ? `GH₵${payableDelivery.toFixed(2)}` : "Covered"}</span>
+                                        </span>
+                                    ) : (
+                                        <span style={{ fontSize: 11, fontFamily: "var(--f-mono)", color: "var(--ac-ink-3)" }}>GH₵{deliveryFee.toFixed(2)}</span>
+                                    )}
                                 </div>
                             )}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

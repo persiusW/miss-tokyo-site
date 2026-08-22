@@ -13,6 +13,9 @@ export interface PosAppliedDiscount {
     type: PosDiscountTag;
     discount_type: string;
     discount_amount: number;
+    /** Percent for a percentage coupon, GHS for every other type. Kept so the
+     *  till can re-split the code when the delivery zone changes under it. */
+    raw_value?: number;
     label: string;
 }
 

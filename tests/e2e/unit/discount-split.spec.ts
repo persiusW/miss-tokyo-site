@@ -83,3 +83,30 @@ test.describe("edges", () => {
         expect(s.subtotalAmount).toBe(5);
     });
 });
+
+test.describe("reported cases", () => {
+    // The till on 2026-08-23: MISST900 (fixed, GHS 900) on a GHS 670 basket with
+    // GHS 35 delivery within Accra. The screen showed a GHS 670 discount and
+    // GHS 35 still to collect, because the till capped the code at the goods and
+    // added delivery afterwards — while send-link had already worked the same
+    // order out as fully covered. Staff would have taken cash the order was
+    // never going to record.
+    test("MISST900 on a GHS 670 basket covers the GHS 35 delivery too", () => {
+        const s = computeDiscountSplit({ discountType: "fixed", value: 900, subtotal: 670, deliveryFee: 35 });
+        expect(s.subtotalAmount).toBe(670);
+        expect(s.deliveryAmount).toBe(35);
+        expect(s.amount).toBe(705);
+
+        const payableDelivery = Math.max(0, 35 - s.deliveryAmount);
+        const total = Math.max(0, 670 - s.subtotalAmount + payableDelivery);
+        expect(payableDelivery).toBe(0);
+        expect(total).toBe(0);
+    });
+
+    test("the same coupon on a bigger basket leaves delivery payable", () => {
+        const s = computeDiscountSplit({ discountType: "fixed", value: 900, subtotal: 1000, deliveryFee: 35 });
+        expect(s.subtotalAmount).toBe(900);
+        expect(s.deliveryAmount).toBe(0);
+        expect(Math.max(0, 35 - s.deliveryAmount)).toBe(35);
+    });
+});
