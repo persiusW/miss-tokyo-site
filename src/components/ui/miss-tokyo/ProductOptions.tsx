@@ -141,9 +141,51 @@ export function ProductOptions(props: Props) {
             .catch(() => { /* silent — default false is correct for retail users */ });
     }, []);
 
-    const colors: ColorVariant[] = colorVariants && colorVariants.length > 0
-        ? colorVariants
-        : (availableColors || []).map(n => ({ name: n, hex: COLOR_HEX[n] || "#E8D5C4", in_stock: true }));
+    /**
+     * The options a variant-tracked product actually has rows for.
+     *
+     * There are three lists claiming to describe a product's options —
+     * available_colors, the color_variants JSON, and the variant rows — and
+     * nothing keeps them in step. The first two are what the picker offered;
+     * only the third can hold stock or be decremented.
+     *
+     * When they disagreed the customer could buy an option with no row at all,
+     * and the sale fell through to the product roll-up: fourteen brown skirts
+     * sold from a product stocked only in green, pink, purple, red, seablue,
+     * turquoise and wine. The reservation function refuses those lines now, so
+     * left unfiltered the picker would offer an option that cannot be checked
+     * out — worse for the customer than not offering it.
+     *
+     * null means "not variant-tracked" — leave the admin lists alone.
+     */
+    const optionsWithRows = useMemo(() => {
+        if (!trackVariantInventory || !productVariants?.length) return null;
+        const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
+        return {
+            colors: new Set(productVariants.map(v => norm(v.color))),
+            sizes:  new Set(productVariants.map(v => norm(displaySizeLabel(v.size ?? "")))),
+            brands: new Set(productVariants.map(v => norm(v.brand))),
+        };
+    }, [trackVariantInventory, productVariants]);
+
+    /**
+     * Fail open. If matching removes every option, the two lists are spelled
+     * differently rather than genuinely disjoint — "Free (8-16)" against a row
+     * saying "Free(8-16)" — and hiding the whole picker would break a product
+     * that sells perfectly well. Show the unfiltered list in that case: the
+     * reservation function still refuses anything it cannot place, so this can
+     * cost a customer one clear refusal but never an oversell, and the drift
+     * report names the products whose lists disagree.
+     */
+    const keepIfAnyMatch = <T,>(base: T[], matched: T[]): T[] => (matched.length > 0 ? matched : base);
+
+    const colors: ColorVariant[] = ((): ColorVariant[] => {
+        const base = colorVariants && colorVariants.length > 0
+            ? colorVariants
+            : (availableColors || []).map(n => ({ name: n, hex: COLOR_HEX[n] || "#E8D5C4", in_stock: true }));
+        if (!optionsWithRows) return base;
+        return keepIfAnyMatch(base, base.filter(c => optionsWithRows.colors.has(c.name.trim().toLowerCase())));
+    })();
 
     // available_sizes is the admin-managed source of truth.
     // Deduplicate by normalized display label so mixed-format DB arrays (e.g. both
@@ -168,17 +210,30 @@ export function ProductOptions(props: Props) {
             raw = [];
         }
         const seen = new Set<string>();
-        return raw.filter(s => {
+        const deduped = raw.filter(s => {
             const key = displaySizeLabel(s.label);
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
         }).map(s => ({ ...s, label: displaySizeLabel(s.label) }));
+
+        if (!optionsWithRows) return deduped;
+        // Same rule as colours: a size with no variant row cannot be sold, so it
+        // must not be offered. "L" against rows spelling it "L-12" was one of
+        // these — displaySizeLabel canonicalises both sides.
+        return keepIfAnyMatch(
+            deduped,
+            deduped.filter(s => optionsWithRows.sizes.has(s.label.trim().toLowerCase())),
+        );
     })();
 
-    const brands: BrandVariant[] = brandVariants && brandVariants.length > 0
-        ? brandVariants
-        : (availableBrands || []).map(n => ({ name: n, in_stock: true }));
+    const brands: BrandVariant[] = ((): BrandVariant[] => {
+        const base = brandVariants && brandVariants.length > 0
+            ? brandVariants
+            : (availableBrands || []).map(n => ({ name: n, in_stock: true }));
+        if (!optionsWithRows) return base;
+        return keepIfAnyMatch(base, base.filter(b => optionsWithRows.brands.has(b.name.trim().toLowerCase())));
+    })();
 
     const [selectedColor, setSelectedColor] = useState<string>(colors[0]?.name ?? "");
     const [selectedSize, setSelectedSize] = useState<string>(sizes.find(s => s.in_stock)?.label ?? "");
