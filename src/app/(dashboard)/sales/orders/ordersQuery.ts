@@ -1,21 +1,13 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { buildSearchClause, isMissingColumn, sanitiseTerm } from "@/lib/refSearch";
+// Shared with the client component. Defined in their own module because this
+// one imports supabaseAdmin, which cannot be evaluated in the browser.
+import { ORDER_TABS, PAYMENT_FILTERS, type OrderTab, type PaymentFilter } from "./ordersFilters";
+
+export { ORDER_TABS, PAYMENT_FILTERS };
+export type { OrderTab, PaymentFilter };
 
 export const ORDERS_PAGE_SIZE = 100;
-
-export type OrderTab =
-    | "all" | "packed" | "pickups" | "shipped" | "fulfilled" | "cancelled" | "refunded" | "all-orders";
-
-export const ORDER_TABS: { key: OrderTab; label: string }[] = [
-    { key: "all", label: "Inbox" },
-    { key: "packed", label: "Packed" },
-    { key: "pickups", label: "Pickups" },
-    { key: "shipped", label: "Shipped" },
-    { key: "fulfilled", label: "Fulfilled" },
-    { key: "cancelled", label: "Cancelled" },
-    { key: "refunded", label: "Refunds" },
-    { key: "all-orders", label: "All" },
-];
 
 const ORDER_TEXT_COLUMNS = ["customer_name", "customer_email", "customer_phone", "paystack_reference"];
 
@@ -25,15 +17,6 @@ const ORDER_FIELDS_BASE =
 // Requested separately so a deploy landing before the cash migration falls back
 // to the base list instead of failing every order query.
 const ORDER_FIELDS = `${ORDER_FIELDS_BASE}, payment_method`;
-
-export type PaymentFilter = "all" | "cash" | "paystack" | "gift_card";
-
-export const PAYMENT_FILTERS: { key: PaymentFilter; label: string }[] = [
-    { key: "all", label: "All payments" },
-    { key: "cash", label: "Cash" },
-    { key: "paystack", label: "Card / Mobile money" },
-    { key: "gift_card", label: "Gift card" },
-];
 
 /** Narrows to one payment method. Untouched when the filter is "all". */
 function applyPayment<T>(query: T, payment: PaymentFilter): T {
