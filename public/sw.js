@@ -5,16 +5,24 @@
 // v3: stop caching private (admin/dashboard) pages. Bumping the version evicts
 // any authenticated shells the v2 cache-first catch-all had already stored, so
 // a logged-out user no longer sees a cached dashboard.
-const SHELL_CACHE  = "mt-shell-v3";
-const IMAGE_CACHE  = "mt-images-v3";
-const DATA_CACHE   = "mt-data-v3";
+// v4: /pos was missing from PRIVATE_PREFIXES, so the till fell through to the
+// cache-first catch-all with no max-age — a permanent copy that was never
+// revalidated. Staff iPads kept serving a months-old till and never saw
+// features added since. The bump is what evicts those copies; adding the
+// prefix alone would leave every existing device stuck.
+const SHELL_CACHE  = "mt-shell-v4";
+const IMAGE_CACHE  = "mt-images-v4";
+const DATA_CACHE   = "mt-data-v4";
 
 // ─── Private route prefixes — NEVER cached (auth-gated admin dashboard) ───────
 // Mirrors the dashboard/account protection in src/proxy.ts. Caching these would
 // let the shell render for a logged-out user before any API call 401s.
+// Keep this list and the isDashboard check in src/proxy.ts in step — /pos was
+// absent from both, which is how the till ended up cached.
 const PRIVATE_PREFIXES = [
     "/overview", "/sales", "/catalog", "/customers", "/finance",
     "/seo", "/settings", "/cms", "/communications", "/team", "/admin",
+    "/pos",
 ];
 
 // ─── App Shell URLs to precache on install ────────────────────────────────────

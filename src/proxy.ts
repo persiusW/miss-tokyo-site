@@ -82,7 +82,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
     // ── Route protection ──────────────────────────────────────────────────────
 
+    // Keep in step with PRIVATE_PREFIXES in public/sw.js. /pos was missing from
+    // both lists: the dashboard layout still redirected an unauthenticated
+    // visitor, so nothing leaked, but the service worker treated the till as a
+    // public page and cached it permanently.
     const isDashboard = pathname.startsWith("/overview") ||
+        pathname.startsWith("/pos") ||
         pathname.startsWith("/sales") ||
         pathname.startsWith("/catalog") ||
         pathname.startsWith("/customers") ||
