@@ -7,7 +7,10 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { MoreHorizontal, Copy, Printer, Eye, Truck, X, Search, Store, ChevronLeft, ChevronRight } from "lucide-react";
 import { updateOrderStatus, bulkUpdateOrderStatus } from "./actions";
-import { PAYMENT_FILTERS, type PaymentFilter } from "./ordersQuery";
+// From ordersFilters, never ordersQuery: that module imports supabaseAdmin,
+// and pulling it into this client bundle threw "supabaseKey is required" at
+// module evaluation, which took the whole orders page down in production.
+import { PAYMENT_FILTERS, type PaymentFilter } from "./ordersFilters";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
