@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 import type { PosProduct, PosItem, PosDeliveryMethod, PosAppliedDiscount } from '@/types/pos';
 import { GHANA_REGIONS, COUNTRIES, DEFAULT_COUNTRY, DEFAULT_REGION } from '@/lib/geo';
+import { useViewportHeight } from '@/hooks/useViewportHeight';
 import {
     DELIVERY_DEFAULTS,
     parseDeliverySettings,
@@ -107,6 +108,12 @@ export default function POSPage() {
     const [cashArmed, setCashArmed] = useState(false);
     const [copied, setCopied] = useState(false);
     const [productMatchCount, setProductMatchCount] = useState(0);
+
+    // The till is a fixed-height, overflow-hidden layout. On an iPad the
+    // on-screen keyboard does not shrink the layout viewport, so a viewport-unit
+    // height leaves the cart column — and the Send Link / Cash Received buttons
+    // at the bottom of it — behind the keyboard with no way to scroll to them.
+    const viewportHeight = useViewportHeight();
 
     const searchProducts = useCallback(async (q: string) => {
         // Filters before limit(): a transform builder has no .or().
@@ -439,7 +446,7 @@ export default function POSPage() {
     const modeInactive: React.CSSProperties = { background: "transparent", color: "var(--ac-ink-3)", border: "1px solid var(--ac-line)" };
 
     return (
-        <div style={{ margin: "-80px -48px 0", height: "100vh", overflow: "hidden", display: "flex" }}>
+        <div style={{ margin: "-80px -48px 0", height: viewportHeight ? `${viewportHeight}px` : "100dvh", overflow: "hidden", display: "flex" }}>
             {/* LEFT: Product Browser */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: "1px solid var(--ac-line)", overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--ac-line)", flexShrink: 0, background: "var(--ac-panel)" }}>
