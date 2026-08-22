@@ -46,6 +46,18 @@ type Rider = {
     bike_reg: string | null;
 };
 
+/**
+ * The picture for an order line, wherever it can be found.
+ *
+ * Storefront lines carry imageUrl from the cart; till lines carry nothing at
+ * all, because the POS cart item shape has no image field. Falling back to the
+ * product means an order drawn today shows a picture even if the line was
+ * written before any of this — all 244 existing POS orders included.
+ */
+function itemImage(item: any, byProduct: Record<string, string>): string | null {
+    return item.imageUrl || item.image_url || byProduct[item.productId] || null;
+}
+
 const STATUSES = ["pending", "paid", "refunded", "cancelled"];
 
 const STATUS_CLASS: Record<string, string> = {
@@ -177,6 +189,7 @@ export default function OrderDetailPage() {
     const [showRiderPicker, setShowRiderPicker] = useState(false);
     const [assignedRider, setAssignedRider] = useState<AssignedRider | null>(null);
     const [productSkus, setProductSkus] = useState<Record<string, string>>({});
+    const [productImages, setProductImages] = useState<Record<string, string>>({});
 
     useEffect(() => {
         Promise.all([
@@ -193,15 +206,23 @@ export default function OrderDetailPage() {
                     if (productIds.length > 0) {
                         supabase
                             .from("products")
-                            .select("id, sku")
+                            .select("id, sku, image_urls")
                             .in("id", productIds)
                             .then(({ data: skuData }: { data: any }) => {
                                 if (skuData) {
                                     const map: Record<string, string> = {};
+                                    const imgs: Record<string, string> = {};
                                     for (const p of skuData) {
                                         if (p.sku) map[p.id] = p.sku;
+                                        // Till sales store no image on the line — the POS cart
+                                        // item never carried one — so every POS order rendered
+                                        // a blank slot. Reading it from the product here fixes
+                                        // the existing ones too, and rides along on the SKU
+                                        // lookup that was already happening.
+                                        if (p.image_urls?.[0]) imgs[p.id] = p.image_urls[0];
                                     }
                                     setProductSkus(map);
+                                    setProductImages(imgs);
                                 }
                             });
                     }
@@ -536,9 +557,9 @@ export default function OrderDetailPage() {
                         {order.items && order.items.length > 0 ? (
                             order.items.map((item: any, idx: number) => (
                                 <div key={idx} style={{ display: "flex", gap: 16, alignItems: "center", padding: "14px 20px", borderTop: "1px solid var(--ac-line)" }}>
-                                    {(item.imageUrl || item.image_url) && (
+                                    {itemImage(item, productImages) && (
                                         <div style={{ width: 52, height: 60, flexShrink: 0, overflow: "hidden", borderRadius: "var(--r-sm)", border: "1px solid var(--ac-line)", background: "var(--ac-panel-2)" }}>
-                                            <img src={item.imageUrl || item.image_url} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                            <img src={itemImage(item, productImages)!} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                         </div>
                                     )}
                                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -572,6 +593,7 @@ export default function OrderDetailPage() {
                             </div>
                         )}
                     </div>
+
                 </div>
 
                 {/* RIGHT: Payment + Status */}
@@ -806,8 +828,8 @@ export default function OrderDetailPage() {
                                     <tr key={i} style={{ borderBottom: "1px solid #f5f5f5" }}>
                                         <td style={{ padding: "10px 0" }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                                {(item.imageUrl || item.image_url) && (
-                                                    <img src={item.imageUrl || item.image_url} alt={name} style={{ width: 52, height: 52, objectFit: "cover", border: "1px solid #eee" }} />
+                                                {itemImage(item, productImages) && (
+                                                    <img src={itemImage(item, productImages)!} alt={name} style={{ width: 52, height: 52, objectFit: "cover", border: "1px solid #eee" }} />
                                                 )}
                                                 <div>
                                                     <p style={{ fontWeight: 600, color: "#222" }}>{name}</p>
