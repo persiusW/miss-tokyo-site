@@ -44,7 +44,7 @@ export default async function OrdersPage({
                     <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4 block">Total Revenue</span>
                     <span className="text-3xl font-serif">GH₵ {stats.totalRevenue.toFixed(2)}</span>
                     <span className="text-[10px] text-neutral-400 mt-2 block tracking-wider">
-                        PAID · PROCESSING · FULFILLED
+                        GH₵ {stats.cashRevenue.toFixed(2)} CASH · GH₵ {stats.gatewayRevenue.toFixed(2)} CARD
                     </span>
                 </div>
                 <div className="bg-white border border-neutral-200 p-6">

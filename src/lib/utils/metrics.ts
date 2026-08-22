@@ -17,6 +17,11 @@ export type RevenueStatus = (typeof REVENUE_STATUSES)[number];
 
 export type OrderStats = {
     totalRevenue: number;
+    /** Cash taken at the till. No gateway holds this money — it is in the drawer. */
+    cashRevenue: number;
+    cashOrderCount: number;
+    /** Everything settled through Paystack or a gift card. */
+    gatewayRevenue: number;
     revenueOrderCount: number;   // orders in REVENUE_STATUSES
     pendingCount: number;
     processingCount: number;
@@ -75,9 +80,19 @@ export async function fetchTotalRevenue(): Promise<number> {
  * Status breakdown: lightweight status-only query (no amount columns fetched).
  */
 export async function fetchOrderStats(): Promise<OrderStats> {
-    const { data, error } = await supabase
+    // payment_method arrives with the cash migration. Asked for separately so a
+    // deploy landing first degrades to "no cash recorded" instead of blanking
+    // every dashboard tile.
+    let { data, error } = await supabase
         .from("orders")
-        .select("status, payment_status, fulfillment_status, total_amount");
+        .select("status, payment_status, fulfillment_status, total_amount, payment_method");
+
+    if (error?.message?.toLowerCase().includes("payment_method")) {
+        console.warn("[metrics] `payment_method` missing — cash split unavailable. Apply 20260822090000_cash_payments.sql.");
+        ({ data, error } = await supabase
+            .from("orders")
+            .select("status, payment_status, fulfillment_status, total_amount"));
+    }
 
     if (error) {
         console.error("[metrics] fetchOrderStats:", error.message, error.details);
@@ -88,6 +103,7 @@ export async function fetchOrderStats(): Promise<OrderStats> {
         payment_status: string | null;
         fulfillment_status: string | null;
         total_amount: number | null;
+        payment_method?: string | null;
     }[];
 
     const totalOrders = orders.length;
@@ -102,6 +118,11 @@ export async function fetchOrderStats(): Promise<OrderStats> {
     const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total_amount ?? 0), 0);
     const revenueOrderCount = paidOrders.length;
 
+    // Cash is the money that has to be physically counted at close. Everything
+    // else reconciles against a gateway statement instead.
+    const cashOrders = paidOrders.filter(o => o.payment_method === "cash");
+    const cashRevenue = cashOrders.reduce((sum, o) => sum + Number(o.total_amount ?? 0), 0);
+
     // Paid but not yet delivered
     const unfulfilledPaidCount = paidOrders.filter(o =>
         o.fulfillment_status !== "delivered"
@@ -114,6 +135,9 @@ export async function fetchOrderStats(): Promise<OrderStats> {
 
     return {
         totalRevenue,
+        cashRevenue,
+        cashOrderCount: cashOrders.length,
+        gatewayRevenue: totalRevenue - cashRevenue,
         revenueOrderCount,
         pendingCount: unfulfilledPaidCount,
         processingCount: 0,
