@@ -20,6 +20,17 @@ import { buildShippingAddress } from "@/lib/geo";
 import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
 import { releaseDiscountHolds } from "@/lib/discountValidation";
 
+/**
+ * True when Postgres/PostgREST rejected the write because the column does not
+ * exist yet — i.e. the code shipped ahead of its migration.
+ */
+function isMissingColumn(error: { message?: string; code?: string } | null, column: string): boolean {
+    if (!error) return false;
+    const msg = (error.message ?? "").toLowerCase();
+    return (error.code === "PGRST204" || error.code === "42703" || msg.includes("column"))
+        && msg.includes(column.toLowerCase());
+}
+
 /** The only windows staff can choose, and the fallback when unset. */
 export const POS_HOLD_OPTIONS = [15, 30, 45] as const;
 export const DEFAULT_POS_HOLD_MINUTES = 15;
@@ -60,9 +71,23 @@ export type PosSettlementResult =
  */
 export async function settlePosSession(
     posSessionId: string,
-    opts: { paystackRef?: string | null; eventMeta?: Record<string, any>; logPrefix?: string } = {},
+    opts: {
+        paystackRef?: string | null;
+        eventMeta?: Record<string, any>;
+        logPrefix?: string;
+        /** How the sale was paid. Cash never reaches a gateway, so nothing else records it. */
+        paymentMethod?: "paystack" | "cash" | "gift_card";
+        /** Staff profile that took the cash. The order row is the only proof of a cash sale. */
+        recordedBy?: string | null;
+    } = {},
 ): Promise<PosSettlementResult> {
-    const { paystackRef = null, eventMeta = {}, logPrefix = "[POS settle]" } = opts;
+    const {
+        paystackRef = null,
+        eventMeta = {},
+        logPrefix = "[POS settle]",
+        paymentMethod = "paystack",
+        recordedBy = null,
+    } = opts;
 
     const { data: posSession } = await supabaseAdmin
         .from("pos_sessions")
@@ -106,6 +131,8 @@ export async function settlePosSession(
         paystack_reference: paystackRef || posSession.paystack_reference,
         delivery_method: deliveryMethod,
         source: "pos",
+        payment_method: paymentMethod,
+        recorded_by: recordedBy,
         notes: posSession.notes,
         customer_id: posSession.contact_id,
     };
@@ -119,6 +146,20 @@ export async function settlePosSession(
     // orders.customer_email may still be NOT NULL. Recording the sale under the
     // store's own address beats losing the order entirely — the payment has
     // already been taken by this point.
+    // The cash columns arrive with their own migration. If the code is live
+    // before the migration is, every POS settlement would fail on an unknown
+    // column and the till would stop taking money — so drop the new fields and
+    // record the sale without them rather than losing it.
+    if (isMissingColumn(orderError, "payment_method") || isMissingColumn(orderError, "recorded_by")) {
+        console.warn(`${logPrefix} cash columns missing — run the cash_payments migration. Recording without them.`, { posSessionId });
+        const { payment_method: _pm, recorded_by: _rb, ...legacyPayload } = orderPayload;
+        ({ data: newOrder, error: orderError } = await supabaseAdmin
+            .from("orders")
+            .insert(legacyPayload)
+            .select("id")
+            .single());
+    }
+
     if (isNotNullViolation(orderError, "customer_email")) {
         console.warn(`${logPrefix} orders.customer_email is NOT NULL — recording this walk-in under the store address`, { posSessionId });
         ({ data: newOrder, error: orderError } = await supabaseAdmin
