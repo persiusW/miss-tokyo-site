@@ -45,6 +45,86 @@ async function decrementStock(productId: string, variantId: string | null, quant
     if (error) console.error("[inventory] fn_decrement_stock failed:", error.message, { productId, variantId, quantity });
 }
 
+/** One settlement line, in the shape the ledger functions expect. */
+export type SaleLine = { product_id: string; variant_id: string | null; quantity: number };
+
+/**
+ * Records a settlement in the stock ledger.
+ *
+ * Keyed on (order, product, variant), so the two callers that can both settle
+ * one payment — the webhook and the verify route — write the same keys and the
+ * second one is suppressed instead of taking the stock twice. That race used to
+ * be invisible: the webhook's idempotency check was a plain read while verify's
+ * was an atomic claim, so both could pass, and the duplicate decrement looked
+ * exactly like a second sale.
+ *
+ * Throws on failure. A throw is now safe to let through: the caller retries,
+ * finds the reservation gone, falls back to the order items, and produces the
+ * same keys — so the retry settles correctly instead of double-counting.
+ */
+async function recordSale(orderId: string, lines: SaleLine[]): Promise<number> {
+    const items = lines.filter(l => l.product_id && (l.quantity ?? 0) > 0);
+    if (!items.length) return 0;
+
+    const { data, error } = await supabaseAdmin.rpc("fn_record_sale", {
+        p_order_id: orderId,
+        p_items: items,
+    });
+    if (error) {
+        console.error("[inventory] fn_record_sale failed:", error.message, { orderId });
+        throw new Error(error.message);
+    }
+    return Number(data) || 0;
+}
+
+/**
+ * Resolves cart/order lines to current variant IDs by (size, colour, brand).
+ *
+ * Stored lines carry the attributes the customer chose, not a variant UUID —
+ * and any UUID they do carry goes stale the moment a product re-save recreates
+ * its variant rows. 265 paid lines in production point at variant IDs that no
+ * longer exist. Matching on attributes through variantKey is the durable route;
+ * the stored UUID is only a last resort.
+ */
+async function resolveSaleLines(
+    items: Array<{ productId: string; size?: string; color?: string; brand?: string; variantId?: string | null; quantity?: number }>,
+): Promise<SaleLine[]> {
+    const pIds = [...new Set(items.map(i => i.productId).filter(Boolean))];
+    if (!pIds.length) return [];
+
+    const { data: products } = await supabaseAdmin
+        .from("products")
+        .select("id, track_inventory, track_variant_inventory")
+        .in("id", pIds);
+    const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
+
+    const variantTracked = new Set<string>(
+        (products ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string),
+    );
+
+    const lookup: Record<string, string> = {};
+    if (variantTracked.size > 0) {
+        const { data: variants } = await supabaseAdmin
+            .from("product_variants")
+            .select("id, product_id, size, color, brand")
+            .in("product_id", [...variantTracked]);
+        for (const v of variants ?? []) lookup[variantKey(v.product_id, v)] = v.id;
+    }
+
+    const out: SaleLine[] = [];
+    for (const item of items) {
+        const product = productMap.get(item.productId) as any;
+        if (!product || product.track_inventory === false) continue;
+
+        const variantId = product.track_variant_inventory
+            ? (lookup[variantKey(item.productId, item)] ?? item.variantId ?? null)
+            : null;
+
+        out.push({ product_id: item.productId, variant_id: variantId, quantity: item.quantity ?? 1 });
+    }
+    return out;
+}
+
 /**
  * Availability for (product, variant) pairs, net of live POS and online holds.
  * Reading raw inventory_count lets two buyers each see the last unit as free.
@@ -333,13 +413,17 @@ export async function confirmSale(orderId: string): Promise<boolean> {
         console.warn(`[confirmSale] Late webhook for order ${orderId}: reservation expired but payment confirmed — processing sale`);
     }
 
-    // One atomic call per reservation row. fn_decrement_stock takes the variant
-    // down (when present) and the product-level count together, so the two can
-    // never drift apart.
-    await Promise.all(
-        (reservations as any[]).map(r =>
-            decrementStock(r.product_id, r.variant_id ?? null, r.quantity),
-        ),
+    // Through the ledger, keyed on (order, product, variant). The reservation
+    // rows already carry resolved variant IDs, so these are the authoritative
+    // keys — a later fallback for the same order recomputes them identically
+    // and is suppressed rather than decrementing a second time.
+    await recordSale(
+        orderId,
+        (reservations as any[]).map(r => ({
+            product_id: r.product_id,
+            variant_id: r.variant_id ?? null,
+            quantity: r.quantity,
+        })),
     );
 
     return true;
@@ -441,48 +525,27 @@ export async function releaseSupersededAttempts(opts: {
  * online checkout fallbacks — keeps inventory writes inside this file.
  */
 export async function fallbackDecrementFromItems(
+    orderId: string | null,
     items: Array<{ productId: string; size?: string; color?: string; brand?: string; variantId?: string | null; quantity?: number }>,
 ): Promise<void> {
     if (!items?.length) return;
 
-    const pIds = [...new Set(items.map(i => i.productId).filter(Boolean))];
-    if (pIds.length === 0) return;
+    const lines = await resolveSaleLines(items);
+    if (!lines.length) return;
 
-    const { data: products } = await supabaseAdmin
-        .from("products")
-        .select("id, inventory_count, track_inventory, track_variant_inventory")
-        .in("id", pIds);
-    const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
-
-    const variantTrackedPIds = new Set<string>(
-        (products ?? []).filter((p: any) => p.track_variant_inventory).map((p: any) => p.id as string)
-    );
-
-    const variantIdLookup: Record<string, string> = {};
-    if (variantTrackedPIds.size > 0) {
-        const { data: variants } = await supabaseAdmin
-            .from("product_variants")
-            .select("id, product_id, size, color, brand")
-            .in("product_id", [...variantTrackedPIds]);
-        for (const v of variants ?? []) {
-            const k = variantKey(v.product_id, v);
-            variantIdLookup[k] = v.id;
-        }
+    // With an order id this goes through the ledger under the same keys
+    // confirmSale would have used, so the webhook and the verify route can both
+    // reach here for one payment and only the first takes the stock.
+    if (orderId) {
+        await recordSale(orderId, lines);
+        return;
     }
 
-    await Promise.allSettled(items.map(async (item) => {
-        const product = productMap.get(item.productId) as any;
-        if (!product || product.track_inventory === false) return;
-        const qty = item.quantity ?? 1;
-
-        if (product.track_variant_inventory) {
-            const lookupKey = variantKey(item.productId, item);
-            const resolvedVariantId = variantIdLookup[lookupKey] ?? item.variantId ?? null;
-            await decrementStock(item.productId, resolvedVariantId, qty);
-        } else {
-            await decrementStock(item.productId, null, qty);
-        }
-    }));
+    // No order context — the legacy single-product charge. Nothing to key on,
+    // so this stays an unguarded decrement, recorded as such in the ledger.
+    await Promise.allSettled(
+        lines.map(l => decrementStock(l.product_id, l.variant_id, l.quantity)),
+    );
 }
 
 /**

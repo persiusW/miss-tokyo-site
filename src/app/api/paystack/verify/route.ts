@@ -109,7 +109,7 @@ export async function GET(req: Request) {
                         // inventory lib's sanctioned path (keeps inventory writes in one place).
                         const orderItems: any[] = Array.isArray(currentOrder?.items) ? (currentOrder.items as any[]) : [];
                         if (orderItems.length > 0) {
-                            await fallbackDecrementFromItems(orderItems);
+                            await fallbackDecrementFromItems(metaOrderId, orderItems);
                             console.log(`[verify] fallback stock decrement applied for order ${metaOrderId}`);
                         }
                     }
