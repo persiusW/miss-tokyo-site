@@ -358,6 +358,82 @@ export async function releaseReservation(orderId: string): Promise<void> {
 }
 
 /**
+ * Releases the stock a customer's own earlier, abandoned checkout attempt is
+ * still holding, so their retry is not refused by their own reservation.
+ *
+ * A customer who reaches Paystack and comes back clicks Pay again. That creates
+ * a fresh order, and fn_reserve_online_stock counts the previous attempt's hold
+ * against them — so the retry fails with "just sold out" until the hold expires.
+ * Observed in production: one customer made six consecutive attempts in three
+ * minutes, all refused, and eventually removed an item from her basket to get
+ * through.
+ *
+ * Safety, in three parts, because a settlement can be running concurrently:
+ *  - only orders still pending on both status columns are considered;
+ *  - the cancel is a CONDITIONAL update, re-checking both columns, so it can
+ *    never flip an order that has just been marked paid;
+ *  - if this deletes reservation rows a settling webhook was about to consume,
+ *    confirmSale finds none, returns false, and the caller's
+ *    fallbackDecrementFromItems still takes the stock down from order items.
+ *
+ * Note the payment_status CHECK constraint allows only pending / paid /
+ * refunded / cancelled — there is no in-flight 'processing' value to test for,
+ * which is why the conditional update carries the weight here.
+ */
+export async function releaseSupersededAttempts(opts: {
+    email: string;
+    currentOrderId: string;
+    previousOrderId?: string | null;
+    withinMinutes?: number;
+}): Promise<number> {
+    const { email, currentOrderId, previousOrderId, withinMinutes = 30 } = opts;
+    const cutoff = new Date(Date.now() - withinMinutes * 60_000).toISOString();
+
+    const { data: stale } = await supabaseAdmin
+        .from("orders")
+        .select("id")
+        .eq("customer_email", email)
+        .eq("status", "pending")
+        .eq("payment_status", "pending")
+        .neq("id", currentOrderId)
+        .gte("created_at", cutoff);
+
+    const ids = new Set((stale ?? []).map((o: { id: string }) => o.id));
+
+    // The browser reports which attempt it is abandoning. Outside the window
+    // above it would otherwise be missed, so confirm it against the same guards.
+    if (previousOrderId && previousOrderId !== currentOrderId && !ids.has(previousOrderId)) {
+        const { data: prev } = await supabaseAdmin
+            .from("orders")
+            .select("id, status, payment_status")
+            .eq("id", previousOrderId)
+            .maybeSingle();
+        if (prev && prev.status === "pending" && prev.payment_status === "pending") ids.add(prev.id);
+    }
+
+    if (ids.size === 0) return 0;
+
+    const list = [...ids];
+
+    // Cancel first, conditionally: an order that has just settled fails both
+    // predicates and is left alone, and its rows are then not released either.
+    const { data: cancelled } = await supabaseAdmin
+        .from("orders")
+        .update({ status: "cancelled" })
+        .in("id", list)
+        .eq("status", "pending")
+        .eq("payment_status", "pending")
+        .select("id");
+
+    const released = (cancelled ?? []).map((o: { id: string }) => o.id);
+    if (released.length === 0) return 0;
+
+    await Promise.all(released.map(id => releaseReservation(id)));
+    console.warn(`[checkout] released ${released.length} superseded attempt(s) for ${email.slice(0, 3)}***`);
+    return released.length;
+}
+
+/**
  * Fallback decrement from an order's stored items, used when no reservation row
  * exists (order predates the reservation system, or the row was never created).
  * Resolves current variant IDs by (size, color, brand) and decrements variant +
