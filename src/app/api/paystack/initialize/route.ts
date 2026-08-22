@@ -3,7 +3,7 @@ export const maxDuration = 30; // 30 seconds — headroom for Paystack API hands
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { reserveStock, releaseReservation, releaseSupersededAttempts, type ReserveItem } from "@/lib/inventory";
-import { normAttr } from "@/lib/utils/normAttr";
+import { variantKey } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
 
@@ -161,12 +161,12 @@ export async function POST(request: Request) {
 
                     const variantStockMap: Record<string, number> = {};
                     for (const v of (dbVariants ?? [])) {
-                        const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+                        const key = variantKey(v.product_id, v);
                         variantStockMap[key] = v.inventory_count ?? 0;
                     }
 
                     for (const item of variantCartItems) {
-                        const key = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
+                        const key = variantKey(item.productId, item);
                         const variantStock = variantStockMap[key];
                         if (variantStock !== undefined && variantStock !== 9999 && (item.quantity ?? 1) > variantStock) {
                             return NextResponse.json(
@@ -435,7 +435,7 @@ export async function POST(request: Request) {
                     .select("id, product_id, size, color, brand")
                     .in("product_id", [...variantTrackedIds]);
                 for (const v of currentVariants ?? []) {
-                    const key = `${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+                    const key = variantKey(v.product_id, v);
                     variantIdLookup[key] = v.id;
                 }
             }
@@ -453,7 +453,7 @@ export async function POST(request: Request) {
 
                 let resolvedVariantId: string | null = item.variantId ?? null;
                 if (variantTrackedIds.has(item.productId)) {
-                    const lookupKey = `${item.productId}|${normAttr(item.size)}|${normAttr(item.color)}|${normAttr(item.brand)}`;
+                    const lookupKey = variantKey(item.productId, item);
                     resolvedVariantId = variantIdLookup[lookupKey] ?? null;
                 }
                 const mapKey = `${item.productId}|${resolvedVariantId ?? "null"}`;

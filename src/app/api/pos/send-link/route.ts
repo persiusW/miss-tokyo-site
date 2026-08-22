@@ -7,7 +7,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { Resend } from 'resend';
 import { sendSMS } from '@/lib/sms';
 import { validateDiscountCode, holdDiscount } from '@/lib/discountValidation';
-import { normAttr } from '@/lib/utils/normAttr';
+import { variantKey } from '@/lib/utils/normAttr';
 import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
 import { parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/delivery';
 import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
@@ -133,13 +133,13 @@ export async function POST(req: NextRequest) {
 
     const variantLookup: Record<string, string> = {};
     for (const v of (allVariants ?? [])) {
-        variantLookup[`${v.product_id}|${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`] = v.id;
+        variantLookup[variantKey(v.product_id, v)] = v.id;
     }
 
     const resolveVariantId = (i: any): string | null => {
         if (i.variantId) return i.variantId;
         if (!variantTrackedIds.includes(i.productId)) return null;
-        return variantLookup[`${i.productId}|${normAttr(i.size)}|${normAttr(i.color)}|${normAttr(i.brand)}`] ?? null;
+        return variantLookup[variantKey(i.productId, i)] ?? null;
     };
 
     // A variant-tracked product whose size/colour matches no variant row would
