@@ -11,7 +11,7 @@
 
 import { revalidateTag } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { decrementDirect } from "@/lib/inventory";
+import { decrementDirect, recordSaleForOrder } from "@/lib/inventory";
 import { sendSMS, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { POS_FALLBACK_EMAIL, isNotNullViolation } from "@/lib/posContact";
@@ -190,26 +190,42 @@ export async function settlePosSession(
             .in("id", productIds);
         const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
 
-        await Promise.allSettled(items.map(async (item: any) => {
+        for (const item of items) {
             const product = productMap.get(item.productId);
-            if (!product || product.track_inventory === false) return;
-            const qty = item.quantity ?? 1;
-
+            if (!product || product.track_inventory === false) continue;
             if (product.track_variant_inventory && !item.variantId) {
                 // send-link resolves this now; a session drafted before that fix
-                // could still arrive here. Decrement product level and shout.
-                console.error(`${logPrefix} variant unresolved — variant stock NOT decremented`, {
+                // could still arrive here. Shout — the ledger will record it as
+                // sale_unresolved_variant and the nightly report will list it.
+                console.error(`${logPrefix} variant unresolved on a variant-tracked product`, {
                     posSessionId, productId: item.productId, size: item.size, color: item.color,
                 });
             }
+        }
 
-            await decrementDirect(
-                item.productId,
-                product.track_variant_inventory ? (item.variantId ?? null) : null,
-                qty,
-                "pos settlement",
-            );
-        }));
+        if (newOrder?.id) {
+            // Keyed to the order, so a refund can give these units back. Until
+            // now the till decremented without an order id: the movement was
+            // recorded but orphaned, and fn_sync_order_stock_position could see
+            // nothing to reverse — which is why a refunded walk-in sale left its
+            // stock subtracted.
+            await recordSaleForOrder(newOrder.id, items, "pos_sale");
+        } else {
+            // The order insert failed, so there is nothing to key on. Take the
+            // stock down anyway — the sale happened and the shelf is emptier —
+            // but say plainly that this one cannot be reversed automatically.
+            console.error(`${logPrefix} no order row — stock taken without an order key; a refund will NOT restock these`, { posSessionId });
+            await Promise.allSettled(items.map(async (item: any) => {
+                const product = productMap.get(item.productId);
+                if (!product || product.track_inventory === false) return;
+                await decrementDirect(
+                    item.productId,
+                    product.track_variant_inventory ? (item.variantId ?? null) : null,
+                    item.quantity ?? 1,
+                    "pos settlement",
+                );
+            }));
+        }
 
         revalidateTag("products", "max");
     }

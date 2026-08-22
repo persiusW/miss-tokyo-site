@@ -85,13 +85,14 @@ export type SaleLine = { product_id: string; variant_id: string | null; quantity
  * finds the reservation gone, falls back to the order items, and produces the
  * same keys — so the retry settles correctly instead of double-counting.
  */
-async function recordSale(orderId: string, lines: SaleLine[]): Promise<number> {
+async function recordSale(orderId: string, lines: SaleLine[], reason: "sale" | "pos_sale" = "sale"): Promise<number> {
     const items = lines.filter(l => l.product_id && (l.quantity ?? 0) > 0);
     if (!items.length) return 0;
 
     const { data, error } = await supabaseAdmin.rpc("fn_record_sale", {
         p_order_id: orderId,
         p_items: items,
+        p_reason: reason,
     });
 
     if (error) {
@@ -623,6 +624,25 @@ export async function fallbackDecrementFromItems(
     await Promise.allSettled(
         lines.map(l => decrementStock(l.product_id, l.variant_id, l.quantity)),
     );
+}
+
+/**
+ * Records a settlement against an order, resolving variant IDs from the line
+ * attributes first. The entry point for any channel that settles its own sale
+ * rather than converting an online reservation.
+ *
+ * Keying on the order is what makes the sale reversible: fn_sync_order_stock_position
+ * can only give back what it can see an order took. A decrement written without
+ * an order id is recorded but orphaned, which is why a refunded till sale used
+ * to leave its units subtracted.
+ */
+export async function recordSaleForOrder(
+    orderId: string,
+    items: Array<{ productId: string; size?: string; color?: string; brand?: string; variantId?: string | null; quantity?: number }>,
+    reason: "sale" | "pos_sale" = "sale",
+): Promise<number> {
+    const lines = await resolveSaleLines(items ?? []);
+    return recordSale(orderId, lines, reason);
 }
 
 /**
