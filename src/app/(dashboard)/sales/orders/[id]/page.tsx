@@ -103,12 +103,13 @@ function RiderPicker({
 }: {
     orderId: string;
     customerName?: string;
-    onConfirm: (riderId: string, notifyRider: boolean) => void;
+    onConfirm: (riderId: string, notifyRider: boolean, notifyCustomer: boolean) => void;
     onCancel: () => void;
 }) {
     const [riders, setRiders] = useState<Rider[]>([]);
     const [selectedRider, setSelectedRider] = useState("");
     const [notifyRider, setNotifyRider] = useState(true);
+    const [notifyCustomer, setNotifyCustomer] = useState(true);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -160,10 +161,22 @@ function RiderPicker({
                 </span>
             </label>
 
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input
+                    type="checkbox"
+                    checked={notifyCustomer}
+                    onChange={e => setNotifyCustomer(e.target.checked)}
+                    className="ac-checkbox"
+                />
+                <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-2)" }}>
+                    Notify customer (email + SMS)
+                </span>
+            </label>
+
             <div style={{ display: "flex", gap: 8, paddingTop: 4 }}>
                 <button onClick={onCancel} className="ac-btn ac-btn-ghost" type="button">Cancel</button>
                 <button
-                    onClick={() => selectedRider && onConfirm(selectedRider, notifyRider)}
+                    onClick={() => selectedRider && onConfirm(selectedRider, notifyRider, notifyCustomer)}
                     disabled={!selectedRider || riders.length === 0}
                     className="ac-btn ac-btn-primary"
                     type="button"
@@ -321,24 +334,26 @@ export default function OrderDetailPage() {
         setUpdating(false);
     };
 
-    const handleDispatch = async (riderId: string, notifyRider: boolean) => {
+    const handleDispatch = async (riderId: string, notifyRider: boolean, notifyCustomer: boolean) => {
         if (!order) return;
         setUpdating(true);
         setShowRiderPicker(false);
-        setNotifStatus("sending");
+        if (notifyCustomer) setNotifStatus("sending");
         try {
             const res = await fetch("/api/dispatch", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderIds: [order.id], riderId, notifyRider }),
+                body: JSON.stringify({ orderIds: [order.id], riderId, notifyRider, notifyCustomer }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Dispatch failed");
             setOrder(prev => prev ? { ...prev, status: "shipped", assigned_rider_id: riderId } : prev);
             supabase.from("riders").select("full_name, phone_number, bike_reg, image_url").eq("id", riderId).single()
                 .then(({ data: r }: { data: any }) => { if (r) setAssignedRider(r as AssignedRider); });
-            setNotifStatus("sent");
-            toast.success("Order dispatched — customer & rider notified via email & SMS.");
+            setNotifStatus(notifyCustomer ? "sent" : "idle");
+            toast.success(notifyCustomer
+                ? "Order dispatched — customer & rider notified via email & SMS."
+                : "Order dispatched — customer not notified.");
         } catch (err: any) {
             toast.error(err.message || "Dispatch failed.");
             setNotifStatus("idle");
