@@ -8,7 +8,8 @@ import { sendCustomerPush } from "@/lib/customerPush";
 /**
  * POST /api/dispatch
  * Batch-assigns a rider to selected orders, updates status to 'processing',
- * sends customer emails with rider info, and optionally notifies the rider via SMS.
+ * and optionally notifies the customer (email + SMS + push) and the rider (SMS).
+ * Both notification flags default to true when absent.
  */
 export async function POST(req: NextRequest) {
     try {
@@ -20,7 +21,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const { orderIds, riderId, notifyRider } = await req.json();
+        const { orderIds, riderId, notifyRider, notifyCustomer } = await req.json();
+        // Staff can suppress the customer-facing email/SMS/push from the dispatch
+        // modal. An absent flag means notify, so older callers keep their behaviour.
+        const shouldNotifyCustomer = notifyCustomer !== false;
 
         const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 100 || orderIds.some((id: unknown) => typeof id !== "string" || !UUID_RE.test(id))) {
@@ -80,7 +84,7 @@ export async function POST(req: NextRequest) {
         const bizName = biz?.business_name || "Miss Tokyo";
 
         // ── Send customer notifications (email) ───────────────────────────────
-        if (process.env.RESEND_API_KEY) {
+        if (shouldNotifyCustomer && process.env.RESEND_API_KEY) {
             const { Resend } = await import("resend");
             const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -166,33 +170,35 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // ── SMS: notify customers ─────────────────────────────────────────────
-        const customerSmsPromises = orders
-            .filter(o => !!o.customer_phone)
-            .map(o => {
-                const ref = o.id.substring(0, 8).toUpperCase();
-                return sendSMSLogged("dispatch:customer", {
-                    to: o.customer_phone!,
-                    message: `${bizName}: Hi ${o.customer_name || "there"}, your order #${ref} is on its way! Your rider ${rider.full_name} will contact you at ${rider.phone_number}. Thank you!`,
+        if (shouldNotifyCustomer) {
+            // ── SMS: notify customers ─────────────────────────────────────────
+            const customerSmsPromises = orders
+                .filter(o => !!o.customer_phone)
+                .map(o => {
+                    const ref = o.id.substring(0, 8).toUpperCase();
+                    return sendSMSLogged("dispatch:customer", {
+                        to: o.customer_phone!,
+                        message: `${bizName}: Hi ${o.customer_name || "there"}, your order #${ref} is on its way! Your rider ${rider.full_name} will contact you at ${rider.phone_number}. Thank you!`,
+                    });
                 });
-            });
 
-        await Promise.allSettled(customerSmsPromises);
+            await Promise.allSettled(customerSmsPromises);
 
-        // ── Push: notify customers ─────────────────────────────────────────────
-        const customerPushPromises = orders
-            .filter(o => !!o.customer_email)
-            .map(o => {
-                const ref = o.id.substring(0, 8).toUpperCase();
-                return sendCustomerPush({
-                    email: o.customer_email!,
-                    title: "Your order is on the way 🚚",
-                    body:  `Order #${ref} has been dispatched. Rider: ${rider.full_name}`,
-                    url:   `/account/orders/${o.id}`,
-                    tag:   `order-shipped-${o.id}`,
+            // ── Push: notify customers ────────────────────────────────────────
+            const customerPushPromises = orders
+                .filter(o => !!o.customer_email)
+                .map(o => {
+                    const ref = o.id.substring(0, 8).toUpperCase();
+                    return sendCustomerPush({
+                        email: o.customer_email!,
+                        title: "Your order is on the way 🚚",
+                        body:  `Order #${ref} has been dispatched. Rider: ${rider.full_name}`,
+                        url:   `/account/orders/${o.id}`,
+                        tag:   `order-shipped-${o.id}`,
+                    });
                 });
-            });
-        await Promise.allSettled(customerPushPromises);
+            await Promise.allSettled(customerPushPromises);
+        }
 
         // ── Log Activity ────────────────────────────────────────────────────────
         const logPromises = orders.map(order => {
@@ -207,13 +213,15 @@ export async function POST(req: NextRequest) {
                     order_number: order.id.slice(0, 8),
                     rider_name: rider.full_name,
                     previous_status: order.status,
-                    new_status: "shipped"
+                    new_status: "shipped",
+                    customer_notified: shouldNotifyCustomer,
+                    rider_notified: !!(notifyRider && rider.phone_number)
                 }
             });
         });
         await Promise.allSettled(logPromises);
 
-        return NextResponse.json({ status: "dispatched", count: orderIds.length });
+        return NextResponse.json({ status: "dispatched", count: orderIds.length, customerNotified: shouldNotifyCustomer });
     } catch (err: any) {
         console.error("[dispatch]", err);
         return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
