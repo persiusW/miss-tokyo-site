@@ -121,11 +121,12 @@ function DispatchModal({
 }: {
     orders: Order[];
     onClose: () => void;
-    onConfirm: (riderId: string, notifyRider: boolean) => void;
+    onConfirm: (riderId: string, notifyRider: boolean, notifyCustomer: boolean) => void;
 }) {
     const [riders, setRiders] = useState<Rider[]>([]);
     const [selectedRider, setSelectedRider] = useState<string>("");
     const [notifyRider, setNotifyRider] = useState(true);
+    const [notifyCustomer, setNotifyCustomer] = useState(true);
     const [loading, setLoading] = useState(true);
     const [confirming, setConfirming] = useState(false);
 
@@ -145,7 +146,7 @@ function DispatchModal({
     const handleConfirm = async () => {
         if (!selectedRider) { toast.error("Select a rider first."); return; }
         setConfirming(true);
-        onConfirm(selectedRider, notifyRider);
+        onConfirm(selectedRider, notifyRider, notifyCustomer);
     };
 
     return (
@@ -190,7 +191,19 @@ function DispatchModal({
                         <input type="checkbox" checked={notifyRider} onChange={e => setNotifyRider(e.target.checked)} className="ac-checkbox" />
                         <div>
                             <span className="ac-label">Notify Rider via SMS</span>
-                            <p style={{ fontSize: 10, color: "var(--ac-ink-4)", marginTop: 2 }}>Sends customer name, phone, and delivery address to rider.</p>
+                            <p style={{ fontSize: 10, color: "var(--ac-ink-4)", marginTop: 2 }}>Sends customer name, phone, and delivery address to rider. Does not affect the customer.</p>
+                        </div>
+                    </label>
+
+                    <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                        <input type="checkbox" checked={notifyCustomer} onChange={e => setNotifyCustomer(e.target.checked)} className="ac-checkbox" />
+                        <div>
+                            <span className="ac-label">Notify Customer (Email + SMS)</span>
+                            <p style={{ fontSize: 10, color: "var(--ac-ink-4)", marginTop: 2 }}>
+                                {notifyCustomer
+                                    ? "Sends the dispatch email, SMS, and app notification with rider details."
+                                    : "Dispatches silently — no email, SMS, or app notification to the customer."}
+                            </p>
                         </div>
                     </label>
                 </div>
@@ -410,18 +423,20 @@ export function OrdersClient({
         setDropdownPos(null);
     };
 
-    const handleDispatchConfirm = async (riderId: string, notifyRider: boolean) => {
+    const handleDispatchConfirm = async (riderId: string, notifyRider: boolean, notifyCustomer: boolean) => {
         const ids = dispatchOrders.map(o => o.id);
         try {
             const res = await fetch("/api/dispatch", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderIds: ids, riderId, notifyRider }),
+                body: JSON.stringify({ orderIds: ids, riderId, notifyRider, notifyCustomer }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Dispatch failed");
 
-            toast.success(`${ids.length} order${ids.length > 1 ? "s" : ""} dispatched.`);
+            toast.success(
+                `${ids.length} order${ids.length > 1 ? "s" : ""} dispatched${notifyCustomer ? "." : " — customer not notified."}`
+            );
             setOrders(prev => prev.map(o =>
                 ids.includes(o.id) ? { ...o, status: "shipped" } : o
             ));
