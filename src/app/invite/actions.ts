@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
-import { findAccountByEmail, isEmailTakenError, isProtectedAccount } from "@/lib/teamInvites";
+import { INVITABLE_ROLES, findAccountByEmail, isEmailTakenError, isProtectedAccount } from "@/lib/teamInvites";
 
 export async function acceptInvite(data: any) {
     const supabaseAdmin = createClient(
@@ -27,6 +27,14 @@ export async function acceptInvite(data: any) {
 
         if (inviteError || !invite) {
             return { success: false, error: "Invalid or expired invitation." };
+        }
+
+        // Invitations outlive the code that wrote them. A row naming a role this
+        // flow must not grant — an older one, or one written before the invite
+        // path checked — is refused here rather than applied on trust.
+        if (!INVITABLE_ROLES.includes(invite.role)) {
+            console.error("Invitation names a role that cannot be granted:", invite.id, invite.role);
+            return { success: false, error: "This invitation is no longer valid. Please ask for a new one." };
         }
 
         if (typeof data.password !== "string" || data.password.length < 6) {

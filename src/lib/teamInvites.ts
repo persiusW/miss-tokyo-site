@@ -22,6 +22,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 const PROTECTED_ROLES = ["owner", "admin"];
 
+/**
+ * Roles an invitation may grant. 'owner' is deliberately absent — it is not
+ * something an invite hands out — and anything outside this list would fail the
+ * profiles_role_check constraint on acceptance anyway. Shared so the role
+ * written at invite time and the role applied at acceptance cannot drift.
+ */
+export const INVITABLE_ROLES = ["admin", "sales_staff"];
+
 export type ExistingAccount = { id: string; role: string };
 
 /** True when GoTrue refused a create/generateLink because the address is taken. */

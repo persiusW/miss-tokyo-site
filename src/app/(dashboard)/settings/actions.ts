@@ -8,13 +8,9 @@ import { sendSMSOrThrow } from "@/lib/sms";
 import crypto from "crypto";
 import { logActivity } from "@/lib/utils/logActivity";
 import { after } from "next/server";
+import { INVITABLE_ROLES } from "@/lib/teamInvites";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
-
-// Roles an invitation may grant. 'owner' is deliberately absent — it is not
-// something an invite hands out — and anything outside this list would fail
-// the profiles_role_check constraint on acceptance anyway.
-const INVITABLE_ROLES = ["admin", "sales_staff"];
 
 interface InviteData {
     fullName: string;
