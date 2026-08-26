@@ -11,6 +11,11 @@ import { after } from "next/server";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
+// Roles an invitation may grant. 'owner' is deliberately absent — it is not
+// something an invite hands out — and anything outside this list would fail
+// the profiles_role_check constraint on acceptance anyway.
+const INVITABLE_ROLES = ["admin", "sales_staff"];
+
 interface InviteData {
     fullName: string;
     email: string;
@@ -32,6 +37,23 @@ export async function inviteTeamMember(data: InviteData) {
         .select("role")
         .eq("id", userData.user.id)
         .single();
+
+    // A server action is a public endpoint — the Invite button being admin-only
+    // in the UI gates nothing. The insert below runs on the service role and so
+    // bypasses the admin/owner RLS policy on team_invitations, which means this
+    // check is the only thing standing between a signed-in customer and an
+    // invitation minted for whatever role they ask for.
+    if (!callerProfile || !["admin", "owner"].includes(callerProfile.role)) {
+        return { success: false, error: "Forbidden: Only admins and owners can invite team members." };
+    }
+
+    if (!INVITABLE_ROLES.includes(data.role)) {
+        return { success: false, error: "Invalid role." };
+    }
+
+    if (!data.email?.trim()) {
+        return { success: false, error: "An email address is required." };
+    }
 
     const token = crypto.randomBytes(32).toString('hex');
     const dynamicHost = await getUrl();
