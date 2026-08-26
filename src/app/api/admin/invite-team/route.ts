@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendEmail } from "@/lib/email";
 import { sendSMSLogged } from "@/lib/sms";
+import { findAccountByEmail, isEmailTakenError, isProtectedAccount } from "@/lib/teamInvites";
 
 // GET /api/admin/invite-team?ids=id1,id2,...
 // Returns which of the given user IDs have never signed in (pending setup)
@@ -68,15 +69,52 @@ export async function POST(req: NextRequest) {
         options: { redirectTo: `${baseUrl}/admin/login` },
     });
 
-    if (linkError || !linkData?.user) {
+    let userId: string;
+    let actionLink: string | undefined;
+
+    if (!linkError && linkData?.user) {
+        userId = linkData.user.id;
+        actionLink = (linkData.properties as any)?.action_link;
+    } else if (!isEmailTakenError(linkError)) {
         return NextResponse.json({ error: linkError?.message || "Invite failed" }, { status: 500 });
+    } else {
+        // An invite type link only works for an address with no account behind
+        // it, and most invitees have one: a removed member keeps their auth user
+        // (removeTeamMember only demotes the profile), and staff often shopped
+        // as customers first. Promote that account and send a recovery link so
+        // they can set a password, instead of dead-ending on "already exists".
+        const existing = await findAccountByEmail(supabaseAdmin, email);
+
+        if (!existing) {
+            return NextResponse.json({ error: "That address is registered but its account could not be found." }, { status: 500 });
+        }
+
+        if (isProtectedAccount(existing)) {
+            return NextResponse.json(
+                { error: "That address already belongs to an administrator account." },
+                { status: 409 },
+            );
+        }
+
+        const { data: recovery, error: recoveryError } = await supabaseAdmin.auth.admin.generateLink({
+            type:    "recovery",
+            email,
+            options: { redirectTo: `${baseUrl}/reset-password` },
+        });
+
+        if (recoveryError) {
+            return NextResponse.json({ error: recoveryError.message }, { status: 500 });
+        }
+
+        userId    = existing.id;
+        actionLink = (recovery?.properties as any)?.action_link;
     }
 
     // Set their profile role immediately
     const { error: profileError } = await supabaseAdmin
         .from("profiles")
         .upsert(
-            { id: linkData.user.id, email, role, ...(name ? { full_name: name } : {}) },
+            { id: userId, email, role, ...(name ? { full_name: name } : {}) },
             { onConflict: "id" },
         );
 
@@ -84,7 +122,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
-    const inviteLink = (linkData.properties as any)?.action_link || `${baseUrl}/admin/login`;
+    const inviteLink = actionLink || `${baseUrl}/admin/login`;
     const roleLabel  = role === "admin" ? "Administrator" : "Sales Staff";
 
     // Fetch branded template from DB
@@ -144,5 +182,5 @@ export async function POST(req: NextRequest) {
         }) : Promise.resolve(),
     ]);
 
-    return NextResponse.json({ success: true, userId: linkData.user.id });
+    return NextResponse.json({ success: true, userId });
 }
