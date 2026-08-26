@@ -28,13 +28,24 @@ export async function acceptInvite(data: any) {
             return { success: false, error: "Invalid or expired invitation." };
         }
 
+        if (typeof data.password !== "string" || data.password.length < 6) {
+            return { success: false, error: "Your password must be at least 6 characters long." };
+        }
+
+        // Everything that decides *which* account this touches comes off the
+        // invitation row, never off the request. The form posts the address it
+        // was rendered with, but trusting it would let a token holder point the
+        // acceptance at an address they were not invited under.
+        const email = String(invite.email).trim().toLowerCase();
+        const fullName = invite.full_name ?? data.fullName ?? null;
+
         // 2. Create the user in Auth
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email: data.email,
+            email,
             password: data.password,
             email_confirm: true, // Auto-confirm since they received the email
             user_metadata: {
-                full_name: data.fullName,
+                full_name: fullName,
                 role: invite.role, // Pass the role through metadata for the DB trigger
             }
         });
@@ -54,8 +65,8 @@ export async function acceptInvite(data: any) {
             .upsert(
                 {
                     id: authData.user.id,
-                    email: data.email,
-                    full_name: data.fullName,
+                    email,
+                    full_name: fullName,
                     role: invite.role,
                 },
                 { onConflict: "id" }
