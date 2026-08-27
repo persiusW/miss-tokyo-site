@@ -113,6 +113,24 @@ function getSummary(log: any): string {
     }
 }
 
+/**
+ * A changed value, short enough to read in a row.
+ *
+ * A list of sizes or colours is the whole point of the change when it is the
+ * thing that changed, so print it. "Data" told the reader nothing.
+ */
+function formatLogValue(value: any): string {
+    if (value === null || value === undefined || value === "") return "empty";
+    if (Array.isArray(value)) {
+        if (value.length === 0) return "empty";
+        const text = value.map(v => (typeof v === "object" ? "…" : String(v))).join(", ");
+        return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+    }
+    if (typeof value === "object") return "Data";
+    const text = String(value);
+    return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+}
+
 const ROLE_BADGE_CLASS: Record<string, string> = {
     owner: "ac-badge ac-badge-role-owner",
     admin: "ac-badge ac-badge-role-admin",
@@ -593,11 +611,11 @@ export function TeamTab() {
                                                                     <div key={field} style={{ fontSize: 11, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
                                                                         <span style={{ fontWeight: 600, color: "var(--ac-ink-3)", textTransform: "capitalize" }}>{field.replace(/_/g, ' ')}:</span>
                                                                         <span style={{ color: "var(--ac-danger)", textDecoration: "line-through", opacity: 0.7 }}>
-                                                                            {typeof delta.from === 'object' ? 'Data' : String(delta.from ?? 'null')}
+                                                                            {formatLogValue(delta.from)}
                                                                         </span>
                                                                         <span style={{ color: "var(--ac-ink-4)" }}>→</span>
                                                                         <span style={{ color: "var(--ac-accent)", fontWeight: 500 }}>
-                                                                            {typeof delta.to === 'object' ? 'Data' : String(delta.to ?? 'null')}
+                                                                            {formatLogValue(delta.to)}
                                                                         </span>
                                                                     </div>
                                                                 ))}

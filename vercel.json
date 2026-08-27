@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/reconcile-stock",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-payments",
+      "schedule": "30 23 * * *"
     }
   ]
 }

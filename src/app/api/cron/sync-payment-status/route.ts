@@ -10,6 +10,21 @@ import { zoneLabel } from "@/lib/delivery";
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 const PAYSTACK_VERIFY = "https://api.paystack.co/transaction/verify";
 
+/**
+ * How long a checkout is left alone before an unpaid verdict is believed.
+ *
+ * Paystack reports "abandoned" for any transaction the customer has not yet
+ * completed — including one they are still sitting in front of. Mobile money in
+ * Ghana routinely takes a couple of minutes to deliver the prompt and collect a
+ * PIN, and a card can be retried after a decline on the same reference. Without
+ * a grace period this cron cancelled live checkouts out from under paying
+ * customers: 18 orders died under two minutes old, one of them three seconds
+ * after it was created.
+ *
+ * Only "failed" and "abandoned" wait. A "success" is acted on immediately.
+ */
+const UNPAID_GRACE_MS = Number(process.env.PAYMENT_SYNC_GRACE_MINUTES || 20) * 60 * 1000;
+
 async function verifyReference(ref: string): Promise<string | null> {
     try {
         const res = await fetch(`${PAYSTACK_VERIFY}/${encodeURIComponent(ref)}`, {
@@ -55,7 +70,7 @@ export async function GET(req: Request) {
     }
 
     const orders = pendingOrders ?? [];
-    const results = { success: 0, failed: 0, abandoned: 0, skipped: 0, errors: 0 };
+    const results = { success: 0, failed: 0, abandoned: 0, skipped: 0, tooYoung: 0, errors: 0 };
 
     // Fetch biz settings once — used for confirmation emails
     const { data: biz } = await supabaseAdmin
@@ -135,7 +150,16 @@ export async function GET(req: Request) {
                 revalidateTag("products", "max");
                 results.success++;
 
-            } else if (paystackStatus === "failed") {
+            } else if (paystackStatus === "failed" || paystackStatus === "abandoned") {
+                // An unpaid verdict on a checkout that has only just started
+                // usually means the customer is still paying, not that they gave
+                // up. Leave it for a later pass rather than cancelling under them.
+                const age = Date.now() - new Date(order.created_at!).getTime();
+                if (age < UNPAID_GRACE_MS) {
+                    results.tooYoung++;
+                    return;
+                }
+
                 await supabaseAdmin
                     .from("orders")
                     .update({ status: "cancelled", payment_status: "cancelled" })
@@ -143,17 +167,8 @@ export async function GET(req: Request) {
                     .in("payment_status", ["pending", "processing"]);
 
                 await releaseReservation(order.id).catch(() => {});
-                results.failed++;
-
-            } else if (paystackStatus === "abandoned") {
-                await supabaseAdmin
-                    .from("orders")
-                    .update({ status: "cancelled", payment_status: "cancelled" })
-                    .eq("id", order.id)
-                    .in("payment_status", ["pending", "processing"]);
-
-                await releaseReservation(order.id).catch(() => {});
-                results.abandoned++;
+                if (paystackStatus === "failed") results.failed++;
+                else results.abandoned++;
 
             } else {
                 // "ongoing" or unknown — leave as-is
