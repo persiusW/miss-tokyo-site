@@ -754,6 +754,9 @@ export default function CheckoutPage() {
                                 <p className="mt-2 text-[11px] text-neutral-500">
                                     Outside Accra covers Kumasi, Takoradi, Akosombo and every other region.
                                 </p>
+                                <p className="mt-1 text-[11px] font-semibold text-red-600">
+                                    Deliveries outside central Accra may carry a small extra fee, paid directly to the dispatch rider on arrival.
+                                </p>
                             </div>
                         )}
                         {/* Inline pickup instructions — shown when pickup is selected */}
