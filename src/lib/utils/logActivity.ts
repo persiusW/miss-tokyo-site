@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { computeDiff } from "@/lib/utils/activityDiff";
 
 interface ActivityLogProps {
     userId: string;
@@ -11,28 +12,11 @@ interface ActivityLogProps {
     details?: any; // any extra info
 }
 
-function computeDiff(oldObj: any, newObj: any) {
-    if (!oldObj || !newObj) return null;
-    const changes: any = {};
-    const allKeys = Array.from(new Set([...Object.keys(oldObj), ...Object.keys(newObj)]));
-
-    for (const key of allKeys) {
-        // Skip common metadata
-        if (["id", "created_at", "updated_at", "slug"].includes(key)) continue;
-
-        const oldVal = oldObj[key];
-        const newVal = newObj[key];
-
-        // Deep equal check for arrays/objects (simplified)
-        if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-            changes[key] = { from: oldVal, to: newVal };
-        }
-    }
-    return Object.keys(changes).length > 0 ? changes : null;
-}
+/** Roles whose actions are worth recording. Everything staff-facing. */
+const LOGGED_ROLES = ["owner", "admin", "sales_staff"];
 
 export async function logActivity({ userId, userRole, actionType, resource, resourceId, oldData, newData, details = {} }: ActivityLogProps) {
-    if (!["owner", "sales_staff"].includes(userRole)) {
+    if (!LOGGED_ROLES.includes(userRole)) {
         return;
     }
 
@@ -46,7 +30,7 @@ export async function logActivity({ userId, userRole, actionType, resource, reso
     };
 
     try {
-        await supabaseAdmin.from("activity_logs").insert({
+        const { error } = await supabaseAdmin.from("activity_logs").insert({
             user_id: userId,
             user_role: userRole,
             action_type: actionType,
@@ -54,6 +38,17 @@ export async function logActivity({ userId, userRole, actionType, resource, reso
             resource_id: resourceId,
             details: finalDetails,
         });
+
+        // PostgREST reports a rejected insert in the response, not by throwing.
+        // Discarding it is how the action_type CHECK constraint silently emptied
+        // the audit trail for orders, invites and discounts for months. An audit
+        // trail that fails quietly is worse than none, because it looks fine.
+        if (error) {
+            console.error(
+                `[activity-log] insert rejected for ${actionType} on ${resource}:`,
+                error.message,
+            );
+        }
     } catch (error) {
         console.error("Failed to log activity:", error);
     }
