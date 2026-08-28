@@ -200,6 +200,12 @@ export default function OrderDetailPage() {
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
     const [notifStatus, setNotifStatus] = useState<"idle" | "sending" | "sent">("idle");
+
+    // Paystack verification. `verifyResult` holds whatever the last check said,
+    // so the verdict stays on screen while the staff member decides what to do
+    // with it rather than vanishing into a toast.
+    const [verifying, setVerifying] = useState(false);
+    const [verifyResult, setVerifyResult] = useState<any>(null);
     const [showRiderPicker, setShowRiderPicker] = useState(false);
     const [assignedRider, setAssignedRider] = useState<AssignedRider | null>(null);
     const [productSkus, setProductSkus] = useState<Record<string, string>>({});
@@ -263,6 +269,59 @@ export default function OrderDetailPage() {
             setLoading(false);
         });
     }, [id]);
+
+    /**
+     * Ask Paystack what really happened to this order.
+     *
+     * Two steps on purpose: the check only reports, and applying is a separate,
+     * confirmed click. Nothing here can cancel or refund — the only change it
+     * can make is into paid.
+     */
+    const verifyPayment = async (apply = false) => {
+        if (!order) return;
+
+        if (apply) {
+            const amount = verifyResult?.paystack?.amount;
+            const willEmail = !verifyResult?.alreadyFulfilled;
+            const confirmed = confirm(
+                `Paystack confirms GH\u20B5 ${Number(amount ?? 0).toFixed(2)} was paid for this order.\n\n` +
+                `Mark it paid and take the stock?` +
+                (willEmail
+                    ? "\n\nThe customer will also receive a confirmation email."
+                    : "\n\nThis order has already been delivered, so no email will be sent."),
+            );
+            if (!confirmed) return;
+        }
+
+        setVerifying(true);
+        try {
+            const res = await fetch("/api/admin/orders/verify-payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: order.id, apply }),
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                toast.error(data.error || data.message || "Could not verify with Paystack.");
+                setVerifyResult(data.reason ? data : null);
+                return;
+            }
+
+            setVerifyResult(data);
+
+            if (data.applied) {
+                toast.success(data.message);
+                setOrder(prev => prev ? { ...prev, status: "paid", payment_status: "paid" } : prev);
+            } else if (data.checked && !data.mismatch) {
+                toast.success(`Paystack says "${data.paystack.status}" — this matches the order.`);
+            }
+        } catch {
+            toast.error("Could not reach the server. Nothing has been changed.");
+        } finally {
+            setVerifying(false);
+        }
+    };
 
     const updateStatus = async (newStatus: string) => {
         if (!order) return;
@@ -689,6 +748,91 @@ export default function OrderDetailPage() {
                             <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Amount Paid</span>
                             <span style={{ fontFamily: "var(--f-mono)", fontSize: 13, color: "var(--ac-ink)", fontWeight: 600 }}>GH₵ {Number(order.total_amount).toFixed(2)}</span>
                         </div>
+
+                        {/* Verify against Paystack. The store's own record has been
+                            wrong before — a cron cancelled orders customers had
+                            actually paid for — so this asks the payment provider
+                            directly rather than trusting the row. */}
+                        {order.paystack_reference && (
+                            <div style={{ padding: "12px 20px", borderTop: "1px solid var(--ac-line)", display: "flex", flexDirection: "column", gap: 10 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => verifyPayment(false)}
+                                    disabled={verifying}
+                                    className="ac-btn ac-btn-ghost ac-btn-sm"
+                                    style={{ width: "100%", justifyContent: "center" }}
+                                >
+                                    {verifying ? "Checking Paystack\u2026" : "Verify with Paystack"}
+                                </button>
+
+                                {verifyResult && !verifyResult.checked && (
+                                    <p style={{ fontSize: 11, color: "var(--ac-ink-3)", lineHeight: 1.6, margin: 0 }}>
+                                        {verifyResult.message}
+                                    </p>
+                                )}
+
+                                {verifyResult?.checked && (
+                                    <div style={{
+                                        border: "1px solid var(--ac-line)",
+                                        borderLeft: `2px solid ${verifyResult.mismatch ? "var(--ac-danger)" : "var(--ac-accent)"}`,
+                                        padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6,
+                                    }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Paystack says</span>
+                                            <span style={{
+                                                fontFamily: "var(--f-mono)", fontSize: 12, fontWeight: 600,
+                                                color: verifyResult.paystack.status === "success" ? "var(--ac-accent)" : "var(--ac-ink-3)",
+                                            }}>
+                                                {verifyResult.paystack.unknown ? "reference not found" : verifyResult.paystack.status}
+                                            </span>
+                                        </div>
+
+                                        {verifyResult.paystack.amount != null && (
+                                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Charged</span>
+                                                <span style={{ fontFamily: "var(--f-mono)", fontSize: 12 }}>
+                                                    GH₵ {verifyResult.paystack.amount.toFixed(2)}
+                                                    {verifyResult.paystack.channel ? ` \u00B7 ${verifyResult.paystack.channel.replace(/_/g, " ")}` : ""}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {verifyResult.paystack.paidAt && (
+                                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Paid at</span>
+                                                <span style={{ fontFamily: "var(--f-mono)", fontSize: 11 }}>
+                                                    {new Date(verifyResult.paystack.paidAt).toLocaleString()}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {verifyResult.mismatch && (
+                                            <>
+                                                <p style={{ fontSize: 11, color: "var(--ac-danger)", lineHeight: 1.6, margin: "4px 0 0", fontWeight: 600 }}>
+                                                    This customer paid, but the order is marked {verifyResult.order.payment_status}.
+                                                    {verifyResult.alreadyFulfilled && " The goods have already gone out, so only the record is wrong."}
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => verifyPayment(true)}
+                                                    disabled={verifying}
+                                                    className="ac-btn ac-btn-primary ac-btn-sm"
+                                                    style={{ width: "100%", justifyContent: "center", marginTop: 2 }}
+                                                >
+                                                    {verifying ? "Applying\u2026" : "Mark this order paid"}
+                                                </button>
+                                            </>
+                                        )}
+
+                                        {!verifyResult.mismatch && !verifyResult.applied && (
+                                            <p style={{ fontSize: 11, color: "var(--ac-ink-3)", lineHeight: 1.6, margin: "4px 0 0" }}>
+                                                Paystack and the order agree. Nothing to correct.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Payment Status */}
