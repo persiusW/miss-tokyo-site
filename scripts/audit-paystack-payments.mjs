@@ -12,7 +12,7 @@
  * This asks Paystack about every non-paid order that has a reference and reports
  * the ones Paystack says were paid. Read-only — it changes nothing.
  *
- *   node scripts/audit-paystack-payments.mjs [--all] [--json out.json] [--concurrency N]
+ *   node scripts/audit-paystack-payments.mjs [--all] [--json out.json] [--csv out.csv] [--concurrency N]
  *
  * By default only non-paid orders are checked. --all re-verifies paid ones too.
  */
@@ -52,6 +52,8 @@ for (const [name, value] of Object.entries({ NEXT_PUBLIC_SUPABASE_URL: SUPABASE_
 const checkAll = process.argv.includes("--all");
 const jsonFlag = process.argv.indexOf("--json");
 const jsonOut = jsonFlag !== -1 ? process.argv[jsonFlag + 1] : null;
+const csvFlag = process.argv.indexOf("--csv");
+const csvOut = csvFlag !== -1 ? process.argv[csvFlag + 1] : null;
 const concFlag = process.argv.indexOf("--concurrency");
 // Paystack throttles a burst of verifies hard enough that a wide pool comes back
 // with connection errors rather than 429s, which reads as "unknown" and quietly
@@ -70,7 +72,7 @@ async function fetchOrders() {
     for (let from = 0; ; from += PAGE) {
         let q = supabase
             .from("orders")
-            .select("id, ref, customer_email, customer_name, total_amount, status, payment_status, paystack_reference, created_at, updated_at, customer_metadata")
+            .select("id, ref, customer_email, customer_name, customer_phone, total_amount, status, payment_status, fulfillment_status, paystack_reference, created_at, updated_at, customer_metadata, items")
             .not("paystack_reference", "is", null)
             .neq("paystack_reference", "")
             .neq("paystack_reference", "dummy-ref")
@@ -130,6 +132,79 @@ async function mapPool(items, size, fn) {
     return out;
 }
 
+
+// ── CSV ───────────────────────────────────────────────────────────────────────
+/** Addresses that belong to the business rather than to a customer. */
+const INTERNAL = /persiuswilder|persiusaddo|test@|testmen|persiustools|dashttpltd|misstokyo440/i;
+
+/**
+ * What fixing this order actually involves. An order whose goods already went
+ * out needs its books corrected and nothing else — telling someone their
+ * cancelled order is confirmed, days after they received it, is worse than
+ * saying nothing.
+ */
+function remedyFor(order) {
+    const shipped = ["delivered", "fulfilled"];
+    const inFlight = ["packed", "shipped", "ready_for_pickup"];
+    if (shipped.includes(order.fulfillment_status) || shipped.includes(order.status)) {
+        return "books only - goods already delivered, do not email";
+    }
+    if (inFlight.includes(order.fulfillment_status) || inFlight.includes(order.status)) {
+        return "in flight - finish dispatch";
+    }
+    return "unfulfilled - customer paid and received nothing";
+}
+
+function csvCell(value) {
+    const text = value === null || value === undefined ? "" : String(value);
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function toCsv(entries) {
+    const header = [
+        "ref", "order_id", "customer_name", "customer_email", "customer_phone",
+        "store_total_ghs", "paystack_amount_ghs", "amount_matches",
+        "paystack_status", "paid_at", "channel", "paystack_reference",
+        "order_status", "payment_status", "fulfillment_status",
+        "created_at", "last_updated_at", "seconds_before_cancel",
+        "remedy", "account_type", "items",
+    ];
+    const lines = [header.join(",")];
+
+    for (const { order, ps } of entries) {
+        const storeTotal = Number(order.total_amount ?? 0);
+        const psAmount = ps.amount ?? null;
+        lines.push([
+            order.ref,
+            order.id,
+            order.customer_name,
+            order.customer_email,
+            order.customer_phone,
+            storeTotal.toFixed(2),
+            psAmount === null ? "" : psAmount.toFixed(2),
+            // Paystack collects the delivery fee too, so a difference here is
+            // expected; a large one is not, and is worth an eye.
+            psAmount === null ? "" : (Math.abs(psAmount - storeTotal) < 0.01 ? "exact" : `differs by ${(psAmount - storeTotal).toFixed(2)}`),
+            ps.status,
+            ps.paidAt ?? "",
+            ps.channel ?? "",
+            order.paystack_reference,
+            order.status,
+            order.payment_status,
+            order.fulfillment_status,
+            order.created_at,
+            order.updated_at,
+            Math.round((new Date(order.updated_at) - new Date(order.created_at)) / 1000),
+            remedyFor(order),
+            INTERNAL.test(order.customer_email || "") ? "internal/test" : "customer",
+            (Array.isArray(order.items) ? order.items : [])
+                .map(i => `${i.quantity ?? 1}x ${i.name}${i.size ? ` (${i.size})` : ""}`)
+                .join("; "),
+        ].map(csvCell).join(","));
+    }
+    return lines.join("\n") + "\n";
+}
+
 // ── run ───────────────────────────────────────────────────────────────────────
 const orders = await fetchOrders();
 console.log(`Checking ${orders.length} order(s) against Paystack${checkAll ? " (including paid)" : ""}…\n`);
@@ -173,6 +248,13 @@ const unresolved = rows.filter(r => r.ps.status === "error");
 if (unresolved.length) {
     console.log(`\n!! ${unresolved.length} reference(s) could not be verified — the audit is incomplete.`);
     console.log("   Re-run; only a clean pass with zero errors proves the figure above.");
+}
+
+if (csvOut) {
+    const { writeFileSync } = await import("node:fs");
+    const sorted = [...paidButNot].sort((a, b) => Number(b.ps.amount ?? 0) - Number(a.ps.amount ?? 0));
+    writeFileSync(csvOut, toCsv(sorted));
+    console.log(`\nCSV written to ${csvOut} (${sorted.length} row(s))`);
 }
 
 if (jsonOut) {
