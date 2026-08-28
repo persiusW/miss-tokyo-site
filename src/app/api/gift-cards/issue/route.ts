@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { logActivity } from "@/lib/utils/logActivity";
 
 function genCode(): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -15,8 +17,17 @@ export async function POST(req: NextRequest) {
         const { data: { user } } = await serverClient.auth.getUser();
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
-        if (!caller || !["admin", "owner"].includes(caller.role)) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+        // Sales staff belong here. The Gift Cards page is deliberately outside
+        // the isFullAccess gate in the sidebar, the RLS policy on gift_cards
+        // admits them through is_admin(), and the resend route already accepts
+        // them — this endpoint was the only thing that disagreed, so seven of
+        // the ten staff accounts got a bare "Forbidden" after filling the form.
+        if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
+            return NextResponse.json(
+                { error: "Your account does not have permission to issue gift cards." },
+                { status: 403 },
+            );
         }
 
         const { recipient_email, recipient_name, sender_name, message, initial_value } = await req.json();
@@ -92,6 +103,22 @@ export async function POST(req: NextRequest) {
                 </div>`,
             });
         }
+
+        // A gift card is money. Now that the activity log actually records what
+        // it is given, issuing one leaves a trace naming who did it.
+        after(() => logActivity({
+            userId: user.id,
+            userRole: caller.role,
+            actionType: "CREATE",
+            resource: "gift_card",
+            resourceId: card.id,
+            details: {
+                resource_name: `Gift card ${card.code}`,
+                code: card.code,
+                value: Number(initial_value),
+                recipient_email,
+            },
+        }));
 
         return NextResponse.json({ status: "issued", code: card.code, id: card.id });
     } catch (err: any) {
