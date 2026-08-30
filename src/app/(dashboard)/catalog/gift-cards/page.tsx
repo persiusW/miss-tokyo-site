@@ -76,6 +76,10 @@ export default function GiftCardsPage() {
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    // Set when the list could not be loaded at all. Without this the table sat
+    // on "Loading…" forever whenever the query threw, which reads to staff as
+    // "the page doesn't open" with nothing to act on.
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const [showIssueModal, setShowIssueModal] = useState(false);
     const [form, setForm] = useState<IssueForm>(EMPTY_FORM);
@@ -89,27 +93,57 @@ export default function GiftCardsPage() {
 
     const fetchCards = useCallback(async () => {
         setLoading(true);
+        setLoadError(null);
         const from = (page - 1) * PAGE_SIZE;
-        // Filters before range(): a transform builder has no .eq()/.or().
-        let q = supabase.from("gift_cards").select("*", { count: "exact" });
-        if (statusFilter) q = q.eq("status", statusFilter);
-        const term = debouncedSearch.trim().replace(/[%,()]/g, "");
-        if (term) {
-            q = q.or(`code.ilike.%${term}%,recipient_email.ilike.%${term}%,purchased_by_email.ilike.%${term}%`);
+        try {
+            // Filters before range(): a transform builder has no .eq()/.or().
+            let q = supabase.from("gift_cards").select("*", { count: "exact" });
+            if (statusFilter) q = q.eq("status", statusFilter);
+            const term = debouncedSearch.trim().replace(/[%,()]/g, "");
+            if (term) {
+                q = q.or(`code.ilike.%${term}%,recipient_email.ilike.%${term}%,purchased_by_email.ilike.%${term}%`);
+            }
+            const { data, count, error } = await q
+                .order("created_at", { ascending: false })
+                .range(from, from + PAGE_SIZE - 1);
+
+            // Asking past the end of the list is not a failure — go back to the
+            // first page and let the refetch clear the loading flag.
+            if (error?.code === "PGRST103" && page > 1) { setPage(1); return; }
+
+            if (error) {
+                console.error("[gift-cards] list query failed:", error);
+                setLoadError("We could not load your gift cards just now.");
+                return;
+            }
+
+            setCards(data ?? []);
+            setTotalCount(count ?? 0);
+        } catch (err) {
+            // supabase-js returns query errors, but the underlying fetch can
+            // still reject — a dropped connection, or the service worker's
+            // network-first strategy giving up. That used to escape as an
+            // unhandled rejection and leave the table loading forever.
+            console.error("[gift-cards] list request threw:", err);
+            setLoadError("We could not reach the server. Please check your connection and try again.");
+        } finally {
+            setLoading(false);
         }
-        const { data, count, error } = await q
-            .order("created_at", { ascending: false })
-            .range(from, from + PAGE_SIZE - 1);
-        if (error?.code === "PGRST103" && page > 1) { setPage(1); return; }
-        if (data) setCards(data);
-        setTotalCount(count ?? 0);
-        setLoading(false);
     }, [statusFilter, debouncedSearch, page]);
 
     const fetchStats = useCallback(async () => {
-        const { data: all } = await supabase
-            .from("gift_cards")
-            .select("initial_value, remaining_value, status, created_at") as { data: Pick<GiftCard, "initial_value" | "remaining_value" | "status" | "created_at">[] | null };
+        // Kept independent of the list on purpose: the KPI strip failing must
+        // not decide whether the table renders.
+        type StatRow = Pick<GiftCard, "initial_value" | "remaining_value" | "status" | "created_at">;
+        let all: StatRow[] | null = null;
+        try {
+            const res = await supabase
+                .from("gift_cards")
+                .select("initial_value, remaining_value, status, created_at") as { data: StatRow[] | null };
+            all = res.data;
+        } catch (err) {
+            console.error("[gift-cards] stats request threw:", err);
+        }
         if (!all) return;
         const monthStart = new Date();
         monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
@@ -257,6 +291,15 @@ export default function GiftCardsPage() {
                         <tbody>
                             {loading ? (
                                 <tr><td colSpan={8} className="ac-table-empty">Loading…</td></tr>
+                            ) : loadError ? (
+                                <tr><td colSpan={8} className="ac-table-empty">
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "8px 0" }}>
+                                        <span>{loadError}</span>
+                                        <button type="button" onClick={() => fetchCards()} className="ac-btn ac-btn-ghost ac-btn-sm">
+                                            Try again
+                                        </button>
+                                    </div>
+                                </td></tr>
                             ) : cards.length === 0 ? (
                                 <tr><td colSpan={8} className="ac-table-empty">No gift cards found.</td></tr>
                             ) : cards.map(g => (
