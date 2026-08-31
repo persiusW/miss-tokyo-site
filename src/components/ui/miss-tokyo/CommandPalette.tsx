@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { buildSearchClause, isMissingColumn, sanitiseTerm } from "@/lib/refSearch";
@@ -180,7 +181,17 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
 
     const q = sanitiseTerm(term);
 
-    return (
+    // Rendered into <body>, not where it sits in the tree.
+    //
+    // This component lives inside .admin-topbar, which carries
+    // backdrop-filter: blur(8px). A filtered ancestor becomes the containing
+    // block for position:fixed descendants, so inset:0 resolved to the topbar's
+    // own box — the scrim covered a 1280x124 strip at the top of the screen and
+    // left the rest of the page undimmed and clickable. A portal takes it out
+    // of that containing block without moving the state that drives it.
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
         <div
             onClick={e => { if (e.target === e.currentTarget) onClose(); }}
             style={{
@@ -251,6 +262,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }
