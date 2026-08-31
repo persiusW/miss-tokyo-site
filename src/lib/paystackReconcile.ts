@@ -141,6 +141,10 @@ export async function applyPaystackSuccess(
                 webhook_email_sent: true,
                 reconciled_at: new Date().toISOString(),
                 reconciled_by: source,
+                // This order is no longer cancelled, so the cron's marker must
+                // not survive. Leaving it would make a later, deliberate staff
+                // cancellation look automatic and therefore reversible.
+                auto_cancelled_at: null,
                 // Kept so staff can tell a repaired order from one that was paid
                 // normally when it reappears in the Inbox days later.
                 ...(wasCancelled ? { reconciled_from: "cancelled" } : {}),

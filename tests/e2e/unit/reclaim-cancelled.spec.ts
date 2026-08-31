@@ -52,3 +52,37 @@ test("handles a missing order", () => {
     expect(isReclaimableCancellation(null)).toBe(false);
     expect(isReclaimableCancellation(undefined)).toBe(false);
 });
+
+// ── The lifecycle that makes the marker safe ─────────────────────────────────
+// The predicate cannot tell on its own whether the LAST cancellation was
+// automatic — it only reads a flag. What makes it correct is that every path
+// leaving a cron cancellation clears that flag. These pin the sequence that
+// would otherwise resurrect a deliberate staff cancellation.
+
+/** What the sync cron writes when it gives up on an order. */
+const afterAutoCancel = { payment_status: "cancelled", customer_metadata: { auto_cancelled_at: "2026-08-20T14:02:00Z", auto_cancelled_by: "cron:sync-payment-status" } };
+
+/** What applyPaystackSuccess and the Verify button leave behind. */
+const afterRestore = { payment_status: "paid", customer_metadata: { auto_cancelled_at: null, reconciled_at: "2026-08-31T09:00:00Z" } };
+
+/** What updateOrderStatus leaves behind when a person cancels. */
+const afterStaffCancel = { payment_status: "cancelled", customer_metadata: { auto_cancelled_at: null, reconciled_at: "2026-08-31T09:00:00Z" } };
+
+test("auto-cancel → restore → staff cancel is NOT reclaimable", () => {
+    // The sequence that would otherwise let a retried charge.success undo a
+    // deliberate cancellation months after the original automatic one.
+    expect(isReclaimableCancellation(afterAutoCancel)).toBe(true);
+    expect(isReclaimableCancellation(afterRestore)).toBe(false);
+    expect(isReclaimableCancellation(afterStaffCancel)).toBe(false);
+});
+
+test("a restored order is not reclaimable while it is paid", () => {
+    expect(isReclaimableCancellation(afterRestore)).toBe(false);
+});
+
+test("an explicit null marker reads as absent, not as present", () => {
+    // The clearing paths write null rather than deleting the key, so falsiness
+    // is what the predicate must rely on.
+    expect(isReclaimableCancellation({ payment_status: "cancelled", customer_metadata: { auto_cancelled_at: null } })).toBe(false);
+    expect(isReclaimableCancellation({ payment_status: "cancelled", customer_metadata: { auto_cancelled_at: "" } })).toBe(false);
+});

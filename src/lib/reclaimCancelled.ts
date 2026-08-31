@@ -11,6 +11,15 @@
  * A person cancelling an order is a deliberate act, usually paired with a
  * refund, and Paystack retries webhooks for days. Undoing that silently would
  * resurrect orders staff had settled, so an unstamped cancellation is final.
+ *
+ * The marker means "the MOST RECENT cancellation was automatic", not "this
+ * order was auto-cancelled once". It is therefore cleared by everything that
+ * moves an order out of a cron cancellation — the webhook reclaim below,
+ * applyPaystackSuccess, and every staff status change. Without that, an order
+ * auto-cancelled in August and restored, then deliberately cancelled by staff
+ * in September, would still look reclaimable and a retried webhook would
+ * resurrect it. Callers clearing the marker are what makes this predicate safe;
+ * it cannot tell on its own.
  */
 export function isReclaimableCancellation(order: {
     payment_status?: string | null;
