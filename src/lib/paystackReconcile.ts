@@ -3,6 +3,9 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { zoneLabel } from "@/lib/delivery";
+import { isReclaimableCancellation } from "@/lib/reclaimCancelled";
+
+export { isReclaimableCancellation };
 
 /**
  * Asking Paystack what really happened to an order, and acting on the answer.
