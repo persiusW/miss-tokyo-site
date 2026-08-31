@@ -62,6 +62,14 @@ export function AdminTopbar({ user, onMenu, theme, onTheme }: Props) {
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
+            // Not every keydown reaching window is a real keystroke. Browser
+            // extensions dispatch synthetic KeyboardEvents with no `key` at all,
+            // and calling a method on it threw an uncaught TypeError into the
+            // console on every one of them. This listener is mounted on every
+            // dashboard page, so a staff member running such an extension saw a
+            // steady stream of errors that had nothing to do with the store.
+            if (typeof e.key !== "string") return;
+
             if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 setPaletteOpen(o => !o);

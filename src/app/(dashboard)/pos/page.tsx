@@ -116,6 +116,25 @@ export default function POSPage() {
     // at the bottom of it — behind the keyboard with no way to scroll to them.
     const viewportHeight = useViewportHeight();
 
+    // The till is the one full-bleed page in the dashboard: it cancels
+    // .admin-page's padding with negative margins so the grid and the cart run
+    // edge to edge. Those margins have to match that padding exactly
+    // (28px 32px 80px) — the old -80px top over-pulled by 52px, sliding the
+    // cart's first row underneath the sticky topbar, which paints over it at
+    // z-index 5. Measuring where we actually land keeps the height honest
+    // without hardcoding the topbar's height here.
+    const shellRef = useRef<HTMLDivElement>(null);
+    const [shellTop, setShellTop] = useState(0);
+    useEffect(() => {
+        const measure = () => {
+            const el = shellRef.current;
+            if (el) setShellTop(el.getBoundingClientRect().top);
+        };
+        measure();
+        window.addEventListener("resize", measure);
+        return () => window.removeEventListener("resize", measure);
+    }, [viewportHeight]);
+
     const searchProducts = useCallback(async (q: string) => {
         // Filters before limit(): a transform builder has no .or().
         let dbQuery = supabase
@@ -475,7 +494,15 @@ export default function POSPage() {
     const modeInactive: React.CSSProperties = { background: "transparent", color: "var(--ac-ink-3)", border: "1px solid var(--ac-line)" };
 
     return (
-        <div style={{ margin: "-80px -48px 0", height: viewportHeight ? `${viewportHeight}px` : "100dvh", overflow: "hidden", display: "flex" }}>
+        <div
+            ref={shellRef}
+            style={{
+                margin: "-28px -32px -80px",
+                height: viewportHeight ? `${Math.max(320, viewportHeight - shellTop)}px` : "100dvh",
+                overflow: "hidden",
+                display: "flex",
+            }}
+        >
             {/* LEFT: Product Browser */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: "1px solid var(--ac-line)", overflow: "hidden" }}>
                 <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--ac-line)", flexShrink: 0, background: "var(--ac-panel)" }}>
