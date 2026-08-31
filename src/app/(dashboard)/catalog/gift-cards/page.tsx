@@ -353,8 +353,9 @@ export default function GiftCardsPage() {
 
             {/* ── Issue Modal ─────────────────────────────────────────────── */}
             {showIssueModal && (
-                <div className="ac-modal">
-                    <div className="ac-modal-box" style={{ maxWidth: 520 }}>
+                <div className="ac-modal-scrim"
+                     onClick={e => { if (e.target === e.currentTarget) setShowIssueModal(false); }}>
+                    <div className="ac-modal" style={{ maxWidth: 520, padding: 24 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                             <h2 style={{ fontFamily: "var(--f-display)", fontSize: 18, fontWeight: 600, color: "var(--ac-ink)" }}>Issue Gift Card</h2>
                             <button onClick={() => setShowIssueModal(false)}
