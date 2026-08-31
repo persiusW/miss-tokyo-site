@@ -181,15 +181,22 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
 
     const q = sanitiseTerm(term);
 
-    // Rendered into <body>, not where it sits in the tree.
+    // Rendered into .admin-shell, not where it sits in the tree.
     //
     // This component lives inside .admin-topbar, which carries
     // backdrop-filter: blur(8px). A filtered ancestor becomes the containing
     // block for position:fixed descendants, so inset:0 resolved to the topbar's
     // own box — the scrim covered a 1280x124 strip at the top of the screen and
-    // left the rest of the page undimmed and clickable. A portal takes it out
-    // of that containing block without moving the state that drives it.
+    // left the rest of the page undimmed and clickable.
+    //
+    // The target is .admin-shell rather than document.body on purpose: every
+    // --ac-* colour is declared on .admin-shell, so a palette parented to
+    // <body> had no panel background, border or text colour and rendered
+    // see-through over the page. .admin-shell sets no transform, filter or
+    // containment, so fixed positioning still resolves to the viewport there —
+    // its own ::before is position:fixed and fills the screen.
     if (typeof document === "undefined") return null;
+    const host = document.querySelector(".admin-shell") ?? document.body;
 
     return createPortal(
         <div
@@ -263,6 +270,6 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
                 </div>
             </div>
         </div>,
-        document.body,
+        host,
     );
 }
