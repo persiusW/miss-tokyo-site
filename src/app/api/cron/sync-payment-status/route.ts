@@ -40,6 +40,28 @@ async function verifyReference(ref: string): Promise<string | null> {
     }
 }
 
+/**
+ * The patch this job applies when it gives up on an order.
+ *
+ * The marker matters as much as the status. charge.success can arrive after
+ * this runs — a customer who finished paying late — and the webhook is allowed
+ * to undo a cancellation it made itself. It must never undo one a person made
+ * deliberately, so only cancellations stamped here are reversible.
+ */
+function cancelPatch(order: { customer_metadata?: unknown }, reason: string) {
+    const meta = (order.customer_metadata as Record<string, unknown>) ?? {};
+    return {
+        status: "cancelled",
+        payment_status: "cancelled",
+        customer_metadata: {
+            ...meta,
+            auto_cancelled_at: new Date().toISOString(),
+            auto_cancelled_by: "cron:sync-payment-status",
+            auto_cancelled_reason: reason,
+        },
+    };
+}
+
 export async function GET(req: Request) {
     const auth = req.headers.get("Authorization");
     if (!auth || auth !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -92,7 +114,7 @@ export async function GET(req: Request) {
                 if (orderAge < new Date(ghostCutoff)) {
                     await supabaseAdmin
                         .from("orders")
-                        .update({ status: "cancelled", payment_status: "cancelled" })
+                        .update({ ...cancelPatch(order, "reference unknown at Paystack after 24h") })
                         .eq("id", order.id)
                         .in("payment_status", ["pending", "processing"]);
                     await releaseReservation(order.id).catch(() => {});
@@ -162,7 +184,7 @@ export async function GET(req: Request) {
 
                 await supabaseAdmin
                     .from("orders")
-                    .update({ status: "cancelled", payment_status: "cancelled" })
+                    .update({ ...cancelPatch(order, `Paystack reported "${paystackStatus}"`) })
                     .eq("id", order.id)
                     .in("payment_status", ["pending", "processing"]);
 
