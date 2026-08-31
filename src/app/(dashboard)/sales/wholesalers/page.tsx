@@ -158,8 +158,8 @@ export default function WholesalersPage() {
 
             {/* Manage Modal */}
             {showModal && (
-                <div className="ac-modal">
-                    <div className="ac-modal-box" style={{ maxWidth: 500 }}>
+                <div className="ac-modal-scrim">
+                    <div className="ac-modal" style={{ maxWidth: 500, padding: 24 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                             <h2 style={{ fontFamily: "var(--f-display)", fontSize: 18, fontWeight: 600, color: "var(--ac-ink)" }}>Promote to Wholesale</h2>
                             <button onClick={() => { setShowModal(false); setSearchQuery(""); setSearchResults([]); }}
