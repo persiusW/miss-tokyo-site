@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { revalidateTag } from "next/cache";
 import { confirmSale, fallbackDecrementFromItems, decrementDirect } from "@/lib/inventory";
+import { isReclaimableCancellation } from "@/lib/reclaimCancelled";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
@@ -95,6 +96,9 @@ export async function POST(req: Request) {
             // Verify if this transaction has already been processed to prevent double inventory/logic
             let isAlreadyProcessed = false;
             let emailAlreadySent = false;
+            // True when this order was cancelled by the sync cron and Paystack
+            // has now confirmed the payment, so the update below may claim it.
+            let claimableFromCancelled = false;
             // Items fetched from DB — avoids relying on cartItems in Paystack metadata
             // (large carts hit Paystack's metadata size limit).
             let orderItemsFromDB: any[] = [];
@@ -106,13 +110,36 @@ export async function POST(req: Request) {
                     .eq("id", orderId)
                     .single();
 
+                // An order this system cancelled on its own, that Paystack now
+                // confirms was paid, is reclaimable.
+                //
+                // The /30 sync job cancels on an unpaid verdict, and Paystack
+                // reports "abandoned" for a payment merely still in progress.
+                // When the customer then finishes, charge.success used to match
+                // nothing — the money landed against a cancelled order in total
+                // silence. Paystack saying the money moved is the authority
+                // here; a local guess made minutes earlier is not.
+                //
+                // Only cancellations the cron stamped are reclaimable. A person
+                // cancelling a paid order is a deliberate act, often followed by
+                // a refund, and a retried webhook must never quietly undo it.
+                const autoCancelled = isReclaimableCancellation(existingOrder);
+
+                if (autoCancelled) {
+                    console.warn(
+                        `[webhook] Order ${orderId} was auto-cancelled but Paystack confirms payment — reclaiming it.`,
+                    );
+                }
+
                 // Use payment_status for idempotency — NOT order.status.
                 // "processing" means the verify route atomically claimed the order and is
                 // currently decrementing stock — treat as already processed.
-                if (existingOrder && !["pending"].includes(existingOrder.payment_status)) {
+                // An auto-cancelled order released its stock, so it needs taking again.
+                if (existingOrder && !["pending"].includes(existingOrder.payment_status) && !autoCancelled) {
                     console.log(`[webhook] Order ${orderId} already processed (payment_status=${existingOrder.payment_status}). Skipping inventory deductions.`);
                     isAlreadyProcessed = true;
                 }
+                claimableFromCancelled = autoCancelled;
 
                 if (existingOrder && (existingOrder.customer_metadata as any)?.webhook_email_sent) {
                     emailAlreadySent = true;
@@ -295,12 +322,24 @@ export async function POST(req: Request) {
                             whatsapp: whatsapp || null,
                             instagram: instagram || null,
                             snapchat: snapchat || null,
-                            webhook_email_sent: true
+                            webhook_email_sent: true,
+                            // Leave a trace that this order came back, and drop
+                            // the marker so it is not reclaimable a second time.
+                            ...(claimableFromCancelled
+                                ? { reclaimed_from_auto_cancel_at: new Date().toISOString(), auto_cancelled_at: null }
+                                : {}),
                         },
                         ...(customerId ? { customer_id: customerId } : {}),
                     })
                     .eq("id", orderId)
-                    .in("payment_status", ["pending", "processing"]); // "processing" = verify claimed it but may have stalled
+                    .in(
+                        "payment_status",
+                        // "processing" = verify claimed it but may have stalled.
+                        // "cancelled" only when this system cancelled it itself.
+                        claimableFromCancelled
+                            ? ["pending", "processing", "cancelled"]
+                            : ["pending", "processing"],
+                    );
 
                 if (error) {
                     console.error("Webhook: Failed to update order:", error);

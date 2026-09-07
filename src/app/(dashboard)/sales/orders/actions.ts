@@ -48,6 +48,12 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
         status: newStatus,
         ...(PAYMENT_STATUSES.includes(newStatus) ? { payment_status: newStatus } : {}),
         ...(syncedFulfillment ? { fulfillment_status: syncedFulfillment } : {}),
+        // A human set this status, so the resulting state is theirs. Clearing
+        // the sync cron's marker is what stops a confirmed payment reversing a
+        // deliberate cancellation: without it, an order auto-cancelled once
+        // would stay reversible forever, and a retried charge.success could
+        // undo a staff cancellation made months later.
+        customer_metadata: { ...((oldData.customer_metadata as object) ?? {}), auto_cancelled_at: null },
         ...extraData,
     };
     if (newStatus === "packed" && !oldData.packed_by) {
