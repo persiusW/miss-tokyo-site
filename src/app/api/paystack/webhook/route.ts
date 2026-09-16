@@ -11,6 +11,7 @@ import { activateAndDeliverGiftCard } from "@/lib/giftCardDelivery";
 import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
 import { releaseDiscountHolds } from "@/lib/discountValidation";
 import { settlePosSession } from "@/lib/posSettlement";
+import { recordPaystackCharge } from "@/lib/paystackReconcile";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 
@@ -305,6 +306,7 @@ export async function POST(req: Request) {
                 if (error) {
                     console.error("Webhook: Failed to update order:", error);
                 } else {
+                    await recordPaystackCharge(orderId, data);
                     const orderRef = orderId.substring(0, 8).toUpperCase();
                     if (!emailAlreadySent) console.log('Webhook triggered email for order:', orderId);
                     
@@ -387,6 +389,7 @@ export async function POST(req: Request) {
                     if (error) {
                         console.error("Webhook: Failed to create order:", error);
                     } else if (newOrder) {
+                        await recordPaystackCharge(newOrder.id, data);
                         const orderRef = newOrder.id.substring(0, 8).toUpperCase();
                         console.log('Webhook triggered email for order:', newOrder.id);
                         const [emailResult, , smsResult, pushResult] = await Promise.allSettled([
