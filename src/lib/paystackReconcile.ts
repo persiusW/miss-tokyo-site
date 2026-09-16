@@ -22,8 +22,17 @@ const PAYSTACK_VERIFY = "https://api.paystack.co/transaction/verify";
 export type PaystackVerdict = {
     /** "success" | "failed" | "abandoned" | "ongoing" | "reversed" | … */
     status: string;
-    /** GHS, as charged by Paystack — includes the fee the store passes on. */
+    /** GHS, what the customer was actually debited. */
     amount: number | null;
+    /** GHS, what the store asked Paystack to collect — should equal the order total. */
+    requestedAmount: number | null;
+    /**
+     * GHS, Paystack's transaction fee. When `amount` exceeds `requestedAmount`
+     * the customer bore it; when they match, the store did.
+     */
+    fees: number | null;
+    /** The same money fields raw (pesewas), for recordPaystackCharge. */
+    tx: PaystackTxMoney | null;
     paidAt: string | null;
     channel: string | null;
     /** True when the reference itself could not be resolved at all. */
@@ -45,12 +54,15 @@ export async function verifyReference(reference: string): Promise<PaystackVerdic
         // real answer, not a failure to get one, so it is reported rather than
         // collapsed into null.
         if (!json.status || !json.data?.status) {
-            return { status: "unknown", amount: null, paidAt: null, channel: null, unknown: true };
+            return { status: "unknown", amount: null, requestedAmount: null, fees: null, tx: null, paidAt: null, channel: null, unknown: true };
         }
 
         return {
             status: json.data.status,
             amount: json.data.amount != null ? json.data.amount / 100 : null,
+            requestedAmount: json.data.requested_amount != null ? json.data.requested_amount / 100 : null,
+            fees: json.data.fees != null ? json.data.fees / 100 : null,
+            tx: { amount: json.data.amount ?? null, requested_amount: json.data.requested_amount ?? null, fees: json.data.fees ?? null },
             paidAt: json.data.paid_at ?? null,
             channel: json.data.channel ?? null,
             unknown: false,
@@ -60,6 +72,34 @@ export async function verifyReference(reference: string): Promise<PaystackVerdic
         // is Paystack answering that it has never seen the reference.
         return null;
     }
+}
+
+/** The money fields of a raw Paystack transaction object, in pesewas. */
+type PaystackTxMoney = { amount?: number | null; requested_amount?: number | null; fees?: number | null };
+
+/**
+ * What to keep on the order row from a confirmed Paystack transaction.
+ * Charged is what the customer was actually debited; the fee is what Paystack
+ * kept. Both are stored rather than derived so the order page can tell "the
+ * customer paid the fee" from "the store did" without asking Paystack again.
+ */
+export function chargeColumnsFromTx(tx: PaystackTxMoney): { paystack_charged: number | null; paystack_fee: number | null } {
+    return {
+        paystack_charged: tx.amount != null ? tx.amount / 100 : null,
+        paystack_fee: tx.fees != null ? tx.fees / 100 : null,
+    };
+}
+
+/**
+ * Record the charge on the order. Deliberately its own update, after the one
+ * that marks the order paid: a missing column (migration not yet applied) or
+ * any other failure here must never be what stops a payment being recorded.
+ */
+export async function recordPaystackCharge(orderId: string, tx: PaystackTxMoney): Promise<void> {
+    const cols = chargeColumnsFromTx(tx);
+    if (cols.paystack_charged == null && cols.paystack_fee == null) return;
+    const { error } = await supabaseAdmin.from("orders").update(cols).eq("id", orderId);
+    if (error) console.warn(`[paystack] could not record charge on order ${orderId}:`, error.message);
 }
 
 type RestorableOrder = {

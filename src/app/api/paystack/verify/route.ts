@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
+import { recordPaystackCharge } from "@/lib/paystackReconcile";
 
 const NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const ORDER_FIELDS = "id, customer_name, customer_email, customer_phone, shipping_address, delivery_method, total_amount, items, discount_code, discount_amount, status, paystack_reference";
@@ -85,6 +86,8 @@ export async function GET(req: Request) {
                 .eq("id", metaOrderId);
 
             if (paystackTxStatus === "success") {
+                await recordPaystackCharge(metaOrderId, txData);
+
                 // Atomically claim the order for stock decrement by transitioning
                 // payment_status pending → processing. Only ONE concurrent caller
                 // (verify or webhook) wins this; the other sees 0 rows and skips.

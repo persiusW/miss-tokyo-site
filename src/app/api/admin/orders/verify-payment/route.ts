@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { logActivity } from "@/lib/utils/logActivity";
-import { verifyReference, applyPaystackSuccess, loadBizIdentity } from "@/lib/paystackReconcile";
+import { verifyReference, applyPaystackSuccess, loadBizIdentity, recordPaystackCharge } from "@/lib/paystackReconcile";
 
 /**
  * POST /api/admin/orders/verify-payment
@@ -71,6 +71,10 @@ export async function POST(req: NextRequest) {
 
     const isPaidHere = order.payment_status === "paid";
     const paidAtPaystack = verdict.status === "success";
+
+    // A plain check is also the backfill for orders that predate the charge
+    // columns: what Paystack says now is what it will always say.
+    if (paidAtPaystack && verdict.tx) await recordPaystackCharge(order.id, verdict.tx);
     const mismatch = paidAtPaystack && !isPaidHere;
 
     // Goods already out means the customer has everything and only the books are

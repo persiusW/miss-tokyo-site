@@ -2,7 +2,7 @@ export const maxDuration = 300; // 5 min — may re-verify a full day of referen
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { verifyReference, applyPaystackSuccess, loadBizIdentity } from "@/lib/paystackReconcile";
+import { verifyReference, applyPaystackSuccess, loadBizIdentity, recordPaystackCharge } from "@/lib/paystackReconcile";
 
 /**
  * End-of-day payment reconciliation.
@@ -74,6 +74,8 @@ export async function GET(req: Request) {
                 results.unchanged++;
                 return;
             }
+
+            if (verdict.tx) await recordPaystackCharge(order.id, verdict.tx);
 
             const wasCancelled = order.payment_status === "cancelled";
 
