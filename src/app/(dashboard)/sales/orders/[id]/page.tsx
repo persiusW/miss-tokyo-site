@@ -28,6 +28,9 @@ type Order = {
     discount_amount?: number | null;
     auto_discount_title?: string | null;
     auto_discount_amount?: number | null;
+    /** What Paystack actually debited; above total_amount when the customer bore the fee. */
+    paystack_charged?: number | null;
+    paystack_fee?: number | null;
     customer_metadata?: { whatsapp?: string; instagram?: string; snapchat?: string } | null;
     assigned_rider_id?: string | null;
     notes?: string | null;
@@ -213,7 +216,7 @@ export default function OrderDetailPage() {
 
     useEffect(() => {
         Promise.all([
-            supabase.from("orders").select("id, customer_email, customer_name, customer_phone, delivery_method, total_amount, status, payment_status, fulfillment_status, paystack_reference, created_at, shipping_address, items, delivery_fee, delivery_zone, discount_code, discount_amount, auto_discount_title, auto_discount_amount, customer_metadata, assigned_rider_id, notes").eq("id", id).single(),
+            supabase.from("orders").select("id, customer_email, customer_name, customer_phone, delivery_method, total_amount, status, payment_status, fulfillment_status, paystack_reference, created_at, shipping_address, items, delivery_fee, delivery_zone, discount_code, discount_amount, auto_discount_title, auto_discount_amount, paystack_charged, paystack_fee, customer_metadata, assigned_rider_id, notes").eq("id", id).single(),
             supabase.from("business_settings").select("business_name, email, contact, address").eq("id", "default").single(),
             supabase.from("site_settings").select("pickup_enabled, pickup_instructions, pickup_address, pickup_contact_phone, pickup_estimated_wait").eq("id", "singleton").single(),
         ]).then(async ([{ data: ord }, { data: biz }, { data: ss }]) => {
@@ -309,6 +312,12 @@ export default function OrderDetailPage() {
             }
 
             setVerifyResult(data);
+
+            // The check also backfilled the charge columns server-side; mirror
+            // that locally so the Payment card updates without a reload.
+            if (data.checked && data.paystack?.status === "success" && data.paystack.amount != null) {
+                setOrder(prev => prev ? { ...prev, paystack_charged: data.paystack.amount, paystack_fee: data.paystack.fees ?? prev.paystack_fee ?? null } : prev);
+            }
 
             if (data.applied) {
                 toast.success(data.message);
@@ -744,10 +753,29 @@ export default function OrderDetailPage() {
                                 <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: "var(--ac-ink)" }}>GH₵ {Number(order.delivery_fee).toFixed(2)}</span>
                             </div>
                         )}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
-                            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Amount Paid</span>
-                            <span style={{ fontFamily: "var(--f-mono)", fontSize: 13, color: "var(--ac-ink)", fontWeight: 600 }}>GH₵ {Number(order.total_amount).toFixed(2)}</span>
-                        </div>
+                        {(() => {
+                            const total = Number(order.total_amount);
+                            const charged = order.paystack_charged != null ? Number(order.paystack_charged) : null;
+                            const fee = order.paystack_fee != null ? Number(order.paystack_fee) : null;
+                            // Paystack grosses the charge up when the customer bears
+                            // the fee, so "charged" can legitimately exceed the order
+                            // total. Both are shown so neither reads as an error.
+                            const customerBoreFee = charged != null && charged - total > 0.005;
+                            const row = (label: string, value: string, strong = false) => (
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px", borderTop: "1px solid var(--ac-line)" }}>
+                                    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>{label}</span>
+                                    <span style={{ fontFamily: "var(--f-mono)", fontSize: strong ? 13 : 12, color: "var(--ac-ink)", fontWeight: strong ? 600 : 400 }}>{value}</span>
+                                </div>
+                            );
+                            if (charged == null) return row("Amount Paid", `GH₵ ${total.toFixed(2)}`, true);
+                            return (
+                                <>
+                                    {row("Order Total", `GH₵ ${total.toFixed(2)}`)}
+                                    {fee != null && fee > 0 && row("Paystack Fee", `GH₵ ${fee.toFixed(2)} \u00B7 ${customerBoreFee ? "paid by customer" : "borne by store"}`)}
+                                    {row("Amount Paid", `GH₵ ${charged.toFixed(2)}`, true)}
+                                </>
+                            );
+                        })()}
 
                         {/* Verify against Paystack. The store's own record has been
                             wrong before — a cron cancelled orders customers had
