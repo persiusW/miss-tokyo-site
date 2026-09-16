@@ -787,15 +787,39 @@ export default function OrderDetailPage() {
                                             </span>
                                         </div>
 
-                                        {verifyResult.paystack.amount != null && (
-                                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                                                <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>Charged</span>
-                                                <span style={{ fontFamily: "var(--f-mono)", fontSize: 12 }}>
-                                                    GH₵ {verifyResult.paystack.amount.toFixed(2)}
-                                                    {verifyResult.paystack.channel ? ` \u00B7 ${verifyResult.paystack.channel.replace(/_/g, " ")}` : ""}
-                                                </span>
-                                            </div>
-                                        )}
+                                        {verifyResult.paystack.amount != null && (() => {
+                                            const charged: number = verifyResult.paystack.amount;
+                                            const requested: number | null = verifyResult.paystack.requestedAmount ?? null;
+                                            const fees: number | null = verifyResult.paystack.fees ?? null;
+                                            const orderTotal: number = Number(verifyResult.order?.total_amount ?? 0);
+                                            // Paystack grosses the charge up when the customer bears the
+                                            // transaction fee, so "charged" and "order total" legitimately
+                                            // differ by that fee. Only a gap between the order total and
+                                            // what the store asked Paystack for is a real discrepancy.
+                                            const customerBoreFee = requested != null && charged - requested > 0.005;
+                                            const requestedDiffers = requested != null && Math.abs(requested - orderTotal) > 0.005;
+                                            const row = (label: string, value: string, danger = false) => (
+                                                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                                    <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".1em", fontWeight: 600, color: "var(--ac-ink-4)" }}>{label}</span>
+                                                    <span style={{ fontFamily: "var(--f-mono)", fontSize: 12, color: danger ? "var(--ac-danger)" : undefined }}>{value}</span>
+                                                </div>
+                                            );
+                                            return (
+                                                <>
+                                                    {row("Charged", `GH₵ ${charged.toFixed(2)}${verifyResult.paystack.channel ? ` \u00B7 ${verifyResult.paystack.channel.replace(/_/g, " ")}` : ""}`)}
+                                                    {requested != null && requested !== charged && row("Order total", `GH₵ ${requested.toFixed(2)}`)}
+                                                    {fees != null && fees > 0 && row(
+                                                        "Paystack fee",
+                                                        `GH₵ ${fees.toFixed(2)} \u00B7 ${customerBoreFee ? "paid by customer" : "borne by store"}`,
+                                                    )}
+                                                    {requestedDiffers && (
+                                                        <p style={{ fontSize: 11, color: "var(--ac-danger)", lineHeight: 1.6, margin: "4px 0 0", fontWeight: 600 }}>
+                                                            Paystack was asked for GH₵ {requested!.toFixed(2)} but this order totals GH₵ {orderTotal.toFixed(2)}. The order record has changed since checkout.
+                                                        </p>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
 
                                         {verifyResult.paystack.paidAt && (
                                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>

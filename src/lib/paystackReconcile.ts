@@ -19,8 +19,15 @@ const PAYSTACK_VERIFY = "https://api.paystack.co/transaction/verify";
 export type PaystackVerdict = {
     /** "success" | "failed" | "abandoned" | "ongoing" | "reversed" | … */
     status: string;
-    /** GHS, as charged by Paystack — includes the fee the store passes on. */
+    /** GHS, what the customer was actually debited. */
     amount: number | null;
+    /** GHS, what the store asked Paystack to collect — should equal the order total. */
+    requestedAmount: number | null;
+    /**
+     * GHS, Paystack's transaction fee. When `amount` exceeds `requestedAmount`
+     * the customer bore it; when they match, the store did.
+     */
+    fees: number | null;
     paidAt: string | null;
     channel: string | null;
     /** True when the reference itself could not be resolved at all. */
@@ -42,12 +49,14 @@ export async function verifyReference(reference: string): Promise<PaystackVerdic
         // real answer, not a failure to get one, so it is reported rather than
         // collapsed into null.
         if (!json.status || !json.data?.status) {
-            return { status: "unknown", amount: null, paidAt: null, channel: null, unknown: true };
+            return { status: "unknown", amount: null, requestedAmount: null, fees: null, paidAt: null, channel: null, unknown: true };
         }
 
         return {
             status: json.data.status,
             amount: json.data.amount != null ? json.data.amount / 100 : null,
+            requestedAmount: json.data.requested_amount != null ? json.data.requested_amount / 100 : null,
+            fees: json.data.fees != null ? json.data.fees / 100 : null,
             paidAt: json.data.paid_at ?? null,
             channel: json.data.channel ?? null,
             unknown: false,
