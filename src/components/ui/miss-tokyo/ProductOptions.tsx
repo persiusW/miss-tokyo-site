@@ -359,7 +359,9 @@ export function ProductOptions(props: Props) {
 
         // Scenario B: Traditional product-level inventory tracking.
         return inventoryCount;
-    }, [trackInventory, trackVariantInventory, productVariants, selectedSize, selectedColor, inventoryCount]);
+    // selectedBrand was missing here: the count was computed once for the
+    // first brand and every other brand showed that same figure.
+    }, [trackInventory, trackVariantInventory, productVariants, selectedSize, selectedColor, selectedBrand, brands.length, inventoryCount]);
 
     // Out of stock when effectiveInventory is 0.
     const isOutOfStock = effectiveInventory === 0;
