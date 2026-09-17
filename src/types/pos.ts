@@ -25,6 +25,9 @@ export interface PosItem {
     name: string;
     size: string | null;
     color: string | null;
+    // Part of the variant key alongside size and colour. A brand-only product
+    // (three purses, one row each) is unresolvable without it.
+    brand: string | null;
     price: number;        // GHS, server-verified on send
     quantity: number;
 }
@@ -73,6 +76,7 @@ export interface PosSessionPublic {
         sku: string | null;
         size: string | null;
         color: string | null;
+        brand: string | null;
         quantity: number;
         price: number;
         image_url: string | null;
@@ -93,4 +97,5 @@ export interface PosProduct {
     track_variant_inventory: boolean;
     available_sizes: string[] | null;
     available_colors: string[] | null;
+    available_brands: string[] | null;
 }

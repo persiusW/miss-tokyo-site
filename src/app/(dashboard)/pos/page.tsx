@@ -25,10 +25,69 @@ type Contact = { id: string | null; name: string; email: string | null; phone: s
 const PRODUCT_RESULT_LIMIT = 60;
 type CustomerMode = 'search' | 'new';
 
-function ProductCard({ product, onAdd }: { product: PosProduct; onAdd: (p: PosProduct, size: string | null, color: string | null) => void }) {
-    const [selectedSize, setSelectedSize] = useState<string | null>(product.available_sizes?.[0] ?? null);
-    const [selectedColor, setSelectedColor] = useState<string | null>(product.available_colors?.[0] ?? null);
+type PosPick = { size: string | null; color: string | null; brand: string | null };
+
+// Above this many options a row of chips stops fitting a card; a select does.
+// The perfume products carry 17 and 28 brands each.
+const CHIP_LIMIT = 6;
+
+// Stacked above its options, not beside them: a card is ~140px wide and a
+// side label left room for one chip per line.
+const optionLabelStyle = { fontSize: 8, textTransform: "uppercase" as const, letterSpacing: ".12em", fontWeight: 700, color: "var(--ac-ink-4)", lineHeight: 1 };
+
+/**
+ * One dimension of a variant — size, colour or brand — rendered by how many
+ * options it has, so the card never grows a row it does not need: nothing for
+ * none, plain text for one (already chosen), chips for a few, a select for many.
+ */
+function OptionRow({ label, options, value, onChange }: { label: string; options: string[]; value: string | null; onChange: (v: string) => void }) {
+    if (options.length === 0) return null;
+    // A lone option is already the choice; show it on the label line and stop.
+    if (options.length === 1) {
+        return (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span style={optionLabelStyle}>{label}</span>
+                <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-ink-3)" }}>{options[0]}</span>
+            </div>
+        );
+    }
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <span style={optionLabelStyle}>{label}</span>
+            {options.length > CHIP_LIMIT ? (
+                <select
+                    value={value ?? ""}
+                    onChange={e => onChange(e.target.value)}
+                    aria-label={label}
+                    style={{ width: "100%", fontSize: 9, textTransform: "uppercase", letterSpacing: ".08em", padding: "3px 4px", border: "1px solid var(--ac-line)", background: "var(--ac-panel)", color: "var(--ac-ink)", borderRadius: 0 }}
+                >
+                    {options.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+            ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                    {options.map(o => (
+                        <button key={o} type="button" onClick={() => onChange(o)} aria-pressed={value === o}
+                            style={{ padding: "2px 6px", fontSize: 9, textTransform: "uppercase", letterSpacing: ".08em", border: `1px solid ${value === o ? "var(--ac-accent)" : "var(--ac-line)"}`, background: value === o ? "var(--ac-accent)" : "transparent", color: value === o ? "#fff" : "var(--ac-ink-3)", cursor: "pointer" }}>
+                            {o}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+const uniq = (xs: string[] | null | undefined) => [...new Set((xs ?? []).filter(Boolean))];
+
+function ProductCard({ product, onAdd }: { product: PosProduct; onAdd: (p: PosProduct, pick: PosPick) => void }) {
+    const sizes = uniq(product.available_sizes);
+    const colors = uniq(product.available_colors);
+    const brands = uniq(product.available_brands);
+    const [selectedSize, setSelectedSize] = useState<string | null>(sizes[0] ?? null);
+    const [selectedColor, setSelectedColor] = useState<string | null>(colors[0] ?? null);
+    const [selectedBrand, setSelectedBrand] = useState<string | null>(brands[0] ?? null);
     const unavailable = product.track_inventory && !product.track_variant_inventory && product.inventory_count <= 0;
+    const hasOptions = sizes.length + colors.length + brands.length > 0;
 
     return (
         <div style={{ border: "1px solid var(--ac-line)", padding: 8, display: "flex", flexDirection: "column", gap: 6, opacity: unavailable ? 0.4 : 1, background: "var(--ac-panel)" }}>
@@ -46,30 +105,17 @@ function ProductCard({ product, onAdd }: { product: PosProduct; onAdd: (p: PosPr
                     </p>
                 )}
             </div>
-            {product.available_sizes && product.available_sizes.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                    {[...new Set(product.available_sizes)].map(s => (
-                        <button key={s} onClick={() => setSelectedSize(s)}
-                            style={{ padding: "2px 6px", fontSize: 9, textTransform: "uppercase", letterSpacing: ".08em", border: `1px solid ${selectedSize === s ? "var(--ac-accent)" : "var(--ac-line)"}`, background: selectedSize === s ? "var(--ac-accent)" : "transparent", color: selectedSize === s ? "#fff" : "var(--ac-ink-3)", cursor: "pointer" }}>
-                            {s}
-                        </button>
-                    ))}
-                </div>
-            )}
-            {product.available_colors && product.available_colors.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                    {[...new Set(product.available_colors)].map(c => (
-                        <button key={c} onClick={() => setSelectedColor(c)}
-                            style={{ padding: "2px 6px", fontSize: 9, textTransform: "uppercase", letterSpacing: ".08em", border: `1px solid ${selectedColor === c ? "var(--ac-accent)" : "var(--ac-line)"}`, background: selectedColor === c ? "var(--ac-accent)" : "transparent", color: selectedColor === c ? "#fff" : "var(--ac-ink-3)", cursor: "pointer" }}>
-                            {c}
-                        </button>
-                    ))}
+            {hasOptions && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <OptionRow label="Size" options={sizes} value={selectedSize} onChange={setSelectedSize} />
+                    <OptionRow label="Colour" options={colors} value={selectedColor} onChange={setSelectedColor} />
+                    <OptionRow label="Brand" options={brands} value={selectedBrand} onChange={setSelectedBrand} />
                 </div>
             )}
             <button
                 disabled={unavailable}
-                onClick={() => !unavailable && onAdd(product, selectedSize, selectedColor)}
-                style={{ width: "100%", padding: "6px 0", background: "var(--ac-ink)", color: "var(--ac-bg)", fontSize: 9, textTransform: "uppercase", letterSpacing: ".2em", fontWeight: 700, border: "none", cursor: unavailable ? "not-allowed" : "pointer", opacity: unavailable ? 0.3 : 1 }}>
+                onClick={() => !unavailable && onAdd(product, { size: selectedSize, color: selectedColor, brand: selectedBrand })}
+                style={{ width: "100%", padding: "6px 0", background: "var(--ac-ink)", color: "var(--ac-bg)", fontSize: 9, textTransform: "uppercase", letterSpacing: ".2em", fontWeight: 700, border: "none", cursor: unavailable ? "not-allowed" : "pointer", opacity: unavailable ? 0.3 : 1, marginTop: "auto" }}>
                 Add
             </button>
         </div>
@@ -140,7 +186,7 @@ export default function POSPage() {
         let dbQuery = supabase
             .from('products')
             .select(
-                'id, name, slug, sku, price_ghs, image_urls, inventory_count, track_inventory, track_variant_inventory, available_sizes, available_colors',
+                'id, name, slug, sku, price_ghs, image_urls, inventory_count, track_inventory, track_variant_inventory, available_sizes, available_colors, available_brands',
                 { count: 'exact' },
             )
             .eq('is_active', true);
@@ -216,12 +262,12 @@ export default function POSPage() {
             .then((res: { data: unknown }) => setDeliverySettings(parseDeliverySettings(res.data)));
     }, []);
 
-    const addToCart = (product: PosProduct, size: string | null, color: string | null) => {
+    const addToCart = (product: PosProduct, { size, color, brand }: PosPick) => {
+        const sameLine = (i: PosItem) => i.productId === product.id && i.size === size && i.color === color && (i.brand ?? null) === brand;
         setCart(prev => {
-            const exists = prev.find(i => i.productId === product.id && i.size === size && i.color === color);
-            if (exists) return prev.map(i => i.productId === product.id && i.size === size && i.color === color
-                ? { ...i, quantity: i.quantity + 1 } : i);
-            return [...prev, { productId: product.id, variantId: null, name: product.name, size, color, price: product.price_ghs, quantity: 1 }];
+            const exists = prev.find(sameLine);
+            if (exists) return prev.map(i => sameLine(i) ? { ...i, quantity: i.quantity + 1 } : i);
+            return [...prev, { productId: product.id, variantId: null, name: product.name, size, color, brand, price: product.price_ghs, quantity: 1 }];
         });
         toast.success(`${product.name} added`);
     };
@@ -374,6 +420,7 @@ export default function POSPage() {
                 variantId: i.variantId,
                 size: i.size ?? undefined,
                 color: i.color ?? undefined,
+                brand: i.brand ?? undefined,
                 quantity: i.quantity,
             }));
             const stockRes = await fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`);
@@ -386,9 +433,11 @@ export default function POSPage() {
                     if (!result.isActive) {
                         issues.push(`"${line.name}" is no longer available.`);
                     } else if (!result.preorderEnabled && result.available < line.quantity) {
+                        const variant = [line.size, line.color, line.brand].filter(Boolean).join(' / ');
+                        const lineLabel = `"${line.name}"${variant ? ` (${variant})` : ''}`;
                         issues.push(result.available === 0
-                            ? `"${line.name}"${line.size ? ` (${line.size})` : ''} is sold out.`
-                            : `"${line.name}"${line.size ? ` (${line.size})` : ''} only has ${result.available} left.`);
+                            ? `${lineLabel} is sold out.`
+                            : `${lineLabel} only has ${result.available} left.`);
                     }
                 });
                 if (issues.length > 0) {
@@ -540,8 +589,8 @@ export default function POSPage() {
                         <div key={idx} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, paddingBottom: 8, borderBottom: "1px solid var(--ac-line)" }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <p style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ac-ink)" }}>{item.name}</p>
-                                {(item.size || item.color) && (
-                                    <p style={{ fontSize: 10, color: "var(--ac-ink-4)", marginTop: 2 }}>{[item.size, item.color].filter(Boolean).join(' / ')}</p>
+                                {(item.size || item.color || item.brand) && (
+                                    <p style={{ fontSize: 10, color: "var(--ac-ink-4)", marginTop: 2 }}>{[item.size, item.color, item.brand].filter(Boolean).join(' / ')}</p>
                                 )}
                                 <p style={{ fontSize: 11, color: "var(--ac-ink-3)", marginTop: 2 }}>GH₵{(item.price * item.quantity).toFixed(2)}</p>
                             </div>

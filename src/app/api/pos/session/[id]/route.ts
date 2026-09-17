@@ -42,6 +42,7 @@ export async function GET(
         sku: productMap[i.productId]?.sku ?? null,
         size: i.size ?? null,
         color: i.color ?? null,
+        brand: i.brand ?? null,
         quantity: i.quantity ?? 1,
         price: i.price ?? 0,
         image_url: productMap[i.productId]?.image_url ?? null,
