@@ -109,9 +109,9 @@ export default async function PosPaymentPage({ params }: { params: Promise<{ pos
                                 {item.sku && (
                                     <p className="text-[10px] text-neutral-400 uppercase tracking-widest">SKU: {item.sku}</p>
                                 )}
-                                {(item.size || item.color) && (
+                                {(item.size || item.color || item.brand) && (
                                     <p className="text-[10px] text-neutral-500 uppercase tracking-widest">
-                                        {[item.size, item.color].filter(Boolean).join(' / ')}
+                                        {[item.size, item.color, item.brand].filter(Boolean).join(' / ')}
                                     </p>
                                 )}
                                 <p className="text-[10px] text-neutral-400 mt-0.5">

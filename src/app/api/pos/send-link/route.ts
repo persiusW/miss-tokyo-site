@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     const unresolved = items.find((i: any) => variantTrackedIds.includes(i.productId) && !resolveVariantId(i));
     if (unresolved) {
         return NextResponse.json({
-            error: `"${unresolved.name}" (${[unresolved.size, unresolved.color].filter(Boolean).join(' / ') || 'no variant selected'}) does not match a stocked variant. Re-add it from the product list.`,
+            error: `"${unresolved.name}" (${[unresolved.size, unresolved.color, unresolved.brand].filter(Boolean).join(' / ') || 'no variant selected'}) does not match a stocked variant. Re-add it from the product list.`,
         }, { status: 409 });
     }
 
@@ -392,7 +392,10 @@ export async function POST(req: NextRequest) {
 
     // Send email + SMS in parallel (non-blocking — log failures, don't fail the request)
     const firstName = session.customer_name.split(' ')[0];
-    const itemList = items.map((i: any) => `${i.name}${i.size ? ` (${i.size})` : ''} x${i.quantity}`).join(', ');
+    const itemList = items.map((i: any) => {
+        const variant = [i.size, i.color, i.brand].filter(Boolean).join(' / ');
+        return `${i.name}${variant ? ` (${variant})` : ''} x${i.quantity}`;
+    }).join(', ');
 
     // The link must reach the customer on BOTH channels. sendSMS resolves with
     // { ok: false } on an mNotify failure rather than throwing, so the result has
