@@ -50,6 +50,13 @@ export async function runCheckout(payload: CheckoutPayload): Promise<CheckoutRun
 
         const cartArr: any[] = Array.isArray(cartItems) ? cartItems : [];
 
+        // Quantities price the order, so each line must be a whole number of
+        // units. A negative or fractional line on a pre-order — which skips the
+        // stock checks below — used to lower the total.
+        if (cartArr.some((i: any) => !Number.isInteger(i?.quantity) || i.quantity < 1 || i.quantity > 999)) {
+            return { status: 400, body: { error: "Please check the quantities in your cart and try again." } };
+        }
+
         // Hoisted — populated inside the cart block, returned in the success response
         const oosItems: string[] = [];
 
