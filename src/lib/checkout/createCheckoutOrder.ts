@@ -105,11 +105,20 @@ export async function runCheckout(payload: CheckoutPayload): Promise<CheckoutRun
             const pIds = cartArr.length > 0 ? cartArr.map(i => i.productId) : [productId];
             const { data: dbProducts } = await supabaseAdmin
                 .from("products")
-                .select("id, name, price_ghs, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, is_active, preorder_enabled")
+                .select("id, name, price_ghs, is_sale, discount_value, inventory_count, track_inventory, track_variant_inventory, is_active, preorder_enabled, category_id, category_ids, category_type")
                 .in("id", pIds);
 
             // Build a product map for server-side is_active and preorder checks
             dbProductMap = Object.fromEntries((dbProducts ?? []).map((p: any) => [p.id, p]));
+
+            // A line flagged isPreOrder skips every stock check and the
+            // reservation, so the flag cannot be taken on the client's word. It
+            // still records which button the customer pressed (Add to Cart vs
+            // Pre-Order), so it is kept only where the catalogue allows it.
+            const preorderEligible = await preorderEligibleIds(dbProducts ?? []);
+            for (const item of cartArr) {
+                if (item.isPreOrder === true && !preorderEligible.has(item.productId)) item.isPreOrder = false;
+            }
 
             // Reject inactive products — client isPreOrder is untrusted
             for (const item of cartArr) {
@@ -655,4 +664,29 @@ export async function runCheckout(payload: CheckoutPayload): Promise<CheckoutRun
             }
             return { status: 400, body: { error: data.message } };
         }
+}
+
+/**
+ * Products that take pre-orders: their own flag, or any category they belong
+ * to that has pre-orders enabled. The same inheritance the storefront uses to
+ * show the Pre-Order button (getProducts in @/lib/products).
+ */
+export async function preorderEligibleIds(products: any[]): Promise<Set<string>> {
+    const eligible = new Set<string>();
+    if (products.length === 0) return eligible;
+    const { data: cats } = await supabaseAdmin
+        .from("categories")
+        .select("id, name")
+        .eq("preorder_enabled", true);
+    const catIds = new Set((cats ?? []).map((c: any) => c.id as string));
+    const catNames = new Set((cats ?? []).map((c: any) => String(c.name ?? "").toLowerCase()));
+    for (const p of products) {
+        if (
+            p.preorder_enabled === true
+            || (Array.isArray(p.category_ids) && p.category_ids.some((id: string) => catIds.has(id)))
+            || (p.category_id && catIds.has(p.category_id))
+            || (p.category_type && catNames.has(String(p.category_type).toLowerCase()))
+        ) eligible.add(p.id);
+    }
+    return eligible;
 }
