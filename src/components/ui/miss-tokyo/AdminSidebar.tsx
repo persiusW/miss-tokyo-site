@@ -14,6 +14,7 @@ const Ico = {
     Doc:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"/><path d="M14 3v6h6"/></svg>,
     Tag:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M20 12 12.5 4.5A2 2 0 0 0 11 4H5a1 1 0 0 0-1 1v6a2 2 0 0 0 .5 1.3L12 20l8-8Z"/><circle cx="8" cy="8" r="1"/></svg>,
     Sparkles:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6L12 4Z"/><path d="M19 16l.7 1.8L21.5 18l-1.8.7L19 20.5l-.7-1.8L16.5 18l1.8-.7L19 16Z"/></svg>,
+    Chat:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>,
     Gift:       () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="9" width="18" height="11" rx="1"/><path d="M3 13h18M12 9v11"/><path d="M8 9c0-3 4-3 4 0 0-3 4-3 4 0"/></svg>,
     Wallet:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14" r="1.2"/></svg>,
     Box:        () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>,
@@ -38,13 +39,13 @@ const Ico = {
 // ─── Nav item ─────────────────────────────────────────────────────────────────
 
 import type { ReactElement } from "react";
-type NavItemDef = { label: string; href: string; Icon: () => ReactElement; badge?: string };
+type NavItemDef = { label: string; href: string; Icon: () => ReactElement; badge?: string; exact?: boolean };
 
-function NavItem({ label, href, Icon, badge, onClose, collapsed }: NavItemDef & { onClose: () => void; collapsed: boolean }) {
+function NavItem({ label, href, Icon, badge, exact, onClose, collapsed }: NavItemDef & { onClose: () => void; collapsed: boolean }) {
     const pathname = usePathname();
     const isActive =
-        (href === "/overview" && pathname === "/overview") ||
-        (href !== "/overview" && (pathname === href || pathname.startsWith(href + "/")));
+        ((href === "/overview" || exact) && pathname === href) ||
+        (href !== "/overview" && !exact && (pathname === href || pathname.startsWith(href + "/")));
 
     return (
         <Link
@@ -93,6 +94,7 @@ export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, m
         { label: "Point of Sale",    href: "/pos",                Icon: Ico.POS },
         { label: "POS History",      href: "/pos/history",        Icon: Ico.Doc },
         { label: "Orders",           href: "/sales/orders",       Icon: Ico.Orders },
+        { label: "Store Assistant",  href: "/agent",              Icon: Ico.Chat },
         { label: "Pre-Orders",       href: "/sales/pre-orders",   Icon: Ico.Box },
         { label: "Abandoned Carts",  href: "/customers/abandoned",Icon: Ico.Cart },
         { label: "Discounts",        href: "/catalog/discounts",  Icon: Ico.Tag },
@@ -119,8 +121,9 @@ export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, m
 
     const settingsItems: NavItemDef[] = isFullAccess
         ? [
-              { label: "Site Settings", href: "/settings", Icon: Ico.Cog },
+              { label: "Site Settings", href: "/settings", Icon: Ico.Cog, exact: true },
               { label: "Team",          href: "/team",     Icon: Ico.Team },
+              { label: "AI Settings",   href: "/settings/ai", Icon: Ico.Sparkles },
           ]
         : [];
 

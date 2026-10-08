@@ -444,7 +444,11 @@ export const ONLINE_HOLD_MINUTES = 5;
  * Throws if any item is unavailable or the product is inactive.
  * MUST be called BEFORE initialising the Paystack transaction.
  */
-export async function reserveStock(orderId: string, items: ReserveItem[]): Promise<void> {
+export async function reserveStock(
+    orderId: string,
+    items: ReserveItem[],
+    ttlMins: number = ONLINE_HOLD_MINUTES,
+): Promise<void> {
     const rpcItems = items.map(i => ({
         product_id: i.productId,
         variant_id: i.variantId ?? null,
@@ -454,7 +458,7 @@ export async function reserveStock(orderId: string, items: ReserveItem[]): Promi
     const { error } = await supabaseAdmin.rpc("fn_reserve_online_stock", {
         p_order_id: orderId,
         p_items: rpcItems,
-        p_ttl_mins: ONLINE_HOLD_MINUTES,
+        p_ttl_mins: ttlMins,
     });
 
     if (error) throw new Error(error.message);

@@ -23,6 +23,7 @@ function getCrumbs(pathname: string): string[] {
     if (pathname.startsWith("/sales/riders")) return ["Sales", "Riders"];
     if (pathname.startsWith("/sales/payments")) return ["Sales", "Payments"];
     if (pathname.startsWith("/sales/wholesalers")) return ["Sales", "Wholesalers"];
+    if (pathname.startsWith("/agent")) return ["Sales", "Store Assistant"];
     if (pathname.startsWith("/pos/history")) return ["Sales", "POS History"];
     if (pathname.startsWith("/pos")) return ["Sales", "Point of Sale"];
     if (pathname.startsWith("/catalog/products/low-stock")) return ["Catalogue", "Products", "Low Stock"];
@@ -42,6 +43,7 @@ function getCrumbs(pathname: string): string[] {
     if (pathname.startsWith("/finance/invoices")) return ["Finance", "Invoices"];
     if (pathname.startsWith("/finance/links")) return ["Finance", "Pay Links"];
     if (pathname.startsWith("/finance")) return ["Finance"];
+    if (pathname.startsWith("/settings/ai")) return ["Settings", "AI"];
     if (pathname.startsWith("/settings")) return ["Settings"];
     if (pathname.startsWith("/team")) return ["Settings", "Team"];
     if (pathname.startsWith("/communications")) return ["Communications", "Emails"];
