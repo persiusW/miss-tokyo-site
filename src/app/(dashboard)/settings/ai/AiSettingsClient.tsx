@@ -55,7 +55,8 @@ function Switch({ checked, onChange, label, description }: { checked: boolean; o
     );
 }
 
-export default function AiSettingsClient() {
+/** showMarkup: admin only. The API also withholds the value from anyone else. */
+export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }) {
     const [data, setData] = useState<Data | null>(null);
     const [form, setForm] = useState<Form | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -85,13 +86,13 @@ export default function AiSettingsClient() {
         const cap = Number(form.daily_spend_cap_ghs);
         const markup = Number(form.admin_cost_markup_pct);
         if (!Number.isFinite(cap) || cap < 0 || cap > 10_000) { toast.error("Daily spend cap must be between 0 and 10,000 GHS."); return; }
-        if (!Number.isFinite(markup) || markup < 0 || markup > 500) { toast.error("Markup must be between 0 and 500%."); return; }
+        if (showMarkup && (!Number.isFinite(markup) || markup < 0 || markup > 500)) { toast.error("Markup must be between 0 and 500%."); return; }
 
         const changes: { key: string; value: unknown }[] = [];
         if (form.whatsapp_enabled !== original.whatsapp_enabled) changes.push({ key: "whatsapp_enabled", value: form.whatsapp_enabled });
         if (form.dashboard_agent_enabled !== original.dashboard_agent_enabled) changes.push({ key: "dashboard_agent_enabled", value: form.dashboard_agent_enabled });
         if (cap !== Number(original.daily_spend_cap_ghs)) changes.push({ key: "daily_spend_cap_ghs", value: cap });
-        if (markup !== Number(original.admin_cost_markup_pct)) changes.push({ key: "admin_cost_markup_pct", value: markup });
+        if (showMarkup && markup !== Number(original.admin_cost_markup_pct)) changes.push({ key: "admin_cost_markup_pct", value: markup });
         if (changes.length === 0) { toast.info("Nothing to save."); return; }
 
         setSaving(true);
@@ -172,7 +173,7 @@ export default function AiSettingsClient() {
                             onChange={e => setForm({ ...form, daily_spend_cap_ghs: e.target.value })}
                         />
                     </label>
-                    <label>
+                    {showMarkup && <label>
                         <span className="ac-label">Dev cost markup (%)</span>
                         <input
                             className="ac-input" type="number" min={0} max={500} step="1"
@@ -180,9 +181,9 @@ export default function AiSettingsClient() {
                             onChange={e => setForm({ ...form, admin_cost_markup_pct: e.target.value })}
                         />
                         <span style={{ display: "block", fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>
-                            Not visible to customers or staff
+                            Only visible to admins
                         </span>
-                    </label>
+                    </label>}
                 </div>
                 <div style={{ marginTop: 18 }}>
                     <button type="button" className="ac-btn ac-btn-primary" onClick={save} disabled={saving}>

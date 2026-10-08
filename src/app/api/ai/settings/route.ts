@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireAiAdmin } from "@/lib/ai/requireAdmin";
-import { EDITABLE_AI_SETTINGS, getAiSettings, type EditableAiSettingKey } from "@/lib/ai/settings";
+import { ADMIN_ONLY_AI_SETTINGS, EDITABLE_AI_SETTINGS, getAiSettings, visibleAiSettings, type EditableAiSettingKey } from "@/lib/ai/settings";
 import { USD_TO_GHS } from "@/lib/ai/pricing";
 import { startOfTodayUtc } from "@/lib/ai/spend";
 
@@ -44,7 +44,7 @@ export async function GET() {
         const todayUsd = byDay.get(today.slice(0, 10)) ?? 0;
 
         return NextResponse.json({
-            settings: settingsRes.data ?? [],
+            settings: visibleAiSettings(settingsRes.data ?? [], auth.role),
             today: { spend_usd: parseFloat(todayUsd.toFixed(6)), spend_ghs: toGhs(todayUsd), cap_ghs: effective.dailySpendCapGhs },
             recent_turns: (recentRes.data ?? []).map(t => ({ ...t, cost_ghs: toGhs(Number(t.cost_usd) || 0) })),
             history: [...byDay.entries()].map(([date, usd]) => ({ date, cost_usd: parseFloat(usd.toFixed(6)), cost_ghs: toGhs(usd) })),
@@ -66,6 +66,9 @@ export async function PATCH(req: NextRequest) {
     const value = body?.value;
     if (!key || !(key in EDITABLE_AI_SETTINGS)) {
         return NextResponse.json({ error: "That setting can't be changed here." }, { status: 400 });
+    }
+    if (ADMIN_ONLY_AI_SETTINGS.has(key) && auth.role !== "admin") {
+        return NextResponse.json({ error: "That setting can't be changed here." }, { status: 403 });
     }
     if (!EDITABLE_AI_SETTINGS[key](value)) {
         return NextResponse.json({ error: "That value is out of range." }, { status: 400 });

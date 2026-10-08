@@ -21,7 +21,7 @@ export default async function AiSettingsPage() {
                     </div>
                 </div>
             ) : (
-                <AiSettingsClient />
+                <AiSettingsClient showMarkup={auth.role === "admin"} />
             )}
         </>
     );
