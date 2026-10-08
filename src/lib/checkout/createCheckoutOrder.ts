@@ -4,7 +4,7 @@
 // and the Paystack webhook behave identically wherever an order starts.
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { reserveStock, releaseReservation, releaseSupersededAttempts, type ReserveItem } from "@/lib/inventory";
+import { reserveStock, releaseReservation, releaseSupersededAttempts, getStockStatus, ONLINE_HOLD_MINUTES, type ReserveItem } from "@/lib/inventory";
 import { variantKey } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
@@ -18,8 +18,22 @@ export type CheckoutPayload = {
     previousOrderId?: unknown;
 };
 
+/** Server-computed money for an order, in GHS. */
+export type OrderTotals = {
+    /** Goods at catalogue price (sale and wholesale applied), before discounts. */
+    subtotal: number;
+    /** Automatic discounts, coupon or gift card, including any part spent on delivery. */
+    discount: number;
+    platformFee: number;
+    /** Delivery actually payable, after any discount against it. */
+    deliveryFee: number;
+    total: number;
+    itemCount: number;
+    hasPreorderItems: boolean;
+};
+
 /** An HTTP status and JSON body, exactly as the route returns them. */
-export type CheckoutRunResult = { status: number; body: any };
+export type CheckoutRunResult = { status: number; body: any; totals?: OrderTotals };
 
 /** Where an order came from. Stored on orders.source. */
 export type CheckoutSource = "storefront" | "whatsapp" | "pos" | "dashboard";
@@ -28,6 +42,18 @@ export type CheckoutContext = {
     source: CheckoutSource;
     /** The signed-in shopper, if any. Only used to grant wholesale pricing. */
     authUserId: string | null;
+    /** Stock hold length. Defaults to the storefront's ONLINE_HOLD_MINUTES. */
+    holdMinutes?: number;
+    /**
+     * Release this email's earlier unpaid attempts first (the storefront retry
+     * path). Off for staff and WhatsApp orders: they must never free the holds
+     * of a checkout the same customer has open on the website.
+     */
+    supersede?: boolean;
+    /** Stored on orders.notes. */
+    notes?: string | null;
+    /** Price and validate only: return totals before anything is written. */
+    dryRun?: boolean;
 };
 
 export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext): Promise<CheckoutRunResult> {
@@ -237,6 +263,8 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             }
         }
 
+        const goodsSubtotal = amountInGHS;
+
         // Apply automatic discounts server-side (re-evaluated independently of client)
         let autoDiscountAmount = 0;
         let autoDiscountLabel = "";
@@ -372,6 +400,21 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
         const payableDelivery = parseFloat(Math.max(0, deliveryFee - deliveryDiscount).toFixed(2));
         const amountWithDelivery = parseFloat((amountWithFee + payableDelivery).toFixed(2));
 
+        const totals: OrderTotals = {
+            subtotal: parseFloat(goodsSubtotal.toFixed(2)),
+            discount: parseFloat((goodsSubtotal - amountInGHS + deliveryDiscount).toFixed(2)),
+            platformFee: platformFeeAmount,
+            deliveryFee: payableDelivery,
+            total: amountWithDelivery,
+            itemCount: cartArr.length > 0
+                ? cartArr.reduce((n: number, i: any) => n + (i.quantity ?? 1), 0)
+                : (productId ? 1 : 0),
+            hasPreorderItems: cartArr.some((i: any) => i.isPreOrder === true),
+        };
+        if (ctx.dryRun) {
+            return { status: 200, body: { quote: true, oosItems }, totals };
+        }
+
         if (amountWithDelivery <= 0) {
             return { status: 409, body: {
                 error: "This order is fully covered. Please contact us to complete it — no payment is needed.",
@@ -383,7 +426,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             return { status: 200, body: {
                 authorizationUrl: "https://checkout.paystack.com/dummy",
                 reference: "dummy-ref",
-            } };
+            }, totals };
         }
 
         // Use the cart-item flag — this covers both product-level and category-inherited preorder
@@ -409,6 +452,8 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
                 delivery_fee: deliveryFee,
                 delivery_zone: deliveryFee > 0 ? deliveryZone : null,
                 status: "pending",
+                source: ctx.source,
+                ...(ctx.notes ? { notes: ctx.notes } : {}),
                 has_preorder: hasPreorder,
                 is_mixed_order: isMixedOrder,
                 items: cartArr,
@@ -454,7 +499,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
         // A retry after an abandoned attempt must not be blocked by that
         // attempt's own hold. Released before reserving, never after — the new
         // reservation has to be able to take those units.
-        try {
+        if (ctx.supersede !== false) try {
             await releaseSupersededAttempts({
                 email,
                 currentOrderId: orderId,
@@ -516,7 +561,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             const reserveItems: ReserveItem[] = [...reserveMap.values()];
 
             try {
-                await reserveStock(orderId, reserveItems);
+                await reserveStock(orderId, reserveItems, ctx.holdMinutes ?? ONLINE_HOLD_MINUTES);
             } catch (err: any) {
                 await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
 
@@ -561,7 +606,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             const singleProduct = dbProductMap[productId];
             if (singleProduct.track_inventory !== false && !singleProduct.preorder_enabled) {
                 try {
-                    await reserveStock(orderId, [{ productId, variantId: null, quantity: 1 }]);
+                    await reserveStock(orderId, [{ productId, variantId: null, quantity: 1 }], ctx.holdMinutes ?? ONLINE_HOLD_MINUTES);
                 } catch (err: any) {
                     await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
                     const availMatch = /available:\s*(\d+)/i.exec(err.message ?? "");
@@ -664,7 +709,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
                 reference: data.data.reference,
                 orderId,
                 oosItems: oosItems ?? [],
-            } };
+            }, totals };
         } else {
             // Paystack init failed — mark pending order as cancelled
             if (orderId) {
@@ -697,4 +742,232 @@ export async function preorderEligibleIds(products: any[]): Promise<Set<string>>
         ) eligible.add(p.id);
     }
     return eligible;
+}
+
+// ─── Typed entry point for staff and WhatsApp orders ─────────────────────────
+
+/**
+ * Stand-in address for customers with no email. Paystack requires one, and
+ * the order flow keys several lookups on it. The domain must be registered to
+ * Miss Tokyo before go-live: whoever controls it receives these receipts.
+ */
+export const PLACEHOLDER_EMAIL_DOMAIN = "misstokyo.store";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export type CreateCheckoutOrderInput = {
+    items: Array<{
+        product_id: string;
+        /** Optional; the size/colour/brand below are what resolve the variant. */
+        variant_id?: string | null;
+        size?: string | null;
+        colour?: string | null;
+        brand?: string | null;
+        quantity: number; // whole number >= 1
+    }>;
+    customer: {
+        name: string;
+        phone: string;
+        email?: string | null; // {phone}@misstokyo.store when the customer has none
+    };
+    delivery: {
+        method: "delivery" | "pickup";
+        address?: string | null;
+        /** The storefront's zones: Greater Accra, or anywhere else in Ghana. */
+        zone?: "accra" | "outside" | null;
+        region?: string | null;
+    };
+    source: "web" | "whatsapp" | "pos" | "dashboard";
+    notes?: string | null;
+    discount_code?: string | null;
+    hold_minutes?: number;
+};
+
+export type CreateCheckoutOrderResult =
+    | { success: true; orderId: string; authorizationUrl: string; paystackReference: string; totals: OrderTotals }
+    | { success: false; error: string; code: string };
+
+export type QuoteCheckoutOrderResult =
+    | { success: true; totals: OrderTotals; outOfStock: string[] }
+    | { success: false; error: string; code: string };
+
+const fail = (code: string, error: string) => ({ success: false as const, code, error });
+
+/** Ghana numbers as 233 + the last 9 digits, whatever form they were typed in. */
+export function normaliseGhanaPhone(phone: string): string | null {
+    const digits = (phone ?? "").replace(/\D/g, "");
+    if (digits.length < 9) return null;
+    return `233${digits.slice(-9)}`;
+}
+
+function codeForStatus(status: number): string {
+    if (status === 400) return "invalid";
+    if (status === 409) return "unavailable";
+    if (status === 502) return "gateway";
+    return "internal";
+}
+
+/**
+ * Turns the typed input into the storefront's own payload, so pricing, stock
+ * and Paystack run through runCheckout() unchanged. Names, prices and the
+ * pre-order flag come from the database, never from the caller.
+ */
+async function buildRun(input: CreateCheckoutOrderInput, dryRun: boolean): Promise<
+    { ok: true; run: CheckoutRunResult } | { ok: false; error: ReturnType<typeof fail> }
+> {
+    const items = Array.isArray(input?.items) ? input.items : [];
+    if (items.length === 0 || items.length > 50) return { ok: false, error: fail("invalid", "Add between 1 and 50 items.") };
+    for (const it of items) {
+        if (!UUID_RE.test(String(it?.product_id ?? ""))) return { ok: false, error: fail("invalid", "One of the products could not be identified.") };
+        if (!Number.isInteger(it.quantity) || it.quantity < 1 || it.quantity > 999) return { ok: false, error: fail("invalid", "Quantities must be whole numbers of 1 or more.") };
+        if (it.variant_id && !UUID_RE.test(it.variant_id)) return { ok: false, error: fail("invalid", "One of the options could not be identified.") };
+    }
+
+    const name = String(input?.customer?.name ?? "").trim().slice(0, 120);
+    if (!name) return { ok: false, error: fail("invalid", "The customer's name is required.") };
+    const phone = normaliseGhanaPhone(String(input?.customer?.phone ?? ""));
+    if (!phone) return { ok: false, error: fail("invalid", "A valid phone number is required.") };
+    const typedEmail = String(input?.customer?.email ?? "").trim().toLowerCase();
+    const email = EMAIL_RE.test(typedEmail) ? typedEmail : `${phone}@${PLACEHOLDER_EMAIL_DOMAIN}`;
+
+    const method = input?.delivery?.method === "pickup" ? "pickup" : "delivery";
+    const address = String(input?.delivery?.address ?? "").trim().slice(0, 500);
+    const zone = input?.delivery?.zone === "accra" || input?.delivery?.zone === "outside" ? input.delivery.zone : null;
+    if (method === "delivery" && (!address || !zone)) {
+        return { ok: false, error: fail("invalid", "Delivery needs an address and a zone (within Accra or outside Accra).") };
+    }
+    const region = String(input?.delivery?.region ?? "").trim() || (zone === "accra" ? "Greater Accra" : "");
+
+    // A variant id fills in the options it stands for, so a caller holding
+    // only the id still resolves the same variant the storefront would.
+    const variantIds = items.map(i => i.variant_id).filter(Boolean) as string[];
+    const variantMap = new Map<string, any>();
+    if (variantIds.length > 0) {
+        const { data: vRows } = await supabaseAdmin
+            .from("product_variants")
+            .select("id, product_id, size, color, brand")
+            .in("id", variantIds);
+        for (const v of vRows ?? []) variantMap.set(v.id, v);
+    }
+
+    const productIds = [...new Set(items.map(i => i.product_id))];
+    const { data: products } = await supabaseAdmin
+        .from("products")
+        .select("id, name, slug, price_ghs, is_sale, discount_value, image_urls, preorder_enabled, category_id, category_ids, category_type")
+        .in("id", productIds);
+    const productMap = new Map((products ?? []).map((p: any) => [p.id, p]));
+    if (productMap.size !== productIds.length) return { ok: false, error: fail("unavailable", "One of the products is no longer in the catalogue.") };
+
+    const lines = items.map(it => {
+        const v = it.variant_id ? variantMap.get(it.variant_id) : null;
+        if (v && v.product_id !== it.product_id) return null;
+        return {
+            productId: it.product_id,
+            size: (it.size ?? v?.size ?? "") || "",
+            color: (it.colour ?? v?.color ?? undefined) || undefined,
+            brand: (it.brand ?? v?.brand ?? undefined) || undefined,
+            quantity: it.quantity,
+        };
+    });
+    if (lines.some(l => l === null)) return { ok: false, error: fail("invalid", "An option does not belong to its product.") };
+
+    // A line is a pre-order only when the catalogue takes pre-orders for it AND
+    // live stock cannot cover it. In stock, it is reserved like any other sale.
+    const eligible = await preorderEligibleIds(products ?? []);
+    const stock = await getStockStatus(lines.map(l => ({ ...l!, variantId: null })));
+
+    const cartItems = lines.map((l, idx) => {
+        const p = productMap.get(l!.productId) as any;
+        const unit = p.is_sale && p.discount_value > 0 ? p.price_ghs * (1 - p.discount_value / 100) : p.price_ghs;
+        return {
+            id: [l!.productId, l!.size, l!.color ?? "", l!.brand ?? ""].join("-"),
+            productId: l!.productId,
+            name: p.name,
+            slug: p.slug,
+            price: parseFloat(Number(unit).toFixed(2)),
+            size: l!.size,
+            ...(l!.color ? { color: l!.color } : {}),
+            ...(l!.brand ? { brand: l!.brand } : {}),
+            quantity: l!.quantity,
+            imageUrl: Array.isArray(p.image_urls) ? p.image_urls[0] ?? "" : "",
+            isPreOrder: eligible.has(l!.productId) && (stock[idx]?.available ?? 0) < l!.quantity,
+        };
+    });
+
+    const source: CheckoutSource = input.source === "web" ? "storefront" : input.source;
+    const defaultHold = input.source === "web" ? ONLINE_HOLD_MINUTES : 15;
+    const holdMinutes = Number.isInteger(input.hold_minutes) && input.hold_minutes! >= 1 && input.hold_minutes! <= 120
+        ? input.hold_minutes!
+        : defaultHold;
+
+    const run = await runCheckout(
+        {
+            email,
+            cartItems,
+            metadata: {
+                fullName: name,
+                phone,
+                address: method === "delivery" ? address : "",
+                country: "Ghana",
+                region,
+                deliveryMethod: method,
+                delivery_zone: zone ?? undefined,
+                ...(input.source === "whatsapp" ? { whatsapp: phone } : {}),
+                ...(input.discount_code ? { discount_code: String(input.discount_code).trim() } : {}),
+            },
+        },
+        {
+            source,
+            authUserId: null,
+            holdMinutes,
+            supersede: false,
+            notes: input.notes ? String(input.notes).slice(0, 1000) : null,
+            dryRun,
+        },
+    );
+    return { ok: true, run };
+}
+
+/** Prices an order exactly as checkout would, without writing anything. */
+export async function quoteCheckoutOrder(input: CreateCheckoutOrderInput): Promise<QuoteCheckoutOrderResult> {
+    try {
+        const built = await buildRun(input, true);
+        if (!built.ok) return built.error;
+        const { status, body, totals } = built.run;
+        if (status === 200 && totals) return { success: true, totals, outOfStock: body?.oosItems ?? [] };
+        return fail(codeForStatus(status), body?.error ?? "This order could not be priced.");
+    } catch (e) {
+        console.error("[quoteCheckoutOrder]", e);
+        return fail("internal", "This order could not be priced. Please try again.");
+    }
+}
+
+/**
+ * Creates a pending order, holds its stock and returns a Paystack payment
+ * link — the same path the storefront checkout takes, so the webhook settles
+ * it identically.
+ */
+export async function createCheckoutOrder(input: CreateCheckoutOrderInput): Promise<CreateCheckoutOrderResult> {
+    try {
+        const built = await buildRun(input, false);
+        if (!built.ok) return built.error;
+        const { status, body, totals } = built.run;
+        if (status === 200 && body?.reference === "dummy-ref") {
+            return fail("payments_unconfigured", "Online payments are not set up on this server.");
+        }
+        if (status === 200 && body?.authorizationUrl && body?.orderId && totals) {
+            return {
+                success: true,
+                orderId: body.orderId,
+                authorizationUrl: body.authorizationUrl,
+                paystackReference: body.reference,
+                totals,
+            };
+        }
+        return fail(codeForStatus(status), body?.error ?? "The order could not be created.");
+    } catch (e) {
+        console.error("[createCheckoutOrder]", e);
+        return fail("internal", "The order could not be created. Please try again.");
+    }
 }
