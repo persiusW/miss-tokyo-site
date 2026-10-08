@@ -47,9 +47,15 @@ export default function AccountProfilePage() {
             toast.success("Profile updated.");
         } else if (!updateError && (!updated || updated.length === 0)) {
             // Row didn't exist yet — insert it (email is required)
+            if (!user?.email) {
+                console.warn("[profiles] skipping upsert — email is null", { userId: user?.id });
+                toast.error("Failed to save changes.");
+                setSaving(false);
+                return;
+            }
             const { error: insertError } = await supabase
                 .from("profiles")
-                .insert({ id: user.id, email: user.email ?? "", ...payload });
+                .insert({ id: user.id, email: user.email, ...payload });
             if (insertError) toast.error("Failed to save changes.");
             else toast.success("Profile updated.");
         } else {

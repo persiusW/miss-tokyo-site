@@ -37,11 +37,8 @@ export async function fetchProductsPage(
     const from = (page - 1) * PRODUCTS_PAGE_SIZE;
     const to = from + PRODUCTS_PAGE_SIZE - 1;
 
-    let q = supabaseAdmin
-        .from("products")
-        .select(PRODUCT_FIELDS, { count: "exact" });
-
     const term = query.trim().replace(/[%,()]/g, "");
+    let searchClause = "";
     if (term) {
         // Variant SKUs live on another table, so collect the parents first.
         const { data: variantHits } = await supabaseAdmin
@@ -57,32 +54,53 @@ export async function fetchProductsPage(
             `category_type.ilike.%${term}%`,
         ];
         if (variantProductIds.length > 0) clauses.push(`id.in.(${variantProductIds.join(",")})`);
-        q = q.or(clauses.join(","));
+        searchClause = clauses.join(",");
     }
 
-    if (status === "active")   q = q.eq("is_active", true);
-    if (status === "inactive") q = q.eq("is_active", false);
-    if (status === "preorder") q = q.eq("preorder_enabled", true);
+    // The same filters serve the page query and, when the page is past the end,
+    // the head-only count that tells the UI how many pages really exist.
+    const applyFilters = (q: any) => {
+        if (searchClause) q = q.or(searchClause);
 
-    // Stock filters only mean anything for tracked products; an untracked
-    // product has no meaningful count and must not be reported as sold out.
-    if (stock === "out") {
-        q = q.eq("track_inventory", true).lte("inventory_count", 0);
-    } else if (stock === "low") {
-        q = q.eq("track_inventory", true).gt("inventory_count", 0).lt("inventory_count", LOW_STOCK_THRESHOLD);
-    } else if (stock === "in") {
-        q = q.or(`track_inventory.eq.false,inventory_count.gte.${LOW_STOCK_THRESHOLD}`);
-    }
+        if (status === "active")   q = q.eq("is_active", true);
+        if (status === "inactive") q = q.eq("is_active", false);
+        if (status === "preorder") q = q.eq("preorder_enabled", true);
 
-    const { data, count } = await q
+        // Stock filters only mean anything for tracked products; an untracked
+        // product has no meaningful count and must not be reported as sold out.
+        if (stock === "out") {
+            q = q.eq("track_inventory", true).lte("inventory_count", 0);
+        } else if (stock === "low") {
+            q = q.eq("track_inventory", true).gt("inventory_count", 0).lt("inventory_count", LOW_STOCK_THRESHOLD);
+        } else if (stock === "in") {
+            q = q.or(`track_inventory.eq.false,inventory_count.gte.${LOW_STOCK_THRESHOLD}`);
+        }
+        return q;
+    };
+
+    const { data, count, error } = await applyFilters(
+        supabaseAdmin.from("products").select(PRODUCT_FIELDS, { count: "exact" }),
+    )
         .order("created_at", { ascending: false })
         .range(from, to);
 
+    // PGRST103 (HTTP 416): the page starts past the last row. PostgREST returns
+    // no count with it, so fetch the real total rather than report "0 products".
+    let totalCount = count ?? 0;
+    if (error?.code === "PGRST103") {
+        const { count: total } = await applyFilters(
+            supabaseAdmin.from("products").select("id", { count: "exact", head: true }),
+        );
+        totalCount = total ?? 0;
+    } else if (error) {
+        console.error("[fetchProductsPage]", error);
+    }
+
     return {
-        products: data ?? [],
+        products: error ? [] : data ?? [],
         page,
         pageSize: PRODUCTS_PAGE_SIZE,
-        totalCount: count ?? 0,
+        totalCount,
         query,
         status,
         stock,

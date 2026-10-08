@@ -1,6 +1,6 @@
 // src/app/api/cron/expire-reservations/route.ts
 // Called every 5 minutes by Vercel Cron (Pro tier) or external scheduler.
-// Marks orders with expired reservations as 'expired'.
+// Marks orders with expired reservations as 'reservation_expired'.
 //
 // IMPORTANT: Does NOT delete reservation rows.
 // fn_combined_available_stock already ignores rows where expires_at < NOW(),
@@ -30,12 +30,18 @@ export async function GET(req: Request) {
 
     let expired = 0;
     for (const orderId of orderIds) {
-        const { data: updated } = await supabaseAdmin
+        const { data: updated, error: updateError } = await supabaseAdmin
             .from("orders")
-            .update({ status: "expired" })
+            .update({ status: "reservation_expired" })
             .eq("id", orderId)
             .eq("status", "pending")
             .select("id");
+        // A constraint violation fails every order the same way, so retrying the
+        // rest of the batch only repeats the error. Stop and let it be fixed.
+        if (updateError?.code === "23514" || updateError?.code === "23502") {
+            console.error("[order-retry] constraint violation — stopping retry", updateError);
+            break;
+        }
         if (updated && updated.length > 0) expired++;
     }
 
