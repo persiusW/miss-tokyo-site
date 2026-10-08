@@ -310,8 +310,10 @@ export async function POST(req: Request) {
                         payment_status: "paid",
                         status: "paid",
                         paystack_reference: paystackRef,
-                        customer_name: fullName || null,
-                        customer_phone: phone || null,
+                        paid_at: new Date().toISOString(),
+                        // customer_name / customer_phone are not rewritten: they
+                        // were stored when the order was created, and Paystack's
+                        // metadata is only the client's copy passed back to us.
                         shipping_address: address
                             ? { text: address, country: country || null, region: region || null }
                             : null,
