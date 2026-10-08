@@ -21,6 +21,17 @@ export const EDITABLE_AI_SETTINGS = {
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
 
+/**
+ * Settings only the admin role may see or change. Owners manage the rest of
+ * the AI settings but never see the dev markup; the ai_settings RLS policy
+ * enforces the same rule at the database.
+ */
+export const ADMIN_ONLY_AI_SETTINGS: ReadonlySet<string> = new Set(["admin_cost_markup_pct"]);
+
+export function visibleAiSettings<T extends { key: string }>(rows: T[], role: string): T[] {
+    return role === "admin" ? rows : rows.filter(r => !ADMIN_ONLY_AI_SETTINGS.has(r.key));
+}
+
 function envCap(): number {
     const n = Number(process.env.DAILY_AI_SPEND_CAP_GHS);
     return Number.isFinite(n) && n >= 0 ? n : 50;
