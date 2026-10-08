@@ -15,6 +15,8 @@ export async function PATCH(
     }
 
     const { id } = await params;
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(id)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     let body: any;
     try { body = await req.json(); } catch { body = {}; }
 
