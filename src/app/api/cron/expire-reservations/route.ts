@@ -1,6 +1,6 @@
 // src/app/api/cron/expire-reservations/route.ts
 // Called every 5 minutes by Vercel Cron (Pro tier) or external scheduler.
-// Marks orders with expired reservations as 'expired'.
+// Marks orders with expired reservations as 'reservation_expired'.
 //
 // IMPORTANT: Does NOT delete reservation rows.
 // fn_combined_available_stock already ignores rows where expires_at < NOW(),
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     for (const orderId of orderIds) {
         const { data: updated, error: updateError } = await supabaseAdmin
             .from("orders")
-            .update({ status: "expired" })
+            .update({ status: "reservation_expired" })
             .eq("id", orderId)
             .eq("status", "pending")
             .select("id");
