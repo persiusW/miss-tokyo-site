@@ -1,5 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// wcygtmcnysbhzgcicocm is the production Miss Tokyo project. Tests that sign in
+// and click through the dashboard write real orders, logs and messages there.
+if (process.env.NEXT_PUBLIC_SUPABASE_URL?.includes("wcygtmcnysbhzgcicocm")) {
+    throw new Error("❌ Tests cannot run against production Supabase.");
+}
+
 /**
  * Playwright configuration for Miss Tokyo e-commerce E2E tests.
  *
