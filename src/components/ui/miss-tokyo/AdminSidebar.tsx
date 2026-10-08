@@ -39,13 +39,13 @@ const Ico = {
 // ─── Nav item ─────────────────────────────────────────────────────────────────
 
 import type { ReactElement } from "react";
-type NavItemDef = { label: string; href: string; Icon: () => ReactElement; badge?: string };
+type NavItemDef = { label: string; href: string; Icon: () => ReactElement; badge?: string; exact?: boolean };
 
-function NavItem({ label, href, Icon, badge, onClose, collapsed }: NavItemDef & { onClose: () => void; collapsed: boolean }) {
+function NavItem({ label, href, Icon, badge, exact, onClose, collapsed }: NavItemDef & { onClose: () => void; collapsed: boolean }) {
     const pathname = usePathname();
     const isActive =
-        (href === "/overview" && pathname === "/overview") ||
-        (href !== "/overview" && (pathname === href || pathname.startsWith(href + "/")));
+        ((href === "/overview" || exact) && pathname === href) ||
+        (href !== "/overview" && !exact && (pathname === href || pathname.startsWith(href + "/")));
 
     return (
         <Link
@@ -121,8 +121,9 @@ export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, m
 
     const settingsItems: NavItemDef[] = isFullAccess
         ? [
-              { label: "Site Settings", href: "/settings", Icon: Ico.Cog },
+              { label: "Site Settings", href: "/settings", Icon: Ico.Cog, exact: true },
               { label: "Team",          href: "/team",     Icon: Ico.Team },
+              { label: "AI Settings",   href: "/settings/ai", Icon: Ico.Sparkles },
           ]
         : [];
 
