@@ -21,7 +21,16 @@ export type CheckoutPayload = {
 /** An HTTP status and JSON body, exactly as the route returns them. */
 export type CheckoutRunResult = { status: number; body: any };
 
-export async function runCheckout(payload: CheckoutPayload): Promise<CheckoutRunResult> {
+/** Where an order came from. Stored on orders.source. */
+export type CheckoutSource = "storefront" | "whatsapp" | "pos" | "dashboard";
+
+export type CheckoutContext = {
+    source: CheckoutSource;
+    /** The signed-in shopper, if any. Only used to grant wholesale pricing. */
+    authUserId: string | null;
+};
+
+export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext): Promise<CheckoutRunResult> {
         const {
             productId,
             email: rawEmail,
@@ -67,20 +76,19 @@ export async function runCheckout(payload: CheckoutPayload): Promise<CheckoutRun
         let amountInGHS = 0;
         if (cartArr.length > 0 || productId) {
             // Priority 2: Recalculate Cart Total or Single Product server-side
-            // Case-insensitive on purpose. The incoming address is now
-            // lower-cased, but profiles rows written before that still carry
-            // whatever was typed — an exact match would miss a wholesaler
-            // stored as "Name@x.com" and quietly charge them retail.
-            // ilike treats _ and % as wildcards, so the row is confirmed in JS
-            // rather than trusted from the pattern alone.
-            const { data: profileMatches } = await supabaseAdmin
-                .from("profiles")
-                .select("role, email")
-                .ilike("email", email)
-                .limit(5);
-            const userProfile = (profileMatches ?? []).find(
-                (p: any) => (p.email ?? "").toLowerCase() === email,
-            );
+            // Wholesale tiers go to a signed-in wholesale account on the
+            // storefront only. They used to follow the typed email address, so
+            // anyone who typed a wholesaler's (or an admin's) address was charged
+            // tier prices. Staff and WhatsApp orders are always retail.
+            let userProfile: { role: string | null } | null = null;
+            if (ctx.source === "storefront" && ctx.authUserId) {
+                const { data } = await supabaseAdmin
+                    .from("profiles")
+                    .select("role")
+                    .eq("id", ctx.authUserId)
+                    .maybeSingle();
+                userProfile = data;
+            }
 
             const isWholesaler = !!(userProfile?.role && ["admin", "owner", "wholesale", "wholesaler"].includes(userProfile.role.toLowerCase()));
 
