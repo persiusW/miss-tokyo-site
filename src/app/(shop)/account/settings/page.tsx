@@ -90,6 +90,11 @@ export default function ProfilePage() {
     const saveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!userId) return;
+        if (!email) {
+            console.warn("[profiles] skipping upsert — email is null", { userId });
+            toast.error("Failed to save.");
+            return;
+        }
         setSaving(true);
         const { error } = await supabase.from("profiles")
             .upsert({ id: userId, email, full_name: form.full_name, phone: form.phone }, { onConflict: "id" });
@@ -101,7 +106,9 @@ export default function ProfilePage() {
     const toggleComm = (key: keyof Pick<Profile, "email_subscribed" | "sms_subscribed">) => {
         setForm(p => {
             const next = { ...p, [key]: !p[key] };
-            if (userId) {
+            if (userId && !email) {
+                console.warn("[profiles] skipping upsert — email is null", { userId });
+            } else if (userId) {
                 supabase.from("profiles")
                     .upsert({ id: userId, email, [key]: next[key] }, { onConflict: "id" })
                     .then(({ error }: { error: any }) => { if (error) toast.error("Failed to update preference."); });

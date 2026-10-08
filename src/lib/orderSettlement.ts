@@ -76,9 +76,13 @@ export async function ensureCustomerAccount(
 
     if (existingProfile) {
         if (fullName) {
+            // update, not upsert: an upsert without email builds an insert row
+            // with email NULL, and Postgres rejects it (23502) before ON CONFLICT
+            // ever gets to turn it into an update. The row exists — we just found it.
             await supabaseAdmin
                 .from("profiles")
-                .upsert({ id: existingProfile.id, full_name: fullName }, { onConflict: "id" });
+                .update({ full_name: fullName })
+                .eq("id", existingProfile.id);
         }
         // An account that exists is not necessarily an account the customer can
         // get into: most are created here at settlement and never signed into,
