@@ -29,18 +29,37 @@ const STATUS_TO_FULFILLMENT: Record<string, string> = {
     delivered:        "delivered",
 };
 
-export async function updateOrderStatus(orderId: string, newStatus: string, extraData?: any) {
+// Server actions are public endpoints: anyone signed in — including every
+// customer, since checkout creates an account — can call them directly. The
+// dashboard layout guard does not run for them, so each one checks the role.
+const ORDER_STAFF_ROLES = ["admin", "owner", "sales_staff"];
+
+// The only extra column a caller may set alongside a status change.
+const EXTRA_UPDATABLE_FIELDS = ["assigned_rider_id"] as const;
+
+async function requireOrderStaff() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "Unauthorized" };
+    if (!user) return { user: null, profile: null, error: "Unauthorized" };
+    const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+    if (!profile || !ORDER_STAFF_ROLES.includes(profile.role ?? "")) {
+        return { user: null, profile: null, error: "Forbidden" };
+    }
+    return { user, profile, error: null };
+}
 
-    // Role check and old-record fetch (for diffing) are independent reads — run in parallel
-    const [{ data: profile }, { data: oldData }] = await Promise.all([
-        supabase.from("profiles").select("role").eq("id", user.id).single(),
-        supabaseAdmin.from("orders").select("*, riders(full_name)").eq("id", orderId).single(),
-    ]);
-    if (!profile) return { success: false, error: "Profile not found" };
+export async function updateOrderStatus(orderId: string, newStatus: string, extraData?: Record<string, unknown>) {
+    const { user, profile, error: authError } = await requireOrderStaff();
+    if (!user || !profile) return { success: false, error: authError };
+
+    const { data: oldData } = await supabaseAdmin.from("orders").select("*, riders(full_name)").eq("id", orderId).single();
     if (!oldData) return { success: false, error: "Order not found" };
+
+    // Never spread caller input into the update: pick the allowed fields only.
+    const allowedExtra: Record<string, unknown> = {};
+    for (const key of EXTRA_UPDATABLE_FIELDS) {
+        if (extraData && key in extraData) allowedExtra[key] = extraData[key];
+    }
 
     const syncedFulfillment = STATUS_TO_FULFILLMENT[newStatus];
     const PAYMENT_STATUSES = ["pending", "paid", "refunded", "cancelled"];
@@ -54,7 +73,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
         // would stay reversible forever, and a retried charge.success could
         // undo a staff cancellation made months later.
         customer_metadata: { ...((oldData.customer_metadata as object) ?? {}), auto_cancelled_at: null },
-        ...extraData,
+        ...allowedExtra,
     };
     if (newStatus === "packed" && !oldData.packed_by) {
         updateData.packed_by = user.id;
@@ -122,7 +141,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
                 rider_name: riderName,
                 previous_status: oldData.status,
                 new_status: newStatus,
-                ...extraData
+                ...allowedExtra
             }
         });
     });
@@ -131,9 +150,8 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
 }
 
 export async function updateFulfillmentStatus(orderId: string, fulfillment_status: string) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "Unauthorized" };
+    const { user, error: authError } = await requireOrderStaff();
+    if (!user) return { success: false, error: authError };
 
     // Sync the legacy `status` column so Inbox/Packed/Shipped tabs remain accurate.
     const syncedStatus = FULFILLMENT_TO_STATUS[fulfillment_status];
@@ -175,12 +193,8 @@ export async function updateFulfillmentStatus(orderId: string, fulfillment_statu
 }
 
 export async function bulkUpdateOrderStatus(orderIds: string[], newStatus: string) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, error: "Unauthorized" };
-
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-    if (!profile) return { success: false, error: "Profile not found" };
+    const { user, profile, error: authError } = await requireOrderStaff();
+    if (!user || !profile) return { success: false, error: authError };
 
     const syncedFulfillment = STATUS_TO_FULFILLMENT[newStatus];
     const updateData: any = {
