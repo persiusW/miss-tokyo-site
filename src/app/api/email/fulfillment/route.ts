@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendSMSLogged, injectSmsVars } from "@/lib/sms";
-import { Resend } from "resend";
-
-function getResend() { return new Resend(process.env.RESEND_API_KEY); }
+import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -119,12 +117,12 @@ export async function POST(req: NextRequest) {
 </body>
 </html>`;
 
-      await getResend().emails.send({
+      await sendEmail({
         from: `${bizName} <${fromEmail}>`,
         to: [order.customer_email],
         subject: subject,
         html: html,
-      });
+      }, { event: `fulfillment:${type}`, orderId: order.id });
     }
 
     // ── SMS ───────────────────────────────────────────────────────────────

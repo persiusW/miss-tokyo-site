@@ -3,14 +3,12 @@
 import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getUrl } from "@/lib/utils/getUrl";
-import { Resend } from "resend";
 import { sendSMSOrThrow } from "@/lib/sms";
 import crypto from "crypto";
 import { logActivity } from "@/lib/utils/logActivity";
 import { after } from "next/server";
 import { INVITABLE_ROLES } from "@/lib/teamInvites";
-
-const resend = new Resend(process.env.RESEND_API_KEY!);
+import { sendEmail } from "@/lib/email";
 
 interface InviteData {
     fullName: string;
@@ -98,13 +96,13 @@ export async function inviteTeamMember(data: InviteData) {
     }
 
     try {
-        await resend.emails.send({
+        await sendEmail({
             from: process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop",
             to: email,
             subject: "Invitation to Join Miss Tokyo Team",
             text: message,
             html: `<p>You have been invited to collaborate on Miss Tokyo as a <strong>${data.role}</strong>.</p><p><a href="${inviteLink}">Click here to accept your invitation</a></p>`,
-        });
+        }, { event: "team_invite" });
 
         if (formattedPhone) {
             try {

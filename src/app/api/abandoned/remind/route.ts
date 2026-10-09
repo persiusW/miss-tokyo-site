@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,10 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "skipped", reason: "No RESEND_API_KEY" });
     }
 
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-
-    await resend.emails.send({
+    await sendEmail({
       from: `${bizName} <${fromEmail}>`,
       to: customerEmail,
       subject: `You left something behind at ${bizName}`,
@@ -56,7 +54,7 @@ export async function POST(req: NextRequest) {
                 </div>
               </div>
             </div>`,
-    });
+    }, { event: "abandoned_cart_reminder", orderId });
 
     return NextResponse.json({ status: "sent" });
   } catch (err: any) {

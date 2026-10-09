@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { sendSMSLogged } from "@/lib/sms";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendCustomerPush } from "@/lib/customerPush";
+import { sendEmail } from "@/lib/email";
 
 /**
  * POST /api/dispatch
@@ -85,9 +86,6 @@ export async function POST(req: NextRequest) {
 
         // ── Send customer notifications (email) ───────────────────────────────
         if (shouldNotifyCustomer && process.env.RESEND_API_KEY) {
-            const { Resend } = await import("resend");
-            const resend = new Resend(process.env.RESEND_API_KEY);
-
             const fromEmail = process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop";
 
             const emailPromises = orders
@@ -122,7 +120,7 @@ export async function POST(req: NextRequest) {
                         ? `Hello ${order.customer_name || "valued customer"}, your in-stock items from order <strong>#${ref}</strong> are on their way. Your pre-order items will be dispatched in a separate shipment once they arrive.`
                         : `Hello ${order.customer_name || "valued customer"}, your order <strong>#${ref}</strong> has been dispatched and is on its way to you.`;
 
-                    return resend.emails.send({
+                    return sendEmail({
                         from: `${bizName} <${fromEmail}>`,
                         to: order.customer_email!,
                         subject: isMixed ? `Your available items from #${ref} are on their way!` : `Your order #${ref} is on its way!`,
@@ -151,7 +149,7 @@ export async function POST(req: NextRequest) {
                             </div>
                           </div>
                         </div>`,
-                    });
+                    }, { event: "dispatch", orderId: order.id });
                 });
 
             await Promise.allSettled(emailPromises);

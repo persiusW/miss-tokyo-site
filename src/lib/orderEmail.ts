@@ -1,6 +1,4 @@
-import { Resend } from "resend";
-
-function getResend() { return new Resend(process.env.RESEND_API_KEY); }
+import { sendEmail } from "@/lib/email";
 
 // Prevents injection of user-supplied cart data into email templates
 export const escHtml = (s: string): string =>
@@ -170,7 +168,7 @@ export async function sendOrderConfirmation(opts: {
       View Order Status →
     </a>`;
 
-    await getResend().emails.send({
+    await sendEmail({
         from: `${bizName} <${process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop"}>`,
         to: [customerEmail],
         subject: `Order Confirmed — #${orderRef}`,
@@ -225,5 +223,5 @@ export async function sendOrderConfirmation(opts: {
   </div>
 </body>
 </html>`,
-    });
+    }, { event: "order_confirmed" });
 }
