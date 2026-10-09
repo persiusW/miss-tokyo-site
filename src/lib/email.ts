@@ -63,7 +63,7 @@ async function sendViaResend(payload: EmailPayload): Promise<{ ok: boolean; erro
             subject: payload.subject,
             html: payload.html,
             ...(payload.text ? { text: payload.text } : {}),
-            ...(payload.replyTo ? { reply_to: payload.replyTo } : {}),
+            ...(payload.replyTo ? { replyTo: payload.replyTo } : {}),
         });
 
         if (error) {
