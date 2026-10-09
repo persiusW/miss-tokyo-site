@@ -205,7 +205,15 @@ export function ChatSurface({
                             <button type="button" className="mtai-action go" onClick={() => { onEffect?.(); router.push("/settings/ai"); }}>Open AI Settings</button>
                         )}
                     </div>
-                ) : bubbles.length === 0 ? (
+                ) : null}
+                {/* Admin replies still reach the asker while the assistant is off. */}
+                {unavailable && bubbles.filter(b => b.role === "team").map(b => (
+                    <div key={b.id} className="mtai-msg team">
+                        <div className="mtai-team-label">Miss Tokyo team{b.question ? <> · re: <span>{b.question}</span></> : null}</div>
+                        <div className="mtai-bubble"><ReplyText text={b.text} /></div>
+                    </div>
+                ))}
+                {unavailable ? null : bubbles.length === 0 ? (
                     <>
                         <div className="mtai-greet">
                             {greeting()}{user.firstName ? <>, <em>{user.firstName}</em></> : null}
