@@ -13,6 +13,7 @@ import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage }
 import { releaseDiscountHolds } from "@/lib/discountValidation";
 import { settlePosSession } from "@/lib/posSettlement";
 import { recordPaystackCharge } from "@/lib/paystackReconcile";
+import { recordResult } from "@/lib/payments/attempts";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 
@@ -66,6 +67,7 @@ export async function POST(req: Request) {
         if (event.event === "charge.success") {
             const data = event.data;
             const paystackRef: string = data.reference || "";
+            await recordResult(paystackRef, data);
             const metadata = data.metadata || {};
 
             // ── Gift card purchase: activate + deliver ─────────────────────────

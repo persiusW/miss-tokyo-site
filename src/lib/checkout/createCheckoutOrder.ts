@@ -9,6 +9,8 @@ import { variantKey } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
 import { errorBody } from "@/lib/errors/catalogue";
+import { channelFor, cleanSaleKey } from "@/lib/payments/attemptRules";
+import { recordError, recordStart } from "@/lib/payments/attempts";
 
 /** The JSON body /api/paystack/initialize has always accepted. */
 export type CheckoutPayload = {
@@ -58,6 +60,8 @@ export type CheckoutContext = {
 };
 
 export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext): Promise<CheckoutRunResult> {
+    const saleKey = cleanSaleKey((payload as { saleKey?: unknown } | null)?.saleKey);
+    const attemptChannel = channelFor(ctx.source);
         const {
             productId,
             email: rawEmail,
@@ -637,7 +641,9 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             }
         }
 
-        const response = await fetch("https://api.paystack.co/transaction/initialize", {
+        let response: Response;
+        try {
+        response = await fetch("https://api.paystack.co/transaction/initialize", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${paystackSecret}`,
@@ -680,6 +686,14 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
                 },
             }),
         });
+        } catch (e) {
+            console.error("[Paystack init] unreachable:", e);
+            await recordError({ saleKey, channel: attemptChannel, code: "PAY-01", message: String(e), orderId });
+            if (orderId) {
+                await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+            }
+            return { status: 502, body: { ...errorBody("PAY-01", "customer"), code: "gateway" } };
+        }
 
         if (!response.ok) {
             const errText = await response.text();
@@ -688,6 +702,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             console.error(
                 `[Paystack init] HTTP ${response.status}: ${errText} — email=${emailForLog} amount=${amountInPesewas}`,
             );
+            await recordError({ saleKey, channel: attemptChannel, code: "PAY-01", message: `HTTP ${response.status}`, orderId });
             if (orderId) {
                 await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
             }
@@ -705,6 +720,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
                     .eq("id", orderId);
             }
 
+            await recordStart({ saleKey, channel: attemptChannel, reference: data.data?.reference ?? null, amount: amountInPesewas / 100, orderId, userId: ctx.authUserId });
             return { status: 200, body: {
                 authorizationUrl: data.data.authorization_url,
                 reference: data.data.reference,
@@ -717,6 +733,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
                 await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
             }
             console.error("[Paystack init] refused:", data?.message);
+            await recordError({ saleKey, channel: attemptChannel, code: "PAY-02", message: data?.message, orderId });
             return { status: 400, body: { ...errorBody("PAY-02", "customer"), code: "refused" } };
         }
 }

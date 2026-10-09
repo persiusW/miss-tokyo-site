@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
 import { recordPaystackCharge } from "@/lib/paystackReconcile";
+import { recordResult } from "@/lib/payments/attempts";
 
 const NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const ORDER_FIELDS = "id, customer_name, customer_email, customer_phone, shipping_address, delivery_method, total_amount, items, discount_code, discount_amount, status, paystack_reference";
@@ -57,6 +58,7 @@ export async function GET(req: Request) {
         }
 
         const txData = data.data;
+        await recordResult(reference, txData);
         const paystackTxStatus: string = txData.status; // "success" | "failed" | "abandoned" | "ongoing"
         const metadata = txData.metadata || {};
         const { orderId: metaOrderId, fullName, phone, address, deliveryMethod, cartItems } = metadata;

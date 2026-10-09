@@ -13,6 +13,8 @@ import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
 import { logActivity } from '@/lib/utils/logActivity';
 import { sendEmail } from "@/lib/email";
 import { apiError } from "@/lib/errors/apiError";
+import { cleanSaleKey } from '@/lib/payments/attemptRules';
+import { recordError, recordStart } from '@/lib/payments/attempts';
 
 
 export async function POST(req: NextRequest) {
@@ -32,10 +34,12 @@ export async function POST(req: NextRequest) {
     // same work a link sale does, so cash branches at the end rather than
     // duplicating this route.
     let mode: 'link' | 'cash' = 'link';
+    let rawSaleKey: unknown;
     try {
         const body = await req.json();
         sessionId = body?.sessionId;
         if (body?.mode === 'cash') mode = 'cash';
+        rawSaleKey = body?.saleKey;
     } catch {
         sessionId = undefined;
     }
@@ -390,6 +394,7 @@ export async function POST(req: NextRequest) {
         await supabaseAdmin.from('pos_reservations').delete().eq('pos_session_id', sessionId);
         await releaseDiscountHolds({ posSessionId: sessionId });
         await supabaseAdmin.from('pos_sessions').update({ status: 'draft' }).eq('id', sessionId);
+        await recordError({ saleKey: cleanSaleKey(rawSaleKey), channel: 'pos', code: gatewayReachable ? 'PAY-02' : 'PAY-01', message: paystackData?.message, posSessionId: sessionId, userId: user.id });
         return NextResponse.json(
             { error: gatewayReachable
                 ? "Paystack didn't create the link. Please try again."
@@ -400,6 +405,7 @@ export async function POST(req: NextRequest) {
 
     // Store the authorization_url as paystack_reference — used by /pay/[pos_id] as the "Pay Now" href
     const authorizationUrl: string = paystackData.data?.authorization_url ?? '';
+    await recordStart({ saleKey: cleanSaleKey(rawSaleKey), channel: 'pos', reference: paystackData.data?.reference ?? null, amount: amountWithFee, posSessionId: sessionId, userId: user.id });
 
     await supabaseAdmin
         .from('pos_sessions')

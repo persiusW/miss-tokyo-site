@@ -155,6 +155,9 @@ export default function POSPage() {
     const [completedVia, setCompletedVia] = useState<'cash' | 'gift_card'>('gift_card');
     const [completedHadContact, setCompletedHadContact] = useState(false);
     const [delivery, setDelivery] = useState<Delivery>(null);
+    // One id per sale, so payment attempts for it can be counted together.
+    const [saleKey, setSaleKey] = useState(() => crypto.randomUUID());
+    const [sessionId, setSessionId] = useState<string | null>(null);
     // Cash is irreversible once recorded, so the button arms on the first tap
     // and fires on the second. A native confirm() would block the whole till.
     const [cashArmed, setCashArmed] = useState(false);
@@ -476,11 +479,12 @@ export default function POSPage() {
             if (!sessionIsJson) { toast.error(TILL_SERVER_UNREACHABLE); return; }
             if (!sessionRes.ok || !sessionData?.sessionId) { toast.error(sessionData?.error ?? TILL_GENERIC); return; }
 
+            setSessionId(sessionData.sessionId);
             sendStarted = true;
             const sendRes = await fetch('/api/pos/send-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId: sessionData.sessionId, mode }),
+                body: JSON.stringify({ sessionId: sessionData.sessionId, mode, saleKey }),
             });
             if (sendRes.status === 401) return expiredSession();
             const { data: sent, isJson: sentIsJson } = await readJson<{
@@ -523,7 +527,8 @@ export default function POSPage() {
     };
 
     const reset = () => {
-        setCart([]); setPaymentUrl(null); setCompletedOrderRef(null); setDelivery(null); setSelectedContact(null);
+        setCart([]); setPaymentUrl(null); setCompletedOrderRef(null); setDelivery(null);
+        setSaleKey(crypto.randomUUID()); setSessionId(null); setSelectedContact(null);
         setNewCustomer({ name: '', email: '' });
         setCustomerPhone('');
         setDeliveryMethod('pickup'); setDeliveryAddress('');
