@@ -25,13 +25,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     if (profile.role === "sales_staff" && session.created_by !== user.id) return apiError("GEN-00", { status: 403, audience: "staff" });
 
     const { data: attempt } = await supabaseAdmin.from("sale_payment_attempts")
-        .select("sale_key, paystack_reference, status, updated_at")
+        .select("id, sale_key, paystack_reference, status, updated_at")
         .eq("pos_session_id", id).not("paystack_reference", "is", null)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
 
     let attemptStatus: string | null = attempt?.status ?? null;
-    const fresh = !!attempt && Date.now() - Date.parse(attempt.updated_at) < 4000;
-    if (attempt?.paystack_reference && !fresh && session.status === "pending_payment" && process.env.PAYSTACK_SECRET_KEY) {
+    // Claim this check by stamping updated_at first (only rows older than 4s
+    // match), so tabs and instances share one Paystack call even when it fails.
+    let claimed = false;
+    if (attempt?.paystack_reference && session.status === "pending_payment" && process.env.PAYSTACK_SECRET_KEY) {
+        const cutoff = new Date(Date.now() - 4000).toISOString();
+        const { data: won } = await supabaseAdmin.from("sale_payment_attempts")
+            .update({ updated_at: new Date().toISOString() })
+            .eq("id", attempt.id).lt("updated_at", cutoff).select("id");
+        claimed = (won?.length ?? 0) > 0;
+    }
+    if (attempt?.paystack_reference && claimed) {
         try {
             const res = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(attempt.paystack_reference)}`, {
                 headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },

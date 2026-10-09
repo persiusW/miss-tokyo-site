@@ -19,6 +19,7 @@ import {
     type DeliveryFeeSettings,
     type DeliveryZone,
 } from '@/lib/delivery';
+import { stopPolling } from '@/lib/payments/attemptRules';
 
 type Contact = { id: string | null; name: string; email: string | null; phone: string | null };
 
@@ -280,15 +281,22 @@ export default function POSPage() {
         if (!liveStatusOn || !paymentUrl || completedOrderRef || !sessionId) return;
         let stop = false;
         let lastState = "";
+        let settlingSince: number | null = null;
         const tick = async () => {
             try {
                 const res = await fetch(`/api/pos/session/${sessionId}/payment`);
                 const { data } = await readJson<{ state: string; failures: number; orderRef?: string }>(res);
-                if (stop || !res.ok || !data) return;
+                if (stop) return;
+                if (!res.ok || !data) {
+                    // Signed out or not allowed: asking again won't help.
+                    if (stopPolling({ state: "", httpStatus: res.status, settlingSince, now: Date.now() })) stop = true;
+                    return;
+                }
                 setLive(data);
                 if (data.state === "declined" && lastState !== "declined") toast.code("PAY-04", { audience: "staff", ask: { posSessionId: sessionId, saleKey } });
+                if (data.state === "settling" && settlingSince === null) settlingSince = Date.now();
                 lastState = data.state;
-                if (data.state === "paid" || data.state === "expired") stop = true;
+                if (stopPolling({ state: data.state, httpStatus: res.status, settlingSince, now: Date.now() })) stop = true;
             } catch { /* next tick */ }
         };
         void tick();
