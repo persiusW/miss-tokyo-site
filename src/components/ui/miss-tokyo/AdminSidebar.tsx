@@ -94,7 +94,7 @@ export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, m
         { label: "Point of Sale",    href: "/pos",                Icon: Ico.POS },
         { label: "POS History",      href: "/pos/history",        Icon: Ico.Doc },
         { label: "Orders",           href: "/sales/orders",       Icon: Ico.Orders },
-        { label: "Store Assistant",  href: "/agent",              Icon: Ico.Chat },
+        { label: "Miss Tokyo AI",    href: "/agent",              Icon: Ico.Chat },
         { label: "Pre-Orders",       href: "/sales/pre-orders",   Icon: Ico.Box },
         { label: "Abandoned Carts",  href: "/customers/abandoned",Icon: Ico.Cart },
         { label: "Discounts",        href: "/catalog/discounts",  Icon: Ico.Tag },

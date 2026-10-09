@@ -3,6 +3,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import { AdminSidebar } from "./AdminSidebar";
 import { AdminTopbar } from "./AdminTopbar";
+import { MissTokyoAi, MissTokyoAiProvider } from "@/components/admin/missTokyoAi/MissTokyoAi";
 
 export type Theme = "dark" | "light" | "system";
 
@@ -43,6 +44,7 @@ export function AdminShellClient({ children, businessName, isFullAccess, showCus
     const dataTheme = theme === "system" ? undefined : theme;
 
     return (
+        <MissTokyoAiProvider user={user}>
         <div className="admin-shell" {...(dataTheme ? { "data-theme": dataTheme } : {})}>
             <div
                 className={`admin-sidebar-scrim${navOpen ? " on" : ""}`}
@@ -71,6 +73,10 @@ export function AdminShellClient({ children, businessName, isFullAccess, showCus
                     {children}
                 </div>
             </div>
+
+            {/* Inside .admin-shell for its tokens, outside the topbar's backdrop-filter. */}
+            <MissTokyoAi />
         </div>
+        </MissTokyoAiProvider>
     );
 }

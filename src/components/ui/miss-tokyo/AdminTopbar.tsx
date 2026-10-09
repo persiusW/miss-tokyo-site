@@ -23,7 +23,7 @@ function getCrumbs(pathname: string): string[] {
     if (pathname.startsWith("/sales/riders")) return ["Sales", "Riders"];
     if (pathname.startsWith("/sales/payments")) return ["Sales", "Payments"];
     if (pathname.startsWith("/sales/wholesalers")) return ["Sales", "Wholesalers"];
-    if (pathname.startsWith("/agent")) return ["Sales", "Store Assistant"];
+    if (pathname.startsWith("/agent")) return ["Sales", "Miss Tokyo AI"];
     if (pathname.startsWith("/pos/history")) return ["Sales", "POS History"];
     if (pathname.startsWith("/pos")) return ["Sales", "Point of Sale"];
     if (pathname.startsWith("/catalog/products/low-stock")) return ["Catalogue", "Products", "Low Stock"];
