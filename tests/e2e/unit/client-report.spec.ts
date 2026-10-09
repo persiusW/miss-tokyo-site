@@ -38,3 +38,16 @@ test("server limiter allows 20 per IP per 10 minutes", () => {
     expect(allowReport("5.6.7.8", t0 + 100)).toBe(true);
     expect(allowReport("1.2.3.4", t0 + 10 * 60_000 + 1)).toBe(true);
 });
+
+test("error screens and ErrorNet share one reporter, so a crash is reported once", async () => {
+    const { sharedReporter } = await import("../../../src/lib/errors/clientReport");
+    const sent: string[] = [];
+    const a = sharedReporter(async r => { sent.push("a:" + r.message); });
+    const b = sharedReporter(async r => { sent.push("b:" + r.message); });
+    expect(a).toBe(b);
+    const crash = new Error("render crash");
+    a(buildReport(crash, "/pos"));
+    b(buildReport(crash, "/pos"));
+    await new Promise(res => setTimeout(res, 0));
+    expect(sent).toEqual(["a:render crash"]);
+});

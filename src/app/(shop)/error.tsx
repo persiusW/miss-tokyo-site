@@ -2,9 +2,13 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { reportClientError } from "@/components/errors/ErrorNet";
 
 export default function ShopError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-    useEffect(() => { console.error("[shop error]", error.digest ?? "", error); }, [error]);
+    useEffect(() => {
+        console.error("[shop error]", error.digest ?? "", error);
+        reportClientError(error, error.digest);
+    }, [error]);
     return (
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-24 text-center">
             <h1 className="font-serif text-2xl md:text-3xl tracking-widest uppercase mb-4">Something happened</h1>

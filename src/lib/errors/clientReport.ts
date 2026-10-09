@@ -33,6 +33,13 @@ export function createReporter(send: (r: ClientReport) => Promise<void>, max = R
     };
 }
 
+let shared: ((r: ClientReport) => void) | null = null;
+/** One reporter per page load, shared by ErrorNet and the error screens. */
+export function sharedReporter(send: (r: ClientReport) => Promise<void>): (r: ClientReport) => void {
+    if (!shared) shared = createReporter(send);
+    return shared;
+}
+
 const hits = new Map<string, number[]>();
 /** Best-effort per-IP limit (per server instance). */
 export function allowReport(ip: string, now: number): boolean {

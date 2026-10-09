@@ -2,9 +2,13 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { reportClientError } from "@/components/errors/ErrorNet";
 
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-    useEffect(() => { console.error("[dashboard error]", error.digest ?? "", error); }, [error]);
+    useEffect(() => {
+        console.error("[dashboard error]", error.digest ?? "", error);
+        reportClientError(error, error.digest);
+    }, [error]);
     return (
         <div className="ac-card" style={{ maxWidth: 560, margin: "48px auto", textAlign: "center" }}>
             <div className="ac-empty">
