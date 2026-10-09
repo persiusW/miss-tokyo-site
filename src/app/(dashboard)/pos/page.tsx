@@ -158,6 +158,8 @@ export default function POSPage() {
     // One id per sale, so payment attempts for it can be counted together.
     const [saleKey, setSaleKey] = useState(() => crypto.randomUUID());
     const [sessionId, setSessionId] = useState<string | null>(null);
+    const [liveStatusOn, setLiveStatusOn] = useState(false);
+    const [live, setLive] = useState<{ state: string; failures: number; orderRef?: string } | null>(null);
     // Cash is irreversible once recorded, so the button arms on the first tap
     // and fires on the second. A native confirm() would block the whole till.
     const [cashArmed, setCashArmed] = useState(false);
@@ -264,11 +266,35 @@ export default function POSPage() {
     useEffect(() => {
         supabase
             .from('store_settings')
-            .select('delivery_fees_enabled, delivery_fee_accra, delivery_fee_outside')
+            .select('delivery_fees_enabled, delivery_fee_accra, delivery_fee_outside, pos_live_payment_status')
             .eq('id', 'default')
             .maybeSingle()
-            .then((res: { data: unknown }) => setDeliverySettings(parseDeliverySettings(res.data)));
+            .then((res: { data: unknown }) => {
+                setDeliverySettings(parseDeliverySettings(res.data));
+                setLiveStatusOn((res.data as { pos_live_payment_status?: unknown } | null)?.pos_live_payment_status === true);
+            });
     }, []);
+
+    // Live link status (switch: Settings → Store). Polls only while a sent link is on screen.
+    useEffect(() => {
+        if (!liveStatusOn || !paymentUrl || completedOrderRef || !sessionId) return;
+        let stop = false;
+        let lastState = "";
+        const tick = async () => {
+            try {
+                const res = await fetch(`/api/pos/session/${sessionId}/payment`);
+                const { data } = await readJson<{ state: string; failures: number; orderRef?: string }>(res);
+                if (stop || !res.ok || !data) return;
+                setLive(data);
+                if (data.state === "declined" && lastState !== "declined") toast.code("PAY-04", { audience: "staff" });
+                lastState = data.state;
+                if (data.state === "paid" || data.state === "expired") stop = true;
+            } catch { /* next tick */ }
+        };
+        void tick();
+        const t = setInterval(() => { if (!stop) void tick(); }, 5000);
+        return () => { stop = true; clearInterval(t); };
+    }, [liveStatusOn, paymentUrl, completedOrderRef, sessionId]);
 
     const addToCart = (product: PosProduct, { size, color, brand }: PosPick) => {
         const sameLine = (i: PosItem) => i.productId === product.id && i.size === size && i.color === color && (i.brand ?? null) === brand;
@@ -528,7 +554,7 @@ export default function POSPage() {
 
     const reset = () => {
         setCart([]); setPaymentUrl(null); setCompletedOrderRef(null); setDelivery(null);
-        setSaleKey(crypto.randomUUID()); setSessionId(null); setSelectedContact(null);
+        setSaleKey(crypto.randomUUID()); setSessionId(null); setLive(null); setSelectedContact(null);
         setNewCustomer({ name: '', email: '' });
         setCustomerPhone('');
         setDeliveryMethod('pickup'); setDeliveryAddress('');
@@ -818,6 +844,15 @@ export default function POSPage() {
                             <div role="status" style={{ padding: "10px 12px", background: `color-mix(in srgb, ${c} 10%, transparent)`, border: `1px solid ${c}`, borderRadius: "var(--r-sm)" }}>
                                 <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: c, fontWeight: 700, marginBottom: 4 }}>{h.text}</p>
                                 <p style={{ fontSize: 10, color: "var(--ac-ink-3)", wordBreak: "break-all", fontFamily: "var(--f-mono)" }}>{paymentUrl}</p>
+                                {liveStatusOn && live && (
+                                    <p role="status" style={{ fontSize: 11, fontWeight: 600, marginTop: 6, color: live.state === "declined" || live.state === "expired" ? "var(--ac-warn)" : "var(--ac-ink)" }}>
+                                        {live.state === "paid" ? `Paid ✓${live.orderRef ? ` · Order #${live.orderRef}` : ""}`
+                                            : live.state === "settling" ? "Paid, finishing up…"
+                                            : live.state === "declined" ? `Declined (${Math.min(Math.max(live.failures, 1), 2)} of 2)`
+                                            : live.state === "expired" ? "Link expired"
+                                            : "Waiting for the customer…"}
+                                    </p>
+                                )}
                             </div>); })()}
                             <button onClick={copyUrl} style={{ width: "100%", padding: "10px 0", border: "1px solid var(--ac-ink)", background: "transparent", color: "var(--ac-ink)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".12em", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: "var(--r-sm)" }}>
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
