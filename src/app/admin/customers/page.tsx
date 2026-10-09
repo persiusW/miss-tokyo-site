@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabaseBrowser";
-import toast from "react-hot-toast";
+import { toast } from "@/lib/toast";
 import { X, Search, Plus, Download, Filter, Trash2, Upload, FileUp } from "lucide-react";
 import Papa from "papaparse";
 
@@ -49,7 +49,8 @@ export default function AdminCustomers() {
       setContacts(data || []);
       setSelected(new Set());
     } catch (err: any) {
-      toast.error(`Fetch failure: ${err.message}`);
+      console.error("[admin/customers] load failed", err);
+      toast.error("Couldn't load customers. Please refresh.");
     } finally {
       setLoading(false);
     }
@@ -96,14 +97,14 @@ export default function AdminCustomers() {
         if (error) throw error;
     };
 
-    toast.promise(savePromise(), {
-      loading: 'Recording client specimen...',
-      success: 'Client added to atelier files.',
-      error: (err) => `Failed to add: ${err.message}`,
-    }).then(() => {
+    savePromise().then(() => {
+      toast.success('Client added to atelier files.');
       setShowAddModal(false);
       setAddForm({ firstName: "", lastName: "", email: "", phone: "" });
       fetchContacts();
+    }).catch((err) => {
+      console.error("[admin/customers] save failed", err);
+      toast.error("That didn't save. Please try again.");
     }).finally(() => {
       setSaving(false);
     });
@@ -176,19 +177,20 @@ export default function AdminCustomers() {
             return mapped.length;
         };
 
-        toast.promise(importPromise(), {
-          loading: `Calibrating ${mapped.length} profile textures...`,
-          success: (n) => `Successfully integrated ${n} customers into the archives.`,
-          error: (err) => `Import failed: ${err.message}`
-        }).then(() => {
+        importPromise().then((n) => {
+          toast.success(`Successfully integrated ${n} customers into the archives.`);
           setShowImportModal(false);
           fetchContacts();
+        }).catch((err) => {
+          console.error("[admin/customers] import failed", err);
+          toast.error("The import didn't save. Please try again.");
         }).finally(() => {
           setImporting(false);
         });
       },
       error: (err) => {
-        toast.error(`CSV Parsing Error: ${err.message}`);
+        console.error("[admin/customers] CSV parse failed", err);
+        toast.error("That file couldn't be read. Check it's a CSV with an Email column.");
         setImporting(false);
       }
     });

@@ -43,7 +43,8 @@ export default function InviteForm({ inviteId, email, fullName, role, token }: a
             });
 
             if (signInError) {
-                toast.error("Account created, but automatic login failed: " + signInError.message);
+                console.error("[invite] auto sign-in failed", signInError);
+                toast.error("Your account was created. Please sign in to continue.");
                 setLoading(false);
                 return;
             }
