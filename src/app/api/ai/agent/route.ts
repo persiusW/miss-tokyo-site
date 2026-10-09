@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { runStoreAssistant, validateTranscript } from "@/lib/ai/storeAssistant/run";
+import { runStoreAssistant, validateTranscript } from "@/lib/ai/missTokyoAi/run";
 
 export const maxDuration = 120;
 

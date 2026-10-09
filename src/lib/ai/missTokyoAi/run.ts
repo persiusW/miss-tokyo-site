@@ -4,8 +4,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { AI_MODEL, costUsd } from "@/lib/ai/pricing";
 import { getAiSettings } from "@/lib/ai/settings";
 import { todaySpendUsd, withinCap, startOfTodayUtc } from "@/lib/ai/spend";
-import { STORE_ASSISTANT_SYSTEM } from "@/lib/ai/storeAssistant/prompt";
-import { STORE_ASSISTANT_TOOLS, runStoreAssistantTool } from "@/lib/ai/storeAssistant/tools";
+import { STORE_ASSISTANT_SYSTEM } from "@/lib/ai/missTokyoAi/prompt";
+import { STORE_ASSISTANT_TOOLS, runStoreAssistantTool } from "@/lib/ai/missTokyoAi/tools";
 
 const MAX_ITERATIONS = 10;
 const MAX_TOKENS = 8000;
