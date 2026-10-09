@@ -94,6 +94,9 @@ export async function GET(req: Request) {
                 sentinelStranded.push(row);
                 continue;
             }
+            // Not stock-tracked: the roll-up is not a count, so there is no
+            // drift to find. Reporting these made the warning fire every night.
+            if (p.track_inventory === false) continue;
             if (row.delta !== 0) drift.push(row);
         }
 
