@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/utils/logActivity";
 import { adjustStock, syncProductStockFromVariants } from "@/lib/inventory";
 import { normAttr } from "@/lib/utils/normAttr";
 import { apiError } from "@/lib/errors/apiError";
+import { uniqueViolationMessage } from "@/lib/errors/dbError";
 
 /**
  * Removes variant rows the staff member dropped from the product, skipping any
@@ -113,6 +114,7 @@ export async function POST(req: NextRequest) {
 
     if (error) {
         console.error("[admin/products POST]", error);
+        { const dup = uniqueViolationMessage(error); if (dup) return NextResponse.json({ error: dup }, { status: 409 }); }
         return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
@@ -133,6 +135,7 @@ export async function POST(req: NextRequest) {
 
         if (insertErr) {
             console.error("[admin/products POST] variant insert failed:", insertErr.message);
+            { const dup = uniqueViolationMessage(insertErr); if (dup) return NextResponse.json({ error: dup }, { status: 409 }); }
             return apiError("GEN-00", { status: 500, audience: "staff", cause: insertErr });
         }
 
@@ -192,6 +195,7 @@ export async function PATCH(req: NextRequest) {
         const { error } = await supabaseAdmin.from("products").update(fields).eq("id", id);
         if (error) {
             console.error("[admin/products PATCH toggle]", error);
+            { const dup = uniqueViolationMessage(error); if (dup) return NextResponse.json({ error: dup }, { status: 409 }); }
             return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
         }
         revalidatePath("/shop", "page");
@@ -284,6 +288,7 @@ export async function PATCH(req: NextRequest) {
 
     if (error) {
         console.error("[admin/products PATCH]", error);
+        { const dup = uniqueViolationMessage(error); if (dup) return NextResponse.json({ error: dup }, { status: 409 }); }
         return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
@@ -373,6 +378,7 @@ export async function PATCH(req: NextRequest) {
             const { error: insertErr } = await supabaseAdmin.from("product_variants").insert(toInsert);
             if (insertErr) {
                 console.error("[admin/products PATCH] variant insert failed:", insertErr.message);
+                { const dup = uniqueViolationMessage(insertErr); if (dup) return NextResponse.json({ error: dup }, { status: 409 }); }
                 return apiError("GEN-00", { status: 500, audience: "staff", cause: insertErr });
             }
         }
