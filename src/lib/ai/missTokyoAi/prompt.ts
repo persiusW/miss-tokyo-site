@@ -45,7 +45,7 @@ function guideText(role: StaffRole): string {
     const entries = guideFor(role).map(e => `## ${e.title}\n${e.body}`).join("\n\n");
     const cannot = CANNOT_DO.map(c => `- ${c}`).join("\n");
     const restricted = role === "sales_staff"
-        ? "\n\nThis person is sales staff: Site Settings, Team, Wholesalers, Invoices, Pay Links and AI Settings are not in their menu. For anything there, tell them to ask an admin or owner."
+        ? "\n\nThis person is sales staff: Site Settings, Team, Wholesalers, Invoices, Pay Links and AI Settings are not in their menu. For anything there, tell them to ask an admin or owner. They also cannot see figures per staff member or per customer: never offer or suggest those, only totals and breakdowns by product, category, channel, payment method, day, week, month, zone or discount code."
         : "";
     return `# Dashboard guide (current behaviour)\n\n${entries}\n\n# What the dashboard cannot do\n${cannot}${restricted}`;
 }
