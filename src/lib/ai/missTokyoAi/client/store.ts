@@ -7,6 +7,8 @@
 import { create } from "zustand";
 import type { Effect } from "@/lib/ai/missTokyoAi/effects";
 import type { MtaiFeatures } from "@/lib/ai/settings";
+import { ERRORS, isErrorCode } from "@/lib/errors/catalogue";
+import type { AskTarget } from "@/lib/toast";
 
 export type Bubble = {
     id: string;
@@ -55,6 +57,8 @@ type State = {
     setAvailability: (a: Availability) => void;
     send: (text: string) => Promise<void>;
     newChat: () => void;
+    /** "Ask Miss Tokyo AI" from a payment error: new chat, seeded on the server. */
+    askAboutError: (ask: AskTarget) => Promise<void>;
     setSpotlight: (s: Spotlight) => void;
     /** Rings a control now. The timestamp is taken here, not in a component render. */
     showMe: (anchor: string, label: string) => void;
@@ -225,6 +229,48 @@ export const useMissTokyoAi = create<State>((set, get) => ({
     newChat: () => {
         set({ transcript: [], bubbles: [], loading: false });
         persist([], []);
+    },
+
+    askAboutError: async (ask) => {
+        if (get().loading || !isErrorCode(ask.code)) return;
+        const code = ask.code;
+        const text = `Help me with this payment problem (${code}).`;
+        // No model when the assistant is off: the fixed steps for this code.
+        const steps = (): Bubble => {
+            const d = ERRORS[code] as { staff: string; steps?: string[] };
+            const lines = [d.staff, ...(d.steps ?? []).map((s, i) => `${i + 1}. ${s}`)];
+            return { id: id(), role: "assistant", text: lines.join("\n") };
+        };
+        set({ transcript: [], bubbles: [{ id: id(), role: "user", text }], loading: true, open: true });
+        const { availability } = get();
+        if (availability === "off" || availability === "not_set_up") {
+            const next = [...get().bubbles, steps()];
+            set({ bubbles: next, loading: false });
+            persist([], next);
+            return;
+        }
+        try {
+            const res = await fetch("/api/ai/agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: [{ role: "user", content: text }], seed: ask }),
+            });
+            const data = await res.json().catch(() => null);
+            if (res.ok && Array.isArray(data?.messages)) {
+                const next: Bubble[] = [...get().bubbles, { id: id(), role: "assistant", text: String(data.reply ?? ""), effects: Array.isArray(data.effects) ? data.effects : [] }];
+                set({ transcript: data.messages, bubbles: next, loading: false });
+                persist(data.messages, next);
+            } else {
+                const fallback = res.status === 503 ? steps() : { id: id(), role: "assistant" as const, text: data?.error ?? CALM_FAIL, error: true };
+                const next: Bubble[] = [...get().bubbles, fallback];
+                set({ bubbles: next, loading: false });
+                persist([], next);
+            }
+        } catch {
+            const next: Bubble[] = [...get().bubbles, steps()];
+            set({ bubbles: next, loading: false });
+            persist([], next);
+        }
     },
 
     showMe: (anchor, label) => get().setSpotlight({ anchor, label, startedAt: Date.now() }),

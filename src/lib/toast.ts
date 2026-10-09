@@ -2,7 +2,15 @@ import { ERRORS, errorText, isCatalogueText, isErrorCode, staffLine, type Audien
 import { looksRaw } from "@/lib/errors/looksRaw";
 
 export type ToastType = "success" | "error" | "info";
-export type Toast = { id: string; message: string; type: ToastType; code?: string };
+/** The sale a payment error is about, for "Ask Miss Tokyo AI". */
+export type AskTarget = { code: string; posSessionId?: string; orderId?: string; saleKey?: string };
+export type Toast = { id: string; message: string; type: ToastType; code?: string; ask?: AskTarget };
+
+// Registered by the dashboard's Miss Tokyo AI panel while help on payment
+// errors is switched on; null everywhere else (so customers never see it).
+let askHandler: ((ask: AskTarget) => void) | null = null;
+export function setAskHandler(fn: ((ask: AskTarget) => void) | null) { askHandler = fn; notify(); }
+export function getAskHandler() { return askHandler; }
 
 type Listener = (toasts: Toast[]) => void;
 
@@ -27,11 +35,12 @@ export function dismiss(id: string) {
     notify();
 }
 
-function add(message: string, type: ToastType, code?: string) {
+function add(message: string, type: ToastType, code?: string, ask?: AskTarget) {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    toasts = [...toasts, { id, message, type, code }];
+    const keepAsk = ask && code && isErrorCode(code) && (ERRORS[code] as { aiHelp?: boolean }).aiHelp ? { ...ask, code } : undefined;
+    toasts = [...toasts, { id, message, type, code, ask: keepAsk }];
     notify();
-    setTimeout(() => dismiss(id), type === "error" ? 6000 : 3500);
+    setTimeout(() => dismiss(id), keepAsk ? 12000 : type === "error" ? 6000 : 3500);
 }
 
 /** Backstop: technical text never reaches the screen. The original goes to the console. */
@@ -54,11 +63,12 @@ export const toast = {
     error: (message: string) => add(calmMessage(message), "error"),
     info: (message: string) => add(message, "info"),
     /** A known error by code. Staff see the code. */
-    code: (code: ErrorCode, opts: { audience: Audience }) =>
-        add(opts.audience === "staff" ? staffLine(code) : errorText(code, "customer"), "error", code),
+    code: (code: ErrorCode, opts: { audience: Audience; ask?: Omit<AskTarget, "code"> }) =>
+        add(opts.audience === "staff" ? staffLine(code) : errorText(code, "customer"), "error", code, opts.audience === "staff" && opts.ask ? { code, ...opts.ask } : undefined),
     /** An API reply `{ code?, error? }`: the route's calm text wins; the code is appended for staff. */
-    fromResponse: (data: unknown, opts: { audience: Audience; fallback?: ErrorCode }) => {
+    fromResponse: (data: unknown, opts: { audience: Audience; fallback?: ErrorCode; ask?: Omit<AskTarget, "code"> }) => {
         const d = (data ?? {}) as { code?: unknown };
-        add(responseMessage(data, opts.audience, opts.fallback), "error", isErrorCode(d.code) ? d.code : opts.fallback ?? "GEN-00");
+        const code = isErrorCode(d.code) ? d.code : opts.fallback ?? "GEN-00";
+        add(responseMessage(data, opts.audience, opts.fallback), "error", code, opts.audience === "staff" && opts.ask ? { code, ...opts.ask } : undefined);
     },
 };
