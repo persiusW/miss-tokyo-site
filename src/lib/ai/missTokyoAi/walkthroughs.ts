@@ -45,7 +45,7 @@ export const WALKTHROUGHS = [
             { route: "orders", anchor: "orders.tabs", text: "Open the Packed tab and tick the delivery orders going out now." },
             { route: "orders", anchor: "orders.bulk-ship", text: "Press Assign Rider & Ship. (For one order, use its … menu or the button on its page.)" },
             { route: "orders", anchor: "orders.dispatch-confirm", text: "Choose the rider and whether to SMS the rider and notify the customer, then press Confirm Dispatch." },
-            { route: "orders", orderPage: true, anchor: "order.mark-fulfilled", text: "When the rider has delivered, open the order and press Mark Fulfilled." },
+            { route: "orders", anchor: "orders.row-menu", text: "When the rider has delivered, use the order's … menu and choose Mark Fulfilled (the order's own page has the same button)." },
         ],
     },
     {
