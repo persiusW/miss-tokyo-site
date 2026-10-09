@@ -156,7 +156,7 @@ export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }
                     <div style={{ width: `${pct}%`, height: "100%", background: barColour, transition: "width .3s" }} />
                 </div>
                 <div style={{ fontSize: 12, color: "var(--ac-ink-3)", marginTop: 8 }}>
-                    Shared by the WhatsApp agent and the Store Assistant. Resets at midnight (Ghana time).
+                    Shared by the WhatsApp agent and Miss Tokyo AI. Resets at midnight (Ghana time).
                 </div>
             </div>
 
@@ -171,8 +171,8 @@ export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }
                 <Switch
                     checked={form.dashboard_agent_enabled}
                     onChange={v => setForm({ ...form, dashboard_agent_enabled: v })}
-                    label="Dashboard Agent"
-                    description="The Store Assistant for staff in this dashboard."
+                    label="Miss Tokyo AI"
+                    description="The assistant for staff on every dashboard page, and at Miss Tokyo AI in the sidebar."
                 />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginTop: 16 }}>
                     <label>

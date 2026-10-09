@@ -1,4 +1,4 @@
-// One Store Assistant request: guard, run the tool loop, meter, log.
+// One Miss Tokyo AI request: guard, run the tool loop, meter, log.
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { AI_MODEL, costUsd } from "@/lib/ai/pricing";
