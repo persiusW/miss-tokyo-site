@@ -5,7 +5,8 @@
 import type { AnchorId } from "@/lib/ai/missTokyoAi/anchors";
 import type { RouteKey, StaffRole } from "@/lib/ai/missTokyoAi/routes";
 
-export type WalkStep = { route: RouteKey; anchor?: AnchorId; text: string };
+/** orderPage: the step happens on any order's own page (/sales/orders/<id>). */
+export type WalkStep = { route: RouteKey; anchor?: AnchorId; text: string; orderPage?: true };
 export type Walkthrough = { id: string; title: string; roles: StaffRole[]; steps: WalkStep[] };
 
 const ALL: StaffRole[] = ["admin", "owner", "sales_staff"];
@@ -31,7 +32,43 @@ export const WALKTHROUGHS = [
             { route: "orders", anchor: "topbar.search", text: "From any page, search the order's 8-character ref, the customer's name or phone." },
             { route: "orders", anchor: "orders.tabs", text: "Or on Orders, choose the All tab, so unpaid and cancelled orders are included too." },
             { route: "orders", anchor: "orders.search", text: "Search here, then open the order." },
-            { route: "orders", text: "On the order page, press Verify with Paystack. It only checks and changes nothing. If Paystack says paid but the order doesn't, an admin or owner can apply it." },
+            { route: "orders", orderPage: true, anchor: "order.verify", text: "On the order page, press Verify with Paystack. It only checks and changes nothing. If Paystack says paid but the order doesn't, an admin or owner can apply it." },
+        ],
+    },
+    {
+        id: "dispatch",
+        title: "Dispatch orders to a rider",
+        roles: ALL,
+        steps: [
+            { route: "orders", anchor: "orders.row-select", text: "In the Inbox tab, tick the delivery orders you have packed." },
+            { route: "orders", anchor: "orders.bulk-pack", text: "Press Mark Packed. They move to the Packed tab." },
+            { route: "orders", anchor: "orders.tabs", text: "Open the Packed tab and tick the delivery orders going out now." },
+            { route: "orders", anchor: "orders.bulk-ship", text: "Press Assign Rider & Ship. (For one order, use its … menu or the button on its page.)" },
+            { route: "orders", anchor: "orders.dispatch-confirm", text: "Choose the rider and whether to SMS the rider and notify the customer, then press Confirm Dispatch." },
+            { route: "orders", orderPage: true, anchor: "order.mark-fulfilled", text: "When the rider has delivered, open the order and press Mark Fulfilled." },
+        ],
+    },
+    {
+        id: "pickup-ready",
+        title: "Get a pickup order ready for collection",
+        roles: ALL,
+        steps: [
+            { route: "orders", anchor: "orders.row-select", text: "In the Inbox tab, tick the pickup orders you have packed." },
+            { route: "orders", anchor: "orders.bulk-pack", text: "Press Mark Packed. They move to the Packed tab." },
+            { route: "orders", anchor: "orders.tabs", text: "Open the Packed tab and tick the pickup orders." },
+            { route: "orders", anchor: "orders.bulk-pickup", text: "Press Mark Ready for Pickup. The customer gets an email and SMS saying it's ready." },
+            { route: "orders", anchor: "orders.tabs", text: "They now wait in the Pickups tab until collected." },
+            { route: "orders", orderPage: true, anchor: "order.mark-collected", text: "When the customer collects, open the order and press Mark Collected." },
+        ],
+    },
+    {
+        id: "cancel-refund",
+        title: "Cancel or refund an order",
+        roles: ALL,
+        steps: [
+            { route: "orders", orderPage: true, anchor: "order.cancel", text: "Open the order. Cancel works at once with no second check: it puts back the stock the order took and emails the customer." },
+            { route: "orders", orderPage: true, anchor: "order.refund", text: "Refund marks the order refunded and puts the stock back, but sends no money. Refund the customer in the Paystack dashboard." },
+            { route: "pos_history", anchor: "poshistory.cancel", text: "For an unpaid till link, open the session in POS History and press Cancel Session. A paid till sale is cancelled or refunded from its order instead." },
         ],
     },
     {

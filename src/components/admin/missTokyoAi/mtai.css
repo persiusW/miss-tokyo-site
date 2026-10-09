@@ -182,6 +182,7 @@
 .mtai-walk-title { font-weight: 600; font-size: 14px; }
 .mtai-walk p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ac-ink); }
 .mtai-walk-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.mtai-walk p.mtai-walk-hint { font-size: 12.5px; color: var(--ac-ink-3); }
 @media (max-width: 767px) {
   .mtai-walk { left: 12px; right: 12px; width: auto; bottom: 88px; }
 }

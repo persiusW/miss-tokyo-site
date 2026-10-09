@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { WALKTHROUGHS, walkthroughsFor } from "../../../src/lib/ai/missTokyoAi/walkthroughs";
-import { ANCHORS } from "../../../src/lib/ai/missTokyoAi/anchors";
+import { ANCHORS, SHOW_ME_ANCHORS, isOrderPageAnchor } from "../../../src/lib/ai/missTokyoAi/anchors";
 import { ROUTES, routeAllowed } from "../../../src/lib/ai/missTokyoAi/routes";
-import { walkthroughEffect } from "../../../src/lib/ai/missTokyoAi/effects";
+import { showMeEffect, walkthroughEffect } from "../../../src/lib/ai/missTokyoAi/effects";
 
 // A walkthrough may only send people to pages they can open and ring
 // controls that exist on the step's page.
@@ -36,4 +36,18 @@ test("tours are role-filtered, and the effect refuses tours a role can't run", (
     expect(walkthroughEffect("delivery-fees", "sales_staff")).toBeNull();
     expect(walkthroughEffect("nope", "admin")).toBeNull();
     expect(walkthroughEffect("pos-sale", "sales_staff")).toEqual({ kind: "walkthrough", id: "pos-sale", href: "/pos", label: "Start walkthrough" });
+});
+
+test("order-page controls are rung only on order-page steps, and Show me never offers them", () => {
+    for (const w of WALKTHROUGHS) {
+        for (const [i, s] of w.steps.entries()) {
+            const orderStep = "orderPage" in s && !!s.orderPage;
+            if (orderStep) expect(s.route, `${w.id}#${i}`).toBe("orders");
+            if ("anchor" in s && s.anchor) expect(isOrderPageAnchor(s.anchor), `${w.id}#${i} ${s.anchor}`).toBe(orderStep);
+        }
+    }
+    expect(SHOW_ME_ANCHORS).not.toContain("order.cancel");
+    expect(SHOW_ME_ANCHORS).toContain("orders.row-menu");
+    expect(showMeEffect("order.refund", "admin")).toBeNull();
+    expect(Object.keys(ANCHORS).filter(isOrderPageAnchor).every(id => id.startsWith("order."))).toBe(true);
 });

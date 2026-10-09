@@ -12,6 +12,9 @@ import { findWalkthrough } from "@/lib/ai/missTokyoAi/walkthroughs";
 import { ROUTES, type StaffRole } from "@/lib/ai/missTokyoAi/routes";
 import { ANCHORS } from "@/lib/ai/missTokyoAi/anchors";
 
+/** An order's own page; its address changes per order. */
+const ORDER_PAGE = /^\/sales\/orders\/[^/]+$/;
+
 export function WalkthroughRunner() {
     const { walk, setWalk, setSpotlight, features, featuresKnown } = useMissTokyoAi();
     const user = useMissTokyoAiUser();
@@ -21,7 +24,8 @@ export function WalkthroughRunner() {
     const tour = walk ? findWalkthrough(walk.id, user.role as StaffRole) : null;
     const step = tour && walk ? tour.steps[walk.step] : null;
     const stepPath = step ? ROUTES[step.route].path : null;
-    const here = !!stepPath && pathname === stepPath;
+    const onOrderPage = !!step && "orderPage" in step && !!step.orderPage;
+    const here = onOrderPage ? ORDER_PAGE.test(pathname) : !!stepPath && pathname === stepPath;
     // A control inside a Settings tab opens that tab.
     const anchorDef = step?.anchor ? ANCHORS[step.anchor] : null;
     const tab = anchorDef && "tab" in anchorDef ? String(anchorDef.tab) : null;
@@ -51,10 +55,13 @@ export function WalkthroughRunner() {
             </div>
             <div className="mtai-walk-title">{tour.title}</div>
             <p>{step.text}</p>
+            {!here && onOrderPage && <p className="mtai-walk-hint">Open the order from Orders. This card waits for you.</p>}
             <div className="mtai-walk-actions">
                 <button type="button" className="mtai-action show" disabled={walk.step === 0} onClick={() => setWalk({ id: walk.id, step: walk.step - 1 })}>Back</button>
                 {!here ? (
-                    <button type="button" className="mtai-action go" onClick={() => stepHref && router.push(stepHref)}>Take me there →</button>
+                    <button type="button" className="mtai-action go" onClick={() => stepHref && router.push(stepHref)}>
+                        {onOrderPage ? "Open Orders →" : "Take me there →"}
+                    </button>
                 ) : last ? (
                     <button type="button" className="mtai-action go" onClick={exit}>Done</button>
                 ) : (
