@@ -2,7 +2,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { catalogTools } from "./catalog";
 import { orderTools } from "./orders";
-import { salesTools } from "./sales";
+import { statsTools } from "./stats";
 import { messageTools } from "./messages";
 import { checkoutTools } from "./checkout";
 import { helpTools } from "./help";
@@ -11,7 +11,7 @@ import { redactText } from "@/lib/ai/missTokyoAi/scrub";
 
 export type { ToolContext, ToolOutcome } from "./shared";
 
-const TOOLS = [...catalogTools, ...orderTools, ...salesTools, ...messageTools, ...checkoutTools, ...helpTools];
+const TOOLS = [...catalogTools, ...orderTools, ...statsTools, ...messageTools, ...checkoutTools, ...helpTools];
 
 export function toolDefsFor(role: StaffRole): Anthropic.Tool[] {
     return TOOLS.filter(t => !t.roles || t.roles.includes(role)).map(t => t.def);
