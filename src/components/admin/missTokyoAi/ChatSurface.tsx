@@ -4,6 +4,8 @@ import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNo
 import { useRouter } from "next/navigation";
 import { TRANSCRIPT_SOFT_LIMIT, useMissTokyoAi, type Bubble } from "@/lib/ai/missTokyoAi/client/store";
 import type { ButtonEffect, Effect } from "@/lib/ai/missTokyoAi/effects";
+import { appendHeard, voiceMessage } from "@/lib/ai/missTokyoAi/voice";
+import { useVoice } from "./useVoice";
 import { Spark } from "./icons";
 
 export type ChatUser = { firstName: string | null; role: string };
@@ -89,12 +91,14 @@ export function ChatSurface({
     focusKey?: unknown;
     headProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
-    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight, setWalk, open, sendToAdmin, pollReplies } = useMissTokyoAi();
+    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight, setWalk, open, sendToAdmin, pollReplies, features } = useMissTokyoAi();
     const router = useRouter();
     const [input, setInput] = useState("");
     const [online, setOnline] = useState(true);
     const bodyRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const voice = useVoice(heard => { setInput(prev => appendHeard(prev, heard)); inputRef.current?.focus(); });
+    const voiceNote = voiceMessage(voice.state);
 
     useEffect(() => {
         const update = () => setOnline(navigator.onLine);
@@ -277,6 +281,19 @@ export function ChatSurface({
                         maxLength={1000}
                         aria-label="Message Miss Tokyo AI"
                     />
+                    {features.voice && voice.supported && (
+                        <button
+                            type="button"
+                            className={`mtai-mic${voice.state === "listening" ? " on" : ""}`}
+                            onClick={() => (voice.state === "listening" ? voice.stop() : voice.start())}
+                            disabled={!online || unavailable || tooLong}
+                            aria-label={voice.state === "listening" ? "Stop listening" : "Speak your question"}
+                            aria-pressed={voice.state === "listening"}
+                            title={voice.state === "listening" ? "Stop listening" : "Speak your question"}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+                        </button>
+                    )}
                     <button
                         type="button"
                         className={`mtai-send${input.trim() && canSend ? " ready" : ""}`}
@@ -287,6 +304,8 @@ export function ChatSurface({
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
                     </button>
                 </div>
+                {features.voice && voiceNote && <div className="mtai-hint" role="status">{voiceNote}</div>}
+                {features.voice && voice.state === "listening" && <div className="mtai-hint" role="status">Listening… Don't say card numbers, PINs or codes.</div>}
                 {variant === "page" && <div className="mtai-hint">Enter to send · Shift+Enter for a new line</div>}
             </div>
         </>

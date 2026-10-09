@@ -185,3 +185,11 @@
 @media (max-width: 767px) {
   .mtai-walk { left: 12px; right: 12px; width: auto; bottom: 88px; }
 }
+
+/* Voice input */
+.mtai-mic { width: 40px; height: 40px; border-radius: 50%; border: none; flex: none; display: grid; place-items: center; cursor: pointer; background: none; color: var(--ac-ink-3); }
+.mtai-mic.on { background: var(--ac-accent); color: var(--ac-acc-ink); animation: mtai-pulse 1.4s ease-in-out infinite; }
+.mtai-mic:disabled { opacity: .5; cursor: default; }
+.mtai-mic:focus-visible { outline: 2px solid var(--ac-warn); outline-offset: 2px; }
+@keyframes mtai-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ac-accent) 25%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .mtai-mic.on { animation: none; } }
