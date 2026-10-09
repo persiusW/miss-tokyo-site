@@ -4,6 +4,7 @@ export type StaffRole = "admin" | "owner" | "sales_staff";
 
 const ALL: StaffRole[] = ["admin", "owner", "sales_staff"];
 const FULL: StaffRole[] = ["admin", "owner"];
+const ADMIN: StaffRole[] = ["admin"];
 
 export const SETTINGS_TABS = [
     "business", "store", "shipping", "cms", "seo", "emails", "notifications", "riders", "size-guide", "product-page",
@@ -36,6 +37,7 @@ export const ROUTES = {
     settings: { path: "/settings", title: "Site Settings", roles: FULL, tabs: SETTINGS_TABS },
     team: { path: "/team", title: "Team", roles: FULL },
     ai_settings: { path: "/settings/ai", title: "AI Settings", roles: FULL },
+    ai_inbox: { path: "/ai/inbox", title: "AI Inbox", roles: ADMIN },
     assistant: { path: "/agent", title: "Miss Tokyo AI", roles: ALL },
 } satisfies Record<string, RouteDef>;
 

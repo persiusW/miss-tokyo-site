@@ -62,6 +62,8 @@ function ReplyText({ text }: { text: string }) {
 }
 
 const isButton = (e: Effect): e is ButtonEffect => e.kind === "navigate" || e.kind === "show_me";
+const isSendToAdmin = (e: Effect): e is Extract<Effect, { kind: "send_to_admin" }> =>
+    e.kind === "send_to_admin" && typeof e.summary === "string";
 const isQuery = (e: Effect): e is Extract<Effect, { kind: "query" }> =>
     e.kind === "query" && typeof e.sql === "string";
 
@@ -87,7 +89,7 @@ export function ChatSurface({
     focusKey?: unknown;
     headProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
-    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight } = useMissTokyoAi();
+    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight, open, sendToAdmin, pollReplies } = useMissTokyoAi();
     const router = useRouter();
     const [input, setInput] = useState("");
     const [online, setOnline] = useState(true);
@@ -109,6 +111,16 @@ export function ChatSurface({
     useEffect(() => {
         if (focusKey) setTimeout(() => inputRef.current?.focus(), 60);
     }, [focusKey]);
+
+    // Admin replies to Send to admin questions: checked when the chat is on
+    // screen and every 60 seconds while it stays there. The admin never asks.
+    const visible = variant === "page" || open;
+    useEffect(() => {
+        if (!visible || user.role === "admin") return;
+        void pollReplies(true);
+        const t = setInterval(() => { if (document.visibilityState === "visible") void pollReplies(true); }, 60_000);
+        return () => clearInterval(t);
+    }, [visible, user.role, pollReplies]);
 
     // Grow the box with its text, up to the CSS max-height.
     useEffect(() => {
@@ -201,8 +213,11 @@ export function ChatSurface({
                 ) : (
                     bubbles.map((b: Bubble) => (
                         <div key={b.id} className={`mtai-msg ${b.role}`}>
+                            {b.role === "team" && (
+                                <div className="mtai-team-label">Miss Tokyo team{b.question ? <> · re: <span>{b.question}</span></> : null}</div>
+                            )}
                             <div className={`mtai-bubble${b.error ? " error" : ""}`}>
-                                {b.role === "assistant" ? <ReplyText text={b.text} /> : b.text}
+                                {b.role === "user" ? b.text : <ReplyText text={b.text} />}
                             </div>
                             {b.role === "assistant" && b.effects && b.effects.some(isButton) && (
                                 <div className="mtai-actions">
@@ -213,6 +228,21 @@ export function ChatSurface({
                                     ))}
                                 </div>
                             )}
+                            {b.role === "assistant" && b.effects?.filter(isSendToAdmin).slice(0, 1).map(e => (
+                                <div key="send" className="mtai-send-admin">
+                                    {b.sent === "sent" ? (
+                                        <span className="mtai-send-note" role="status">{b.sentNote}</span>
+                                    ) : (
+                                        <>
+                                            <button type="button" className="mtai-action show" disabled={b.sent === "sending" || !online}
+                                                onClick={() => void sendToAdmin(b.id, e.summary)}>
+                                                {b.sent === "sending" ? "Sending…" : "Send to admin"}
+                                            </button>
+                                            {b.sent === "failed" && <span className="mtai-send-note error" role="alert">{b.sentNote}</span>}
+                                        </>
+                                    )}
+                                </div>
+                            ))}
                             {b.role === "assistant" && b.effects?.filter(isQuery).map((q, k) => (
                                 <details key={`q${k}`} className="mtai-query">
                                     <summary>View query · {q.rows} {q.rows === 1 ? "row" : "rows"}</summary>

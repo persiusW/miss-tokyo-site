@@ -114,6 +114,14 @@
 .mtai-msg.user .mtai-bubble { background: var(--ac-accent); color: var(--ac-acc-ink); border-bottom-right-radius: 4px; }
 .mtai-msg.assistant .mtai-bubble { background: var(--ac-panel); color: var(--ac-ink); border: 1px solid var(--ac-line); border-bottom-left-radius: 4px; }
 .mtai-msg.assistant .mtai-bubble.error { color: var(--ac-danger); }
+.mtai-msg.team { align-self: flex-start; }
+.mtai-msg.team .mtai-bubble { background: var(--ac-panel); color: var(--ac-ink); border: 1px solid var(--ac-accent); border-bottom-left-radius: 4px; }
+.mtai-team-label { font: 600 11px/1.3 var(--f-sans); color: var(--ac-ink-3); margin: 0 0 0 2px; letter-spacing: .02em; }
+.mtai-team-label span { font-weight: 500; }
+.mtai-send-admin { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mtai-send-note { font-size: 12.5px; color: var(--ac-ink-3); }
+.mtai-send-note.error { color: var(--ac-danger); }
+.mtai-action:disabled { opacity: .6; cursor: default; }
 .mtai-bubble a { color: inherit; text-decoration: underline; word-break: break-all; }
 .mtai-steps { margin: 4px 0; padding-left: 22px; display: grid; gap: 4px; white-space: normal; list-style: decimal; }
 .mtai-steps li { padding-left: 2px; }

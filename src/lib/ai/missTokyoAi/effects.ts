@@ -3,10 +3,13 @@
 // before it leaves the server.
 import { ANCHORS, type AnchorId } from "@/lib/ai/missTokyoAi/anchors";
 import { ROUTES, routeAllowed, type RouteKey, type StaffRole } from "@/lib/ai/missTokyoAi/routes";
+import { cleanQuestion } from "@/lib/ai/missTokyoAi/questions";
 
 export type Effect =
     | { kind: "navigate"; route: RouteKey; href: string; label: string }
     | { kind: "show_me"; anchor: AnchorId; href: string; label: string }
+    /** Offers to send the question to the admin inbox. Nothing is sent until the person taps it. */
+    | { kind: "send_to_admin"; summary: string }
     /** Admin only: the SQL a reporting_query ran, shown under the reply. Not a button. */
     | { kind: "query"; sql: string; rows: number };
 
@@ -30,4 +33,9 @@ export function showMeEffect(anchorId: string, role: StaffRole): ButtonEffect | 
     const route = ROUTES[anchor.route];
     const href = anchor.tab ? `${route.path}?tab=${encodeURIComponent(anchor.tab)}` : route.path;
     return { kind: "show_me", anchor: anchorId as AnchorId, href, label: "Show me" };
+}
+
+export function sendToAdminEffect(summary: unknown): Effect | null {
+    const clean = cleanQuestion(summary);
+    return clean.length >= 5 ? { kind: "send_to_admin", summary: clean } : null;
 }

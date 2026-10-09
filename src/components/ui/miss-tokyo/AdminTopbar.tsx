@@ -44,6 +44,7 @@ function getCrumbs(pathname: string): string[] {
     if (pathname.startsWith("/finance/links")) return ["Finance", "Pay Links"];
     if (pathname.startsWith("/finance")) return ["Finance"];
     if (pathname.startsWith("/settings/ai")) return ["Settings", "AI"];
+    if (pathname.startsWith("/ai/inbox")) return ["Settings", "AI Inbox"];
     if (pathname.startsWith("/settings")) return ["Settings"];
     if (pathname.startsWith("/team")) return ["Settings", "Team"];
     if (pathname.startsWith("/communications")) return ["Communications", "Emails"];

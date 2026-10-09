@@ -239,7 +239,7 @@ export async function runStoreAssistant(args: {
     const seen = new Set<string>();
     const buttons = effects.filter(e => {
         if (e.kind === "query") return false;
-        const key = `${e.kind}:${e.href}:${"anchor" in e ? e.anchor : ""}`;
+        const key = `${e.kind}:${"href" in e ? e.href : ""}:${"anchor" in e ? e.anchor : ""}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;

@@ -168,6 +168,13 @@ export const GUIDE: GuideEntry[] = [
         roles: FULL,
         body: `Switch Miss Tokyo AI and the WhatsApp agent on or off, set the daily spend limit, and see recent usage. Also switches the Miss Tokyo AI extras: Send to admin, the bell count, walkthroughs and voice input (each off until tested).`,
     },
+    {
+        id: "ai-inbox",
+        title: "AI Inbox",
+        route: "ai_inbox",
+        roles: ["admin"],
+        body: `Settings → AI Inbox (admin only). Questions staff sent with "Send to admin" when Miss Tokyo AI couldn't answer. Open tab: read the chat before they asked, write a reply ("Send reply"), and tick "Also save as an answer for all staff" so the assistant gives that answer next time; or Dismiss (tap twice). The reply appears in the asker's Miss Tokyo AI chat. Saved answers tab: add, edit, choose which roles see each one, or switch one off. Nothing is deleted.`,
+    },
 ];
 
 /** Things the dashboard cannot do. Stops the assistant inventing workarounds. */
