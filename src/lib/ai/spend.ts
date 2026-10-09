@@ -8,12 +8,14 @@ export function startOfTodayUtc(): string {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
 }
 
-/** Today's spend in USD, or null when it cannot be read (callers fail closed). */
-export async function todaySpendUsd(): Promise<number | null> {
-    const { data, error } = await supabaseAdmin
+/** Today's spend in USD, optionally for one channel, or null when it cannot be read (callers fail closed). */
+export async function todaySpendUsd(channel?: "dashboard" | "whatsapp"): Promise<number | null> {
+    let q = supabaseAdmin
         .from("ai_turns")
         .select("cost_usd")
         .gte("created_at", startOfTodayUtc());
+    if (channel) q = q.eq("channel", channel);
+    const { data, error } = await q;
     if (error) {
         console.error("[ai/spend] could not read ai_turns", error);
         return null;

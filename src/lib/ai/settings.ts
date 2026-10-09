@@ -8,6 +8,10 @@ export type AiSettings = {
     dashboardAgentEnabled: boolean;
     holdMinutesWhatsapp: number;
     adminCostMarkupPct: number;
+    /** Share of the daily cap Miss Tokyo AI may use; the rest stays free for WhatsApp. */
+    dashboardCapSharePct: number;
+    /** Messages per staff member or owner per day; admin gets 3×. */
+    dashboardDailyMessagesPerUser: number;
 };
 
 /** Keys staff may change from the AI Settings page, with their validators. */
@@ -43,6 +47,8 @@ const OFF: AiSettings = {
     dashboardAgentEnabled: false,
     holdMinutesWhatsapp: 15,
     adminCostMarkupPct: 0,
+    dashboardCapSharePct: 0,
+    dashboardDailyMessagesPerUser: 0,
 };
 
 export async function getAiSettings(): Promise<AiSettings> {
@@ -63,5 +69,7 @@ export async function getAiSettings(): Promise<AiSettings> {
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
         holdMinutesWhatsapp: num("hold_minutes_whatsapp", 15),
         adminCostMarkupPct: num("admin_cost_markup_pct", 0),
+        dashboardCapSharePct: Math.min(100, Math.max(0, num("dashboard_cap_share_pct", 60))),
+        dashboardDailyMessagesPerUser: Math.max(0, num("dashboard_daily_messages_per_user", 100)),
     };
 }
