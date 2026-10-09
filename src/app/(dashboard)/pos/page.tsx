@@ -504,7 +504,7 @@ export default function POSPage() {
             if (sessionRes.status === 401) return expiredSession();
             const { data: sessionData, isJson: sessionIsJson } = await readJson<{ sessionId?: string; error?: string }>(sessionRes);
             if (!sessionIsJson) { toast.error(TILL_SERVER_UNREACHABLE); return; }
-            if (!sessionRes.ok || !sessionData?.sessionId) { toast.error(sessionData?.error ?? TILL_GENERIC); return; }
+            if (!sessionRes.ok || !sessionData?.sessionId) { toast.fromResponse(sessionData, { audience: 'staff', fallback: 'GEN-00' }); return; }
 
             setSessionId(sessionData.sessionId);
             sendStarted = true;
@@ -518,7 +518,7 @@ export default function POSPage() {
                 paymentUrl?: string; error?: string; delivery?: Delivery; completed?: boolean; orderRef?: string; paidBy?: string;
             }>(sendRes);
             if (!sentIsJson) { toast.error(unclearOutcome(mode)); return; }
-            if (!sendRes.ok || !sent?.paymentUrl) { toast.error(sent?.error ?? TILL_GENERIC); return; }
+            if (!sendRes.ok || !sent?.paymentUrl) { toast.fromResponse(sent, { audience: 'staff', fallback: 'GEN-00' }); return; }
 
             setPaymentUrl(sent.paymentUrl);
 

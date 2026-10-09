@@ -15,6 +15,7 @@ import { sendEmail } from "@/lib/email";
 import { apiError } from "@/lib/errors/apiError";
 import { cleanSaleKey } from '@/lib/payments/attemptRules';
 import { recordError, recordStart } from '@/lib/payments/attempts';
+import { errorBody } from "@/lib/errors/catalogue";
 
 
 export async function POST(req: NextRequest) {
@@ -396,12 +397,7 @@ export async function POST(req: NextRequest) {
         await releaseDiscountHolds({ posSessionId: sessionId });
         await supabaseAdmin.from('pos_sessions').update({ status: 'draft' }).eq('id', sessionId);
         await recordError({ saleKey: cleanSaleKey(rawSaleKey), channel: 'pos', code: gatewayReachable ? 'PAY-02' : 'PAY-01', message: paystackData?.message, posSessionId: sessionId, userId: user.id });
-        return NextResponse.json(
-            { error: gatewayReachable
-                ? "Paystack didn't create the link. Please try again."
-                : "Paystack isn't answering right now. Please try again in a minute." },
-            { status: gatewayReachable ? 502 : 503 },
-        );
+        return NextResponse.json(errorBody(gatewayReachable ? 'PAY-02' : 'PAY-01', 'staff'), { status: gatewayReachable ? 502 : 503 });
     }
 
     // Store the authorization_url as paystack_reference — used by /pay/[pos_id] as the "Pay Now" href

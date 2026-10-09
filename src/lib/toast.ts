@@ -41,6 +41,14 @@ export function calmMessage(message: string): string {
     return ERRORS["GEN-00"].customer;
 }
 
+/** The text for an API error reply: the route's calm text, else the catalogue's; staff get the code. */
+export function responseMessage(data: unknown, audience: Audience, fallback: ErrorCode = "GEN-00"): string {
+    const d = (data ?? {}) as { code?: unknown; error?: unknown };
+    const code: ErrorCode = isErrorCode(d.code) ? d.code : fallback;
+    const text = typeof d.error === "string" && !looksRaw(d.error) ? d.error : errorText(code, audience);
+    return audience === "staff" && isErrorCode(d.code) && !text.endsWith(`(${code})`) ? `${text} (${code})` : text;
+}
+
 export const toast = {
     success: (message: string) => add(message, "success"),
     error: (message: string) => add(calmMessage(message), "error"),
@@ -50,9 +58,7 @@ export const toast = {
         add(opts.audience === "staff" ? staffLine(code) : errorText(code, "customer"), "error", code),
     /** An API reply `{ code?, error? }`: the route's calm text wins; the code is appended for staff. */
     fromResponse: (data: unknown, opts: { audience: Audience; fallback?: ErrorCode }) => {
-        const d = (data ?? {}) as { code?: unknown; error?: unknown };
-        const code: ErrorCode = isErrorCode(d.code) ? d.code : opts.fallback ?? "GEN-00";
-        const text = typeof d.error === "string" && !looksRaw(d.error) ? d.error : errorText(code, opts.audience);
-        add(opts.audience === "staff" && isErrorCode(d.code) && !text.endsWith(`(${code})`) ? `${text} (${code})` : text, "error", code);
+        const d = (data ?? {}) as { code?: unknown };
+        add(responseMessage(data, opts.audience, opts.fallback), "error", isErrorCode(d.code) ? d.code : opts.fallback ?? "GEN-00");
     },
 };
