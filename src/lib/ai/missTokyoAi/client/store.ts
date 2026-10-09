@@ -22,6 +22,8 @@ export type Bubble = {
     /** For assistant bubbles: Send to admin state for the button it carries. */
     sent?: "sending" | "sent" | "failed";
     sentNote?: string;
+    /** Fixed help shown without the model (assistant off): stays visible under the lock. */
+    fallback?: boolean;
 };
 
 export const FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false, errorHelp: false };
@@ -239,12 +241,12 @@ export const useMissTokyoAi = create<State>((set, get) => ({
         const steps = (): Bubble => {
             const d = ERRORS[code] as { staff: string; steps?: string[] };
             const lines = [d.staff, ...(d.steps ?? []).map((s, i) => `${i + 1}. ${s}`)];
-            return { id: id(), role: "assistant", text: lines.join("\n") };
+            return { id: id(), role: "assistant", text: lines.join("\n"), fallback: true };
         };
         set({ transcript: [], bubbles: [{ id: id(), role: "user", text }], loading: true, open: true });
         const { availability } = get();
         if (availability === "off" || availability === "not_set_up") {
-            const next = [...get().bubbles, steps()];
+            const next = [{ ...get().bubbles[0], fallback: true }, steps()];
             set({ bubbles: next, loading: false });
             persist([], next);
             return;
