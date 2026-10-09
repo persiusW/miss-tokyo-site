@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { toast } from "@/lib/toast";
@@ -153,8 +154,19 @@ function CMSTab() {
     );
 }
 
+// ?tab=<key> opens a tab directly (Miss Tokyo AI's "Take me there"). Without
+// it the page behaves as before; clicking tabs does not change the URL.
 export default function SettingsPage() {
+    return (
+        <Suspense fallback={null}>
+            <SettingsPageInner />
+        </Suspense>
+    );
+}
+
+function SettingsPageInner() {
     const [activeTab, setActiveTab] = useState<TabKey>("business");
+    const tabParam = useSearchParams().get("tab");
 
     const tabs: { key: TabKey; label: string }[] = [
         { key: "business",      label: "Business" },
@@ -168,6 +180,11 @@ export default function SettingsPage() {
         { key: "size-guide",    label: "Size Guide" },
         { key: "product-page",  label: "Product Page" },
     ];
+
+    useEffect(() => {
+        if (tabParam && tabs.some(t => t.key === tabParam)) setActiveTab(tabParam as TabKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tabParam]);
 
     return (
         <>
