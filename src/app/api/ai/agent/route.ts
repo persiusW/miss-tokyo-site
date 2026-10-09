@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { runStoreAssistant, validateTranscript } from "@/lib/ai/missTokyoAi/run";
 import type { StaffRole } from "@/lib/ai/missTokyoAi/routes";
+import { getAiSettings } from "@/lib/ai/settings";
 
 export const maxDuration = 120;
 
@@ -33,5 +34,25 @@ export async function POST(req: NextRequest) {
     } catch (e) {
         console.error("[api/ai/agent]", e);
         return NextResponse.json({ error: "We are updating this feature. Please try again shortly. Sorry for the inconvenience." }, { status: 500 });
+    }
+}
+
+/** Whether Miss Tokyo AI can answer right now, so the panel can say so before anyone types. */
+export async function GET() {
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return NextResponse.json({ available: false, reason: "signed_out" }, { status: 401 });
+        const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
+        if (!profile || !STAFF_ROLES.includes(profile.role as StaffRole)) {
+            return NextResponse.json({ available: false, reason: "forbidden" }, { status: 403 });
+        }
+        const settings = await getAiSettings();
+        if (!settings.dashboardAgentEnabled) return NextResponse.json({ available: false, reason: "off" });
+        if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ available: false, reason: "not_set_up" });
+        return NextResponse.json({ available: true, reason: null });
+    } catch (e) {
+        console.error("[api/ai/agent] GET", e);
+        return NextResponse.json({ available: false, reason: "error" }, { status: 500 });
     }
 }
