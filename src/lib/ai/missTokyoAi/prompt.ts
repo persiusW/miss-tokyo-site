@@ -49,7 +49,12 @@ function guideText(role: StaffRole): string {
     return `# Dashboard guide (current behaviour)\n\n${entries}\n\n# What the dashboard cannot do\n${cannot}${restricted}`;
 }
 
+const ADMIN_DATA = `
+
+Admin data questions: when stats, stock_report and the other tools cannot express a question (several filters at once, cross-tabs, ratios, first or last dates, rankings inside groups), write one SELECT with reporting_query. Aggregate in SQL rather than listing rows. If it fails, read the error, fix the query and try once more. Never paste SQL into the reply; the admin can open it under your answer.`;
+
 /** Deterministic per role, so prompt caching works. */
 export function buildSystemPrompt(role: StaffRole): string {
-    return `${CORE}\n\nYou are talking to ${ROLE_LABEL[role]}.\n\n${guideText(role)}`;
+    const extra = role === "admin" ? ADMIN_DATA : "";
+    return `${CORE}${extra}\n\nYou are talking to ${ROLE_LABEL[role]}.\n\n${guideText(role)}`;
 }
