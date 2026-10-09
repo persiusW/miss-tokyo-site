@@ -6,6 +6,7 @@
 // the bubbles are for display.
 import { create } from "zustand";
 import type { Effect } from "@/lib/ai/missTokyoAi/effects";
+import type { MtaiFeatures } from "@/lib/ai/settings";
 
 export type Bubble = {
     id: string;
@@ -14,6 +15,8 @@ export type Bubble = {
     effects?: Effect[];
     error?: boolean;
 };
+
+export const FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false };
 
 export type Availability = "unknown" | "ready" | "off" | "not_set_up";
 
@@ -27,7 +30,11 @@ type State = {
     transcript: unknown[];
     bubbles: Bubble[];
     spotlight: Spotlight;
+    features: MtaiFeatures;
+    /** False until the server has said which extras are on; nothing is cancelled before then. */
+    featuresKnown: boolean;
     hydrate: () => void;
+    setFeatures: (f: MtaiFeatures) => void;
     setOpen: (open: boolean) => void;
     setAvailability: (a: Availability) => void;
     send: (text: string) => Promise<void>;
@@ -60,6 +67,8 @@ export const useMissTokyoAi = create<State>((set, get) => ({
     transcript: [],
     bubbles: [],
     spotlight: null,
+    features: FEATURES_OFF,
+    featuresKnown: false,
 
     hydrate: () => {
         if (get().hydrated) return;
@@ -80,6 +89,8 @@ export const useMissTokyoAi = create<State>((set, get) => ({
         } catch { /* start fresh */ }
         set({ hydrated: true, transcript, bubbles, spotlight });
     },
+
+    setFeatures: (features) => set({ features, featuresKnown: true }),
 
     setOpen: (open) => set({ open }),
     setAvailability: (availability) => set({ availability }),

@@ -166,7 +166,7 @@ export const GUIDE: GuideEntry[] = [
         title: "AI Settings",
         route: "ai_settings",
         roles: FULL,
-        body: `Switch Miss Tokyo AI and the WhatsApp agent on or off, set the daily spend limit, and see recent usage.`,
+        body: `Switch Miss Tokyo AI and the WhatsApp agent on or off, set the daily spend limit, and see recent usage. Also switches the Miss Tokyo AI extras: Send to admin, the bell count, walkthroughs and voice input (each off until tested).`,
     },
 ];
 

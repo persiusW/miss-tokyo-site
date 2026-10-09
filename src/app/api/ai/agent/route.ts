@@ -48,9 +48,10 @@ export async function GET() {
             return NextResponse.json({ available: false, reason: "forbidden" }, { status: 403 });
         }
         const settings = await getAiSettings();
-        if (!settings.dashboardAgentEnabled) return NextResponse.json({ available: false, reason: "off" });
-        if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ available: false, reason: "not_set_up" });
-        return NextResponse.json({ available: true, reason: null });
+        const features = settings.mtai;
+        if (!settings.dashboardAgentEnabled) return NextResponse.json({ available: false, reason: "off", features });
+        if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ available: false, reason: "not_set_up", features });
+        return NextResponse.json({ available: true, reason: null, features });
     } catch (e) {
         console.error("[api/ai/agent] GET", e);
         return NextResponse.json({ available: false, reason: "error" }, { status: 500 });

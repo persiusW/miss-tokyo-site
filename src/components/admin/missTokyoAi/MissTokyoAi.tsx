@@ -34,7 +34,7 @@ export function MissTokyoAiProvider({ user, children }: { user: { name: string; 
 export function MissTokyoAi() {
     const user = useMissTokyoAiUser();
     const pathname = usePathname();
-    const { open, setOpen, hydrate, hydrated, availability, setAvailability } = useMissTokyoAi();
+    const { open, setOpen, hydrate, hydrated, availability, setAvailability, setFeatures } = useMissTokyoAi();
     const [tip, setTip] = useState(false);
     const [drag, setDrag] = useState(0);
     const dragStart = useRef<number | null>(null);
@@ -54,11 +54,17 @@ export function MissTokyoAi() {
             .then(r => r.json())
             .then(d => {
                 if (cancelled) return;
+                if (d?.features && typeof d.features === "object") setFeatures({
+                    sendToAdmin: d.features.sendToAdmin === true,
+                    bell: d.features.bell === true,
+                    walkthroughs: d.features.walkthroughs === true,
+                    voice: d.features.voice === true,
+                });
                 setAvailability(d?.available ? "ready" : d?.reason === "off" ? "off" : d?.reason === "not_set_up" ? "not_set_up" : "ready");
             })
             .catch(() => { /* leave unknown; the chat itself reports problems */ });
         return () => { cancelled = true; };
-    }, [availability, setAvailability]);
+    }, [availability, setAvailability, setFeatures]);
 
     useEffect(() => {
         try { setTip(localStorage.getItem(TIP_KEY) !== "1"); } catch { setTip(false); }

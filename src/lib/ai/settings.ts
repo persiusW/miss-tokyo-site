@@ -12,7 +12,18 @@ export type AiSettings = {
     dashboardCapSharePct: number;
     /** Messages per staff member or owner per day; admin gets 3×. */
     dashboardDailyMessagesPerUser: number;
+    /** Miss Tokyo AI extras; each defaults off. */
+    mtai: MtaiFeatures;
 };
+
+export type MtaiFeatures = {
+    sendToAdmin: boolean;
+    bell: boolean;
+    walkthroughs: boolean;
+    voice: boolean;
+};
+
+export const MTAI_FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false };
 
 /** Keys staff may change from the AI Settings page, with their validators. */
 export const EDITABLE_AI_SETTINGS = {
@@ -21,6 +32,10 @@ export const EDITABLE_AI_SETTINGS = {
     dashboard_agent_enabled: (v: unknown) => typeof v === "boolean",
     hold_minutes_whatsapp: (v: unknown) => typeof v === "number" && Number.isInteger(v) && v >= 5 && v <= 60,
     admin_cost_markup_pct: (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 500,
+    mtai_send_to_admin_enabled: (v: unknown) => typeof v === "boolean",
+    mtai_bell_enabled: (v: unknown) => typeof v === "boolean",
+    mtai_walkthroughs_enabled: (v: unknown) => typeof v === "boolean",
+    mtai_voice_enabled: (v: unknown) => typeof v === "boolean",
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
@@ -49,6 +64,7 @@ const OFF: AiSettings = {
     adminCostMarkupPct: 0,
     dashboardCapSharePct: 0,
     dashboardDailyMessagesPerUser: 0,
+    mtai: MTAI_FEATURES_OFF,
 };
 
 export async function getAiSettings(): Promise<AiSettings> {
@@ -71,5 +87,11 @@ export async function getAiSettings(): Promise<AiSettings> {
         adminCostMarkupPct: num("admin_cost_markup_pct", 0),
         dashboardCapSharePct: Math.min(100, Math.max(0, num("dashboard_cap_share_pct", 60))),
         dashboardDailyMessagesPerUser: Math.max(0, num("dashboard_daily_messages_per_user", 100)),
+        mtai: {
+            sendToAdmin: bool("mtai_send_to_admin_enabled"),
+            bell: bool("mtai_bell_enabled"),
+            walkthroughs: bool("mtai_walkthroughs_enabled"),
+            voice: bool("mtai_voice_enabled"),
+        },
     };
 }

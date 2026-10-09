@@ -61,7 +61,7 @@ function ReplyText({ text }: { text: string }) {
     return <>{out}</>;
 }
 
-const isButton = (e: Effect): e is ButtonEffect => e.kind !== "query";
+const isButton = (e: Effect): e is ButtonEffect => e.kind === "navigate" || e.kind === "show_me";
 const isQuery = (e: Effect): e is Extract<Effect, { kind: "query" }> =>
     e.kind === "query" && typeof e.sql === "string";
 
@@ -207,7 +207,7 @@ export function ChatSurface({
                             {b.role === "assistant" && b.effects && b.effects.some(isButton) && (
                                 <div className="mtai-actions">
                                     {b.effects.filter(isButton).map((e, k) => (
-                                        <button key={k} type="button" className={`mtai-action ${e.kind === "navigate" ? "go" : "show"}`} onClick={() => runEffect(e)}>
+                                        <button key={k} type="button" className={`mtai-action ${e.kind === "show_me" ? "show" : "go"}`} onClick={() => runEffect(e)}>
                                             {e.kind === "navigate" ? `${e.label} →` : "Show me"}
                                         </button>
                                     ))}
