@@ -1,6 +1,7 @@
 import { NavBar } from "@/components/ui/miss-tokyo/NavBar";
 import { Footer } from "@/components/ui/miss-tokyo/Footer";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
+import { ErrorNet } from "@/components/errors/ErrorNet";
 import { CartDrawer } from "@/components/ui/miss-tokyo/CartDrawer";
 import { MobileTabBar } from "@/components/ui/miss-tokyo/MobileTabBar";
 import { PWAInstallBanner } from "@/components/ui/miss-tokyo/PWAInstallBanner";
@@ -68,6 +69,7 @@ export default async function ShopLayout({
             </main>
             <Footer />
             <Toaster />
+            <ErrorNet />
             <CartDrawer />
             <MobileTabBar />
             <PWAInstallBanner />

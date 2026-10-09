@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import "./admin.css";
 import { Toaster } from "@/components/ui/miss-tokyo/Toaster";
+import { ErrorNet } from "@/components/errors/ErrorNet";
 import { RealtimeStockMonitor } from "@/components/ui/miss-tokyo/RealtimeStockMonitor";
 import { AdminShellClient } from "@/components/ui/miss-tokyo/AdminShellClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
@@ -106,6 +107,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
                 {children}
             </AdminShellClient>
             <Toaster />
+            <ErrorNet />
             <RealtimeStockMonitor />
         </>
     );
