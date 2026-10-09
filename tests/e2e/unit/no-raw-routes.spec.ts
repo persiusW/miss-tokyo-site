@@ -10,6 +10,7 @@ const RAW = [
     /error\s*:\s*result\.error\b/,
     /emailErrors\.push\(`[^`]*\$\{\s*err\?*\.message/,
     /\b(smsError|emailError)\s*[,}]/,
+    /error\s*:\s*["']Internal (Server )?Error["']/i,
 ];
 
 test("no API route returns raw error text", () => {

@@ -4,6 +4,7 @@ import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
 import { recordPaystackCharge } from "@/lib/paystackReconcile";
 import { recordResult } from "@/lib/payments/attempts";
+import { apiError } from "@/lib/errors/apiError";
 
 const NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const ORDER_FIELDS = "id, customer_name, customer_email, customer_phone, shipping_address, delivery_method, total_amount, items, discount_code, discount_amount, status, paystack_reference";
@@ -191,6 +192,6 @@ export async function GET(req: Request) {
         return NextResponse.json({ status: orderStatus, paystackStatus: paystackTxStatus, orderId: newOrder?.id, order, created: true }, { headers: NO_STORE });
     } catch (err) {
         console.error("Verify Error:", err);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "customer" });
     }
 }

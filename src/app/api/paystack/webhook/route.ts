@@ -14,6 +14,7 @@ import { releaseDiscountHolds } from "@/lib/discountValidation";
 import { settlePosSession } from "@/lib/posSettlement";
 import { recordPaystackCharge } from "@/lib/paystackReconcile";
 import { recordResult } from "@/lib/payments/attempts";
+import { apiError } from "@/lib/errors/apiError";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 
@@ -459,6 +460,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ status: "success" });
     } catch (err) {
         console.error("Webhook Error:", err);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff" });
     }
 }

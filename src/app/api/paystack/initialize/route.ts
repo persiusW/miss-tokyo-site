@@ -3,6 +3,7 @@ export const maxDuration = 30; // 30 seconds — headroom for Paystack API hands
 import { NextResponse } from "next/server";
 import { runCheckout } from "@/lib/checkout/createCheckoutOrder";
 import { createClient } from "@/lib/supabaseServer";
+import { apiError } from "@/lib/errors/apiError";
 
 // Thin adapter: the order logic lives in @/lib/checkout so staff and WhatsApp
 // orders run exactly the same code. Request and response shapes are unchanged.
@@ -24,7 +25,6 @@ export async function POST(request: Request) {
         const { status, body } = await runCheckout(payload, { source: "storefront", authUserId });
         return NextResponse.json(body, { status });
     } catch (error) {
-        console.error("Paystack Init Error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return apiError("ORD-01", { status: 500, audience: "customer", cause: error, context: { route: "paystack/initialize" } });
     }
 }

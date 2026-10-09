@@ -90,6 +90,6 @@ export async function POST(req: NextRequest) {
   });
   } catch (err: any) {
     console.error("[newsletter/subscribe]", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return apiError("GEN-00", { status: 500, audience: "customer" });
   }
 }
