@@ -22,7 +22,7 @@ export const ERRORS = {
     "PAY-04": { area: "pay", aiHelp: true,
         staff: "The payment was declined. Nothing was charged.",
         customer: "Your payment didn't go through, so you haven't been charged. You can try again, or pay with card or another mobile money network.",
-        steps: ["Ask the customer to check they have enough balance and approve the prompt.", "Send the same link again, or a new one."] },
+        steps: ["Ask the customer to check they have enough balance and approve the prompt.", "Send the same link again."] },
     "PAY-05": { area: "pay", aiHelp: true,
         staff: "The payment hasn't been completed yet. The customer may still be approving it.",
         customer: "We haven't received confirmation of your payment yet. If you're approving it on your phone, finish there.",

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { altPayment, owedFrom, FAILURES_BEFORE_ALTERNATIVE, OUTAGE_ERRORS } from "../../../src/lib/payments/altPaymentRule";
+import { ERRORS } from "../../../src/lib/errors/catalogue";
 
 const base = { owed: true, channel: "pos" as const, failures: 0, outageErrors: 0 };
 
@@ -32,4 +33,14 @@ test("gift card + link only at the till; never cash", () => {
 test("what counts as still owed", () => {
     for (const s of ["draft", "pending_payment", "pending", "processing"]) expect(owedFrom(s), s).toBe(true);
     for (const s of ["paid", "cancelled", "expired", "refunded", "fulfilled", null, undefined]) expect(owedFrom(s), String(s)).toBe(false);
+});
+
+test("retry steps never offer an alternative the rule hasn't unlocked", () => {
+    const ALT = /new (payment )?link|a new one|card|another mobile money|gift card/i;
+    expect("Send the same link again, or a new one.").toMatch(ALT); // the old wording would fail
+    for (const code of ["PAY-04", "PAY-05"] as const) {
+        for (const s of (ERRORS[code] as { steps?: string[] }).steps ?? []) {
+            expect(s, code).not.toMatch(ALT);
+        }
+    }
 });
