@@ -8,6 +8,7 @@ import { create } from "zustand";
 import type { Effect } from "@/lib/ai/missTokyoAi/effects";
 import type { MtaiFeatures } from "@/lib/ai/settings";
 import { ERRORS, isErrorCode } from "@/lib/errors/catalogue";
+import { fallbackFor } from "@/lib/ai/missTokyoAi/seed";
 import type { AskTarget } from "@/lib/toast";
 
 export type Bubble = {
@@ -237,20 +238,23 @@ export const useMissTokyoAi = create<State>((set, get) => ({
         if (get().loading || !isErrorCode(ask.code)) return;
         const code = ask.code;
         const text = `Help me with this payment problem (${code}).`;
-        // No model when the assistant is off: the fixed steps for this code.
+        const userBubble: Bubble = { id: id(), role: "user", text, fallback: true };
+        // The fixed steps for this code, shown without the model.
         const steps = (): Bubble => {
             const d = ERRORS[code] as { staff: string; steps?: string[] };
             const lines = [d.staff, ...(d.steps ?? []).map((s, i) => `${i + 1}. ${s}`)];
             return { id: id(), role: "assistant", text: lines.join("\n"), fallback: true };
         };
-        set({ transcript: [], bubbles: [{ id: id(), role: "user", text }], loading: true, open: true });
+        set({ open: true });
         const { availability } = get();
         if (availability === "off" || availability === "not_set_up") {
-            const next = [{ ...get().bubbles[0], fallback: true }, steps()];
-            set({ bubbles: next, loading: false });
+            const next = [userBubble, steps()];
+            set({ transcript: [], bubbles: next });
             persist([], next);
             return;
         }
+        // The current chat stays as it is until the server accepts the ask.
+        set({ loading: true });
         try {
             const res = await fetch("/api/ai/agent", {
                 method: "POST",
@@ -259,19 +263,21 @@ export const useMissTokyoAi = create<State>((set, get) => ({
             });
             const data = await res.json().catch(() => null);
             if (res.ok && Array.isArray(data?.messages)) {
-                const next: Bubble[] = [...get().bubbles, { id: id(), role: "assistant", text: String(data.reply ?? ""), effects: Array.isArray(data.effects) ? data.effects : [] }];
+                const next: Bubble[] = [{ ...userBubble, fallback: false }, { id: id(), role: "assistant", text: String(data.reply ?? ""), effects: Array.isArray(data.effects) ? data.effects : [] }];
                 set({ transcript: data.messages, bubbles: next, loading: false });
                 persist(data.messages, next);
-            } else {
-                const fallback = res.status === 503 ? steps() : { id: id(), role: "assistant" as const, text: data?.error ?? CALM_FAIL, error: true };
-                const next: Bubble[] = [...get().bubbles, fallback];
-                set({ bubbles: next, loading: false });
-                persist([], next);
+                return;
             }
-        } catch {
-            const next: Bubble[] = [...get().bubbles, steps()];
+            const extra: Bubble = fallbackFor(res.status) === "steps"
+                ? steps()
+                : { id: id(), role: "assistant", text: typeof data?.error === "string" ? data.error : CALM_FAIL, error: true };
+            const next = [...get().bubbles, userBubble, extra];
             set({ bubbles: next, loading: false });
-            persist([], next);
+            persist(get().transcript, next);
+        } catch {
+            const next = [...get().bubbles, userBubble, steps()];
+            set({ bubbles: next, loading: false });
+            persist(get().transcript, next);
         }
     },
 
