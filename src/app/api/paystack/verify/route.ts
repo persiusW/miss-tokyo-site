@@ -136,7 +136,7 @@ export async function GET(req: Request) {
             }
 
             const order = await fetchOrderForReceipt(metaOrderId);
-            return NextResponse.json({ status: orderStatus, orderId: metaOrderId, order }, {
+            return NextResponse.json({ status: orderStatus, paystackStatus: paystackTxStatus, orderId: metaOrderId, order }, {
                 headers: { "Cache-Control": "private, no-store" },
             });
         }
@@ -151,7 +151,7 @@ export async function GET(req: Request) {
         if (existingOrder) {
             // Do not update status here — webhook is the sole owner of order status.
             const order = await fetchOrderForReceipt(existingOrder.id);
-            return NextResponse.json({ status: orderStatus, orderId: existingOrder.id, order }, { headers: NO_STORE });
+            return NextResponse.json({ status: orderStatus, paystackStatus: paystackTxStatus, orderId: existingOrder.id, order }, { headers: NO_STORE });
         }
 
         // Only create an order record if we have a customer email
@@ -186,7 +186,7 @@ export async function GET(req: Request) {
         // Do not deduct here to avoid race conditions and double-deductions.
 
         const order = newOrder ? await fetchOrderForReceipt(newOrder.id) : null;
-        return NextResponse.json({ status: orderStatus, orderId: newOrder?.id, order, created: true }, { headers: NO_STORE });
+        return NextResponse.json({ status: orderStatus, paystackStatus: paystackTxStatus, orderId: newOrder?.id, order, created: true }, { headers: NO_STORE });
     } catch (err) {
         console.error("Verify Error:", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
