@@ -1,6 +1,7 @@
 import { createClient as createServerClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { NextResponse } from 'next/server';
+import { apiError } from "@/lib/errors/apiError";
 
 export async function POST(req: Request) {
   try {
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: "Collision detected but user record inaccessible." }, { status: 500 });
             }
         } else {
-            return NextResponse.json({ error: inviteError.message }, { status: 500 });
+            return apiError("GEN-00", { status: 500, audience: "staff", cause: inviteError });
         }
     } else {
         userId = inviteData?.user?.id;

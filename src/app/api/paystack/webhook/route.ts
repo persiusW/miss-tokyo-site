@@ -13,6 +13,8 @@ import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage }
 import { releaseDiscountHolds } from "@/lib/discountValidation";
 import { settlePosSession } from "@/lib/posSettlement";
 import { recordPaystackCharge } from "@/lib/paystackReconcile";
+import { recordResult } from "@/lib/payments/attempts";
+import { apiError } from "@/lib/errors/apiError";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 
@@ -66,6 +68,7 @@ export async function POST(req: Request) {
         if (event.event === "charge.success") {
             const data = event.data;
             const paystackRef: string = data.reference || "";
+            await recordResult(paystackRef, data);
             const metadata = data.metadata || {};
 
             // ── Gift card purchase: activate + deliver ─────────────────────────
@@ -457,6 +460,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ status: "success" });
     } catch (err) {
         console.error("Webhook Error:", err);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff" });
     }
 }

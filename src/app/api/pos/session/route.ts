@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import type { PosItem, PosDeliveryMethod } from '@/types/pos';
 import { POS_FALLBACK_EMAIL, isNotNullViolation, normaliseEmail } from '@/lib/posContact';
+import { apiError } from "@/lib/errors/apiError";
 
 export async function POST(req: NextRequest) {
     // Auth check
@@ -125,11 +126,11 @@ export async function POST(req: NextRequest) {
                 .from('pos_sessions')
                 .update({ ...payload, customer_email: POS_FALLBACK_EMAIL })
                 .eq('id', sessionId);
-            if (retryError) return NextResponse.json({ error: retryError.message }, { status: 500 });
+            if (retryError) return apiError("GEN-00", { status: 500, audience: "staff", cause: retryError });
             return NextResponse.json({ sessionId });
         }
 
-        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        if (error) return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
         return NextResponse.json({ sessionId });
     }
 
@@ -149,6 +150,6 @@ export async function POST(req: NextRequest) {
             .single());
     }
 
-    if (error || !data) return NextResponse.json({ error: error?.message ?? 'Insert failed' }, { status: 500 });
+    if (error || !data) return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     return NextResponse.json({ sessionId: data.id });
 }

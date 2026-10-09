@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { apiError } from "@/lib/errors/apiError";
 
 // POST  — save/update a customer push subscription
 // DELETE — remove a customer push subscription
@@ -33,13 +34,13 @@ export async function POST(req: Request) {
 
         if (error) {
             console.error("[customer-push/subscribe] DB error:", error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            return apiError("GEN-00", { status: 500, audience: "customer", cause: error });
         }
 
         return NextResponse.json({ status: "subscribed" });
     } catch (err: any) {
         console.error("[customer-push/subscribe] Error:", err);
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "customer", cause: err });
     }
 }
 
@@ -62,6 +63,6 @@ export async function DELETE(req: Request) {
 
         return NextResponse.json({ status: "unsubscribed" });
     } catch (err: any) {
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "customer", cause: err });
     }
 }

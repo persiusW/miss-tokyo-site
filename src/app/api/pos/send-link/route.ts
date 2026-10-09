@@ -12,6 +12,10 @@ import { parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/deli
 import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
 import { logActivity } from '@/lib/utils/logActivity';
 import { sendEmail } from "@/lib/email";
+import { apiError } from "@/lib/errors/apiError";
+import { cleanSaleKey } from '@/lib/payments/attemptRules';
+import { recordError, recordStart } from '@/lib/payments/attempts';
+import { errorBody } from "@/lib/errors/catalogue";
 
 
 export async function POST(req: NextRequest) {
@@ -31,10 +35,12 @@ export async function POST(req: NextRequest) {
     // same work a link sale does, so cash branches at the end rather than
     // duplicating this route.
     let mode: 'link' | 'cash' = 'link';
+    let rawSaleKey: unknown;
     try {
         const body = await req.json();
         sessionId = body?.sessionId;
         if (body?.mode === 'cash') mode = 'cash';
+        rawSaleKey = body?.saleKey;
     } catch {
         sessionId = undefined;
     }
@@ -256,10 +262,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (reserveError) {
-        const msg = reserveError.message.includes('Insufficient stock')
-            ? 'One or more items are out of stock'
-            : reserveError.message;
-        return NextResponse.json({ error: msg }, { status: 409 });
+        if (!reserveError.message.includes('Insufficient stock')) {
+            return apiError("GEN-00", { status: 409, audience: "staff", cause: reserveError, context: { route: "pos/send-link" } });
+        }
+        return NextResponse.json({ code: "POS-01", error: 'One or more items are out of stock' }, { status: 409 });
     }
 
     // Hold the discount for the same window as the stock, so a second till
@@ -376,7 +382,8 @@ export async function POST(req: NextRequest) {
             body: JSON.stringify(paystackBody),
             signal: AbortSignal.timeout(15_000),
         });
-        if (paystackRes.status >= 500) gatewayReachable = false;
+        // 5xx, rate-limited or a firewall page: Paystack isn't really answering.
+        if (paystackRes.status >= 500 || paystackRes.status === 429 || paystackRes.status === 403) gatewayReachable = false;
         paystackData = await paystackRes.json().catch(() => null);
     } catch (e) {
         gatewayReachable = false;
@@ -389,16 +396,13 @@ export async function POST(req: NextRequest) {
         await supabaseAdmin.from('pos_reservations').delete().eq('pos_session_id', sessionId);
         await releaseDiscountHolds({ posSessionId: sessionId });
         await supabaseAdmin.from('pos_sessions').update({ status: 'draft' }).eq('id', sessionId);
-        return NextResponse.json(
-            { error: gatewayReachable
-                ? "Paystack didn't create the link. Please try again."
-                : "Paystack isn't answering right now. Please try again in a minute." },
-            { status: gatewayReachable ? 502 : 503 },
-        );
+        await recordError({ saleKey: cleanSaleKey(rawSaleKey), channel: 'pos', code: gatewayReachable ? 'PAY-02' : 'PAY-01', message: paystackData?.message, posSessionId: sessionId, userId: user.id });
+        return NextResponse.json(errorBody(gatewayReachable ? 'PAY-02' : 'PAY-01', 'staff'), { status: gatewayReachable ? 502 : 503 });
     }
 
     // Store the authorization_url as paystack_reference — used by /pay/[pos_id] as the "Pay Now" href
     const authorizationUrl: string = paystackData.data?.authorization_url ?? '';
+    await recordStart({ saleKey: cleanSaleKey(rawSaleKey), channel: 'pos', reference: paystackData.data?.reference ?? null, amount: amountWithFee, posSessionId: sessionId, userId: user.id });
 
     await supabaseAdmin
         .from('pos_sessions')
@@ -487,6 +491,6 @@ export async function POST(req: NextRequest) {
         discount: validatedDiscount ? { code: validatedDiscount.code, amount: discountAmount, label: validatedDiscount.label } : null,
         // Per-channel outcome so the till can tell staff what actually reached
         // the customer instead of always claiming both were delivered
-        delivery: { email: emailStatus, emailError, sms: smsStatus, smsError },
+        delivery: { email: emailStatus, sms: smsStatus },
     });
 }

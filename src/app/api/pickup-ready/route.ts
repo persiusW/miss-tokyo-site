@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { sendSMSLogged } from "@/lib/sms";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendEmail } from "@/lib/email";
+import { apiError } from "@/lib/errors/apiError";
 
 /**
  * POST /api/pickup-ready
@@ -169,6 +170,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: "ready_for_pickup", count: orderIds.length });
   } catch (err: any) {
     console.error("[pickup-ready]", err);
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+    return apiError("GEN-00", { status: 500, audience: "staff", cause: err });
   }
 }

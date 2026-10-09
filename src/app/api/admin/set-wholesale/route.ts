@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendEmail } from "@/lib/email";
 import { sendSMSLogged } from "@/lib/sms";
+import { apiError } from "@/lib/errors/apiError";
 
 export async function POST(req: NextRequest) {
     // Auth check — only admin/owner can promote users
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
         .update({ role: newRole })
         .eq("id", userId);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
 
     // Send notifications if we have the user's email
     if (profile?.email) {

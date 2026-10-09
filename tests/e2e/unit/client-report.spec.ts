@@ -51,3 +51,15 @@ test("error screens and ErrorNet share one reporter, so a crash is reported once
     await new Promise(res => setTimeout(res, 0));
     expect(sent).toEqual(["a:render crash"]);
 });
+
+test("log fields are single-line", async () => {
+    const { oneLine } = await import("../../../src/lib/errors/clientReport");
+    expect(oneLine("a\nb\r\nc")).toBe("a b c");
+});
+
+test("the IP map forgets quiet IPs", async () => {
+    const { allowReport, ipCount } = await import("../../../src/lib/errors/clientReport");
+    allowReport("9.9.9.9", 5_000_000);
+    allowReport("8.8.8.8", 5_000_000 + 11 * 60_000);
+    expect(ipCount()).toBeLessThanOrEqual(2);
+});

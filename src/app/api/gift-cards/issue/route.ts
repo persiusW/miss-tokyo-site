@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendEmail } from "@/lib/email";
+import { apiError } from "@/lib/errors/apiError";
 
 function genCode(): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -121,6 +122,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ status: "issued", code: card.code, id: card.id });
     } catch (err: any) {
         console.error("[gift-cards/issue]", err);
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: err });
     }
 }
