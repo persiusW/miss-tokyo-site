@@ -29,6 +29,24 @@ type Drift = {
     delta: number;
 };
 
+// PostgREST caps a select at 1000 rows. There are more variant rows than that,
+// so an unpaged read summed only some of them and reported drift that was not
+// there.
+async function allVariantCounts(): Promise<Array<{ product_id: string; inventory_count: number | null }>> {
+    const rows: Array<{ product_id: string; inventory_count: number | null }> = [];
+    for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabaseAdmin
+            .from("product_variants")
+            .select("product_id, inventory_count")
+            .order("id")
+            .range(offset, offset + 999);
+        if (error) throw new Error(error.message);
+        rows.push(...(data ?? []));
+        if (!data || data.length < 1000) break;
+    }
+    return rows;
+}
+
 export async function GET(req: Request) {
     const authHeader = req.headers.get("authorization");
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -44,16 +62,13 @@ export async function GET(req: Request) {
                 .from("products")
                 .select("id, name, inventory_count, is_active, track_variant_inventory, track_inventory")
                 .eq("track_variant_inventory", true),
-            supabaseAdmin
-                .from("product_variants")
-                .select("product_id, inventory_count"),
+            allVariantCounts(),
         ]);
 
         if (products.error) throw new Error(products.error.message);
-        if (variants.error) throw new Error(variants.error.message);
 
         const sums = new Map<string, number>();
-        for (const v of variants.data ?? []) {
+        for (const v of variants) {
             sums.set(v.product_id, (sums.get(v.product_id) ?? 0) + (Number(v.inventory_count) || 0));
         }
 
