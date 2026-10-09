@@ -1,6 +1,6 @@
 export const maxDuration = 60; // 1 minute — safe window for Paystack webhook processing
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import crypto from "crypto";
 import { revalidateTag } from "next/cache";
 import { confirmSale, fallbackDecrementFromItems, decrementDirect } from "@/lib/inventory";
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
         if (event.event === "charge.success") {
             const data = event.data;
             const paystackRef: string = data.reference || "";
-            await recordResult(paystackRef, data);
+            after(() => recordResult(paystackRef, data)); // off the settlement path
             const metadata = data.metadata || {};
 
             // ── Gift card purchase: activate + deliver ─────────────────────────
