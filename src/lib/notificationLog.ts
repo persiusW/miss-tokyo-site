@@ -4,6 +4,7 @@
 // throws and gives up after LOG_TIMEOUT_MS, so a slow or failing database can
 // never change what a send returns or hold a request up for long.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { redactText } from "@/lib/ai/missTokyoAi/scrub";
 
 /** Optional context a caller can attach to a send. */
 export type NotificationMeta = { event?: string; orderId?: string | null };
@@ -49,12 +50,9 @@ export function emailRecipientKey(email: string): string {
     return String(email ?? "").trim().toLowerCase();
 }
 
-/**
- * Phase 2 (spec A) wires src/lib/ai/missTokyoAi/scrub.ts in here; that file
- * does not exist yet, so bodies are stored as sent.
- */
+/** Gift-card codes, OTPs, account-setup links and checkout tokens never reach the log. */
 function redactForLog(text: string): string {
-    return text;
+    return redactText(text);
 }
 
 /** Readable text from an email's HTML: no tags, styles or scripts. */
