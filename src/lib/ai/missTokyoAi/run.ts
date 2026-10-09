@@ -234,13 +234,16 @@ export async function runStoreAssistant(args: {
     }
 
     if (failure) return failure;
-    // One button per destination, in the order the tools offered them.
+    // One button per destination, in the order the tools offered them; the
+    // queries a reply ran ride along after the buttons.
     const seen = new Set<string>();
-    const uniqueEffects = effects.filter(e => {
+    const buttons = effects.filter(e => {
+        if (e.kind === "query") return false;
         const key = `${e.kind}:${e.href}:${"anchor" in e ? e.anchor : ""}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
     }).slice(0, 4);
-    return { ok: true, messages, reply: scrubReply(reply), effects: uniqueEffects };
+    const queries = effects.filter(e => e.kind === "query").slice(-3);
+    return { ok: true, messages, reply: scrubReply(reply), effects: [...buttons, ...queries] };
 }

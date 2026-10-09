@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { TRANSCRIPT_SOFT_LIMIT, useMissTokyoAi, type Bubble } from "@/lib/ai/missTokyoAi/client/store";
-import type { Effect } from "@/lib/ai/missTokyoAi/effects";
+import type { ButtonEffect, Effect } from "@/lib/ai/missTokyoAi/effects";
 import { Spark } from "./icons";
 
 export type ChatUser = { firstName: string | null; role: string };
@@ -60,6 +60,10 @@ function ReplyText({ text }: { text: string }) {
     }
     return <>{out}</>;
 }
+
+const isButton = (e: Effect): e is ButtonEffect => e.kind !== "query";
+const isQuery = (e: Effect): e is Extract<Effect, { kind: "query" }> =>
+    e.kind === "query" && typeof e.sql === "string";
 
 function greeting(): string {
     const h = new Date().getHours();
@@ -132,7 +136,7 @@ export function ChatSurface({
         }
     };
 
-    const runEffect = (effect: Effect) => {
+    const runEffect = (effect: ButtonEffect) => {
         if (effect.kind === "show_me") {
             setSpotlight({ anchor: effect.anchor, label: effect.label, startedAt: Date.now() });
         }
@@ -200,15 +204,21 @@ export function ChatSurface({
                             <div className={`mtai-bubble${b.error ? " error" : ""}`}>
                                 {b.role === "assistant" ? <ReplyText text={b.text} /> : b.text}
                             </div>
-                            {b.role === "assistant" && b.effects && b.effects.length > 0 && (
+                            {b.role === "assistant" && b.effects && b.effects.some(isButton) && (
                                 <div className="mtai-actions">
-                                    {b.effects.map((e, k) => (
+                                    {b.effects.filter(isButton).map((e, k) => (
                                         <button key={k} type="button" className={`mtai-action ${e.kind === "navigate" ? "go" : "show"}`} onClick={() => runEffect(e)}>
                                             {e.kind === "navigate" ? `${e.label} →` : "Show me"}
                                         </button>
                                     ))}
                                 </div>
                             )}
+                            {b.role === "assistant" && b.effects?.filter(isQuery).map((q, k) => (
+                                <details key={`q${k}`} className="mtai-query">
+                                    <summary>View query · {q.rows} {q.rows === 1 ? "row" : "rows"}</summary>
+                                    <pre>{q.sql}</pre>
+                                </details>
+                            ))}
                         </div>
                     ))
                 )}

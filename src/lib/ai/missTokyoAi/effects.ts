@@ -6,10 +6,14 @@ import { ROUTES, routeAllowed, type RouteKey, type StaffRole } from "@/lib/ai/mi
 
 export type Effect =
     | { kind: "navigate"; route: RouteKey; href: string; label: string }
-    | { kind: "show_me"; anchor: AnchorId; href: string; label: string };
+    | { kind: "show_me"; anchor: AnchorId; href: string; label: string }
+    /** Admin only: the SQL a reporting_query ran, shown under the reply. Not a button. */
+    | { kind: "query"; sql: string; rows: number };
+
+export type ButtonEffect = Extract<Effect, { href: string }>;
 
 /** Builds a navigate effect, or null if the route/tab is unknown or not allowed for the role. */
-export function navigateEffect(routeKey: string, role: StaffRole, tab?: string | null): Effect | null {
+export function navigateEffect(routeKey: string, role: StaffRole, tab?: string | null): ButtonEffect | null {
     const route: { path: string; title: string; tabs?: readonly string[] } | undefined = ROUTES[routeKey as RouteKey];
     if (!route || !routeAllowed(routeKey as RouteKey, role)) return null;
     let href = route.path;
@@ -20,7 +24,7 @@ export function navigateEffect(routeKey: string, role: StaffRole, tab?: string |
     return { kind: "navigate", route: routeKey as RouteKey, href, label: `Open ${route.title}` };
 }
 
-export function showMeEffect(anchorId: string, role: StaffRole): Effect | null {
+export function showMeEffect(anchorId: string, role: StaffRole): ButtonEffect | null {
     const anchor: { route: RouteKey; label: string; tab?: string } | undefined = ANCHORS[anchorId as AnchorId];
     if (!anchor || !routeAllowed(anchor.route, role)) return null;
     const route = ROUTES[anchor.route];

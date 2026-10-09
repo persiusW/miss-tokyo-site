@@ -124,6 +124,10 @@
 .mtai-action.go { background: var(--ac-accent); color: var(--ac-acc-ink); border: none; }
 .mtai-action.show { background: none; color: var(--ac-ink); border: 1px solid var(--ac-line-2); }
 .mtai-action:focus-visible { outline: 2px solid var(--ac-warn); outline-offset: 2px; }
+.mtai-query { font: 500 12px/1.4 var(--f-sans); color: var(--ac-ink-3); }
+.mtai-query summary { cursor: pointer; min-height: 28px; display: inline-flex; align-items: center; }
+.mtai-query summary:focus-visible { outline: 2px solid var(--ac-warn); outline-offset: 2px; }
+.mtai-query pre { margin: 4px 0 0; padding: 10px 12px; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: var(--ac-panel); border: 1px solid var(--ac-line); border-radius: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ac-ink); }
 
 .mtai-dots { display: inline-flex; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--ac-panel); border: 1px solid var(--ac-line); align-self: flex-start; }
 .mtai-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--ac-ink-3); }
