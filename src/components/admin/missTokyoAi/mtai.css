@@ -173,3 +173,15 @@
 /* Topbar bell count (Miss Tokyo AI replies / inbox) */
 .mtai-bell { position: relative; }
 .mtai-bell-count { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--ac-accent); color: var(--ac-acc-ink); font: 700 10px/16px var(--f-sans); text-align: center; pointer-events: none; }
+
+/* Walkthrough card: bottom left on desktop, above the launcher on phones */
+.mtai-walk { position: fixed; z-index: 310; left: 16px; bottom: 16px; width: 320px; max-width: calc(100vw - 32px); background: var(--ac-panel); color: var(--ac-ink); border: 1px solid var(--ac-line-2); border-radius: 14px; box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 14px 16px; display: grid; gap: 8px; }
+.mtai-walk-head { display: flex; align-items: center; justify-content: space-between; }
+.mtai-walk-x { width: 36px; height: 36px; border: none; background: none; color: var(--ac-ink-3); font-size: 20px; cursor: pointer; border-radius: 8px; }
+.mtai-walk-x:focus-visible { outline: 2px solid var(--ac-warn); outline-offset: 2px; }
+.mtai-walk-title { font-weight: 600; font-size: 14px; }
+.mtai-walk p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ac-ink); }
+.mtai-walk-actions { display: flex; gap: 8px; justify-content: flex-end; }
+@media (max-width: 767px) {
+  .mtai-walk { left: 12px; right: 12px; width: auto; bottom: 88px; }
+}

@@ -28,6 +28,9 @@ export type Availability = "unknown" | "ready" | "off" | "not_set_up";
 
 export type Spotlight = { anchor: string; label: string; startedAt: number } | null;
 
+/** The walkthrough in progress: which tour and which step (0-based). */
+export type WalkState = { id: string; step: number } | null;
+
 type State = {
     hydrated: boolean;
     open: boolean;
@@ -39,10 +42,12 @@ type State = {
     features: MtaiFeatures;
     /** False until the server has said which extras are on; nothing is cancelled before then. */
     featuresKnown: boolean;
+    walk: WalkState;
     /** Question ids whose replies are already in the chat (survives New chat). */
     shownReplies: string[];
     hydrate: () => void;
     setFeatures: (f: MtaiFeatures) => void;
+    setWalk: (w: WalkState) => void;
     sendToAdmin: (bubbleId: string, question: string) => Promise<void>;
     /** Fetch admin replies; append new ones; mark them read when the person can see them. */
     pollReplies: (visible: boolean) => Promise<void>;
@@ -56,6 +61,7 @@ type State = {
 const STORAGE_KEY = "mt-ai-chat";
 const SPOTLIGHT_KEY = "mt-ai-spotlight";
 const REPLIES_KEY = "mt-ai-replies";
+const WALK_KEY = "mt-ai-walk";
 const KEEP_BUBBLES = 40;
 /** The server accepts 80 messages; stop a little before so the last turn fits. */
 export const TRANSCRIPT_SOFT_LIMIT = 70;
@@ -81,6 +87,7 @@ export const useMissTokyoAi = create<State>((set, get) => ({
     spotlight: null,
     features: FEATURES_OFF,
     featuresKnown: false,
+    walk: null,
     shownReplies: [],
 
     hydrate: () => {
@@ -99,6 +106,8 @@ export const useMissTokyoAi = create<State>((set, get) => ({
             }
             const sp = sessionStorage.getItem(SPOTLIGHT_KEY);
             if (sp) spotlight = JSON.parse(sp);
+            const walk = JSON.parse(sessionStorage.getItem(WALK_KEY) ?? "null");
+            if (walk && typeof walk.id === "string" && Number.isInteger(walk.step)) set({ walk: { id: walk.id, step: walk.step } });
             const shown = JSON.parse(sessionStorage.getItem(REPLIES_KEY) ?? "[]");
             if (Array.isArray(shown)) set({ shownReplies: shown.filter((v: unknown) => typeof v === "string").slice(-100) });
         } catch { /* start fresh */ }
@@ -106,6 +115,14 @@ export const useMissTokyoAi = create<State>((set, get) => ({
     },
 
     setFeatures: (features) => set({ features, featuresKnown: true }),
+
+    setWalk: (walk) => {
+        set({ walk });
+        try {
+            if (walk) sessionStorage.setItem(WALK_KEY, JSON.stringify(walk));
+            else sessionStorage.removeItem(WALK_KEY);
+        } catch { /* the tour still runs on this page */ }
+    },
 
     sendToAdmin: async (bubbleId, question) => {
         const mark = (sent: Bubble["sent"], sentNote?: string) => {

@@ -4,10 +4,13 @@
 import { ANCHORS, type AnchorId } from "@/lib/ai/missTokyoAi/anchors";
 import { ROUTES, routeAllowed, type RouteKey, type StaffRole } from "@/lib/ai/missTokyoAi/routes";
 import { cleanQuestion } from "@/lib/ai/missTokyoAi/questions";
+import { findWalkthrough } from "@/lib/ai/missTokyoAi/walkthroughs";
 
 export type Effect =
     | { kind: "navigate"; route: RouteKey; href: string; label: string }
     | { kind: "show_me"; anchor: AnchorId; href: string; label: string }
+    /** Starts a step-by-step tour on its first step's page. */
+    | { kind: "walkthrough"; id: string; href: string; label: string }
     /** Offers to send the question to the admin inbox. Nothing is sent until the person taps it. */
     | { kind: "send_to_admin"; summary: string }
     /** Admin only: the SQL a reporting_query ran, shown under the reply. Not a button. */
@@ -38,4 +41,12 @@ export function showMeEffect(anchorId: string, role: StaffRole): ButtonEffect | 
 export function sendToAdminEffect(summary: unknown): Effect | null {
     const clean = cleanQuestion(summary);
     return clean.length >= 5 ? { kind: "send_to_admin", summary: clean } : null;
+}
+
+export function walkthroughEffect(id: unknown, role: StaffRole): ButtonEffect | null {
+    const w = typeof id === "string" ? findWalkthrough(id, role) : null;
+    if (!w) return null;
+    const first = w.steps[0];
+    if (!routeAllowed(first.route, role)) return null;
+    return { kind: "walkthrough", id: w.id, href: ROUTES[first.route].path, label: "Start walkthrough" };
 }

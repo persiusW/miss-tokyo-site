@@ -61,7 +61,7 @@ function ReplyText({ text }: { text: string }) {
     return <>{out}</>;
 }
 
-const isButton = (e: Effect): e is ButtonEffect => e.kind === "navigate" || e.kind === "show_me";
+const isButton = (e: Effect): e is ButtonEffect => e.kind === "navigate" || e.kind === "show_me" || e.kind === "walkthrough";
 const isSendToAdmin = (e: Effect): e is Extract<Effect, { kind: "send_to_admin" }> =>
     e.kind === "send_to_admin" && typeof e.summary === "string";
 const isQuery = (e: Effect): e is Extract<Effect, { kind: "query" }> =>
@@ -89,7 +89,7 @@ export function ChatSurface({
     focusKey?: unknown;
     headProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
-    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight, open, sendToAdmin, pollReplies } = useMissTokyoAi();
+    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight, setWalk, open, sendToAdmin, pollReplies } = useMissTokyoAi();
     const router = useRouter();
     const [input, setInput] = useState("");
     const [online, setOnline] = useState(true);
@@ -151,6 +151,10 @@ export function ChatSurface({
     const runEffect = (effect: ButtonEffect) => {
         if (effect.kind === "show_me") {
             setSpotlight({ anchor: effect.anchor, label: effect.label, startedAt: Date.now() });
+        }
+        if (effect.kind === "walkthrough") {
+            setSpotlight(null);
+            setWalk({ id: effect.id, step: 0 });
         }
         onEffect?.();
         router.push(effect.href);
@@ -223,7 +227,7 @@ export function ChatSurface({
                                 <div className="mtai-actions">
                                     {b.effects.filter(isButton).map((e, k) => (
                                         <button key={k} type="button" className={`mtai-action ${e.kind === "show_me" ? "show" : "go"}`} onClick={() => runEffect(e)}>
-                                            {e.kind === "navigate" ? `${e.label} →` : "Show me"}
+                                            {e.kind === "navigate" ? `${e.label} →` : e.kind === "walkthrough" ? "Start walkthrough" : "Show me"}
                                         </button>
                                     ))}
                                 </div>

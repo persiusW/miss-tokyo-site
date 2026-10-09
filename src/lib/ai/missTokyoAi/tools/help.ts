@@ -2,7 +2,8 @@
 // taps it. The enums come from the registries, so the model cannot invent a
 // route or a control.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { navigateEffect, sendToAdminEffect, showMeEffect } from "@/lib/ai/missTokyoAi/effects";
+import { navigateEffect, sendToAdminEffect, showMeEffect, walkthroughEffect } from "@/lib/ai/missTokyoAi/effects";
+import { WALKTHROUGHS } from "@/lib/ai/missTokyoAi/walkthroughs";
 import { ANCHORS } from "@/lib/ai/missTokyoAi/anchors";
 import { ROUTES, SETTINGS_TABS } from "@/lib/ai/missTokyoAi/routes";
 import { guideFor } from "@/lib/ai/missTokyoAi/guide";
@@ -94,6 +95,24 @@ export const helpTools: ToolDef[] = [
             if (!effect) return err("Write the question in a sentence.");
             ctx.effects.push(effect);
             return ok({ button: "Send to admin", note: "Tell them they can tap Send to admin and the reply will come back here." });
+        },
+    },
+    {
+        feature: "walkthroughs",
+        def: {
+            name: "start_walkthrough",
+            description: `When someone asks how to do one of these, answer in a line or two and call this so they get a "Start walkthrough" button that highlights each control in turn: ${WALKTHROUGHS.map(w => `${w.id} (${w.title})`).join("; ")}.`,
+            input_schema: {
+                type: "object",
+                properties: { walkthrough: { type: "string", enum: WALKTHROUGHS.map(w => w.id) } },
+                required: ["walkthrough"],
+            },
+        },
+        async run(input, ctx) {
+            const effect = walkthroughEffect(str(input?.walkthrough, 40), ctx.role);
+            if (!effect) return err("That walkthrough isn't available to this person. Describe the steps instead.");
+            ctx.effects.push(effect);
+            return ok({ button: effect.label });
         },
     },
 ];

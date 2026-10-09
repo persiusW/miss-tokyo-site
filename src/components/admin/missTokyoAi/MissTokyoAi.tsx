@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 import { useMissTokyoAi } from "@/lib/ai/missTokyoAi/client/store";
 import { ChatSurface, type ChatUser } from "./ChatSurface";
 import { Spotlight } from "./Spotlight";
+import { WalkthroughRunner } from "./WalkthroughRunner";
 import { Spark } from "./icons";
 import "./mtai.css";
 
@@ -133,6 +134,7 @@ export function MissTokyoAi() {
     return (
         <>
             <Spotlight />
+            <WalkthroughRunner />
             {!onAgentPage && (
                 <>
                     {!open && tip && availability !== "off" && availability !== "not_set_up" && (
