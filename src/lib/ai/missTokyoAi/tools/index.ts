@@ -4,6 +4,7 @@ import { catalogTools } from "./catalog";
 import { orderTools } from "./orders";
 import { statsTools } from "./stats";
 import { reportingTools } from "./reporting";
+import { paymentTools } from "./payments";
 import { messageTools } from "./messages";
 import { checkoutTools } from "./checkout";
 import { helpTools } from "./help";
@@ -13,7 +14,7 @@ import type { MtaiFeatures } from "@/lib/ai/settings";
 
 export type { ToolContext, ToolOutcome } from "./shared";
 
-const TOOLS = [...catalogTools, ...orderTools, ...statsTools, ...reportingTools, ...messageTools, ...checkoutTools, ...helpTools];
+const TOOLS = [...catalogTools, ...orderTools, ...statsTools, ...reportingTools, ...paymentTools, ...messageTools, ...checkoutTools, ...helpTools];
 
 const available = (t: (typeof TOOLS)[number], role: StaffRole, features: MtaiFeatures) =>
     (!t.roles || t.roles.includes(role)) && (!t.feature || features[t.feature]);
