@@ -26,7 +26,7 @@ export const ERRORS = {
     "PAY-05": { area: "pay", aiHelp: true,
         staff: "The payment hasn't been completed yet. The customer may still be approving it.",
         customer: "We haven't received confirmation of your payment yet. If you're approving it on your phone, finish there.",
-        steps: ["Ask the customer to check their phone for the mobile money prompt.", "Wait a moment before sending a new link, so they aren't charged twice."] },
+        steps: ["Ask the customer to check their phone for the mobile money prompt.", "Wait a moment before sending the link again, so they aren't charged twice."] },
     "PAY-06": { area: "pay", aiHelp: true,
         staff: "This payment link has expired. Send a new one.",
         customer: "This payment link has expired.",
