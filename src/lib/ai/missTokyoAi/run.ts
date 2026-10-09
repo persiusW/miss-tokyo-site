@@ -79,6 +79,7 @@ type TurnLog = {
     channel: "dashboard"; user_id: string; model: string;
     input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number;
     cost_usd: number; tool_calls: { name: string; ok: boolean }[];
+    seed_key?: string | null;
 };
 
 /** Injection points for tests; production uses the defaults. */
@@ -96,6 +97,8 @@ export async function runStoreAssistant(args: {
     transcript: AssistantMessage[];
     userId: string;
     role: StaffRole;
+    /** A seeded payment-help ask: logged so it can be rate-limited. */
+    seedKey?: string;
 }, deps: RunDeps = {}): Promise<RunResult> {
     const settings = await getAiSettings();
     if (!settings.dashboardAgentEnabled) return { ok: false, status: 503, error: CALM.off };
@@ -221,6 +224,7 @@ export async function runStoreAssistant(args: {
         if (usage.input + usage.output + usage.cacheRead + usage.cacheWrite > 0 || toolCalls.length > 0) {
             await (deps.logTurn ?? logTurnToDb)({
                 channel: "dashboard",
+                ...(args.seedKey ? { seed_key: args.seedKey } : {}),
                 user_id: args.userId,
                 model: AI_MODEL,
                 input_tokens: usage.input,
