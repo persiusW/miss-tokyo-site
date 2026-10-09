@@ -22,7 +22,7 @@ export type Bubble = {
     sentNote?: string;
 };
 
-export const FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false };
+export const FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false, errorHelp: false };
 
 export type Availability = "unknown" | "ready" | "off" | "not_set_up";
 

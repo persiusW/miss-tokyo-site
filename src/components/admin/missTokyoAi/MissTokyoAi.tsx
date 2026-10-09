@@ -60,6 +60,7 @@ export function MissTokyoAi() {
                     bell: d.features.bell === true,
                     walkthroughs: d.features.walkthroughs === true,
                     voice: d.features.voice === true,
+                    errorHelp: d.features.errorHelp === true,
                 });
                 setAvailability(d?.available ? "ready" : d?.reason === "off" ? "off" : d?.reason === "not_set_up" ? "not_set_up" : "ready");
             })
