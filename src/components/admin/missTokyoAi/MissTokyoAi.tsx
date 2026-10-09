@@ -75,6 +75,14 @@ export function MissTokyoAi() {
     };
 
     const openPanel = () => { dismissTip(); setOpen(true); setOpenCount(c => c + 1); };
+
+    // The topbar bell (and anything else) can ask for the panel.
+    useEffect(() => {
+        const onOpen = () => { if (!onAgentPage) openPanel(); };
+        window.addEventListener("mtai:open", onOpen);
+        return () => window.removeEventListener("mtai:open", onOpen);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [onAgentPage]);
     const closePanel = () => { setOpen(false); setDrag(0); setTimeout(() => launcherRef.current?.focus(), 0); };
 
     // Dialog behaviour: Escape closes, Tab stays inside, page scroll locked on phones.

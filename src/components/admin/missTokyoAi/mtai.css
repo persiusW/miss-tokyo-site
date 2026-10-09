@@ -169,3 +169,7 @@
 .mtai-ring-card button { justify-self: end; background: var(--ac-accent); color: var(--ac-acc-ink); border: none; border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
 
 .mtai-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Topbar bell count (Miss Tokyo AI replies / inbox) */
+.mtai-bell { position: relative; }
+.mtai-bell-count { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--ac-accent); color: var(--ac-acc-ink); font: 700 10px/16px var(--f-sans); text-align: center; pointer-events: none; }
