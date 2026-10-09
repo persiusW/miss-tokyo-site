@@ -92,7 +92,7 @@ export const checkoutTools: ToolDef[] = [
         },
         async run(input, ctx) {
             const orderInput = toOrderInput(input);
-            const result = await createCheckoutOrder(orderInput);
+            const result = await createCheckoutOrder({ ...orderInput, createdBy: ctx.userId });
             if (!result.success) return err(checkoutErrorLine(result.code, result.error));
             await logActivity({
                 userId: ctx.userId,

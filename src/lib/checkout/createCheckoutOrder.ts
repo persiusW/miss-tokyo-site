@@ -9,7 +9,7 @@ import { variantKey } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
 import { errorBody } from "@/lib/errors/catalogue";
-import { channelFor, cleanSaleKey } from "@/lib/payments/attemptRules";
+import { channelFor, cleanSaleKey, saleKeyFor } from "@/lib/payments/attemptRules";
 import { recordError, recordStart } from "@/lib/payments/attempts";
 
 /** The JSON body /api/paystack/initialize has always accepted. */
@@ -45,6 +45,8 @@ export type CheckoutContext = {
     source: CheckoutSource;
     /** The signed-in shopper, if any. Only used to grant wholesale pricing. */
     authUserId: string | null;
+    /** Staff member who placed it (AI / dashboard orders); recorded on payment attempts only. */
+    createdBy?: string | null;
     /** Stock hold length. Defaults to the storefront's ONLINE_HOLD_MINUTES. */
     holdMinutes?: number;
     /**
@@ -60,7 +62,12 @@ export type CheckoutContext = {
 };
 
 export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext): Promise<CheckoutRunResult> {
-    const saleKey = cleanSaleKey((payload as { saleKey?: unknown } | null)?.saleKey);
+    const requestedKey = cleanSaleKey((payload as { saleKey?: unknown } | null)?.saleKey);
+    // A key whose sale already paid (e.g. the success page never confirmed and
+    // the webhook settled later) must not carry its failures into a new order.
+    const { count: paidOnKey } = await supabaseAdmin.from("sale_payment_attempts")
+        .select("id", { count: "exact", head: true }).eq("sale_key", requestedKey).eq("status", "paid");
+    const saleKey = saleKeyFor(requestedKey, (paidOnKey ?? 0) > 0);
     const attemptChannel = channelFor(ctx.source);
         const {
             productId,
@@ -720,7 +727,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
                     .eq("id", orderId);
             }
 
-            await recordStart({ saleKey, channel: attemptChannel, reference: data.data?.reference ?? null, amount: amountInPesewas / 100, orderId, userId: ctx.authUserId });
+            await recordStart({ saleKey, channel: attemptChannel, reference: data.data?.reference ?? null, amount: amountInPesewas / 100, orderId, userId: ctx.createdBy ?? ctx.authUserId });
             return { status: 200, body: {
                 authorizationUrl: data.data.authorization_url,
                 reference: data.data.reference,
@@ -776,6 +783,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type CreateCheckoutOrderInput = {
+    /** Staff member placing the order (dashboard AI), for payment-attempt records. */
+    createdBy?: string | null;
     items: Array<{
         product_id: string;
         /** Optional; the size/colour/brand below are what resolve the variant. */
@@ -940,6 +949,7 @@ async function buildRun(input: CreateCheckoutOrderInput, dryRun: boolean): Promi
         {
             source,
             authUserId: null,
+            createdBy: input.createdBy ?? null,
             holdMinutes,
             supersede: false,
             notes: input.notes ? String(input.notes).slice(0, 1000) : null,
