@@ -34,3 +34,17 @@ test("sale keys and channels", () => {
     expect(channelFor("dashboard")).toBe("ai");
     expect(channelFor("pos")).toBe("pos");
 });
+
+test("live state for the till", async () => {
+    const { liveState } = await import("../../../src/lib/payments/attemptRules");
+    const now = Date.parse("2026-10-09T12:00:00Z");
+    const later = "2026-10-09T12:10:00Z", earlier = "2026-10-09T11:50:00Z";
+    expect(liveState({ sessionStatus: "paid", expiresAt: later, attemptStatus: "paid", now })).toBe("paid");
+    expect(liveState({ sessionStatus: "pending_payment", expiresAt: later, attemptStatus: "paid", now })).toBe("settling");
+    expect(liveState({ sessionStatus: "pending_payment", expiresAt: later, attemptStatus: "failed", now })).toBe("declined");
+    expect(liveState({ sessionStatus: "pending_payment", expiresAt: later, attemptStatus: "unfinished", now })).toBe("waiting");
+    expect(liveState({ sessionStatus: "pending_payment", expiresAt: later, attemptStatus: null, now })).toBe("waiting");
+    expect(liveState({ sessionStatus: "pending_payment", expiresAt: earlier, attemptStatus: "unfinished", now })).toBe("expired");
+    expect(liveState({ sessionStatus: "expired", expiresAt: null, attemptStatus: null, now })).toBe("expired");
+    expect(liveState({ sessionStatus: "cancelled", expiresAt: null, attemptStatus: null, now })).toBe("expired");
+});

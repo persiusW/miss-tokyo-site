@@ -39,3 +39,15 @@ export function channelFor(source: string): "online" | "ai" | "pos" {
     if (source === "dashboard") return "ai";
     return "online";
 }
+
+export type LiveState = "waiting" | "paid" | "settling" | "declined" | "expired";
+
+/** What the till shows for a sent link. Settlement is the webhook's job; "settling" bridges the gap. */
+export function liveState(i: { sessionStatus: string; expiresAt: string | null; attemptStatus: string | null; now: number }): LiveState {
+    if (i.sessionStatus === "paid") return "paid";
+    if (i.attemptStatus === "paid") return "settling";
+    if (i.sessionStatus === "expired" || i.sessionStatus === "cancelled") return "expired";
+    if (i.expiresAt && Date.parse(i.expiresAt) < i.now) return "expired";
+    if (i.attemptStatus === "failed") return "declined";
+    return "waiting";
+}
