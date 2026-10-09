@@ -40,9 +40,17 @@ export function sharedReporter(send: (r: ClientReport) => Promise<void>): (r: Cl
     return shared;
 }
 
+export const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ");
+
 const hits = new Map<string, number[]>();
-/** Best-effort per-IP limit (per server instance). */
+let lastPrune = 0;
+export const ipCount = () => hits.size;
+/** Best-effort per-IP limit (per server instance). Quiet IPs are forgotten. */
 export function allowReport(ip: string, now: number): boolean {
+    if (now - lastPrune > WINDOW_MS) {
+        for (const [k, v] of hits) if (!v.some(t => now - t < WINDOW_MS)) hits.delete(k);
+        lastPrune = now;
+    }
     const recent = (hits.get(ip) ?? []).filter(t => now - t < WINDOW_MS);
     if (recent.length >= PER_WINDOW) { hits.set(ip, recent); return false; }
     recent.push(now);

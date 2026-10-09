@@ -381,7 +381,8 @@ export async function POST(req: NextRequest) {
             body: JSON.stringify(paystackBody),
             signal: AbortSignal.timeout(15_000),
         });
-        if (paystackRes.status >= 500) gatewayReachable = false;
+        // 5xx, rate-limited or a firewall page: Paystack isn't really answering.
+        if (paystackRes.status >= 500 || paystackRes.status === 429 || paystackRes.status === 403) gatewayReachable = false;
         paystackData = await paystackRes.json().catch(() => null);
     } catch (e) {
         gatewayReachable = false;

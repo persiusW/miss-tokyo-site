@@ -459,7 +459,8 @@ export default function POSPage() {
                 quantity: i.quantity,
             }));
             const stockRes = await fetch(`/api/inventory/check?items=${encodeURIComponent(JSON.stringify(checkItems))}`);
-            const stockData = await stockRes.json();
+            const { data: stockData } = await readJson<{ results?: unknown[] }>(stockRes);
+            if (!stockData) { toast.error(TILL_SERVER_UNREACHABLE); setSending(false); return; }
             if (Array.isArray(stockData?.results)) {
                 const issues: string[] = [];
                 stockData.results.forEach((result: any, idx: number) => {
