@@ -55,6 +55,7 @@ export function AdminShellClient({ children, businessName, isFullAccess, showCus
             <AdminSidebar
                 businessName={businessName}
                 isFullAccess={isFullAccess}
+                isAdmin={user.role === "admin"}
                 showCustomRequests={showCustomRequests}
                 mobileOpen={navOpen}
                 onClose={() => setNavOpen(false)}

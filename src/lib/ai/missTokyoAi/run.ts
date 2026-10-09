@@ -1,4 +1,4 @@
-// One Store Assistant request: guard, run the tool loop, meter, log.
+// One Miss Tokyo AI request: guard, run the tool loop, meter, log.
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { AI_MODEL, costUsd } from "@/lib/ai/pricing";
@@ -122,8 +122,8 @@ export async function runStoreAssistant(args: {
     let runningUsd = 0;
     const toolCalls: { name: string; ok: boolean }[] = [];
     const effects: Effect[] = [];
-    const tools = toolDefsFor(args.role);
-    const system = buildSystemPrompt(args.role);
+    const tools = toolDefsFor(args.role, settings.mtai);
+    const system = buildSystemPrompt(args.role, settings.mtai);
     let reply = "";
     let failure: RunResult | null = null;
 
@@ -183,7 +183,7 @@ export async function runStoreAssistant(args: {
 
             if (response.stop_reason === "tool_use" && toolUses.length > 0) {
                 const results = await Promise.all(toolUses.map(async (t) => {
-                    const outcome = await runTool(t.name, t.input, { userId: args.userId, role: args.role, effects });
+                    const outcome = await runTool(t.name, t.input, { userId: args.userId, role: args.role, effects, features: settings.mtai });
                     toolCalls.push({ name: t.name, ok: !outcome.isError });
                     return {
                         type: "tool_result" as const,
@@ -234,13 +234,16 @@ export async function runStoreAssistant(args: {
     }
 
     if (failure) return failure;
-    // One button per destination, in the order the tools offered them.
+    // One button per destination, in the order the tools offered them; the
+    // queries a reply ran ride along after the buttons.
     const seen = new Set<string>();
-    const uniqueEffects = effects.filter(e => {
-        const key = `${e.kind}:${e.href}:${"anchor" in e ? e.anchor : ""}`;
+    const buttons = effects.filter(e => {
+        if (e.kind === "query") return false;
+        const key = `${e.kind}:${"href" in e ? e.href : ""}:${"anchor" in e ? e.anchor : ""}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
     }).slice(0, 4);
-    return { ok: true, messages, reply: scrubReply(reply), effects: uniqueEffects };
+    const queries = effects.filter(e => e.kind === "query").slice(-3);
+    return { ok: true, messages, reply: scrubReply(reply), effects: [...buttons, ...queries] };
 }

@@ -183,6 +183,7 @@ function RiderPicker({
                     disabled={!selectedRider || riders.length === 0}
                     className="ac-btn ac-btn-primary"
                     type="button"
+                    data-assist="order.confirm-ship"
                 >
                     Confirm & Ship
                 </button>
@@ -532,32 +533,32 @@ export default function OrderDetailPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     {order.status === "packed" && (
                         pickup ? (
-                            <button onClick={handlePickupReady} disabled={updating} className="ac-btn ac-btn-primary" type="button">
+                            <button onClick={handlePickupReady} disabled={updating} className="ac-btn ac-btn-primary" type="button" data-assist="order.pickup-ready">
                                 {notifStatus === "sending" ? "Sending…" : "Send Pickup Ready Notification"}
                             </button>
                         ) : (
-                            <button onClick={() => setShowRiderPicker(v => !v)} disabled={updating} className="ac-btn ac-btn-primary" type="button">
+                            <button onClick={() => setShowRiderPicker(v => !v)} disabled={updating} className="ac-btn ac-btn-primary" type="button" data-assist="order.assign-rider">
                                 Assign Rider & Ship
                             </button>
                         )
                     )}
                     {order.status === "ready_for_pickup" && (
-                        <button onClick={() => updateStatus("fulfilled")} disabled={updating} className="ac-btn ac-btn-primary" type="button">
+                        <button onClick={() => updateStatus("fulfilled")} disabled={updating} className="ac-btn ac-btn-primary" type="button" data-assist="order.mark-collected">
                             Mark Collected
                         </button>
                     )}
                     {order.status === "shipped" && (
-                        <button onClick={() => updateStatus("fulfilled")} disabled={updating} className="ac-btn ac-btn-primary" type="button">
+                        <button onClick={() => updateStatus("fulfilled")} disabled={updating} className="ac-btn ac-btn-primary" type="button" data-assist="order.mark-fulfilled">
                             Mark Fulfilled
                         </button>
                     )}
                     {order.status !== "refunded" && order.status !== "cancelled" && (
-                        <button onClick={() => updateStatus("refunded")} disabled={updating} className="ac-btn ac-btn-ghost" type="button">
+                        <button onClick={() => updateStatus("refunded")} disabled={updating} className="ac-btn ac-btn-ghost" type="button" data-assist="order.refund">
                             Refund
                         </button>
                     )}
                     {order.status !== "cancelled" && (
-                        <button onClick={() => updateStatus("cancelled")} disabled={updating} className="ac-btn ac-btn-sm" type="button"
+                        <button onClick={() => updateStatus("cancelled")} disabled={updating} className="ac-btn ac-btn-sm" type="button" data-assist="order.cancel"
                             style={{ background: "color-mix(in oklab, var(--ac-danger) 12%, transparent)", color: "var(--ac-danger)", borderColor: "color-mix(in oklab, var(--ac-danger) 25%, transparent)" }}>
                             Cancel
                         </button>
@@ -787,6 +788,7 @@ export default function OrderDetailPage() {
                                     type="button"
                                     onClick={() => verifyPayment(false)}
                                     disabled={verifying}
+                                    data-assist="order.verify"
                                     className="ac-btn ac-btn-ghost ac-btn-sm"
                                     style={{ width: "100%", justifyContent: "center" }}
                                 >
@@ -913,7 +915,7 @@ export default function OrderDetailPage() {
                     </div>
 
                     {/* Fulfillment Status */}
-                    <div className="ac-card" style={{ padding: 20 }}>
+                    <div className="ac-card" style={{ padding: 20 }} data-assist="order.fulfillment-status">
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                             <h2 className="ac-card-title">Fulfillment Status</h2>
                             {order.fulfillment_status && (

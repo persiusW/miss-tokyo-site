@@ -114,6 +114,14 @@
 .mtai-msg.user .mtai-bubble { background: var(--ac-accent); color: var(--ac-acc-ink); border-bottom-right-radius: 4px; }
 .mtai-msg.assistant .mtai-bubble { background: var(--ac-panel); color: var(--ac-ink); border: 1px solid var(--ac-line); border-bottom-left-radius: 4px; }
 .mtai-msg.assistant .mtai-bubble.error { color: var(--ac-danger); }
+.mtai-msg.team { align-self: flex-start; }
+.mtai-msg.team .mtai-bubble { background: var(--ac-panel); color: var(--ac-ink); border: 1px solid var(--ac-accent); border-bottom-left-radius: 4px; }
+.mtai-team-label { font: 600 11px/1.3 var(--f-sans); color: var(--ac-ink-3); margin: 0 0 0 2px; letter-spacing: .02em; }
+.mtai-team-label span { font-weight: 500; }
+.mtai-send-admin { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mtai-send-note { font-size: 12.5px; color: var(--ac-ink-3); }
+.mtai-send-note.error { color: var(--ac-danger); }
+.mtai-action:disabled { opacity: .6; cursor: default; }
 .mtai-bubble a { color: inherit; text-decoration: underline; word-break: break-all; }
 .mtai-steps { margin: 4px 0; padding-left: 22px; display: grid; gap: 4px; white-space: normal; list-style: decimal; }
 .mtai-steps li { padding-left: 2px; }
@@ -124,6 +132,10 @@
 .mtai-action.go { background: var(--ac-accent); color: var(--ac-acc-ink); border: none; }
 .mtai-action.show { background: none; color: var(--ac-ink); border: 1px solid var(--ac-line-2); }
 .mtai-action:focus-visible { outline: 2px solid var(--ac-warn); outline-offset: 2px; }
+.mtai-query { font: 500 12px/1.4 var(--f-sans); color: var(--ac-ink-3); }
+.mtai-query summary { cursor: pointer; min-height: 28px; display: inline-flex; align-items: center; }
+.mtai-query summary:focus-visible { outline: 2px solid var(--ac-warn); outline-offset: 2px; }
+.mtai-query pre { margin: 4px 0 0; padding: 10px 12px; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: var(--ac-panel); border: 1px solid var(--ac-line); border-radius: 10px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ac-ink); }
 
 .mtai-dots { display: inline-flex; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--ac-panel); border: 1px solid var(--ac-line); align-self: flex-start; }
 .mtai-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--ac-ink-3); }
@@ -157,3 +169,28 @@
 .mtai-ring-card button { justify-self: end; background: var(--ac-accent); color: var(--ac-acc-ink); border: none; border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
 
 .mtai-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Topbar bell count (Miss Tokyo AI replies / inbox) */
+.mtai-bell { position: relative; }
+.mtai-bell-count { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--ac-accent); color: var(--ac-acc-ink); font: 700 10px/16px var(--f-sans); text-align: center; pointer-events: none; }
+
+/* Walkthrough card: bottom left on desktop, above the launcher on phones */
+.mtai-walk { position: fixed; z-index: 310; left: 16px; bottom: 16px; width: 320px; max-width: calc(100vw - 32px); background: var(--ac-panel); color: var(--ac-ink); border: 1px solid var(--ac-line-2); border-radius: 14px; box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 14px 16px; display: grid; gap: 8px; }
+.mtai-walk-head { display: flex; align-items: center; justify-content: space-between; }
+.mtai-walk-x { width: 36px; height: 36px; border: none; background: none; color: var(--ac-ink-3); font-size: 20px; cursor: pointer; border-radius: 8px; }
+.mtai-walk-x:focus-visible { outline: 2px solid var(--ac-warn); outline-offset: 2px; }
+.mtai-walk-title { font-weight: 600; font-size: 14px; }
+.mtai-walk p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ac-ink); }
+.mtai-walk-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.mtai-walk p.mtai-walk-hint { font-size: 12.5px; color: var(--ac-ink-3); }
+@media (max-width: 767px) {
+  .mtai-walk { left: 12px; right: 12px; width: auto; bottom: 88px; }
+}
+
+/* Voice input */
+.mtai-mic { width: 40px; height: 40px; border-radius: 50%; border: none; flex: none; display: grid; place-items: center; cursor: pointer; background: none; color: var(--ac-ink-3); }
+.mtai-mic.on { background: var(--ac-accent); color: var(--ac-acc-ink); animation: mtai-pulse 1.4s ease-in-out infinite; }
+.mtai-mic:disabled { opacity: .5; cursor: default; }
+.mtai-mic:focus-visible { outline: 2px solid var(--ac-warn); outline-offset: 2px; }
+@keyframes mtai-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ac-accent) 25%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .mtai-mic.on { animation: none; } }

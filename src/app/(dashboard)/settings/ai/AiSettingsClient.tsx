@@ -9,7 +9,15 @@ type Data = {
     today: { spend_ghs: number; cap_ghs: number };
     recent_turns: Turn[];
 };
-type Form = {
+const EXTRAS = [
+    { key: "mtai_send_to_admin_enabled", label: "Send to admin", description: "When Miss Tokyo AI can't answer, owners and staff can send the question to the admin's AI Inbox and get the reply in the chat." },
+    { key: "mtai_bell_enabled", label: "Bell count", description: "The topbar bell shows unread replies (staff and owners) or open questions (admin)." },
+    { key: "mtai_walkthroughs_enabled", label: "Walkthroughs", description: "Miss Tokyo AI can start a step-by-step tour that highlights each control in turn." },
+    { key: "mtai_voice_enabled", label: "Voice input", description: "A microphone button fills the chat box from speech. It never sends by itself." },
+] as const;
+type ExtraKey = (typeof EXTRAS)[number]["key"];
+
+type Form = Record<ExtraKey, boolean> & {
     whatsapp_enabled: boolean;
     dashboard_agent_enabled: boolean;
     daily_spend_cap_ghs: string;
@@ -25,6 +33,7 @@ function formFrom(data: Data): Form {
         dashboard_agent_enabled: v("dashboard_agent_enabled") === true,
         daily_spend_cap_ghs: String(v("daily_spend_cap_ghs") ?? ""),
         admin_cost_markup_pct: String(v("admin_cost_markup_pct") ?? "0"),
+        ...Object.fromEntries(EXTRAS.map(x => [x.key, v(x.key) === true])) as Record<ExtraKey, boolean>,
     };
 }
 
@@ -93,6 +102,7 @@ export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }
         if (form.dashboard_agent_enabled !== original.dashboard_agent_enabled) changes.push({ key: "dashboard_agent_enabled", value: form.dashboard_agent_enabled });
         if (cap !== Number(original.daily_spend_cap_ghs)) changes.push({ key: "daily_spend_cap_ghs", value: cap });
         if (showMarkup && markup !== Number(original.admin_cost_markup_pct)) changes.push({ key: "admin_cost_markup_pct", value: markup });
+        for (const x of EXTRAS) if (form[x.key] !== original[x.key]) changes.push({ key: x.key, value: form[x.key] });
         if (changes.length === 0) { toast.info("Nothing to save."); return; }
 
         setSaving(true);
@@ -146,7 +156,7 @@ export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }
                     <div style={{ width: `${pct}%`, height: "100%", background: barColour, transition: "width .3s" }} />
                 </div>
                 <div style={{ fontSize: 12, color: "var(--ac-ink-3)", marginTop: 8 }}>
-                    Shared by the WhatsApp agent and the Store Assistant. Resets at midnight (Ghana time).
+                    Shared by the WhatsApp agent and Miss Tokyo AI. Resets at midnight (Ghana time).
                 </div>
             </div>
 
@@ -161,8 +171,8 @@ export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }
                 <Switch
                     checked={form.dashboard_agent_enabled}
                     onChange={v => setForm({ ...form, dashboard_agent_enabled: v })}
-                    label="Dashboard Agent"
-                    description="The Store Assistant for staff in this dashboard."
+                    label="Miss Tokyo AI"
+                    description="The assistant for staff on every dashboard page, and at Miss Tokyo AI in the sidebar."
                 />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginTop: 16 }}>
                     <label>
@@ -185,6 +195,19 @@ export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }
                         </span>
                     </label>}
                 </div>
+                <div style={{ marginTop: 18 }}>
+                    <button type="button" className="ac-btn ac-btn-primary" onClick={save} disabled={saving}>
+                        {saving ? "Saving…" : "Save"}
+                    </button>
+                </div>
+            </div>
+
+            <div className="ac-card">
+                <div className="ac-card-head"><div className="ac-card-title">Miss Tokyo AI extras</div></div>
+                <div style={{ fontSize: 12, color: "var(--ac-ink-3)", marginTop: 4 }}>Each stays off until it has been tried in the shop. Turning one off leaves the rest working.</div>
+                {EXTRAS.map(x => (
+                    <Switch key={x.key} checked={form[x.key]} onChange={v => setForm({ ...form, [x.key]: v })} label={x.label} description={x.description} />
+                ))}
                 <div style={{ marginTop: 18 }}>
                     <button type="button" className="ac-btn ac-btn-primary" onClick={save} disabled={saving}>
                         {saving ? "Saving…" : "Save"}

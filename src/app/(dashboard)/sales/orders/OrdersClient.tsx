@@ -210,7 +210,7 @@ function DispatchModal({
 
                 <div className="ac-modal-foot">
                     <button onClick={onClose} className="ac-btn ac-btn-ghost">Cancel</button>
-                    <button onClick={handleConfirm} disabled={confirming || !selectedRider || riders.length === 0} className="ac-btn ac-btn-primary">
+                    <button onClick={handleConfirm} disabled={confirming || !selectedRider || riders.length === 0} className="ac-btn ac-btn-primary" data-assist="orders.dispatch-confirm">
                         {confirming ? "Dispatching…" : "Confirm Dispatch"}
                     </button>
                 </div>
@@ -625,19 +625,19 @@ export function OrdersClient({
                     {activeTab === "packed" ? (
                         <>
                             {hasPickupSelected && (
-                                <button onClick={bulkMarkPickupReady} disabled={bulkLoading} className="ac-btn ac-btn-ghost ac-btn-sm">
+                                <button onClick={bulkMarkPickupReady} disabled={bulkLoading} className="ac-btn ac-btn-ghost ac-btn-sm" data-assist="orders.bulk-pickup">
                                     <Store size={14} /> Mark Ready for Pickup
                                 </button>
                             )}
                             {hasDeliverySelected && (
-                                <button onClick={openDispatchForSelected} disabled={bulkLoading} className="ac-btn ac-btn-accent ac-btn-sm">
+                                <button onClick={openDispatchForSelected} disabled={bulkLoading} className="ac-btn ac-btn-accent ac-btn-sm" data-assist="orders.bulk-ship">
                                     <Truck size={14} /> Assign Rider & Ship
                                 </button>
                             )}
                         </>
                     ) : (
                         <>
-                            <button onClick={() => bulkUpdate("packed")} disabled={bulkLoading} className="ac-btn ac-btn-ghost ac-btn-sm">
+                            <button onClick={() => bulkUpdate("packed")} disabled={bulkLoading} className="ac-btn ac-btn-ghost ac-btn-sm" data-assist="orders.bulk-pack">
                                 Mark Packed
                             </button>
                             <button onClick={openDispatchForSelected} disabled={bulkLoading} className="ac-btn ac-btn-accent ac-btn-sm">
@@ -689,7 +689,7 @@ export function OrdersClient({
                                 style={{ cursor: "pointer" }}
                             >
                                 <td onClick={e => e.stopPropagation()}>
-                                    <input type="checkbox" checked={selected.has(order.id)}
+                                    <input type="checkbox" checked={selected.has(order.id)} data-assist="orders.row-select"
                                         onChange={() => toggleOne(order.id)}
                                         className="ac-checkbox" style={{ cursor: "pointer" }} />
                                 </td>
@@ -770,6 +770,8 @@ export function OrdersClient({
                                             }
                                         }}
                                         style={{ padding: 6, background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", display: "inline-flex" }}
+                                        data-assist="orders.row-menu"
+                                        aria-label="Order actions"
                                     >
                                         <MoreHorizontal size={16} />
                                     </button>

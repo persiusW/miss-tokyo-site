@@ -3,7 +3,9 @@
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { TRANSCRIPT_SOFT_LIMIT, useMissTokyoAi, type Bubble } from "@/lib/ai/missTokyoAi/client/store";
-import type { Effect } from "@/lib/ai/missTokyoAi/effects";
+import type { ButtonEffect, Effect } from "@/lib/ai/missTokyoAi/effects";
+import { appendHeard, voiceMessage } from "@/lib/ai/missTokyoAi/voice";
+import { useVoice } from "./useVoice";
 import { Spark } from "./icons";
 
 export type ChatUser = { firstName: string | null; role: string };
@@ -61,6 +63,12 @@ function ReplyText({ text }: { text: string }) {
     return <>{out}</>;
 }
 
+const isButton = (e: Effect): e is ButtonEffect => e.kind === "navigate" || e.kind === "show_me" || e.kind === "walkthrough";
+const isSendToAdmin = (e: Effect): e is Extract<Effect, { kind: "send_to_admin" }> =>
+    e.kind === "send_to_admin" && typeof e.summary === "string";
+const isQuery = (e: Effect): e is Extract<Effect, { kind: "query" }> =>
+    e.kind === "query" && typeof e.sql === "string";
+
 function greeting(): string {
     const h = new Date().getHours();
     return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
@@ -83,12 +91,14 @@ export function ChatSurface({
     focusKey?: unknown;
     headProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
-    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight } = useMissTokyoAi();
+    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight, showMe, setWalk, open, sendToAdmin, pollReplies, features } = useMissTokyoAi();
     const router = useRouter();
     const [input, setInput] = useState("");
     const [online, setOnline] = useState(true);
     const bodyRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const voice = useVoice(heard => { setInput(prev => appendHeard(prev, heard)); inputRef.current?.focus(); });
+    const voiceNote = voiceMessage(voice.state);
 
     useEffect(() => {
         const update = () => setOnline(navigator.onLine);
@@ -105,6 +115,16 @@ export function ChatSurface({
     useEffect(() => {
         if (focusKey) setTimeout(() => inputRef.current?.focus(), 60);
     }, [focusKey]);
+
+    // Admin replies to Send to admin questions: checked when the chat is on
+    // screen and every 60 seconds while it stays there. The admin never asks.
+    const visible = variant === "page" || open;
+    useEffect(() => {
+        if (!visible || user.role === "admin") return;
+        void pollReplies(true);
+        const t = setInterval(() => { if (document.visibilityState === "visible") void pollReplies(true); }, 60_000);
+        return () => clearInterval(t);
+    }, [visible, user.role, pollReplies]);
 
     // Grow the box with its text, up to the CSS max-height.
     useEffect(() => {
@@ -132,9 +152,13 @@ export function ChatSurface({
         }
     };
 
-    const runEffect = (effect: Effect) => {
+    const runEffect = (effect: ButtonEffect) => {
         if (effect.kind === "show_me") {
-            setSpotlight({ anchor: effect.anchor, label: effect.label, startedAt: Date.now() });
+            showMe(effect.anchor, effect.label);
+        }
+        if (effect.kind === "walkthrough") {
+            setSpotlight(null);
+            setWalk({ id: effect.id, step: 0 });
         }
         onEffect?.();
         router.push(effect.href);
@@ -181,7 +205,15 @@ export function ChatSurface({
                             <button type="button" className="mtai-action go" onClick={() => { onEffect?.(); router.push("/settings/ai"); }}>Open AI Settings</button>
                         )}
                     </div>
-                ) : bubbles.length === 0 ? (
+                ) : null}
+                {/* Admin replies still reach the asker while the assistant is off. */}
+                {unavailable && bubbles.filter(b => b.role === "team").map(b => (
+                    <div key={b.id} className="mtai-msg team">
+                        <div className="mtai-team-label">Miss Tokyo team{b.question ? <> · re: <span>{b.question}</span></> : null}</div>
+                        <div className="mtai-bubble"><ReplyText text={b.text} /></div>
+                    </div>
+                ))}
+                {unavailable ? null : bubbles.length === 0 ? (
                     <>
                         <div className="mtai-greet">
                             {greeting()}{user.firstName ? <>, <em>{user.firstName}</em></> : null}
@@ -197,18 +229,42 @@ export function ChatSurface({
                 ) : (
                     bubbles.map((b: Bubble) => (
                         <div key={b.id} className={`mtai-msg ${b.role}`}>
+                            {b.role === "team" && (
+                                <div className="mtai-team-label">Miss Tokyo team{b.question ? <> · re: <span>{b.question}</span></> : null}</div>
+                            )}
                             <div className={`mtai-bubble${b.error ? " error" : ""}`}>
-                                {b.role === "assistant" ? <ReplyText text={b.text} /> : b.text}
+                                {b.role === "user" ? b.text : <ReplyText text={b.text} />}
                             </div>
-                            {b.role === "assistant" && b.effects && b.effects.length > 0 && (
+                            {b.role === "assistant" && b.effects && b.effects.some(isButton) && (
                                 <div className="mtai-actions">
-                                    {b.effects.map((e, k) => (
-                                        <button key={k} type="button" className={`mtai-action ${e.kind === "navigate" ? "go" : "show"}`} onClick={() => runEffect(e)}>
-                                            {e.kind === "navigate" ? `${e.label} →` : "Show me"}
+                                    {b.effects.filter(isButton).map((e, k) => (
+                                        <button key={k} type="button" className={`mtai-action ${e.kind === "show_me" ? "show" : "go"}`} onClick={() => runEffect(e)}>
+                                            {e.kind === "navigate" ? `${e.label} →` : e.kind === "walkthrough" ? "Start walkthrough" : "Show me"}
                                         </button>
                                     ))}
                                 </div>
                             )}
+                            {b.role === "assistant" && b.effects?.filter(isSendToAdmin).slice(0, 1).map(e => (
+                                <div key="send" className="mtai-send-admin">
+                                    {b.sent === "sent" ? (
+                                        <span className="mtai-send-note" role="status">{b.sentNote}</span>
+                                    ) : (
+                                        <>
+                                            <button type="button" className="mtai-action show" disabled={b.sent === "sending" || !online}
+                                                onClick={() => void sendToAdmin(b.id, e.summary)}>
+                                                {b.sent === "sending" ? "Sending…" : "Send to admin"}
+                                            </button>
+                                            {b.sent === "failed" && <span className="mtai-send-note error" role="alert">{b.sentNote}</span>}
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                            {b.role === "assistant" && b.effects?.filter(isQuery).map((q, k) => (
+                                <details key={`q${k}`} className="mtai-query">
+                                    <summary>View query · {q.rows} {q.rows === 1 ? "row" : "rows"}</summary>
+                                    <pre>{q.sql}</pre>
+                                </details>
+                            ))}
                         </div>
                     ))
                 )}
@@ -233,6 +289,19 @@ export function ChatSurface({
                         maxLength={1000}
                         aria-label="Message Miss Tokyo AI"
                     />
+                    {features.voice && voice.supported && (
+                        <button
+                            type="button"
+                            className={`mtai-mic${voice.state === "listening" ? " on" : ""}`}
+                            onClick={() => (voice.state === "listening" ? voice.stop() : voice.start())}
+                            disabled={!online || unavailable || tooLong}
+                            aria-label={voice.state === "listening" ? "Stop listening" : "Speak your question"}
+                            aria-pressed={voice.state === "listening"}
+                            title={voice.state === "listening" ? "Stop listening" : "Speak your question"}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+                        </button>
+                    )}
                     <button
                         type="button"
                         className={`mtai-send${input.trim() && canSend ? " ready" : ""}`}
@@ -243,6 +312,8 @@ export function ChatSurface({
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
                     </button>
                 </div>
+                {features.voice && voiceNote && <div className="mtai-hint" role="status">{voiceNote}</div>}
+                {features.voice && voice.state === "listening" && <div className="mtai-hint" role="status">Listening… Don't say card numbers, PINs or codes.</div>}
                 {variant === "page" && <div className="mtai-hint">Enter to send · Shift+Enter for a new line</div>}
             </div>
         </>

@@ -409,7 +409,7 @@ export default function POSHistoryPage() {
                         )}
 
                         {['draft', 'pending_payment'].includes(selected.status) && (
-                            <button onClick={() => handleCancel(selected.id)} disabled={cancelling}
+                            <button onClick={() => handleCancel(selected.id)} disabled={cancelling} data-assist="poshistory.cancel"
                                 style={{ width: "100%", padding: "12px 0", border: "1px solid var(--ac-danger)", background: "transparent", color: "var(--ac-danger)", fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 700, cursor: cancelling ? "not-allowed" : "pointer", opacity: cancelling ? 0.5 : 1, borderRadius: "var(--r-sm)" }}>
                                 {cancelling ? 'Cancelling...' : 'Cancel Session'}
                             </button>

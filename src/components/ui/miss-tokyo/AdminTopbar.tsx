@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { Theme } from "./AdminShellClient";
 import CommandPalette from "./CommandPalette";
+import { AiBell } from "@/components/admin/missTokyoAi/AiBell";
 
 type Props = {
     user: { name: string; initials: string; role: string };
@@ -44,6 +45,7 @@ function getCrumbs(pathname: string): string[] {
     if (pathname.startsWith("/finance/links")) return ["Finance", "Pay Links"];
     if (pathname.startsWith("/finance")) return ["Finance"];
     if (pathname.startsWith("/settings/ai")) return ["Settings", "AI"];
+    if (pathname.startsWith("/ai/inbox")) return ["Settings", "AI Inbox"];
     if (pathname.startsWith("/settings")) return ["Settings"];
     if (pathname.startsWith("/team")) return ["Settings", "Team"];
     if (pathname.startsWith("/communications")) return ["Communications", "Emails"];
@@ -151,13 +153,8 @@ export function AdminTopbar({ user, onMenu, theme, onTheme }: Props) {
                 </button>
             </div>
 
-            {/* Bell */}
-            <button className="admin-icon-btn" title="Notifications" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M6 8a6 6 0 1 1 12 0c0 6 2 7 2 7H4s2-1 2-7Z" />
-                    <path d="M10 19a2 2 0 0 0 4 0" />
-                </svg>
-            </button>
+            {/* Bell — Miss Tokyo AI replies / inbox when switched on */}
+            <AiBell />
 
             {/* User chip */}
             <div className="admin-user-chip">

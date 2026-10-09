@@ -6,18 +6,30 @@
 // the bubbles are for display.
 import { create } from "zustand";
 import type { Effect } from "@/lib/ai/missTokyoAi/effects";
+import type { MtaiFeatures } from "@/lib/ai/settings";
 
 export type Bubble = {
     id: string;
-    role: "user" | "assistant";
+    /** "team" is an admin's reply to a Send to admin question: display only, never sent to the model. */
+    role: "user" | "assistant" | "team";
     text: string;
     effects?: Effect[];
     error?: boolean;
+    /** For team bubbles: the question it answers. */
+    question?: string;
+    /** For assistant bubbles: Send to admin state for the button it carries. */
+    sent?: "sending" | "sent" | "failed";
+    sentNote?: string;
 };
+
+export const FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false };
 
 export type Availability = "unknown" | "ready" | "off" | "not_set_up";
 
 export type Spotlight = { anchor: string; label: string; startedAt: number } | null;
+
+/** The walkthrough in progress: which tour and which step (0-based). */
+export type WalkState = { id: string; step: number } | null;
 
 type State = {
     hydrated: boolean;
@@ -27,16 +39,31 @@ type State = {
     transcript: unknown[];
     bubbles: Bubble[];
     spotlight: Spotlight;
+    features: MtaiFeatures;
+    /** False until the server has said which extras are on; nothing is cancelled before then. */
+    featuresKnown: boolean;
+    walk: WalkState;
+    /** Question ids whose replies are already in the chat (survives New chat). */
+    shownReplies: string[];
     hydrate: () => void;
+    setFeatures: (f: MtaiFeatures) => void;
+    setWalk: (w: WalkState) => void;
+    sendToAdmin: (bubbleId: string, question: string) => Promise<void>;
+    /** Fetch admin replies; append new ones; mark them read when the person can see them. */
+    pollReplies: (visible: boolean) => Promise<void>;
     setOpen: (open: boolean) => void;
     setAvailability: (a: Availability) => void;
     send: (text: string) => Promise<void>;
     newChat: () => void;
     setSpotlight: (s: Spotlight) => void;
+    /** Rings a control now. The timestamp is taken here, not in a component render. */
+    showMe: (anchor: string, label: string) => void;
 };
 
 const STORAGE_KEY = "mt-ai-chat";
 const SPOTLIGHT_KEY = "mt-ai-spotlight";
+const REPLIES_KEY = "mt-ai-replies";
+const WALK_KEY = "mt-ai-walk";
 const KEEP_BUBBLES = 40;
 /** The server accepts 80 messages; stop a little before so the last turn fits. */
 export const TRANSCRIPT_SOFT_LIMIT = 70;
@@ -60,6 +87,10 @@ export const useMissTokyoAi = create<State>((set, get) => ({
     transcript: [],
     bubbles: [],
     spotlight: null,
+    features: FEATURES_OFF,
+    featuresKnown: false,
+    walk: null,
+    shownReplies: [],
 
     hydrate: () => {
         if (get().hydrated) return;
@@ -77,8 +108,75 @@ export const useMissTokyoAi = create<State>((set, get) => ({
             }
             const sp = sessionStorage.getItem(SPOTLIGHT_KEY);
             if (sp) spotlight = JSON.parse(sp);
+            const walk = JSON.parse(sessionStorage.getItem(WALK_KEY) ?? "null");
+            if (walk && typeof walk.id === "string" && Number.isInteger(walk.step)) set({ walk: { id: walk.id, step: walk.step } });
+            const shown = JSON.parse(sessionStorage.getItem(REPLIES_KEY) ?? "[]");
+            if (Array.isArray(shown)) set({ shownReplies: shown.filter((v: unknown) => typeof v === "string").slice(-100) });
         } catch { /* start fresh */ }
         set({ hydrated: true, transcript, bubbles, spotlight });
+    },
+
+    setFeatures: (features) => set({ features, featuresKnown: true }),
+
+    setWalk: (walk) => {
+        set({ walk });
+        try {
+            if (walk) sessionStorage.setItem(WALK_KEY, JSON.stringify(walk));
+            else sessionStorage.removeItem(WALK_KEY);
+        } catch { /* the tour still runs on this page */ }
+    },
+
+    sendToAdmin: async (bubbleId, question) => {
+        const mark = (sent: Bubble["sent"], sentNote?: string) => {
+            const next = get().bubbles.map(b => (b.id === bubbleId ? { ...b, sent, sentNote } : b));
+            set({ bubbles: next });
+            persist(get().transcript, next);
+        };
+        const current = get().bubbles.find(b => b.id === bubbleId);
+        if (!current || current.sent === "sending" || current.sent === "sent") return;
+        mark("sending");
+        try {
+            const res = await fetch("/api/ai/questions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ question, transcript: get().transcript, page_path: window.location.pathname }),
+            });
+            const data = await res.json().catch(() => null);
+            if (res.ok) mark("sent", "Sent. You'll get the reply here.");
+            else mark("failed", data?.error ?? "We couldn't send your question. Please try again.");
+        } catch {
+            mark("failed", "We couldn't send your question. Please try again.");
+        }
+    },
+
+    pollReplies: async (visible) => {
+        try {
+            const res = await fetch("/api/ai/questions/mine");
+            if (!res.ok) return;
+            const data = await res.json().catch(() => null);
+            const replies: { id: string; question: string; answer: string; reply_seen_at: string | null }[] =
+                Array.isArray(data?.replies) ? data.replies : [];
+            const { shownReplies, bubbles, transcript } = get();
+            // Unread replies only: once read, a reply does not reappear in other tabs.
+            const fresh = replies.filter(r => r && typeof r.id === "string" && typeof r.answer === "string"
+                && !r.reply_seen_at && !shownReplies.includes(r.id));
+            if (fresh.length > 0) {
+                const next: Bubble[] = [...bubbles, ...fresh.map(r => ({ id: id(), role: "team" as const, text: r.answer, question: String(r.question ?? "") }))];
+                const shown = [...shownReplies, ...fresh.map(r => r.id)].slice(-100);
+                set({ bubbles: next, shownReplies: shown });
+                persist(transcript, next);
+                try { sessionStorage.setItem(REPLIES_KEY, JSON.stringify(shown)); } catch { /* non-essential */ }
+            }
+            const unseen = replies.filter(r => !r.reply_seen_at).map(r => r.id);
+            if (visible && unseen.length > 0) {
+                await fetch("/api/ai/questions/mine", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ids: unseen }),
+                });
+                window.dispatchEvent(new Event("mtai:badge-refresh"));
+            }
+        } catch { /* replies arrive on the next poll */ }
     },
 
     setOpen: (open) => set({ open }),
@@ -128,6 +226,8 @@ export const useMissTokyoAi = create<State>((set, get) => ({
         set({ transcript: [], bubbles: [], loading: false });
         persist([], []);
     },
+
+    showMe: (anchor, label) => get().setSpotlight({ anchor, label, startedAt: Date.now() }),
 
     setSpotlight: (spotlight) => {
         set({ spotlight });

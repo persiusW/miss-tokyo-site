@@ -75,6 +75,8 @@ function NavGroup({ title, items, onClose, collapsed }: { title: string; items: 
 type Props = {
     businessName: string;
     isFullAccess: boolean;
+    /** The AI inbox is the admin's alone. */
+    isAdmin?: boolean;
     showCustomRequests: boolean;
     mobileOpen: boolean;
     onClose: () => void;
@@ -82,7 +84,7 @@ type Props = {
     onToggleCollapse: () => void;
 };
 
-export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, mobileOpen, onClose, collapsed, onToggleCollapse }: Props) {
+export function AdminSidebar({ businessName, isFullAccess, isAdmin = false, showCustomRequests, mobileOpen, onClose, collapsed, onToggleCollapse }: Props) {
     const displayName = businessName || "Miss Tokyo";
 
     const overviewItems: NavItemDef[] = [
@@ -124,6 +126,7 @@ export function AdminSidebar({ businessName, isFullAccess, showCustomRequests, m
               { label: "Site Settings", href: "/settings", Icon: Ico.Cog, exact: true },
               { label: "Team",          href: "/team",     Icon: Ico.Team },
               { label: "AI Settings",   href: "/settings/ai", Icon: Ico.Sparkles },
+              ...(isAdmin ? [{ label: "AI Inbox", href: "/ai/inbox", Icon: Ico.Chat }] : []),
           ]
         : [];
 
