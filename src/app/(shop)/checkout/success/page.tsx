@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/store/useCart";
+import { outcomeFrom, type PaymentOutcome as Outcome } from "@/lib/checkout/paymentOutcome";
 import { supabase } from "@/lib/supabase";
 
 interface OrderItem {
@@ -409,6 +410,9 @@ function FallbackConfirm({ orderRef }: { orderRef: string }) {
     );
 }
 
+const MAX_CHECKS = 8;
+const CHECK_EVERY_MS = 2500;
+
 function CheckoutSuccessContent() {
     const searchParams = useSearchParams();
     const trxref = searchParams.get("trxref");
@@ -418,50 +422,99 @@ function CheckoutSuccessContent() {
 
     const [order, setOrder] = useState<Order | null>(null);
     const [orderRef, setOrderRef] = useState("");
-    const [loading, setLoading] = useState(true);
-    const [attempts, setAttempts] = useState(0);
+    const [outcome, setOutcome] = useState<Outcome>("checking");
+    const [checks, setChecks] = useState(0);
+    const [polling, setPolling] = useState(true);
 
     const verify = useCallback(async () => {
-        if (!reference) { setLoading(false); return; }
+        if (!reference) { setOutcome("unknown"); setPolling(false); return; }
         try {
-            const res = await fetch(`/api/paystack/verify?reference=${reference}`);
-            const data = await res.json();
-            if (data?.order) {
-                setOrder(data.order);
-                setOrderRef((data.order.id as string).substring(0, 8).toUpperCase());
-                setLoading(false);
-            } else if (data?.orderId) {
-                // Order exists but full data not returned — use reference as fallback ref
-                setOrderRef((data.orderId as string).substring(0, 8).toUpperCase());
-                setLoading(false);
-            }
+            const res = await fetch(`/api/paystack/verify?reference=${encodeURIComponent(reference)}`);
+            const data = res.ok ? await res.json().catch(() => null) : null;
+            const next = outcomeFrom(data);
+            if (data?.order) setOrder(data.order);
+            if (data?.orderId) setOrderRef((data.orderId as string).substring(0, 8).toUpperCase());
+            setOutcome(prev => (next === "unknown" && prev !== "checking" ? prev : next));
+            if (next === "paid" || next === "declined") setPolling(false);
         } catch {
-            // handled by fallback UI
+            // Network trouble: keep checking; the page settles on "unknown" if it never answers.
         }
     }, [reference]);
 
-    useEffect(() => {
-        clearCart();
-        verify();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    useEffect(() => { void verify(); }, [verify]);
 
-    // Poll up to 5 times (every 2s) if order not yet confirmed
+    // Keep checking while the payment is unfinished or unconfirmed (MoMo approvals take a moment).
     useEffect(() => {
-        if (!loading || !reference || attempts >= 5) {
-            if (attempts >= 5) setLoading(false);
+        if (!polling) return;
+        if (checks >= MAX_CHECKS) {
+            setPolling(false);
+            setOutcome(o => (o === "checking" ? "unknown" : o));
             return;
         }
-        const id = setTimeout(() => {
-            setAttempts(a => a + 1);
-            verify();
-        }, 2000);
+        const id = setTimeout(() => { setChecks(c => c + 1); void verify(); }, CHECK_EVERY_MS);
         return () => clearTimeout(id);
-    }, [loading, reference, attempts, verify]);
+    }, [polling, checks, verify]);
 
-    if (loading) return <Skeleton />;
-    if (order) return <Receipt order={order} orderRef={orderRef || reference.substring(0, 8).toUpperCase()} />;
-    return <FallbackConfirm orderRef={orderRef || reference.substring(0, 8).toUpperCase()} />;
+    // Only a confirmed payment empties the bag.
+    useEffect(() => { if (outcome === "paid") clearCart(); }, [outcome, clearCart]);
+
+    const checkAgain = () => { setOutcome("checking"); setChecks(0); setPolling(true); void verify(); };
+    const shownRef = orderRef || reference.substring(0, 8).toUpperCase();
+
+    if (outcome === "paid") {
+        return order ? <Receipt order={order} orderRef={shownRef} /> : <FallbackConfirm orderRef={shownRef} />;
+    }
+    if (outcome === "checking" || (polling && outcome !== "declined")) return <Skeleton />;
+    return <NotPaid kind={outcome} orderRef={reference ? shownRef : ""} onCheckAgain={checkAgain} />;
+}
+
+const NOT_PAID_COPY: Record<"declined" | "unfinished" | "unknown", { title: string; body: string; note?: string }> = {
+    declined: {
+        title: "Payment didn't go through",
+        body: "Your bank or mobile money provider didn't approve the payment, so you haven't been charged.",
+        note: "Your bag is saved. You can try again, or pay with card or another mobile money network.",
+    },
+    unfinished: {
+        title: "Waiting for your payment",
+        body: "We haven't received confirmation yet. If you're approving it on your phone, finish there, then tap Check again.",
+        note: "If you've already approved it, please don't pay again — we'll email your confirmation. Your bag is saved.",
+    },
+    unknown: {
+        title: "We couldn't confirm your payment yet",
+        body: "If you were charged, you'll get a confirmation email shortly.",
+        note: "Your bag is saved. Check again in a moment, or contact us if anything looks wrong.",
+    },
+};
+
+function NotPaid({ kind, orderRef, onCheckAgain }: { kind: "declined" | "unfinished" | "unknown"; orderRef: string; onCheckAgain: () => void }) {
+    const copy = NOT_PAID_COPY[kind];
+    const linkStyle = { fontSize: 11, color: "#141210", letterSpacing: "0.15em", textTransform: "uppercase" as const, borderBottom: "1px solid #141210", paddingBottom: 2, textDecoration: "none" };
+    const primary = { display: "inline-block", padding: "14px 28px", background: "#141210", color: "#fafaf9", border: "none", fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase" as const, cursor: "pointer", textDecoration: "none" };
+    return (
+        <div style={{ minHeight: "100vh", background: "#fafaf9", display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
+            <div role="status" style={{ textAlign: "center", maxWidth: 480 }}>
+                <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, letterSpacing: "0.08em", textTransform: "uppercase", color: "#141210", marginBottom: 14 }}>
+                    {copy.title}
+                </h1>
+                <p style={{ fontSize: 14, lineHeight: 1.6, color: "#525252", marginBottom: 10 }}>{copy.body}</p>
+                {copy.note && <p style={{ fontSize: 13, lineHeight: 1.6, color: "#737373", marginBottom: 20 }}>{copy.note}</p>}
+                {orderRef && (
+                    <p style={{ fontSize: 12, color: "#a3a3a3", marginBottom: 28 }}>
+                        Reference: <span style={{ fontFamily: "monospace", color: "#141210", fontWeight: 600 }}>#{orderRef}</span>
+                    </p>
+                )}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
+                    {kind === "declined" ? (
+                        <Link href="/checkout" style={primary}>Try again</Link>
+                    ) : (
+                        <button type="button" onClick={onCheckAgain} style={primary}>Check again</button>
+                    )}
+                    {kind === "unfinished" && <Link href="/checkout" style={linkStyle}>Pay a different way</Link>}
+                    <Link href="/shop" style={linkStyle}>Return to Collection</Link>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 export default function CheckoutSuccessPage() {
