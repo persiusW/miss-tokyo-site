@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { confirmSale, releaseReservation } from "@/lib/inventory";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { zoneLabel } from "@/lib/delivery";
+import { apiError } from "@/lib/errors/apiError";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 const PAYSTACK_VERIFY = "https://api.paystack.co/transaction/verify";
@@ -88,7 +89,7 @@ export async function GET(req: Request) {
 
     if (error) {
         console.error("[sync-payment-status] DB fetch failed:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
     const orders = pendingOrders ?? [];

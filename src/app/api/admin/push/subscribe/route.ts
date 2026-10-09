@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { apiError } from "@/lib/errors/apiError";
 
 export async function POST(req: Request) {
     try {
@@ -28,13 +29,13 @@ export async function POST(req: Request) {
 
         if (error) {
             console.error("[push/subscribe] DB error:", error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
         }
 
         return NextResponse.json({ status: "subscribed" });
     } catch (err: any) {
         console.error("[push/subscribe] Error:", err);
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: err });
     }
 }
 
@@ -56,6 +57,6 @@ export async function DELETE(req: Request) {
 
         return NextResponse.json({ status: "unsubscribed" });
     } catch (err: any) {
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: err });
     }
 }

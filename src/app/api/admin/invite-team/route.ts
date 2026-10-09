@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { sendEmail } from "@/lib/email";
 import { sendSMSLogged } from "@/lib/sms";
 import { findAccountByEmail, isEmailTakenError, isProtectedAccount } from "@/lib/teamInvites";
+import { apiError } from "@/lib/errors/apiError";
 
 // GET /api/admin/invite-team?ids=id1,id2,...
 // Returns which of the given user IDs have never signed in (pending setup)
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
         userId = linkData.user.id;
         actionLink = (linkData.properties as any)?.action_link;
     } else if (!isEmailTakenError(linkError)) {
-        return NextResponse.json({ error: linkError?.message || "Invite failed" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: linkError });
     } else {
         // An invite type link only works for an address with no account behind
         // it, and most invitees have one: a removed member keeps their auth user
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (recoveryError) {
-            return NextResponse.json({ error: recoveryError.message }, { status: 500 });
+            return apiError("GEN-00", { status: 500, audience: "staff", cause: recoveryError });
         }
 
         userId    = existing.id;
@@ -119,7 +120,7 @@ export async function POST(req: NextRequest) {
         );
 
     if (profileError) {
-        return NextResponse.json({ error: profileError.message }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: profileError });
     }
 
     const inviteLink = actionLink || `${baseUrl}/admin/login`;

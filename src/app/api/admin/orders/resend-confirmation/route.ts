@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
         });
     } catch (err: any) {
         console.error("[resend-confirmation] email failed:", err);
-        emailErrors.push(`Email: ${err?.message || "failed"}`);
+        emailErrors.push("The confirmation email didn't go out.");
     }
 
     // Optionally resend SMS if phone is present
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
             await sendSMSOrThrow({ to: order.customer_phone, message });
         } catch (err: any) {
             console.error("[resend-confirmation] SMS failed:", err);
-            emailErrors.push(`SMS: ${err?.message || "failed"}`);
+            emailErrors.push("The confirmation SMS didn't go out.");
         }
     }
 

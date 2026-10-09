@@ -12,6 +12,7 @@ import { parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/deli
 import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
 import { logActivity } from '@/lib/utils/logActivity';
 import { sendEmail } from "@/lib/email";
+import { apiError } from "@/lib/errors/apiError";
 
 
 export async function POST(req: NextRequest) {
@@ -256,10 +257,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (reserveError) {
-        const msg = reserveError.message.includes('Insufficient stock')
-            ? 'One or more items are out of stock'
-            : reserveError.message;
-        return NextResponse.json({ error: msg }, { status: 409 });
+        if (!reserveError.message.includes('Insufficient stock')) {
+            return apiError("GEN-00", { status: 409, audience: "staff", cause: reserveError, context: { route: "pos/send-link" } });
+        }
+        return NextResponse.json({ code: "POS-01", error: 'One or more items are out of stock' }, { status: 409 });
     }
 
     // Hold the discount for the same window as the stock, so a second till
@@ -487,6 +488,6 @@ export async function POST(req: NextRequest) {
         discount: validatedDiscount ? { code: validatedDiscount.code, amount: discountAmount, label: validatedDiscount.label } : null,
         // Per-channel outcome so the till can tell staff what actually reached
         // the customer instead of always claiming both were delivered
-        delivery: { email: emailStatus, emailError, sms: smsStatus, smsError },
+        delivery: { email: emailStatus, sms: smsStatus },
     });
 }

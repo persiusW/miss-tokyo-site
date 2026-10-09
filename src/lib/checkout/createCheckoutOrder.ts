@@ -8,6 +8,7 @@ import { reserveStock, releaseReservation, releaseSupersededAttempts, getStockSt
 import { variantKey } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
+import { errorBody } from "@/lib/errors/catalogue";
 
 /** The JSON body /api/paystack/initialize has always accepted. */
 export type CheckoutPayload = {
@@ -690,7 +691,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             if (orderId) {
                 await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
             }
-            return { status: 502, body: { error: "Payment gateway error. Please try again." } };
+            return { status: 502, body: { ...errorBody("PAY-01", "customer"), code: "gateway" } };
         }
 
         const data = await response.json();
@@ -715,7 +716,8 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             if (orderId) {
                 await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
             }
-            return { status: 400, body: { error: data.message } };
+            console.error("[Paystack init] refused:", data?.message);
+            return { status: 400, body: { ...errorBody("PAY-02", "customer"), code: "refused" } };
         }
 }
 
@@ -801,7 +803,8 @@ export function normaliseGhanaPhone(phone: string): string | null {
     return `233${digits.slice(-9)}`;
 }
 
-function codeForStatus(status: number): string {
+function codeForStatus(status: number, body?: any): string {
+    if (status === 400 && body?.code === "refused") return "refused";
     if (status === 400) return "invalid";
     if (status === 409) return "unavailable";
     if (status === 502) return "gateway";
@@ -936,7 +939,7 @@ export async function quoteCheckoutOrder(input: CreateCheckoutOrderInput): Promi
         if (!built.ok) return built.error;
         const { status, body, totals } = built.run;
         if (status === 200 && totals) return { success: true, totals, outOfStock: body?.oosItems ?? [] };
-        return fail(codeForStatus(status), body?.error ?? "This order could not be priced.");
+        return fail(codeForStatus(status, body), body?.error ?? "This order could not be priced.");
     } catch (e) {
         console.error("[quoteCheckoutOrder]", e);
         return fail("internal", "This order could not be priced. Please try again.");
@@ -965,7 +968,7 @@ export async function createCheckoutOrder(input: CreateCheckoutOrderInput): Prom
                 totals,
             };
         }
-        return fail(codeForStatus(status), body?.error ?? "The order could not be created.");
+        return fail(codeForStatus(status, body), body?.error ?? "The order could not be created.");
     } catch (e) {
         console.error("[createCheckoutOrder]", e);
         return fail("internal", "The order could not be created. Please try again.");

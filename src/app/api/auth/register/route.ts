@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendEmail } from "@/lib/email";
+import { logCause } from "@/lib/errors/apiError";
 
 export async function POST(req: Request) {
     try {
@@ -26,7 +27,10 @@ export async function POST(req: Request) {
         });
 
         if (error) {
-            return NextResponse.json({ error: error.message }, { status: 400 });
+            logCause("AUTH-01", error);
+            return NextResponse.json({ error: /already|registered|exists/i.test(error.message)
+                ? "An account with this email already exists. Try signing in."
+                : "We couldn't create your account. Please check your details and try again." }, { status: 400 });
         }
 
         const confirmLink = (data as any)?.properties?.action_link;

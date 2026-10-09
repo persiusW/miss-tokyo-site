@@ -6,6 +6,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { logActivity } from "@/lib/utils/logActivity";
 import { adjustStock, syncProductStockFromVariants } from "@/lib/inventory";
 import { normAttr } from "@/lib/utils/normAttr";
+import { apiError } from "@/lib/errors/apiError";
 
 /**
  * Removes variant rows the staff member dropped from the product, skipping any
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
 
     if (error) {
         console.error("[admin/products POST]", error);
-        return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
     // Insert per-variant inventory rows when tracking by variant
@@ -132,7 +133,7 @@ export async function POST(req: NextRequest) {
 
         if (insertErr) {
             console.error("[admin/products POST] variant insert failed:", insertErr.message);
-            return NextResponse.json({ error: `Variant insert failed: ${insertErr.message}` }, { status: 500 });
+            return apiError("GEN-00", { status: 500, audience: "staff", cause: insertErr });
         }
 
         // Sync product-level inventory_count to variant sum. The product was
@@ -191,7 +192,7 @@ export async function PATCH(req: NextRequest) {
         const { error } = await supabaseAdmin.from("products").update(fields).eq("id", id);
         if (error) {
             console.error("[admin/products PATCH toggle]", error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
         }
         revalidatePath("/shop", "page");
         revalidatePath("/catalog/products", "page");
@@ -283,7 +284,7 @@ export async function PATCH(req: NextRequest) {
 
     if (error) {
         console.error("[admin/products PATCH]", error);
-        return NextResponse.json({ error: error.message, code: error.code }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
     // Product-level stock for a product that does not track by variant.
@@ -310,7 +311,7 @@ export async function PATCH(req: NextRequest) {
 
         if (readErr) {
             console.error("[admin/products PATCH] variant read failed:", readErr.message);
-            return NextResponse.json({ error: `Variant read failed: ${readErr.message}` }, { status: 500 });
+            return apiError("GEN-00", { status: 500, audience: "staff", cause: readErr });
         }
 
         const keyOf = (v: { size?: string | null; color?: string | null; brand?: string | null }) =>
@@ -372,7 +373,7 @@ export async function PATCH(req: NextRequest) {
             const { error: insertErr } = await supabaseAdmin.from("product_variants").insert(toInsert);
             if (insertErr) {
                 console.error("[admin/products PATCH] variant insert failed:", insertErr.message);
-                return NextResponse.json({ error: `Variant insert failed: ${insertErr.message}` }, { status: 500 });
+                return apiError("GEN-00", { status: 500, audience: "staff", cause: insertErr });
             }
         }
 

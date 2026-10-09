@@ -7,6 +7,7 @@ import {
 } from "@/lib/checkout/createCheckoutOrder";
 import { logActivity } from "@/lib/utils/logActivity";
 import { err, ok, str, type ToolDef } from "./shared";
+import { fromCheckoutCode, staffLine } from "@/lib/errors/catalogue";
 
 const orderInputSchema = {
     type: "object" as const,
@@ -79,7 +80,10 @@ export const checkoutTools: ToolDef[] = [
         },
         async run(input) {
             const result = await quoteCheckoutOrder(toOrderInput(input));
-            if (!result.success) return err(result.error);
+            if (!result.success) {
+                const c = fromCheckoutCode(result.code);
+                return err(c ? staffLine(c) : result.error);
+            }
             return ok({ totals_ghs: result.totals, out_of_stock: result.outOfStock });
         },
     },
@@ -92,7 +96,10 @@ export const checkoutTools: ToolDef[] = [
         async run(input, ctx) {
             const orderInput = toOrderInput(input);
             const result = await createCheckoutOrder(orderInput);
-            if (!result.success) return err(result.error);
+            if (!result.success) {
+                const c = fromCheckoutCode(result.code);
+                return err(c ? staffLine(c) : result.error);
+            }
             await logActivity({
                 userId: ctx.userId,
                 userRole: ctx.role,
