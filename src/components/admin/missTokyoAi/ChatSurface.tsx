@@ -91,7 +91,7 @@ export function ChatSurface({
     focusKey?: unknown;
     headProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
-    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight, setWalk, open, sendToAdmin, pollReplies, features } = useMissTokyoAi();
+    const { bubbles, loading, availability, transcript, send, newChat, setSpotlight, showMe, setWalk, open, sendToAdmin, pollReplies, features } = useMissTokyoAi();
     const router = useRouter();
     const [input, setInput] = useState("");
     const [online, setOnline] = useState(true);
@@ -154,7 +154,7 @@ export function ChatSurface({
 
     const runEffect = (effect: ButtonEffect) => {
         if (effect.kind === "show_me") {
-            setSpotlight({ anchor: effect.anchor, label: effect.label, startedAt: Date.now() });
+            showMe(effect.anchor, effect.label);
         }
         if (effect.kind === "walkthrough") {
             setSpotlight(null);

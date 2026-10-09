@@ -56,6 +56,8 @@ type State = {
     send: (text: string) => Promise<void>;
     newChat: () => void;
     setSpotlight: (s: Spotlight) => void;
+    /** Rings a control now. The timestamp is taken here, not in a component render. */
+    showMe: (anchor: string, label: string) => void;
 };
 
 const STORAGE_KEY = "mt-ai-chat";
@@ -224,6 +226,8 @@ export const useMissTokyoAi = create<State>((set, get) => ({
         set({ transcript: [], bubbles: [], loading: false });
         persist([], []);
     },
+
+    showMe: (anchor, label) => get().setSpotlight({ anchor, label, startedAt: Date.now() }),
 
     setSpotlight: (spotlight) => {
         set({ spotlight });
