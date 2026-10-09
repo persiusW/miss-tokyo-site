@@ -509,7 +509,7 @@ export function OrdersClient({
     return (
         <>
             {/* Search + Tabs row */}
-            <div className="ac-tabs" style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+            <div className="ac-tabs" data-assist="orders.tabs" style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", gap: 0, overflowX: "auto", flex: 1 }}>
                     {TABS.map(tab => (
                         <button
@@ -528,6 +528,7 @@ export function OrdersClient({
                             value={search}
                             onChange={e => onSearchChange(e.target.value)}
                             placeholder="Search order ref, name, email, phone…"
+                            data-assist="orders.search"
                             className="ac-input-line"
                             style={{ width: 260, fontSize: 11 }}
                         />

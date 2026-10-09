@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { toast } from "@/lib/toast";
@@ -153,8 +154,19 @@ function CMSTab() {
     );
 }
 
+// ?tab=<key> opens a tab directly (Miss Tokyo AI's "Take me there"). Without
+// it the page behaves as before; clicking tabs does not change the URL.
 export default function SettingsPage() {
+    return (
+        <Suspense fallback={null}>
+            <SettingsPageInner />
+        </Suspense>
+    );
+}
+
+function SettingsPageInner() {
     const [activeTab, setActiveTab] = useState<TabKey>("business");
+    const tabParam = useSearchParams().get("tab");
 
     const tabs: { key: TabKey; label: string }[] = [
         { key: "business",      label: "Business" },
@@ -169,6 +181,11 @@ export default function SettingsPage() {
         { key: "product-page",  label: "Product Page" },
     ];
 
+    useEffect(() => {
+        if (tabParam && tabs.some(t => t.key === tabParam)) setActiveTab(tabParam as TabKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tabParam]);
+
     return (
         <>
             <div className="ac-page-head">
@@ -178,7 +195,7 @@ export default function SettingsPage() {
                 </div>
             </div>
 
-            <div className="ac-tabs" style={{ marginBottom: 28, overflowX: "auto" }}>
+            <div className="ac-tabs" data-assist="settings.tabs" style={{ marginBottom: 28, overflowX: "auto" }}>
                 {tabs.map((tab) => (
                     <button
                         key={tab.key}
@@ -490,7 +507,7 @@ function StoreTab() {
                                 </div>
                             </div>
 
-                            <div style={{ paddingTop: 12, borderTop: "1px solid var(--ac-line)", display: "flex", flexDirection: "column", gap: 14 }}>
+                            <div data-assist="settings.global-options" style={{ paddingTop: 12, borderTop: "1px solid var(--ac-line)", display: "flex", flexDirection: "column", gap: 14 }}>
                                 <div>
                                     <label className="ac-label">Global Shoe Sizes</label>
                                     <div style={{ marginTop: 6 }}>
@@ -574,6 +591,7 @@ function StoreTab() {
                         <div>
                             <label className="ac-label">Payment Link Hold</label>
                             <select
+                                data-assist="settings.pos-hold"
                                 value={form.pos_hold_minutes}
                                 onChange={(e) => setForm(p => ({ ...p, pos_hold_minutes: Number(e.target.value) as 15 | 30 | 45 }))}
                                 className="ac-select" style={{ marginTop: 6 }}>
@@ -636,7 +654,7 @@ function StoreTab() {
 
                 {/* Delivery Fees */}
                 {deliveryAvailable && (
-                    <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div className="ac-card" data-assist="settings.delivery-fees" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
                         {secTitle("Delivery Fees")}
                         {subLabel("Two flat rates, chosen by the customer at checkout and by staff at the till. Within Accra is the dearer zone \u2014 that is door-to-door dispatch, while outside Accra is a bus parcel drop-off.")}
                         <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>

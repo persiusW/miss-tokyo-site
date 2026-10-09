@@ -164,6 +164,7 @@ export default function DiscountsPage() {
                     <p className="ac-page-sub">Create and manage coupon codes and promotions.</p>
                 </div>
                 <button
+                    data-assist="discounts.new"
                     onClick={() => setIsAdding(!isAdding)}
                     className="ac-btn ac-btn-primary"
                 >

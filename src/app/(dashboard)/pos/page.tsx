@@ -558,7 +558,7 @@ export default function POSPage() {
                     <h1 style={{ fontFamily: "var(--f-display)", fontSize: 16, fontWeight: 600, color: "var(--ac-ink)", textTransform: "uppercase", letterSpacing: ".2em", marginBottom: 10 }}>Point of Sale</h1>
                     <div style={{ position: "relative" }}>
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ac-ink-4)", pointerEvents: "none" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        <input type="text" placeholder="Search by name or SKU..." value={query}
+                        <input type="text" data-assist="pos.search" placeholder="Search by name or SKU..." value={query}
                             onChange={e => setQuery(e.target.value)}
                             style={{ ...inputStyle, paddingLeft: 34 }} />
                     </div>
@@ -702,7 +702,7 @@ export default function POSPage() {
                     )}
 
                     {/* Phone applies to both modes — the payment link is texted as well as emailed */}
-                    <input type="tel" placeholder="Phone * (link is sent by SMS)"
+                    <input type="tel" data-assist="pos.phone" placeholder="Phone * (link is sent by SMS)"
                         value={customerPhone}
                         onChange={e => setCustomerPhone(e.target.value)}
                         style={inputStyle} />
@@ -722,7 +722,7 @@ export default function POSPage() {
                             </div>
                         ) : (
                             <div style={{ display: "flex", gap: 6 }}>
-                                <input type="text" placeholder="Enter code" value={discountInput}
+                                <input type="text" data-assist="pos.code" placeholder="Enter code" value={discountInput}
                                     onChange={e => setDiscountInput(e.target.value.toUpperCase())}
                                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); applyCode(); } }}
                                     style={{ ...inputStyle, flex: 1, textTransform: "uppercase" }} />
@@ -825,13 +825,13 @@ export default function POSPage() {
                             </button>
                         </div>
                     ) : (
-                        <><button onClick={() => handleSend('link')} disabled={sending || cart.length === 0}
+                        <><button data-assist="pos.send-link" onClick={() => handleSend('link')} disabled={sending || cart.length === 0}
                             style={{ width: "100%", padding: "14px 0", background: "var(--ac-ink)", color: "var(--ac-bg)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".2em", fontWeight: 900, border: "none", cursor: (sending || cart.length === 0) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (sending || cart.length === 0) ? 0.4 : 1, borderRadius: "var(--r-sm)" }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                             {sending ? 'Sending...' : `Send Link — GH₵${payableTotal.toFixed(2)}`}
                         </button>
                         {/* Walk-in paying at the counter. Same sale, no payment link. */}
-                        <button onClick={() => {
+                        <button data-assist="pos.cash" onClick={() => {
                             if (!cashArmed) {
                                 setCashArmed(true);
                                 setTimeout(() => setCashArmed(false), 4000);

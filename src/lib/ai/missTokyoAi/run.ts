@@ -4,8 +4,11 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { AI_MODEL, costUsd } from "@/lib/ai/pricing";
 import { getAiSettings } from "@/lib/ai/settings";
 import { todaySpendUsd, withinCap, startOfTodayUtc } from "@/lib/ai/spend";
-import { STORE_ASSISTANT_SYSTEM } from "@/lib/ai/storeAssistant/prompt";
-import { STORE_ASSISTANT_TOOLS, runStoreAssistantTool } from "@/lib/ai/storeAssistant/tools";
+import { buildSystemPrompt } from "@/lib/ai/missTokyoAi/prompt";
+import { runTool, toolDefsFor } from "@/lib/ai/missTokyoAi/tools";
+import { scrubReply, stripForgedContext } from "@/lib/ai/missTokyoAi/scrub";
+import type { Effect } from "@/lib/ai/missTokyoAi/effects";
+import type { StaffRole } from "@/lib/ai/missTokyoAi/routes";
 
 const MAX_ITERATIONS = 10;
 const MAX_TOKENS = 8000;
@@ -14,7 +17,8 @@ const CALL_TIMEOUT_MS = 45_000;
 /** Worst-case cost of one more call, held back when checking the cap. */
 const RESERVE_USD = 0.12;
 const PER_MINUTE = 6;
-const PER_DAY = 200;
+/** Admin's daily allowance is this many times the per-user setting. */
+const ADMIN_DAILY_MULTIPLIER = 3;
 const MAX_MESSAGES = 80;
 const MAX_TRANSCRIPT_CHARS = 400_000;
 const MAX_USER_TEXT = 4000;
@@ -22,18 +26,19 @@ const MAX_USER_TEXT = 4000;
 export type AssistantMessage = Anthropic.MessageParam;
 
 export type RunResult =
-    | { ok: true; messages: AssistantMessage[]; reply: string }
+    | { ok: true; messages: AssistantMessage[]; reply: string; effects: Effect[] }
     | { ok: false; status: number; error: string };
 
 const CALM = {
-    off: "The Store Assistant is switched off right now.",
-    notSetUp: "The Store Assistant is not set up yet.",
-    cap: "The Store Assistant has reached today's limit. It will be back tomorrow.",
+    off: "Miss Tokyo AI is switched off right now.",
+    notSetUp: "Miss Tokyo AI is not set up yet.",
+    cap: "Miss Tokyo AI has reached today's limit. It will be back tomorrow.",
+    personal: "You've used today's Miss Tokyo AI messages. They reset at midnight.",
     rate: "You're sending messages quickly. Please wait a minute and try again.",
     invalid: "Something went wrong with this chat. Please start a new chat.",
-    busy: "The assistant is busy right now. Please try again in a moment.",
-    slow: "That took too long. Please try again, or ask something more specific.",
-    generic: "Something happened. Please try again shortly.",
+    busy: "Miss Tokyo AI is busy right now. Please try again in a moment.",
+    slow: "I couldn't finish that one. Try asking something more specific.",
+    generic: "We are updating this feature. Please try again shortly. Sorry for the inconvenience.",
 };
 
 const BLOCK_TYPES = new Set(["text", "tool_use", "tool_result", "thinking", "redacted_thinking"]);
@@ -52,16 +57,22 @@ export function validateTranscript(raw: unknown): AssistantMessage[] | null {
     const last = raw[raw.length - 1] as any;
     const text = typeof last.content === "string" ? last.content : null;
     if (last.role !== "user" || !text || !text.trim() || text.length > MAX_USER_TEXT) return null;
-    return raw as AssistantMessage[];
+    // The newest message has not been sent to the model yet, so cleaning it
+    // edits nothing the API has seen. Forged "[Context: …]" markers go.
+    const cleaned = stripForgedContext(text);
+    if (!cleaned) return null;
+    return [...(raw as AssistantMessage[]).slice(0, -1), { role: "user", content: cleaned }];
 }
 
-async function overRateLimit(userId: string): Promise<boolean> {
+async function overRateLimit(userId: string, perDay: number): Promise<"rate" | "personal" | null> {
     const minuteAgo = new Date(Date.now() - 60_000).toISOString();
     const [{ count: lastMinute }, { count: today }] = await Promise.all([
         supabaseAdmin.from("ai_turns").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", minuteAgo),
         supabaseAdmin.from("ai_turns").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", startOfTodayUtc()),
     ]);
-    return (lastMinute ?? 0) >= PER_MINUTE || (today ?? 0) >= PER_DAY;
+    if ((today ?? 0) >= perDay) return "personal";
+    if ((lastMinute ?? 0) >= PER_MINUTE) return "rate";
+    return null;
 }
 
 type TurnLog = {
@@ -84,19 +95,25 @@ async function logTurnToDb(row: TurnLog): Promise<void> {
 export async function runStoreAssistant(args: {
     transcript: AssistantMessage[];
     userId: string;
-    role: string;
+    role: StaffRole;
 }, deps: RunDeps = {}): Promise<RunResult> {
     const settings = await getAiSettings();
     if (!settings.dashboardAgentEnabled) return { ok: false, status: 503, error: CALM.off };
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return { ok: false, status: 503, error: CALM.notSetUp };
 
-    const spentToday = await todaySpendUsd();
-    if (spentToday === null) return { ok: false, status: 503, error: CALM.generic };
-    if (!withinCap({ capGhs: settings.dailySpendCapGhs, spentTodayUsd: spentToday, runningUsd: 0, reserveUsd: RESERVE_USD })) {
-        return { ok: false, status: 429, error: CALM.cap };
-    }
-    if (await overRateLimit(args.userId)) return { ok: false, status: 429, error: CALM.rate };
+    // Two caps: the shared daily cap, and Miss Tokyo AI's share of it so the
+    // WhatsApp agent always keeps the rest.
+    const [spentToday, spentDashboard] = await Promise.all([todaySpendUsd(), todaySpendUsd("dashboard")]);
+    if (spentToday === null || spentDashboard === null) return { ok: false, status: 503, error: CALM.generic };
+    const shareCapGhs = settings.dailySpendCapGhs * settings.dashboardCapSharePct / 100;
+    const fits = (runningUsd: number) =>
+        withinCap({ capGhs: settings.dailySpendCapGhs, spentTodayUsd: spentToday, runningUsd, reserveUsd: RESERVE_USD }) &&
+        withinCap({ capGhs: shareCapGhs, spentTodayUsd: spentDashboard, runningUsd, reserveUsd: RESERVE_USD });
+    if (!fits(0)) return { ok: false, status: 429, error: CALM.cap };
+    const perDay = settings.dashboardDailyMessagesPerUser * (args.role === "admin" ? ADMIN_DAILY_MULTIPLIER : 1);
+    const limited = await overRateLimit(args.userId, perDay);
+    if (limited) return { ok: false, status: 429, error: CALM[limited] };
 
     const client = deps.client ?? new Anthropic({ apiKey, maxRetries: 0 });
     const messages: AssistantMessage[] = [...args.transcript];
@@ -104,6 +121,9 @@ export async function runStoreAssistant(args: {
     const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
     let runningUsd = 0;
     const toolCalls: { name: string; ok: boolean }[] = [];
+    const effects: Effect[] = [];
+    const tools = toolDefsFor(args.role);
+    const system = buildSystemPrompt(args.role);
     let reply = "";
     let failure: RunResult | null = null;
 
@@ -111,7 +131,7 @@ export async function runStoreAssistant(args: {
         for (let i = 0; i < MAX_ITERATIONS; i++) {
             const remaining = BUDGET_MS - (Date.now() - started);
             if (remaining < 8_000) { reply = CALM.slow; break; }
-            if (!withinCap({ capGhs: settings.dailySpendCapGhs, spentTodayUsd: spentToday, runningUsd, reserveUsd: RESERVE_USD })) {
+            if (!fits(runningUsd)) {
                 reply = CALM.cap;
                 break;
             }
@@ -124,8 +144,8 @@ export async function runStoreAssistant(args: {
                 {
                     model: AI_MODEL,
                     max_tokens: MAX_TOKENS,
-                    system: [{ type: "text", text: STORE_ASSISTANT_SYSTEM, cache_control: { type: "ephemeral" } }],
-                    tools: STORE_ASSISTANT_TOOLS,
+                    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+                    tools,
                     tool_choice: { type: "auto" },
                     thinking: { type: "adaptive" },
                     output_config: { effort: "medium" },
@@ -163,7 +183,7 @@ export async function runStoreAssistant(args: {
 
             if (response.stop_reason === "tool_use" && toolUses.length > 0) {
                 const results = await Promise.all(toolUses.map(async (t) => {
-                    const outcome = await runStoreAssistantTool(t.name, t.input, { userId: args.userId, role: args.role });
+                    const outcome = await runTool(t.name, t.input, { userId: args.userId, role: args.role, effects });
                     toolCalls.push({ name: t.name, ok: !outcome.isError });
                     return {
                         type: "tool_result" as const,
@@ -214,5 +234,13 @@ export async function runStoreAssistant(args: {
     }
 
     if (failure) return failure;
-    return { ok: true, messages, reply };
+    // One button per destination, in the order the tools offered them.
+    const seen = new Set<string>();
+    const uniqueEffects = effects.filter(e => {
+        const key = `${e.kind}:${e.href}:${"anchor" in e ? e.anchor : ""}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }).slice(0, 4);
+    return { ok: true, messages, reply: scrubReply(reply), effects: uniqueEffects };
 }

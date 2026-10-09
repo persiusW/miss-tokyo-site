@@ -23,7 +23,7 @@ function getCrumbs(pathname: string): string[] {
     if (pathname.startsWith("/sales/riders")) return ["Sales", "Riders"];
     if (pathname.startsWith("/sales/payments")) return ["Sales", "Payments"];
     if (pathname.startsWith("/sales/wholesalers")) return ["Sales", "Wholesalers"];
-    if (pathname.startsWith("/agent")) return ["Sales", "Store Assistant"];
+    if (pathname.startsWith("/agent")) return ["Sales", "Miss Tokyo AI"];
     if (pathname.startsWith("/pos/history")) return ["Sales", "POS History"];
     if (pathname.startsWith("/pos")) return ["Sales", "Point of Sale"];
     if (pathname.startsWith("/catalog/products/low-stock")) return ["Catalogue", "Products", "Low Stock"];
@@ -106,7 +106,7 @@ export function AdminTopbar({ user, onMenu, theme, onTheme }: Props) {
             <div className="admin-topbar-spacer" />
 
             {/* Global search — opens the ⌘K palette */}
-            <button type="button" className="admin-search" onClick={() => setPaletteOpen(true)}
+            <button type="button" className="admin-search" data-assist="topbar.search" onClick={() => setPaletteOpen(true)}
                 style={{ cursor: "text", textAlign: "left" }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
