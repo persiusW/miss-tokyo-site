@@ -53,13 +53,7 @@ export const isPlaceholderEmail = (email: string | null | undefined) =>
 
 export const money = (n: unknown) => parseFloat((Number(n) || 0).toFixed(2));
 
-/** Gift-card codes: four dash-separated groups (XXXX-XXXX-XXXX-XXXX or XX-XXXX-XXXX-XXXX). */
-export const GIFT_CODE_RE = /\b[A-Z0-9]{2,4}(?:-[A-Z0-9]{4}){3}\b/gi;
-
-/** Gift-card codes are money: show only the last 4. Coupon codes stay readable. */
-export function maskGiftCode(code: string): string {
-    return /^[A-Z0-9]{2,4}(?:-[A-Z0-9]{4}){3}$/i.test(code.trim()) ? `••••${code.trim().slice(-4)}` : code;
-}
+export { maskGiftCode } from "@/lib/ai/missTokyoAi/scrub";
 
 /** UTC day bounds; Ghana is UTC all year, so these are the shop's days. */
 export function dayBounds(date: string): { from: string; to: string } {

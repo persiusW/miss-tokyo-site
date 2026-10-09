@@ -1,6 +1,13 @@
 // Redaction for anything Miss Tokyo AI shows or stores, and the final scrub of
-// its replies. Pure functions — covered by tests/e2e/unit/mtai-scrub.spec.ts.
-import { GIFT_CODE_RE } from "@/lib/ai/missTokyoAi/tools/shared";
+// its replies. Pure, dependency-free — covered by tests/e2e/unit/mtai-scrub.spec.ts.
+
+/** Gift-card codes: four dash-separated groups (XXXX-XXXX-XXXX-XXXX or XX-XXXX-XXXX-XXXX). */
+export const GIFT_CODE_RE = /\b[A-Z0-9]{2,4}(?:-[A-Z0-9]{4}){3}\b/gi;
+
+/** Gift-card codes are money: show only the last 4. Coupon codes stay readable. */
+export function maskGiftCode(code: string): string {
+    return /^[A-Z0-9]{2,4}(?:-[A-Z0-9]{4}){3}$/i.test(code.trim()) ? `••••${code.trim().slice(-4)}` : code;
+}
 
 /**
  * Removes secrets from free text (message bodies, tool output):
