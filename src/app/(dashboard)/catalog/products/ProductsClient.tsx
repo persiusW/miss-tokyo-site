@@ -265,10 +265,10 @@ export default function ProductsClient({ initialProducts, totalCount, page, page
                         className="ac-input"
                         style={{ width: 220 }}
                     />
-                    <Link href="/catalog/products/low-stock" className="ac-btn ac-btn-ghost" style={{ color: "var(--ac-warn)", borderColor: "color-mix(in oklab, var(--ac-warn) 45%, transparent)" }}>
+                    <Link href="/catalog/products/low-stock" data-assist="products.low-stock" className="ac-btn ac-btn-ghost" style={{ color: "var(--ac-warn)", borderColor: "color-mix(in oklab, var(--ac-warn) 45%, transparent)" }}>
                         Low Stock
                     </Link>
-                    <Link href="/catalog/products/new" className="ac-btn ac-btn-primary">New Product</Link>
+                    <Link href="/catalog/products/new" data-assist="products.new" className="ac-btn ac-btn-primary">New Product</Link>
                 </div>
             </div>
 

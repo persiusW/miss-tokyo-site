@@ -106,7 +106,7 @@ export function AdminTopbar({ user, onMenu, theme, onTheme }: Props) {
             <div className="admin-topbar-spacer" />
 
             {/* Global search — opens the ⌘K palette */}
-            <button type="button" className="admin-search" onClick={() => setPaletteOpen(true)}
+            <button type="button" className="admin-search" data-assist="topbar.search" onClick={() => setPaletteOpen(true)}
                 style={{ cursor: "text", textAlign: "left" }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
