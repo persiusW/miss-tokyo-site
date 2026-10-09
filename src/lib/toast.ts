@@ -8,8 +8,13 @@ export type Toast = { id: string; message: string; type: ToastType; code?: strin
 
 // Registered by the dashboard's Miss Tokyo AI panel while help on payment
 // errors is switched on; null everywhere else (so customers never see it).
-let askHandler: ((ask: AskTarget) => void) | null = null;
-export function setAskHandler(fn: ((ask: AskTarget) => void) | null) { askHandler = fn; notify(); }
+// The handler returns false when the assistant is busy, so the toast stays.
+let askHandler: ((ask: AskTarget) => boolean) | null = null;
+export function setAskHandler(fn: ((ask: AskTarget) => boolean) | null) {
+    askHandler = fn;
+    toasts = [...toasts]; // new snapshot, so toasts on screen gain or lose the button
+    notify();
+}
 export function getAskHandler() { return askHandler; }
 
 type Listener = (toasts: Toast[]) => void;
