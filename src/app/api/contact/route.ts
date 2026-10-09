@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { Resend } from "resend";
+import { sendEmail } from "@/lib/email";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ORDER_TOPICS = new Set(["Order help", "Returns", "Delivery"]);
@@ -90,7 +90,6 @@ export async function POST(req: NextRequest) {
     const resendKey = process.env.RESEND_API_KEY;
 
     if (resendKey) {
-        const resend = new Resend(resendKey);
         const fullName = [first_name.trim(), last_name?.trim()].filter(Boolean).join(" ");
         const submittedAt = new Date(submission.submitted_at).toLocaleString("en-GB", {
             day: "2-digit", month: "short", year: "numeric",
@@ -98,7 +97,7 @@ export async function POST(req: NextRequest) {
         });
 
         // Notification to store
-        await resend.emails.send({
+        await sendEmail({
             from: `${storeName} <${fromEmail}>`,
             to: storeEmail,
             replyTo: `${fullName} <${email.trim()}>`,
@@ -117,14 +116,14 @@ export async function POST(req: NextRequest) {
   <hr style="margin:24px 0;border:none;border-top:1px solid #E8E4DE"/>
   <p style="color:#8C8479;font-size:13px">Submitted: ${submittedAt}<br/>Reply directly to this email to respond to the customer.</p>
 </div>`,
-        }).catch(e => console.error("[contact] admin email failed:", e));
+        }, { event: "contact_form_admin" }).catch(e => console.error("[contact] admin email failed:", e));
 
         // Confirmation to customer
         const preview = message.trim().length > 200
             ? message.trim().slice(0, 200) + "…"
             : message.trim();
 
-        await resend.emails.send({
+        await sendEmail({
             from: `${storeName} <${fromEmail}>`,
             to: email.trim(),
             subject: `We got your message, ${first_name.trim()}! — Miss Tokyo`,
@@ -136,7 +135,7 @@ export async function POST(req: NextRequest) {
   <p style="line-height:1.7">In the meantime, you can browse our latest drops at <a href="https://misstokyo.shop" style="color:#C8A97A">misstokyo.shop</a></p>
   <p style="margin-top:32px">— The Miss Tokyo Team</p>
 </div>`,
-        }).catch(e => console.error("[contact] customer email failed:", e));
+        }, { event: "contact_form_customer" }).catch(e => console.error("[contact] customer email failed:", e));
     } else {
         console.warn("[contact] RESEND_API_KEY not configured — emails skipped");
     }
