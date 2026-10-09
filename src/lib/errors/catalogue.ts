@@ -69,6 +69,15 @@ const KNOWN_TEXTS = new Set<string>(
 );
 export function isCatalogueText(s: string): boolean { return KNOWN_TEXTS.has(s); }
 
+/** What the AI tells staff when an order fails: hand-written stock and
+ *  validation lines are kept (they say which item to fix), with the code. */
+export function checkoutErrorLine(code: string, error: string): string {
+    const c = fromCheckoutCode(code);
+    if (code === "invalid" || !c) return error;
+    if (code === "unavailable") return `${error} (${c})`;
+    return staffLine(c);
+}
+
 /** createCheckoutOrder's own codes → catalogue codes. "invalid" keeps its hand-written text. */
 export function fromCheckoutCode(c: string): ErrorCode | null {
     switch (c) {
