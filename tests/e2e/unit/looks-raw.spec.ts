@@ -9,7 +9,7 @@ test("technical text is raw", () => {
         'duplicate key value violates unique constraint "x"', 'relation "orders" does not exist', "JWT expired",
         "Unexpected token '<', \"<html>\" is not valid JSON", "fetch failed", "TypeError: Cannot read properties of undefined",
         "mNotify returned HTML — check API key", "Invalid key", "Request failed with status code 500", "<html><body>504</body></html>",
-        "[object Object]", "x".repeat(301), "", "   ",
+        "[object Object]", "x".repeat(1001), "", "   ",
     ]) expect(looksRaw(m), m).toBe(true);
     expect(looksRaw(undefined)).toBe(true);
 });
