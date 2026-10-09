@@ -46,3 +46,18 @@ test("readJson refuses HTML, empty and broken bodies instead of throwing", async
     const ok = new Response(JSON.stringify({ a: 1 }), { status: 200, headers: { "content-type": "application/json; charset=utf-8" } });
     expect(await readJson(ok)).toEqual({ data: { a: 1 }, isJson: true });
 });
+
+test("the banner follows how the server says it was paid, not which button was pressed", async () => {
+    const { completedViaFrom } = await import("../../../src/lib/pos/tillMessages");
+    expect(completedViaFrom("cash", "gift_card")).toBe("gift_card"); // gift card covered it, Cash was pressed
+    expect(completedViaFrom("cash", "cash")).toBe("cash");
+    expect(completedViaFrom("cash", undefined)).toBe("cash");         // older server
+    expect(completedViaFrom("link", undefined)).toBe("gift_card");
+    expect(completedViaFrom("link", "nonsense")).toBe("gift_card");
+});
+
+test("an unclear cash outcome never invites a blind retry", async () => {
+    const { unclearOutcome } = await import("../../../src/lib/pos/tillMessages");
+    expect(unclearOutcome("cash")).toBe("We couldn't confirm the cash sale. Check POS History before trying again, so it isn't recorded twice.");
+    expect(unclearOutcome("link")).toBe(TILL_SERVER_UNREACHABLE);
+});

@@ -44,3 +44,18 @@ export function completionBanner(via: "cash" | "gift_card", hadContact: boolean)
     }
     return { title: "Paid in full by gift card", note: "Nothing to collect. Receipt sent to the customer." };
 }
+
+/** How a completed sale was paid: the server's record wins over the button pressed
+ *  (a gift card can cover a basket rung up with Cash). */
+export function completedViaFrom(mode: "cash" | "link", paidBy: unknown): "cash" | "gift_card" {
+    if (paidBy === "cash" || paidBy === "gift_card") return paidBy;
+    return mode === "cash" ? "cash" : "gift_card";
+}
+
+/** When the till can't tell whether the server finished. A cash sale may already
+ *  be recorded, so staff are sent to check rather than told to retry. */
+export function unclearOutcome(mode: "cash" | "link"): string {
+    return mode === "cash"
+        ? "We couldn't confirm the cash sale. Check POS History before trying again, so it isn't recorded twice."
+        : TILL_SERVER_UNREACHABLE;
+}

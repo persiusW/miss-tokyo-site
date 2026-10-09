@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
-import { completionBanner, deliveryHeadline, deliveryToast, TILL_GENERIC, TILL_SERVER_UNREACHABLE, type Delivery } from '@/lib/pos/tillMessages';
+import { completedViaFrom, completionBanner, deliveryHeadline, deliveryToast, TILL_GENERIC, TILL_SERVER_UNREACHABLE, unclearOutcome, type Delivery } from '@/lib/pos/tillMessages';
 import { readJson } from '@/lib/http/readJson';
 import type { PosProduct, PosItem, PosDeliveryMethod, PosAppliedDiscount } from '@/types/pos';
 import { computeDiscountSplit } from '@/lib/discountSplit';
@@ -416,6 +416,7 @@ export default function POSPage() {
         }
         const customer = customerMode === 'search' ? selectedContact! : newCustomer;
         setSending(true);
+        let sendStarted = false;
         try {
             // Same real-time stock gate the storefront runs before payment, so a
             // till and a customer can't both be promised the last unit. Nets off
@@ -475,6 +476,7 @@ export default function POSPage() {
             if (!sessionIsJson) { toast.error(TILL_SERVER_UNREACHABLE); return; }
             if (!sessionRes.ok || !sessionData?.sessionId) { toast.error(sessionData?.error ?? TILL_GENERIC); return; }
 
+            sendStarted = true;
             const sendRes = await fetch('/api/pos/send-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -482,9 +484,9 @@ export default function POSPage() {
             });
             if (sendRes.status === 401) return expiredSession();
             const { data: sent, isJson: sentIsJson } = await readJson<{
-                paymentUrl?: string; error?: string; delivery?: Delivery; completed?: boolean; orderRef?: string;
+                paymentUrl?: string; error?: string; delivery?: Delivery; completed?: boolean; orderRef?: string; paidBy?: string;
             }>(sendRes);
-            if (!sentIsJson) { toast.error(TILL_SERVER_UNREACHABLE); return; }
+            if (!sentIsJson) { toast.error(unclearOutcome(mode)); return; }
             if (!sendRes.ok || !sent?.paymentUrl) { toast.error(sent?.error ?? TILL_GENERIC); return; }
 
             setPaymentUrl(sent.paymentUrl);
@@ -493,9 +495,9 @@ export default function POSPage() {
             // way the sale is already done and there is no link to chase.
             if (sent.completed) {
                 setCompletedOrderRef(sent.orderRef ?? null);
-                setCompletedVia(mode === 'cash' ? 'cash' : 'gift_card');
+                setCompletedVia(completedViaFrom(mode, sent.paidBy));
                 setCompletedHadContact(Boolean(customerPhone.trim() || customer.email?.trim()));
-                toast.success(mode === 'cash'
+                toast.success(completedViaFrom(mode, sent.paidBy) === 'cash'
                     ? `Cash received — order ${sent.orderRef ?? ''} created`
                     : `Paid in full by gift card — order ${sent.orderRef ?? ''} created`);
                 return;
@@ -507,7 +509,7 @@ export default function POSPage() {
             if (t.type === 'success') toast.success(t.message); else toast.error(t.message);
         } catch (e) {
             console.error('[pos] send failed', e);
-            toast.error(TILL_GENERIC);
+            toast.error(sendStarted ? unclearOutcome(mode) : TILL_GENERIC);
         } finally {
             setSending(false);
         }
