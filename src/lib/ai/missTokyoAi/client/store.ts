@@ -7,6 +7,9 @@
 import { create } from "zustand";
 import type { Effect } from "@/lib/ai/missTokyoAi/effects";
 import type { MtaiFeatures } from "@/lib/ai/settings";
+import { ERRORS, isErrorCode } from "@/lib/errors/catalogue";
+import { fallbackFor } from "@/lib/ai/missTokyoAi/seed";
+import type { AskTarget } from "@/lib/toast";
 
 export type Bubble = {
     id: string;
@@ -20,9 +23,11 @@ export type Bubble = {
     /** For assistant bubbles: Send to admin state for the button it carries. */
     sent?: "sending" | "sent" | "failed";
     sentNote?: string;
+    /** Fixed help shown without the model (assistant off): stays visible under the lock. */
+    fallback?: boolean;
 };
 
-export const FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false };
+export const FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false, errorHelp: false };
 
 export type Availability = "unknown" | "ready" | "off" | "not_set_up";
 
@@ -55,6 +60,8 @@ type State = {
     setAvailability: (a: Availability) => void;
     send: (text: string) => Promise<void>;
     newChat: () => void;
+    /** "Ask Miss Tokyo AI" from a payment error: new chat, seeded on the server. */
+    askAboutError: (ask: AskTarget) => Promise<void>;
     setSpotlight: (s: Spotlight) => void;
     /** Rings a control now. The timestamp is taken here, not in a component render. */
     showMe: (anchor: string, label: string) => void;
@@ -225,6 +232,53 @@ export const useMissTokyoAi = create<State>((set, get) => ({
     newChat: () => {
         set({ transcript: [], bubbles: [], loading: false });
         persist([], []);
+    },
+
+    askAboutError: async (ask) => {
+        if (get().loading || !isErrorCode(ask.code)) return;
+        const code = ask.code;
+        const text = `Help me with this payment problem (${code}).`;
+        const userBubble: Bubble = { id: id(), role: "user", text, fallback: true };
+        // The fixed steps for this code, shown without the model.
+        const steps = (): Bubble => {
+            const d = ERRORS[code] as { staff: string; steps?: string[] };
+            const lines = [d.staff, ...(d.steps ?? []).map((s, i) => `${i + 1}. ${s}`)];
+            return { id: id(), role: "assistant", text: lines.join("\n"), fallback: true };
+        };
+        set({ open: true });
+        const { availability } = get();
+        if (availability === "off" || availability === "not_set_up") {
+            const next = [userBubble, steps()];
+            set({ transcript: [], bubbles: next });
+            persist([], next);
+            return;
+        }
+        // The current chat stays as it is until the server accepts the ask.
+        set({ loading: true });
+        try {
+            const res = await fetch("/api/ai/agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: [{ role: "user", content: text }], seed: ask }),
+            });
+            const data = await res.json().catch(() => null);
+            if (res.ok && Array.isArray(data?.messages)) {
+                const next: Bubble[] = [{ ...userBubble, fallback: false }, { id: id(), role: "assistant", text: String(data.reply ?? ""), effects: Array.isArray(data.effects) ? data.effects : [] }];
+                set({ transcript: data.messages, bubbles: next, loading: false });
+                persist(data.messages, next);
+                return;
+            }
+            const extra: Bubble = fallbackFor(res.status) === "steps"
+                ? steps()
+                : { id: id(), role: "assistant", text: typeof data?.error === "string" ? data.error : CALM_FAIL, error: true };
+            const next = [...get().bubbles, userBubble, extra];
+            set({ bubbles: next, loading: false });
+            persist(get().transcript, next);
+        } catch {
+            const next = [...get().bubbles, userBubble, steps()];
+            set({ bubbles: next, loading: false });
+            persist(get().transcript, next);
+        }
     },
 
     showMe: (anchor, label) => get().setSpotlight({ anchor, label, startedAt: Date.now() }),

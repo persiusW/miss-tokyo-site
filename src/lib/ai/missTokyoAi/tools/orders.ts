@@ -41,7 +41,7 @@ export function orderSummary(o: any, withItems: boolean) {
 }
 
 
-async function findOrder(raw: string) {
+export async function findOrder(raw: string) {
     const v = raw.replace(/^#/, "").trim();
     let q = supabaseAdmin.from("orders").select("*");
     if (UUID_RE.test(v)) q = q.eq("id", v);

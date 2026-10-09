@@ -286,7 +286,7 @@ export default function POSPage() {
                 const { data } = await readJson<{ state: string; failures: number; orderRef?: string }>(res);
                 if (stop || !res.ok || !data) return;
                 setLive(data);
-                if (data.state === "declined" && lastState !== "declined") toast.code("PAY-04", { audience: "staff" });
+                if (data.state === "declined" && lastState !== "declined") toast.code("PAY-04", { audience: "staff", ask: { posSessionId: sessionId, saleKey } });
                 lastState = data.state;
                 if (data.state === "paid" || data.state === "expired") stop = true;
             } catch { /* next tick */ }
@@ -294,7 +294,7 @@ export default function POSPage() {
         void tick();
         const t = setInterval(() => { if (!stop) void tick(); }, 5000);
         return () => { stop = true; clearInterval(t); };
-    }, [liveStatusOn, paymentUrl, completedOrderRef, sessionId]);
+    }, [liveStatusOn, paymentUrl, completedOrderRef, sessionId, saleKey]);
 
     const addToCart = (product: PosProduct, { size, color, brand }: PosPick) => {
         const sameLine = (i: PosItem) => i.productId === product.id && i.size === size && i.color === color && (i.brand ?? null) === brand;
@@ -518,7 +518,7 @@ export default function POSPage() {
                 paymentUrl?: string; error?: string; delivery?: Delivery; completed?: boolean; orderRef?: string; paidBy?: string;
             }>(sendRes);
             if (!sentIsJson) { toast.error(unclearOutcome(mode)); return; }
-            if (!sendRes.ok || !sent?.paymentUrl) { toast.fromResponse(sent, { audience: 'staff', fallback: 'GEN-00' }); return; }
+            if (!sendRes.ok || !sent?.paymentUrl) { toast.fromResponse(sent, { audience: 'staff', fallback: 'GEN-00', ask: { posSessionId: sessionData.sessionId, saleKey } }); return; }
 
             setPaymentUrl(sent.paymentUrl);
 
