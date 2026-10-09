@@ -321,6 +321,7 @@ export async function POST(req: NextRequest) {
             total: 0,
             completed: true,
             orderRef: result.orderRef,
+            paidBy: paidByCash ? 'cash' : 'gift_card',
             discount: validatedDiscount
                 ? { code: validatedDiscount.code, amount: discountAmount, label: validatedDiscount.label }
                 : null,
