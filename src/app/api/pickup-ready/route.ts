@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendSMSLogged } from "@/lib/sms";
 import { logActivity } from "@/lib/utils/logActivity";
+import { sendEmail } from "@/lib/email";
 
 /**
  * POST /api/pickup-ready
@@ -61,8 +62,6 @@ export async function POST(req: NextRequest) {
 
     // ── Send pickup-ready emails ───────────────────────────────────────────
     if (process.env.RESEND_API_KEY) {
-      const { Resend } = await import("resend");
-      const resend = new Resend(process.env.RESEND_API_KEY);
       const fromEmail = process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop";
 
       const emailPromises = orders
@@ -70,7 +69,7 @@ export async function POST(req: NextRequest) {
         .map(order => {
           const ref = order.id.substring(0, 8).toUpperCase();
 
-          return resend.emails.send({
+          return sendEmail({
             from: `${bizName} <${fromEmail}>`,
             to: order.customer_email!,
             subject: `Your order #${ref} is ready for pickup!`,
@@ -127,7 +126,7 @@ export async function POST(req: NextRequest) {
   </div>
 </body>
 </html>`,
-          });
+          }, { event: "pickup_ready", orderId: order.id });
         });
 
       await Promise.allSettled(emailPromises);
