@@ -4,7 +4,6 @@ export const maxDuration = 30;
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { Resend } from 'resend';
 import { sendSMS } from '@/lib/sms';
 import { validateDiscountCode, holdDiscount } from '@/lib/discountValidation';
 import { variantKey } from '@/lib/utils/normAttr';
@@ -12,8 +11,8 @@ import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
 import { parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/delivery';
 import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
 import { logActivity } from '@/lib/utils/logActivity';
+import { sendEmail } from "@/lib/email";
 
-function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 
 export async function POST(req: NextRequest) {
     const startedAt = Date.now();
@@ -403,7 +402,7 @@ export async function POST(req: NextRequest) {
     const [emailSettled, smsSettled] = await Promise.allSettled([
         // Email — skipped for a walk-in with no address; SMS carries the link
         session.customer_email
-            ? getResend().emails.send({
+            ? sendEmail({
                 from: 'Miss Tokyo <info@info.misstokyo.shop>',
                 to: session.customer_email,
                 subject: 'Your Miss Tokyo payment link',
@@ -416,7 +415,7 @@ export async function POST(req: NextRequest) {
                     <p><a href="${previewUrl}" style="background:#000;color:#fff;padding:12px 24px;text-decoration:none;display:inline-block;">Review &amp; Pay &mdash; GH&#8373;${amountWithFee.toFixed(2)}</a></p>
                     <p style="color:#999;font-size:12px;">This link expires in ${holdMinutes} minutes.</p>
                 `,
-            })
+            }, { event: "pos_pay_link" })
             : Promise.resolve(null),
 
         // SMS
@@ -424,7 +423,7 @@ export async function POST(req: NextRequest) {
             ? sendSMS({
                 to: session.customer_phone,
                 message: `Hi ${firstName}, your Miss Tokyo order (GH${String.fromCharCode(8373)}${amountWithFee.toFixed(2)}) is ready. Review and pay here: ${previewUrl} (expires in ${holdMinutes} mins)`,
-            })
+            }, { event: "pos_pay_link" })
             : Promise.resolve(null),
     ]);
 
@@ -432,9 +431,9 @@ export async function POST(req: NextRequest) {
     let emailError: string | null = null;
     if (session.customer_email) {
         if (emailSettled.status === 'fulfilled') {
-            const resendError = (emailSettled.value as { error?: { message?: string } } | undefined)?.error;
-            emailStatus = resendError ? 'failed' : 'sent';
-            emailError = resendError?.message ?? null;
+            const sent = emailSettled.value as { ok: boolean; error?: string } | null;
+            emailStatus = sent?.ok ? 'sent' : 'failed';
+            emailError = sent?.ok ? null : (sent?.error ?? null);
         } else {
             emailStatus = 'failed';
             emailError = String((emailSettled.reason as Error)?.message ?? emailSettled.reason);
