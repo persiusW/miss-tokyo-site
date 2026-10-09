@@ -22,8 +22,20 @@ export function parseSeed(raw: unknown): Seed | null {
     return out;
 }
 
-export function seedKey(s: Seed): string {
-    return `${s.code}:${s.posSessionId ?? s.orderId ?? s.saleKey}`;
+/** One ask per code, sale and latest attempt: a new failure on the same sale may be asked about at once. */
+export function seedKey(s: Seed, latestAttemptId?: string | null): string {
+    return `${s.code}:${s.posSessionId ?? s.orderId ?? s.saleKey}:${latestAttemptId ?? "none"}`;
+}
+
+/** Sales staff may only ask about a sale key whose attempts are all theirs. */
+export function saleVisible(rows: { created_by: string | null }[], role: string, userId: string): boolean {
+    if (role === "admin" || role === "owner") return true;
+    return rows.length > 0 && rows.every(r => r.created_by === userId);
+}
+
+/** After a failed seeded ask: refusals keep their message; anything else shows the code's fixed steps. */
+export function fallbackFor(status: number): "steps" | "message" {
+    return status === 400 || status === 403 || status === 404 ? "message" : "steps";
 }
 
 /** The server-written first line of a seeded chat, with the ids payment_help needs. */

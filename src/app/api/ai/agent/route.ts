@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { runStoreAssistant, validateTranscript } from "@/lib/ai/missTokyoAi/run";
 import type { StaffRole } from "@/lib/ai/missTokyoAi/routes";
 import { getAiSettings } from "@/lib/ai/settings";
-import { parseSeed, seedKey, seedLine, SEED_WINDOW_MINUTES } from "@/lib/ai/missTokyoAi/seed";
+import { parseSeed, saleVisible, seedKey, seedLine, SEED_WINDOW_MINUTES } from "@/lib/ai/missTokyoAi/seed";
 
 export const maxDuration = 120;
 
@@ -50,7 +50,15 @@ export async function POST(req: NextRequest) {
                 if (!o) return NextResponse.json({ error: "That order wasn't found." }, { status: 404 });
                 label = `order #${o.ref ?? String(o.id).slice(0, 8).toUpperCase()}`;
             }
-            const key = seedKey(seed);
+            if (seed.saleKey) {
+                const { data: rows } = await supabaseAdmin.from("sale_payment_attempts").select("created_by, pos_session_id").eq("sale_key", seed.saleKey);
+                const owned = saleVisible(rows ?? [], role, user.id) || (!!seed.posSessionId && (rows ?? []).length > 0 && (rows ?? []).every(r => r.pos_session_id === seed.posSessionId));
+                if (!owned && role === "sales_staff") return NextResponse.json({ error: "That sale belongs to someone else." }, { status: 403 });
+            }
+            const latest = await supabaseAdmin.from("sale_payment_attempts").select("id")
+                .eq(seed.posSessionId ? "pos_session_id" : seed.orderId ? "order_id" : "sale_key", (seed.posSessionId ?? seed.orderId ?? seed.saleKey) as string)
+                .order("created_at", { ascending: false }).limit(1).maybeSingle();
+            const key = seedKey(seed, latest.data?.id ?? null);
             const since = new Date(Date.now() - SEED_WINDOW_MINUTES * 60_000).toISOString();
             const { count } = await supabaseAdmin.from("ai_turns").select("id", { count: "exact", head: true })
                 .eq("user_id", user.id).eq("seed_key", key).gte("created_at", since);
