@@ -5,7 +5,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendSMS } from '@/lib/sms';
-import { validateDiscountCode, holdDiscount } from '@/lib/discountValidation';
+import { validateDiscountCode, holdDiscount, releaseDiscountHolds } from '@/lib/discountValidation';
 import { variantKey } from '@/lib/utils/normAttr';
 import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
 import { parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/delivery';
@@ -321,6 +321,7 @@ export async function POST(req: NextRequest) {
             total: 0,
             completed: true,
             orderRef: result.orderRef,
+            paidBy: paidByCash ? 'cash' : 'gift_card',
             discount: validatedDiscount
                 ? { code: validatedDiscount.code, amount: discountAmount, label: validatedDiscount.label }
                 : null,
@@ -364,18 +365,36 @@ export async function POST(req: NextRequest) {
         },
     };
 
-    const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${secretKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(paystackBody),
-    });
-    const paystackData = await paystackRes.json();
+    // A refusal (bad request) and an unreachable gateway (timeout, network,
+    // 5xx) get different plain messages; Paystack's own text goes to the log.
+    let paystackData: any = null;
+    let gatewayReachable = true;
+    try {
+        const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${secretKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(paystackBody),
+            signal: AbortSignal.timeout(15_000),
+        });
+        if (paystackRes.status >= 500) gatewayReachable = false;
+        paystackData = await paystackRes.json().catch(() => null);
+    } catch (e) {
+        gatewayReachable = false;
+        console.error('[pos/send-link] Paystack unreachable', { sessionId, error: String(e) });
+    }
 
-    if (!paystackRes.ok || !paystackData.status) {
-        // Rollback: release reservations
+    if (!paystackData?.status) {
+        console.error('[pos/send-link] Paystack initialize failed', { sessionId, message: paystackData?.message ?? null });
+        // Undo everything this request held, exactly as Cancel Session does.
         await supabaseAdmin.from('pos_reservations').delete().eq('pos_session_id', sessionId);
+        await releaseDiscountHolds({ posSessionId: sessionId });
         await supabaseAdmin.from('pos_sessions').update({ status: 'draft' }).eq('id', sessionId);
-        return NextResponse.json({ error: paystackData.message ?? 'Paystack error' }, { status: 500 });
+        return NextResponse.json(
+            { error: gatewayReachable
+                ? "Paystack didn't create the link. Please try again."
+                : "Paystack isn't answering right now. Please try again in a minute." },
+            { status: gatewayReachable ? 502 : 503 },
+        );
     }
 
     // Store the authorization_url as paystack_reference — used by /pay/[pos_id] as the "Pay Now" href

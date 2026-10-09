@@ -4,6 +4,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
+import { completedViaFrom, completionBanner, deliveryHeadline, deliveryToast, TILL_GENERIC, TILL_SERVER_UNREACHABLE, unclearOutcome, type Delivery } from '@/lib/pos/tillMessages';
+import { readJson } from '@/lib/http/readJson';
 import type { PosProduct, PosItem, PosDeliveryMethod, PosAppliedDiscount } from '@/types/pos';
 import { computeDiscountSplit } from '@/lib/discountSplit';
 import { GHANA_REGIONS, COUNTRIES, DEFAULT_COUNTRY, DEFAULT_REGION } from '@/lib/geo';
@@ -150,6 +152,9 @@ export default function POSPage() {
     const [sending, setSending] = useState(false);
     const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
     const [completedOrderRef, setCompletedOrderRef] = useState<string | null>(null);
+    const [completedVia, setCompletedVia] = useState<'cash' | 'gift_card'>('gift_card');
+    const [completedHadContact, setCompletedHadContact] = useState(false);
+    const [delivery, setDelivery] = useState<Delivery>(null);
     // Cash is irreversible once recorded, so the button arms on the first tap
     // and fires on the second. A native confirm() would block the whole till.
     const [cashArmed, setCashArmed] = useState(false);
@@ -411,6 +416,7 @@ export default function POSPage() {
         }
         const customer = customerMode === 'search' ? selectedContact! : newCustomer;
         setSending(true);
+        let sendStarted = false;
         try {
             // Same real-time stock gate the storefront runs before payment, so a
             // till and a customer can't both be promised the last unit. Nets off
@@ -465,54 +471,45 @@ export default function POSPage() {
                     notes,
                 }),
             });
-            const { sessionId, error: sessionError } = await sessionRes.json();
             if (sessionRes.status === 401) return expiredSession();
-            if (!sessionRes.ok || !sessionId) throw new Error(sessionError ?? 'Failed to create session');
+            const { data: sessionData, isJson: sessionIsJson } = await readJson<{ sessionId?: string; error?: string }>(sessionRes);
+            if (!sessionIsJson) { toast.error(TILL_SERVER_UNREACHABLE); return; }
+            if (!sessionRes.ok || !sessionData?.sessionId) { toast.error(sessionData?.error ?? TILL_GENERIC); return; }
 
+            sendStarted = true;
             const sendRes = await fetch('/api/pos/send-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId, mode }),
+                body: JSON.stringify({ sessionId: sessionData.sessionId, mode }),
             });
-            const { paymentUrl: url, error: sendError, delivery, completed, orderRef } = await sendRes.json();
             if (sendRes.status === 401) return expiredSession();
-            if (!sendRes.ok || !url) throw new Error(sendError ?? 'Failed to send link');
+            const { data: sent, isJson: sentIsJson } = await readJson<{
+                paymentUrl?: string; error?: string; delivery?: Delivery; completed?: boolean; orderRef?: string; paidBy?: string;
+            }>(sendRes);
+            if (!sentIsJson) { toast.error(unclearOutcome(mode)); return; }
+            if (!sendRes.ok || !sent?.paymentUrl) { toast.error(sent?.error ?? TILL_GENERIC); return; }
 
-            setPaymentUrl(url);
+            setPaymentUrl(sent.paymentUrl);
 
             // Cash taken at the till, or a gift card covering the basket — either
             // way the sale is already done and there is no link to chase.
-            if (completed) {
-                setCompletedOrderRef(orderRef ?? null);
-                toast.success(mode === 'cash'
-                    ? `Cash received — order ${orderRef ?? ''} created`
-                    : `Paid in full by gift card — order ${orderRef ?? ''} created`);
+            if (sent.completed) {
+                setCompletedOrderRef(sent.orderRef ?? null);
+                setCompletedVia(completedViaFrom(mode, sent.paidBy));
+                setCompletedHadContact(Boolean(customerPhone.trim() || customer.email?.trim()));
+                toast.success(completedViaFrom(mode, sent.paidBy) === 'cash'
+                    ? `Cash received — order ${sent.orderRef ?? ''} created`
+                    : `Paid in full by gift card — order ${sent.orderRef ?? ''} created`);
                 return;
             }
 
-            // Report what actually reached the customer. A failed SMS still leaves
-            // a usable link on screen for staff to share manually.
-            const emailStatus = delivery?.email as 'sent' | 'failed' | 'no_email' | undefined;
-            const smsOk = delivery?.sms === 'sent';
-            // A walk-in with no address is not a failed send — SMS is the whole
-            // delivery in that case, so don't cry about an email nobody asked for.
-            if (emailStatus === 'no_email') {
-                if (smsOk) {
-                    toast.success('Payment link sent by SMS');
-                } else {
-                    toast.error(`No email on file and the SMS failed${delivery?.smsError ? `: ${delivery.smsError}` : ''}. Share the link below.`);
-                }
-            } else if (emailStatus === 'sent' && smsOk) {
-                toast.success('Payment link sent by email and SMS');
-            } else if (emailStatus === 'sent' && !smsOk) {
-                toast.error(`Email sent, but SMS failed${delivery?.smsError ? `: ${delivery.smsError}` : ''}. Share the link below.`);
-            } else if (emailStatus !== 'sent' && smsOk) {
-                toast.error(`SMS sent, but email failed${delivery?.emailError ? `: ${delivery.emailError}` : ''}.`);
-            } else {
-                toast.error('Link created but neither email nor SMS went out. Share the link below.');
-            }
-        } catch (e: any) {
-            toast.error(e.message ?? 'Something went wrong');
+            // Report what actually reached the customer, in plain words.
+            setDelivery(sent.delivery ?? null);
+            const t = deliveryToast(sent.delivery);
+            if (t.type === 'success') toast.success(t.message); else toast.error(t.message);
+        } catch (e) {
+            console.error('[pos] send failed', e);
+            toast.error(sendStarted ? unclearOutcome(mode) : TILL_GENERIC);
         } finally {
             setSending(false);
         }
@@ -526,7 +523,7 @@ export default function POSPage() {
     };
 
     const reset = () => {
-        setCart([]); setPaymentUrl(null); setCompletedOrderRef(null); setSelectedContact(null);
+        setCart([]); setPaymentUrl(null); setCompletedOrderRef(null); setDelivery(null); setSelectedContact(null);
         setNewCustomer({ name: '', email: '' });
         setCustomerPhone('');
         setDeliveryMethod('pickup'); setDeliveryAddress('');
@@ -802,9 +799,9 @@ export default function POSPage() {
                     {completedOrderRef ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                             <div style={{ padding: "10px 12px", background: "color-mix(in srgb, var(--ac-accent) 14%, transparent)", border: "1px solid var(--ac-accent)", borderRadius: "var(--r-sm)" }}>
-                                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-accent)", fontWeight: 700, marginBottom: 4 }}>Paid in full by gift card</p>
+                                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-accent)", fontWeight: 700, marginBottom: 4 }}>{completionBanner(completedVia, completedHadContact).title}</p>
                                 <p style={{ fontSize: 11, color: "var(--ac-ink)", fontWeight: 600 }}>Order #{completedOrderRef}</p>
-                                <p style={{ fontSize: 10, color: "var(--ac-ink-3)", marginTop: 2 }}>Nothing to collect. Receipt sent to the customer.</p>
+                                <p style={{ fontSize: 10, color: "var(--ac-ink-3)", marginTop: 2 }}>{completionBanner(completedVia, completedHadContact).note}</p>
                             </div>
                             <button onClick={reset} style={{ width: "100%", padding: "10px 0", border: "1px solid var(--ac-ink)", background: "transparent", color: "var(--ac-ink)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".12em", fontWeight: 700, cursor: "pointer", borderRadius: "var(--r-sm)" }}>
                                 New Order
@@ -812,10 +809,11 @@ export default function POSPage() {
                         </div>
                     ) : paymentUrl ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            <div style={{ padding: "10px 12px", background: "color-mix(in srgb, var(--ac-accent) 10%, transparent)", border: "1px solid var(--ac-accent)", borderRadius: "var(--r-sm)" }}>
-                                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--ac-accent)", fontWeight: 700, marginBottom: 4 }}>Link Sent!</p>
+                            {(() => { const h = deliveryHeadline(delivery); const c = h.tone === 'warn' ? 'var(--ac-warn)' : 'var(--ac-accent)'; return (
+                            <div role="status" style={{ padding: "10px 12px", background: `color-mix(in srgb, ${c} 10%, transparent)`, border: `1px solid ${c}`, borderRadius: "var(--r-sm)" }}>
+                                <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: c, fontWeight: 700, marginBottom: 4 }}>{h.text}</p>
                                 <p style={{ fontSize: 10, color: "var(--ac-ink-3)", wordBreak: "break-all", fontFamily: "var(--f-mono)" }}>{paymentUrl}</p>
-                            </div>
+                            </div>); })()}
                             <button onClick={copyUrl} style={{ width: "100%", padding: "10px 0", border: "1px solid var(--ac-ink)", background: "transparent", color: "var(--ac-ink)", fontSize: 10, textTransform: "uppercase", letterSpacing: ".12em", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: "var(--r-sm)" }}>
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                 {copied ? 'Copied!' : 'Copy Link'}
