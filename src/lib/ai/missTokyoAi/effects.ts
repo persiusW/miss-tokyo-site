@@ -1,7 +1,7 @@
 // Effects: what a reply asks the panel to offer as buttons. Tools never act on
 // their own — the person taps the button. Every effect is validated here
 // before it leaves the server.
-import { ANCHORS, type AnchorId } from "@/lib/ai/missTokyoAi/anchors";
+import { ANCHORS, isOrderPageAnchor, type AnchorId } from "@/lib/ai/missTokyoAi/anchors";
 import { ROUTES, routeAllowed, type RouteKey, type StaffRole } from "@/lib/ai/missTokyoAi/routes";
 import { cleanQuestion } from "@/lib/ai/missTokyoAi/questions";
 import { findWalkthrough } from "@/lib/ai/missTokyoAi/walkthroughs";
@@ -32,7 +32,7 @@ export function navigateEffect(routeKey: string, role: StaffRole, tab?: string |
 
 export function showMeEffect(anchorId: string, role: StaffRole): ButtonEffect | null {
     const anchor: { route: RouteKey; label: string; tab?: string } | undefined = ANCHORS[anchorId as AnchorId];
-    if (!anchor || !routeAllowed(anchor.route, role)) return null;
+    if (!anchor || !routeAllowed(anchor.route, role) || isOrderPageAnchor(anchorId)) return null;
     const route = ROUTES[anchor.route];
     const href = anchor.tab ? `${route.path}?tab=${encodeURIComponent(anchor.tab)}` : route.path;
     return { kind: "show_me", anchor: anchorId as AnchorId, href, label: "Show me" };

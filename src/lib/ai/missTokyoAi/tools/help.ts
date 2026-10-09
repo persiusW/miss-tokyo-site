@@ -4,7 +4,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { navigateEffect, sendToAdminEffect, showMeEffect, walkthroughEffect } from "@/lib/ai/missTokyoAi/effects";
 import { WALKTHROUGHS } from "@/lib/ai/missTokyoAi/walkthroughs";
-import { ANCHORS } from "@/lib/ai/missTokyoAi/anchors";
+import { SHOW_ME_ANCHORS } from "@/lib/ai/missTokyoAi/anchors";
 import { ROUTES, SETTINGS_TABS } from "@/lib/ai/missTokyoAi/routes";
 import { guideFor } from "@/lib/ai/missTokyoAi/guide";
 import { searchDocs, type SearchDoc } from "@/lib/ai/missTokyoAi/guideSearch";
@@ -37,7 +37,7 @@ export const helpTools: ToolDef[] = [
             description: "Give staff a 'Show me' button that opens the page and highlights a specific control. Only these controls can be highlighted.",
             input_schema: {
                 type: "object",
-                properties: { control: { type: "string", enum: Object.keys(ANCHORS) } },
+                properties: { control: { type: "string", enum: SHOW_ME_ANCHORS } },
                 required: ["control"],
             },
         },
