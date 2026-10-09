@@ -3,6 +3,7 @@
 // card), so whichever path runs first sends the emails and the other is a no-op.
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { sendEmail } from "@/lib/email";
 
 export type GiftCardMeta = {
     gift_card_id?: string;
@@ -42,9 +43,6 @@ export async function activateAndDeliverGiftCard(meta: GiftCardMeta, amountPesew
     // Send emails only when we just activated (card is null if already active)
     if (card && process.env.RESEND_API_KEY) {
         try {
-            const { Resend } = await import("resend");
-            const resend = new Resend(process.env.RESEND_API_KEY);
-
             const { data: biz } = await supabaseAdmin
                 .from("business_settings")
                 .select("business_name, email, website_url")
@@ -99,12 +97,12 @@ export async function activateAndDeliverGiftCard(meta: GiftCardMeta, amountPesew
                 : `Your ${bizName} Gift Card — GH₵${amtNum.toFixed(2)}`;
 
             if (deliveryTo) {
-                await resend.emails.send({
+                await sendEmail({
                     from: `${bizName} <${fromEmail}>`,
                     to: deliveryTo,
                     subject: deliverySubject,
                     html: giftCardHtml,
-                });
+                }, { event: "gift_card_delivery" });
             }
 
             if (delivery_mode === "email" && sender_email && sender_email !== recipient_email) {
@@ -112,7 +110,7 @@ export async function activateAndDeliverGiftCard(meta: GiftCardMeta, amountPesew
                     ? new Date(delivery_date).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })
                     : "today";
 
-                await resend.emails.send({
+                await sendEmail({
                     from: `${bizName} <${fromEmail}>`,
                     to: sender_email,
                     subject: `Gift card sent! — ${bizName}`,
@@ -134,7 +132,7 @@ export async function activateAndDeliverGiftCard(meta: GiftCardMeta, amountPesew
     </div>
   </div>
 </div>`,
-                });
+                }, { event: "gift_card_sender_confirmation" });
             }
 
             // Mark as sent

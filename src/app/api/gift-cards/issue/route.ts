@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { logActivity } from "@/lib/utils/logActivity";
+import { sendEmail } from "@/lib/email";
 
 function genCode(): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -68,16 +69,13 @@ export async function POST(req: NextRequest) {
 
         // Send email if Resend is configured
         if (process.env.RESEND_API_KEY) {
-            const { Resend } = await import("resend");
-            const resend = new Resend(process.env.RESEND_API_KEY);
-
             const { data: biz } = await supabaseAdmin
                 .from("business_settings").select("business_name, email").eq("id", "default").single();
 
             const bizName = biz?.business_name || "Miss Tokyo";
             const fromEmail = process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop";
 
-            await resend.emails.send({
+            await sendEmail({
                 from: `${bizName} <${fromEmail}>`,
                 to: recipient_email,
                 subject: `You've received a ${bizName} Gift Card!`,
@@ -101,7 +99,7 @@ export async function POST(req: NextRequest) {
                     </div>
                   </div>
                 </div>`,
-            });
+            }, { event: "gift_card_issued" });
         }
 
         // A gift card is money. Now that the activity log actually records what
