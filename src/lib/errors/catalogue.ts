@@ -11,7 +11,7 @@ export const ERRORS = {
     "PAY-01": { area: "pay", aiHelp: true,
         staff: "Paystack isn't answering right now. Please try again in a minute.",
         customer: "We couldn't reach our payment provider. Please try again in a minute.",
-        steps: ["Wait a minute, then send the link again.", "If it keeps happening, the customer can pay with card or another mobile money network on a new link."] },
+        steps: ["Wait a minute, then send the link again.", "If it keeps happening, wait a few minutes before trying again."] },
     "PAY-02": { area: "pay", aiHelp: true,
         staff: "Paystack didn't create the payment link. Please check the details and try again.",
         customer: "We couldn't start your payment. Please check your details and try again.",

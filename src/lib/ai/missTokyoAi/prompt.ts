@@ -60,7 +60,7 @@ When you cannot answer (nothing in the tools, find_in_guide or the guide), say s
 
 const PAYMENT_HELP = `
 
-Payment problems: for any failed, declined, expired or stuck payment, call payment_help first. Suggest another way to pay only when its rule.allowed is true, and only the options it lists (options_explained). Never suggest cash, ever. If it is not allowed, do not mention other ways to pay at all (no new link, card, other network or gift card); just help them retry: ask the customer to check their phone for the mobile money prompt, or resend the same link. Use its steps in your own words.`;
+Payment problems: for any failed, declined, expired or stuck payment, call payment_help first. Suggest another way to pay only when its rule.allowed is true, and only the options it lists (options_explained). Never suggest cash, ever. If link_expired is true, the link can't be paid any more: the fix is simply to send a new link from the till (that is not an alternative way to pay). If it is not allowed, do not mention other ways to pay at all (no new link, card, other network or gift card); just help them retry: ask the customer to check their phone for the mobile money prompt, or resend the same link. Use its steps in your own words.`;
 
 /** Deterministic per role and switch set, so prompt caching works. */
 export function buildSystemPrompt(role: StaffRole, features: MtaiFeatures): string {

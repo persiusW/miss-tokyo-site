@@ -38,7 +38,7 @@ test("what counts as still owed", () => {
 test("retry steps never offer an alternative the rule hasn't unlocked", () => {
     const ALT = /new (payment )?link|a new one|card|another mobile money|gift card/i;
     expect("Send the same link again, or a new one.").toMatch(ALT); // the old wording would fail
-    for (const code of ["PAY-04", "PAY-05"] as const) {
+    for (const code of ["PAY-01", "PAY-04", "PAY-05"] as const) {
         for (const s of (ERRORS[code] as { steps?: string[] }).steps ?? []) {
             expect(s, code).not.toMatch(ALT);
         }

@@ -4,7 +4,8 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { ERRORS, isErrorCode, type ErrorCode } from "@/lib/errors/catalogue";
 import { failuresForSale, outageErrors } from "@/lib/payments/attempts";
-import { altPayment, owedFrom, type AltChannel, type AltOption } from "@/lib/payments/altPaymentRule";
+import { altPayment, owedFrom, OUTAGE_ERRORS, type AltChannel, type AltOption } from "@/lib/payments/altPaymentRule";
+import { saleVisible } from "@/lib/ai/missTokyoAi/seed";
 import { findOrder } from "./orders";
 import { err, ok, str, UUID_RE, type ToolDef } from "./shared";
 
@@ -36,6 +37,7 @@ export const paymentTools: ToolDef[] = [
             let owed = true;
             let channel: AltChannel = "online";
             let saleKey: string | null = null;
+            let linkExpired = false;
             const cols = "sale_key, status, error_code, paystack_status, created_at, channel";
 
             const sessionId = str(input?.pos_session_id, 60);
@@ -47,6 +49,7 @@ export const paymentTools: ToolDef[] = [
                 if (!s) return err("That till sale wasn't found.");
                 if (ctx.role === "sales_staff" && s.created_by !== ctx.userId) return err("That till sale belongs to someone else. Ask them, or an admin or owner.");
                 owed = owedFrom(s.status);
+                linkExpired = s.status === "expired";
                 channel = "pos";
                 const { data } = await supabaseAdmin.from("sale_payment_attempts").select(cols).eq("pos_session_id", sessionId).order("created_at", { ascending: false }).limit(10);
                 attempts = data ?? [];
@@ -60,7 +63,8 @@ export const paymentTools: ToolDef[] = [
                 attempts = data ?? [];
             } else if (key) {
                 if (!UUID_RE.test(key)) return err("That sale key isn't valid.");
-                const { data } = await supabaseAdmin.from("sale_payment_attempts").select(cols).eq("sale_key", key).order("created_at", { ascending: false }).limit(10);
+                const { data } = await supabaseAdmin.from("sale_payment_attempts").select(`${cols}, created_by`).eq("sale_key", key).order("created_at", { ascending: false }).limit(10);
+                if (!saleVisible((data ?? []) as { created_by: string | null }[], ctx.role, ctx.userId)) return err("That sale belongs to someone else, or it wasn't found.");
                 attempts = data ?? [];
                 owed = !attempts.some(a => a.status === "paid");
                 if (attempts[0]?.channel === "pos") channel = "pos";
@@ -73,7 +77,7 @@ export const paymentTools: ToolDef[] = [
             const rule = altPayment({ owed, channel, failures, outageErrors: outage });
 
             const last = attempts[0];
-            const lastCode: ErrorCode | null = last
+            const lastCode: ErrorCode | null = linkExpired ? "PAY-06" : last
                 ? (isErrorCode(last.error_code) ? last.error_code : last.status === "failed" ? "PAY-04" : last.status === "unfinished" ? "PAY-05" : null)
                 : null;
 
@@ -82,7 +86,8 @@ export const paymentTools: ToolDef[] = [
                 attempts: attempts.map(a => ({ status: a.status, code: a.error_code, paystack: a.paystack_status, at: a.created_at })),
                 last_problem: lastCode ? ERRORS[lastCode].staff : null,
                 failures,
-                paystack_outage: outage >= 2,
+                paystack_outage: outage >= OUTAGE_ERRORS,
+                link_expired: linkExpired,
                 rule,
                 steps: lastCode ? (ERRORS[lastCode] as { steps?: string[] }).steps ?? [] : [],
                 options_explained: rule.options.map(o => OPTION_TEXT[o]),
