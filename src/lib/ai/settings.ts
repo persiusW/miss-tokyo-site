@@ -39,6 +39,7 @@ export const EDITABLE_AI_SETTINGS = {
     mtai_walkthroughs_enabled: (v: unknown) => typeof v === "boolean",
     mtai_voice_enabled: (v: unknown) => typeof v === "boolean",
     mtai_error_help_enabled: (v: unknown) => typeof v === "boolean",
+    mtai_error_log_enabled: (v: unknown) => typeof v === "boolean",
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
