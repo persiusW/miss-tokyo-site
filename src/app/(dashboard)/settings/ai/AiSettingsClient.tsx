@@ -16,7 +16,7 @@ const EXTRAS = [
     { key: "mtai_walkthroughs_enabled", label: "Walkthroughs", description: "Miss Tokyo AI can start a step-by-step tour that highlights each control in turn." },
     { key: "mtai_voice_enabled", label: "Voice input", description: "A microphone button fills the chat box from speech. It never sends by itself." },
     { key: "mtai_error_help_enabled", label: "Help on payment errors", description: "Payment error messages for staff get an \"Ask Miss Tokyo AI\" button. It only suggests another way to pay after 2 failures or a Paystack outage, and never cash." },
-    { key: "mtai_error_log_enabled", label: "Error log", description: "Records which error codes staff and customers see, and on which page, for the errors card below. No technical details. Kept 30 days." },
+    { key: "mtai_error_log_enabled", label: "Error log", description: "Records which error codes staff and customers see, and on which page, for the errors card below. No technical details. Kept 30 days. Takes up to a minute to start or stop." },
 ] as const;
 type ExtraKey = (typeof EXTRAS)[number]["key"];
 

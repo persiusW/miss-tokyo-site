@@ -98,15 +98,18 @@ export default function AiInsights() {
                     <div className="ac-card-title">Errors people saw · last 7 days</div>
                 </div>
                 <div style={{ padding: "8px 22px 0" }}>
-                    {!data.errors.enabled && (
+                    {!data.errors.enabled && data.errors.total === 0 && (
                         <Empty>Not recording. Turn on <strong>Error log</strong> in Miss Tokyo AI extras above to start.</Empty>
+                    )}
+                    {!data.errors.enabled && data.errors.total > 0 && (
+                        <Empty>Recording is off. Showing what was recorded before.</Empty>
                     )}
                     {data.errors.enabled && data.errors.total === 0 && <Empty>No errors in the last 7 days.</Empty>}
                 </div>
                 {data.errors.by_code.length > 0 && (
                     <div className="ac-table-wrap">
                         <table className="ac-table">
-                            <thead><tr><th>Code</th><th>What they saw</th><th>Times</th></tr></thead>
+                            <thead><tr><th>Code</th><th>Meaning</th><th>Times</th></tr></thead>
                             <tbody>
                                 {data.errors.by_code.map(e => (
                                     <tr key={e.code}><td className="ac-mono">{e.code}</td><td>{e.label}</td><td className="ac-mono">{e.count}{data.errors.capped ? "+" : ""}</td></tr>
