@@ -5,7 +5,9 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { runStoreAssistant, validateTranscript } from "@/lib/ai/missTokyoAi/run";
 import type { StaffRole } from "@/lib/ai/missTokyoAi/routes";
 import { getAiSettings } from "@/lib/ai/settings";
-import { parseSeed, saleVisible, seedKey, seedLine, SEED_WINDOW_MINUTES } from "@/lib/ai/missTokyoAi/seed";
+import { seedLine, SEED_WINDOW_MINUTES } from "@/lib/ai/missTokyoAi/seed";
+import { checkSeed } from "@/lib/ai/missTokyoAi/seedGate";
+import { signSeedLine } from "@/lib/ai/missTokyoAi/seedSign";
 
 export const maxDuration = 120;
 
@@ -35,39 +37,21 @@ export async function POST(req: NextRequest) {
         if (body?.seed !== undefined && body?.seed !== null) {
             const settings = await getAiSettings();
             if (!settings.mtai.errorHelp) return NextResponse.json({ error: "This isn't switched on." }, { status: 503 });
-            const seed = parseSeed(body.seed);
-            if (!seed || transcript.length !== 1) {
-                return NextResponse.json({ error: "Something went wrong with this chat. Please start a new chat." }, { status: 400 });
-            }
-            let label = "this sale";
-            if (seed.posSessionId) {
-                const { data: s } = await supabaseAdmin.from("pos_sessions").select("id, ref, created_by").eq("id", seed.posSessionId).maybeSingle();
-                if (!s) return NextResponse.json({ error: "That sale wasn't found." }, { status: 404 });
-                if (role === "sales_staff" && s.created_by !== user.id) return NextResponse.json({ error: "That sale belongs to someone else." }, { status: 403 });
-                label = `till sale #${s.ref ?? String(s.id).slice(0, 8).toUpperCase()}`;
-            } else if (seed.orderId) {
-                const { data: o } = await supabaseAdmin.from("orders").select("id, ref").eq("id", seed.orderId).maybeSingle();
-                if (!o) return NextResponse.json({ error: "That order wasn't found." }, { status: 404 });
-                label = `order #${o.ref ?? String(o.id).slice(0, 8).toUpperCase()}`;
-            }
-            if (seed.saleKey) {
-                const { data: rows } = await supabaseAdmin.from("sale_payment_attempts").select("created_by, pos_session_id").eq("sale_key", seed.saleKey);
-                const owned = saleVisible(rows ?? [], role, user.id) || (!!seed.posSessionId && (rows ?? []).length > 0 && (rows ?? []).every(r => r.pos_session_id === seed.posSessionId));
-                if (!owned && role === "sales_staff") return NextResponse.json({ error: "That sale belongs to someone else." }, { status: 403 });
-            }
-            const latest = await supabaseAdmin.from("sale_payment_attempts").select("id")
-                .eq(seed.posSessionId ? "pos_session_id" : seed.orderId ? "order_id" : "sale_key", (seed.posSessionId ?? seed.orderId ?? seed.saleKey) as string)
-                .order("created_at", { ascending: false }).limit(1).maybeSingle();
-            const key = seedKey(seed, latest.data?.id ?? null);
-            const since = new Date(Date.now() - SEED_WINDOW_MINUTES * 60_000).toISOString();
-            const { count } = await supabaseAdmin.from("ai_turns").select("id", { count: "exact", head: true })
-                .eq("user_id", user.id).eq("seed_key", key).gte("created_at", since);
-            if ((count ?? 0) > 0) {
-                return NextResponse.json({ error: "You asked about this a moment ago. Please check the chat above." }, { status: 429 });
-            }
+            const gate = await checkSeed({ seed: body.seed, transcriptLength: transcript.length, role, userId: user.id }, {
+                session: async (id) => (await supabaseAdmin.from("pos_sessions").select("id, ref, created_by").eq("id", id).maybeSingle()).data,
+                order: async (id) => (await supabaseAdmin.from("orders").select("id, ref").eq("id", id).maybeSingle()).data,
+                saleRows: async (key) => (await supabaseAdmin.from("sale_payment_attempts").select("created_by, pos_session_id").eq("sale_key", key)).data ?? [],
+                latestAttemptId: async (seed) => (await supabaseAdmin.from("sale_payment_attempts").select("id")
+                    .eq(seed.posSessionId ? "pos_session_id" : seed.orderId ? "order_id" : "sale_key", (seed.posSessionId ?? seed.orderId ?? seed.saleKey) as string)
+                    .order("created_at", { ascending: false }).limit(1).maybeSingle()).data?.id ?? null,
+                recentAsks: async (key) => (await supabaseAdmin.from("ai_turns").select("id", { count: "exact", head: true })
+                    .eq("user_id", user.id).eq("seed_key", key)
+                    .gte("created_at", new Date(Date.now() - SEED_WINDOW_MINUTES * 60_000).toISOString())).count ?? 0,
+            });
+            if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
             const first = transcript[0] as { role: "user"; content: unknown };
-            transcript[0] = { role: "user", content: `${seedLine(seed, label)}\n${typeof first.content === "string" ? first.content : ""}` } as (typeof transcript)[number];
-            seedKeyValue = key;
+            transcript[0] = { role: "user", content: `${signSeedLine(seedLine(gate.seed, gate.label))}\n${typeof first.content === "string" ? first.content : ""}` } as (typeof transcript)[number];
+            seedKeyValue = gate.key;
         }
 
         const result = await runStoreAssistant({ transcript, userId: user.id, role, seedKey: seedKeyValue });

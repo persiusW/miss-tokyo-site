@@ -590,6 +590,8 @@ export default function CheckoutPage() {
                 body: JSON.stringify(payload),
             });
             const data = await res.json();
+            // The server starts a new sale when this key's sale already paid.
+            if (typeof data.saleKey === "string") sessionStorage.setItem(SALE_KEY, data.saleKey);
             if (data.authorizationUrl) {
                 // Store any OOS-excluded items so the success page can display them
                 if (data.oosItems?.length) {

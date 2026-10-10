@@ -13,7 +13,7 @@ import { Spotlight } from "./Spotlight";
 import { WalkthroughRunner } from "./WalkthroughRunner";
 import { Spark } from "./icons";
 import "./mtai.css";
-import { setAskHandler } from "@/lib/toast";
+import { setAskHandler, toast } from "@/lib/toast";
 
 const TIP_KEY = "mt.assistant.tipSeen";
 
@@ -82,7 +82,14 @@ export function MissTokyoAi() {
     // Payment error toasts get "Ask Miss Tokyo AI" only while the switch is on.
     const errorHelpOn = useMissTokyoAi(s => s.features.errorHelp);
     useEffect(() => {
-        setAskHandler(errorHelpOn ? (ask) => window.dispatchEvent(new CustomEvent("mtai:ask", { detail: ask })) : null);
+        setAskHandler(errorHelpOn ? (ask) => {
+            if (useMissTokyoAi.getState().loading) {
+                toast.info("Miss Tokyo AI is still answering. Tap Ask again in a moment.");
+                return false;
+            }
+            window.dispatchEvent(new CustomEvent("mtai:ask", { detail: ask }));
+            return true;
+        } : null);
         return () => setAskHandler(null);
     }, [errorHelpOn]);
 

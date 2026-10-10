@@ -26,7 +26,7 @@ export function Toaster() {
                         {t.message}
                         {t.ask && getAskHandler() && (
                             <button type="button" className="block mt-2 underline underline-offset-2"
-                                onClick={() => { const h = getAskHandler(); if (h && t.ask) h(t.ask); dismiss(t.id); }}>
+                                onClick={() => { const h = getAskHandler(); if (h && t.ask && h(t.ask)) dismiss(t.id); }}>
                                 Ask Miss Tokyo AI
                             </button>
                         )}

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { revalidateTag } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/supabaseAdmin";
 import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
@@ -59,7 +59,7 @@ export async function GET(req: Request) {
         }
 
         const txData = data.data;
-        await recordResult(reference, txData);
+        after(() => recordResult(reference, txData)); // off the response path
         const paystackTxStatus: string = txData.status; // "success" | "failed" | "abandoned" | "ongoing"
         const metadata = txData.metadata || {};
         const { orderId: metaOrderId, fullName, phone, address, deliveryMethod, cartItems } = metadata;
