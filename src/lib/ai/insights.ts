@@ -4,6 +4,7 @@
 export function failureReason(channel: string, errorCode: string | null | undefined): string {
     const t = String(errorCode ?? "");
     if (channel === "sms") {
+        if (/api.?key|sender|unauthori[sz]ed|\b40[13]\b/i.test(t)) return "The SMS account settings need checking.";
         if (/balance|credit|insufficient|top.?up/i.test(t)) return "SMS credit has run out.";
         if (/invalid|not a valid|recipient|number/i.test(t)) return "The phone number isn't valid.";
         if (/html|timeout|timed out|network|ECONN|fetch|5\d\d/i.test(t)) return "The SMS provider didn't answer properly.";

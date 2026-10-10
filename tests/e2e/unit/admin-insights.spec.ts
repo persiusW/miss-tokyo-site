@@ -8,7 +8,7 @@ import path from "path";
 test("failure reasons are plain and never the provider's text", () => {
     expect(failureReason("sms", "Insufficient balance on account")).toBe("SMS credit has run out.");
     expect(failureReason("sms", "Invalid recipient number 0244")).toBe("The phone number isn't valid.");
-    expect(failureReason("sms", "mNotify returned HTML — check API key")).toBe("The SMS provider didn't answer properly.");
+    expect(failureReason("sms", "mNotify returned HTML — check API key")).toBe("The SMS account settings need checking.");
     expect(failureReason("email", "Email bounced: mailbox full")).toBe("The email was rejected by the customer's mailbox.");
     expect(failureReason("email", null)).toBe("The email provider refused it.");
     expect(failureReason("sms", "something odd")).toBe("The SMS provider refused it.");
@@ -109,3 +109,9 @@ test("pageAll reads past the 1000-row cap and stops at the limit", async () => {
     expect(failing.error).toBeTruthy();
 });
 
+test("SMS account faults are not blamed on the customer's number", () => {
+    expect(failureReason("sms", "Invalid API key")).toBe("The SMS account settings need checking.");
+    expect(failureReason("sms", "invalid sender id")).toBe("The SMS account settings need checking.");
+    expect(failureReason("sms", "401 Unauthorized")).toBe("The SMS account settings need checking.");
+    expect(failureReason("sms", "Invalid recipient number")).toBe("The phone number isn't valid.");
+});
