@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { errorBody, type Audience, type ErrorCode } from "@/lib/errors/catalogue";
 import { redactText } from "@/lib/ai/missTokyoAi/scrub";
 import { recordErrorEvent } from "@/lib/errors/errorEvents";
-import { cleanPlace } from "@/lib/errors/errorPlace";
+import { audienceForPath, cleanPlace } from "@/lib/errors/errorPlace";
 
 export function logCause(code: string, cause: unknown, context?: Record<string, unknown>) {
     const text = cause instanceof Error ? cause.message : typeof cause === "string" ? cause : cause == null ? "" : JSON.stringify(cause);
@@ -16,10 +16,12 @@ export function apiError(code: ErrorCode, opts: { status: number; audience: Audi
     logCause(code, opts.cause, opts.context);
     try {
         // After the response: the page the request came from, and the code.
+        // No page means no person saw it (cron, webhooks), so nothing is kept.
         after(async () => {
             let place: string | null = null;
             try { place = cleanPlace((await headers()).get("referer")); } catch { /* no request headers */ }
-            await recordErrorEvent(code, place, opts.audience);
+            if (!place) return;
+            await recordErrorEvent(code, place, place === "other" ? opts.audience : audienceForPath(place));
         });
     } catch {
         // Called outside a request: nothing to record against.
