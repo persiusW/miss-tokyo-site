@@ -65,3 +65,12 @@ export function stopPolling(i: { state: string; httpStatus: number; settlingSinc
 export function saleKeyFor(requested: string, alreadyPaid: boolean): string {
     return alreadyPaid ? cleanSaleKey(undefined) : requested;
 }
+
+/**
+ * When the server replaced the key, tell the caller: the checkout page keeps
+ * its key in sessionStorage and would otherwise start a fresh sale every retry.
+ */
+export function withSaleKey<T extends { status: number; body: any }>(result: T, requested: string, used: string): T {
+    if (used === requested || !result.body || typeof result.body !== "object") return result;
+    return { ...result, body: { ...result.body, saleKey: used } };
+}

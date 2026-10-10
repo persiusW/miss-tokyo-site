@@ -9,7 +9,7 @@ import { variantKey } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
 import { errorBody } from "@/lib/errors/catalogue";
-import { channelFor, cleanSaleKey, saleKeyFor } from "@/lib/payments/attemptRules";
+import { channelFor, cleanSaleKey, saleKeyFor, withSaleKey } from "@/lib/payments/attemptRules";
 import { recordError, recordStart } from "@/lib/payments/attempts";
 
 /** The JSON body /api/paystack/initialize has always accepted. */
@@ -62,12 +62,19 @@ export type CheckoutContext = {
 };
 
 export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext): Promise<CheckoutRunResult> {
-    const requestedKey = cleanSaleKey((payload as { saleKey?: unknown } | null)?.saleKey);
+    const raw = (payload as { saleKey?: unknown } | null)?.saleKey;
+    const requestedKey = cleanSaleKey(raw);
     // A key whose sale already paid (e.g. the success page never confirmed and
     // the webhook settled later) must not carry its failures into a new order.
     const { count: paidOnKey } = await supabaseAdmin.from("sale_payment_attempts")
         .select("id", { count: "exact", head: true }).eq("sale_key", requestedKey).eq("status", "paid");
     const saleKey = saleKeyFor(requestedKey, (paidOnKey ?? 0) > 0);
+    const result = await runCheckoutOnKey(payload, ctx, saleKey);
+    // Only a caller that sent a key keeps one; the others never see the field.
+    return typeof raw === "string" ? withSaleKey(result, requestedKey, saleKey) : result;
+}
+
+async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, saleKey: string): Promise<CheckoutRunResult> {
     const attemptChannel = channelFor(ctx.source);
         const {
             productId,

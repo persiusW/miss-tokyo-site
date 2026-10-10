@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { earlierMarkersOk, seedLine } from "../../../src/lib/ai/missTokyoAi/seed";
 import { checkSeed, type SeedDeps } from "../../../src/lib/ai/missTokyoAi/seedGate";
-import { stopPolling, saleKeyFor } from "../../../src/lib/payments/attemptRules";
+import { stopPolling, saleKeyFor, withSaleKey } from "../../../src/lib/payments/attemptRules";
 
 const S = "3bbb1012-8789-456e-a4f8-741861408981";
 const verify = (body: string, sig: string) => sig === `ok-${body.length}`;
@@ -57,3 +57,12 @@ test("a sale key that already paid starts a new sale", () => {
     expect(saleKeyFor(S, true)).not.toBe(S);
     expect(saleKeyFor(S, true)).toMatch(/^[0-9a-f-]{36}$/);
 });
+
+test("a replaced sale key goes back to the checkout page so retries stay on one sale", () => {
+    const S = "11111111-1111-4111-8111-111111111111";
+    const N = "22222222-2222-4222-8222-222222222222";
+    expect(withSaleKey({ status: 502, body: { code: "PAY-01" } }, S, N).body).toEqual({ code: "PAY-01", saleKey: N });
+    expect(withSaleKey({ status: 200, body: { authorizationUrl: "x" } }, S, N).body.saleKey).toBe(N);
+    expect(withSaleKey({ status: 400, body: { error: "e" } }, S, S).body).toEqual({ error: "e" });
+});
+
