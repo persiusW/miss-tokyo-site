@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { failureReason, maskRecipient, summariseUsage, countBy } from "../../../src/lib/ai/insights";
-import { audienceForPath, cleanPlace } from "../../../src/lib/errors/errorPlace";
+import { audienceForPath, cleanPlace, PAGE_ROUTES } from "../../../src/lib/errors/errorPlace";
+import fs from "fs";
+import path from "path";
 
 test("failure reasons are plain and never the provider's text", () => {
     expect(failureReason("sms", "Insufficient balance on account")).toBe("SMS credit has run out.");
@@ -38,10 +40,10 @@ test("counts by key, biggest first", () => {
 test("error place is the page path with ids masked and nothing else", () => {
     expect(cleanPlace("https://misstokyo.shop/sales/orders/0b1c2d3e-1111-4222-8333-444455556666?tab=x#y")).toBe("/sales/orders/:id");
     expect(cleanPlace("/pos")).toBe("/pos");
-    expect(cleanPlace("/track/MT-1234567890")).toBe("/track/:id");
+    expect(cleanPlace("/track/MT-1234567890")).toBe("other");
     expect(cleanPlace(null)).toBeNull();
     expect(cleanPlace("not a url")).toBeNull();
-    expect(cleanPlace("/" + "a".repeat(300))!.length).toBeLessThanOrEqual(120);
+    expect(cleanPlace("/" + "a".repeat(300))).toBe("other");
 });
 
 test("client error audience follows the dashboard paths", () => {
@@ -52,3 +54,34 @@ test("client error audience follows the dashboard paths", () => {
     expect(audienceForPath("/checkout/success")).toBe("customer");
     expect(audienceForPath("/possum")).toBe("customer");
 });
+
+test("error place only ever names a real page; anything else is 'other'", () => {
+    expect(cleanPlace("/products/summer-dress-2026")).toBe("/products/:slug");
+    expect(cleanPlace("/pay/abc123")).toBe("/pay/:pos_id");
+    expect(cleanPlace("/catalog/products/0b1c2d3e-1111-4222-8333-444455556666/edit")).toBe("/catalog/products/:id/edit");
+    expect(cleanPlace("/catalog/products/low-stock")).toBe("/catalog/products/low-stock");
+    expect(cleanPlace("/")).toBe("/");
+    expect(cleanPlace("/x/ama.mensah@gmail.com")).toBe("other");
+    expect(cleanPlace("/products/ama%40gmail.com")).toBe("other");
+    expect(cleanPlace("/call-mr-kofi-on-whatsapp-for-refund")).toBe("other");
+    expect(cleanPlace("/sales/orders/1/extra")).toBe("other");
+});
+
+test("every page in src/app is a known error place", () => {
+    const root = path.join(__dirname, "../../../src/app");
+    const found: string[] = [];
+    const walk = (dir: string) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, e.name);
+            if (e.isDirectory()) walk(full);
+            else if (e.name === "page.tsx") {
+                const route = "/" + path.relative(root, dir).split(path.sep).filter(s => s && !/^\(.*\)$/.test(s)).join("/");
+                found.push(route);
+            }
+        }
+    };
+    walk(root);
+    const missing = found.filter(r => !PAGE_ROUTES.includes(r));
+    expect(missing).toEqual([]);
+});
+
