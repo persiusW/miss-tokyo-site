@@ -1,5 +1,5 @@
 // The till's live view of one link: asks Paystack (at most every 4s per
-// session — recordResult stamps updated_at, which is the throttle), records
+// attempt — a conditional update on updated_at claims the check), records
 // the answer, and never settles anything. The webhook owns settlement.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabaseServer";
