@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { failureReason, maskRecipient, summariseUsage, countBy } from "../../../src/lib/ai/insights";
 import { audienceForPath, cleanPlace, ErrorEventGate, PAGE_ROUTES } from "../../../src/lib/errors/errorPlace";
+import { pageAll } from "../../../src/lib/ai/insights";
 import fs from "fs";
 import path from "path";
 
@@ -93,5 +94,18 @@ test("error recording is throttled per instance and repeats collapse", () => {
     expect(g.allow("PAY-02|/pos|staff", 1000)).toBe(true);
     expect(g.allow("PAY-03|/pos|staff", 1000)).toBe(false);
     expect(g.allow("GEN-00|/pos|staff", 61_000)).toBe(true);
+});
+
+test("pageAll reads past the 1000-row cap and stops at the limit", async () => {
+    const rows = Array.from({ length: 2500 }, (_, i) => i);
+    const fetch = async (from: number, to: number) => ({ data: rows.slice(from, to + 1), error: null });
+    const all = await pageAll(fetch, 1000, 10);
+    expect(all.rows.length).toBe(2500);
+    expect(all.truncated).toBe(false);
+    const capped = await pageAll(fetch, 1000, 2);
+    expect(capped.rows.length).toBe(2000);
+    expect(capped.truncated).toBe(true);
+    const failing = await pageAll(async () => ({ data: null, error: { code: "x" } }), 1000, 3);
+    expect(failing.error).toBeTruthy();
 });
 

@@ -7,16 +7,18 @@ import { useEffect, useState } from "react";
 type Insights = {
     failed_sends: {
         total: number;
+        capped?: boolean;
         by_kind: { channel: string; event: string; count: number }[];
         recent: { at: string; channel: string; event: string; to: string; reason: string }[];
     };
     errors: {
         enabled: boolean;
         total: number;
+        capped?: boolean;
         by_code: { code: string; label: string; count: number }[];
         recent: { at: string; code: string; place: string | null; audience: string }[];
     };
-    usage: Record<"week" | "month", { name: string; questions: number; cost_ghs: number; last_used: string }[]>;
+    usage: Record<"week" | "month", { name: string; questions: number; cost_ghs: number; last_used: string }[]> & { capped?: boolean };
 };
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
@@ -65,7 +67,7 @@ export default function AiInsights() {
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "6px 0 12px" }}>
                             {data.failed_sends.by_kind.map(k => (
                                 <span key={`${k.channel}|${k.event}`} style={{ fontSize: 12, padding: "4px 10px", border: "1px solid var(--ac-line-2)", borderRadius: 999 }}>
-                                    {channelName(k.channel)} · {eventName(k.event)} — <strong>{k.count}</strong>
+                                    {channelName(k.channel)} · {eventName(k.event)} — <strong>{k.count}{data.failed_sends.capped ? "+" : ""}</strong>
                                 </span>
                             ))}
                         </div>
@@ -107,7 +109,7 @@ export default function AiInsights() {
                             <thead><tr><th>Code</th><th>What they saw</th><th>Times</th></tr></thead>
                             <tbody>
                                 {data.errors.by_code.map(e => (
-                                    <tr key={e.code}><td className="ac-mono">{e.code}</td><td>{e.label}</td><td className="ac-mono">{e.count}</td></tr>
+                                    <tr key={e.code}><td className="ac-mono">{e.code}</td><td>{e.label}</td><td className="ac-mono">{e.count}{data.errors.capped ? "+" : ""}</td></tr>
                                 ))}
                             </tbody>
                         </table>
@@ -152,7 +154,7 @@ export default function AiInsights() {
                                 {usage.map((u, i) => (
                                     <tr key={i}>
                                         <td>{u.name}</td>
-                                        <td className="ac-mono">{u.questions}</td>
+                                        <td className="ac-mono">{u.questions}{data.usage.capped ? "+" : ""}</td>
                                         <td className="ac-mono">GHS {u.cost_ghs.toFixed(2)}</td>
                                         <td>{u.last_used ? when(u.last_used) : "—"}</td>
                                     </tr>

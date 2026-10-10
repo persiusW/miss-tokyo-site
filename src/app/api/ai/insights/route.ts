@@ -4,7 +4,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireAiAdmin } from "@/lib/ai/requireAdmin";
-import { countBy, failureReason, maskRecipient, summariseUsage } from "@/lib/ai/insights";
+import { countBy, failureReason, maskRecipient, pageAll, summariseUsage } from "@/lib/ai/insights";
 import { USD_TO_GHS } from "@/lib/ai/pricing";
 import { apiError } from "@/lib/errors/apiError";
 import { errorText } from "@/lib/errors/catalogue";
@@ -15,6 +15,8 @@ const DENIED = {
 };
 
 const DAY = 86_400_000;
+const PAGE = 1000; // PostgREST's max_rows
+const MAX_PAGES = 50;
 
 export async function GET() {
     const auth = await requireAiAdmin();
@@ -24,21 +26,22 @@ export async function GET() {
         const now = Date.now();
         const weekAgo = new Date(now - 7 * DAY).toISOString();
         const monthAgo = new Date(now - 30 * DAY).toISOString();
+        // Each response stops at 1000 rows, so the counted lists are read page by page.
         const [sendsRes, errorsRes, turnsRes, switchRes] = await Promise.all([
-            supabaseAdmin.from("notification_log").select("channel, event, recipient, error_code, created_at")
-                .eq("status", "failed").gte("created_at", weekAgo).order("created_at", { ascending: false }).limit(1000),
-            supabaseAdmin.from("app_error_events").select("code, place, audience, created_at")
-                .gte("created_at", weekAgo).order("created_at", { ascending: false }).limit(5000),
-            supabaseAdmin.from("ai_turns").select("user_id, cost_usd, created_at")
-                .gte("created_at", monthAgo).not("user_id", "is", null).limit(20000),
+            pageAll((from, to) => supabaseAdmin.from("notification_log").select("channel, event, recipient, error_code, created_at")
+                .eq("status", "failed").gte("created_at", weekAgo).order("created_at", { ascending: false }).order("id").range(from, to), PAGE, MAX_PAGES),
+            pageAll((from, to) => supabaseAdmin.from("app_error_events").select("code, place, audience, created_at")
+                .gte("created_at", weekAgo).order("created_at", { ascending: false }).order("id").range(from, to), PAGE, MAX_PAGES),
+            pageAll((from, to) => supabaseAdmin.from("ai_turns").select("user_id, cost_usd, created_at")
+                .gte("created_at", monthAgo).not("user_id", "is", null).order("created_at", { ascending: false }).order("id").range(from, to), PAGE, MAX_PAGES),
             supabaseAdmin.from("ai_settings").select("value").eq("key", "mtai_error_log_enabled").maybeSingle(),
         ]);
         const failed = sendsRes.error ?? errorsRes.error ?? turnsRes.error ?? switchRes.error;
         if (failed) return apiError("GEN-00", { status: 500, audience: "staff", cause: failed, context: { route: "ai/insights" } });
 
-        const sends = sendsRes.data ?? [];
-        const errors = errorsRes.data ?? [];
-        const turns = turnsRes.data ?? [];
+        const sends = sendsRes.rows as { channel: string; event: string; recipient: string | null; error_code: string | null; created_at: string }[];
+        const errors = errorsRes.rows as { code: string; place: string | null; audience: string; created_at: string }[];
+        const turns = turnsRes.rows as { user_id: string | null; cost_usd: number | string | null; created_at: string }[];
 
         const userIds = [...new Set(turns.map(t => t.user_id as string))];
         const names = new Map<string, string>();
@@ -53,6 +56,7 @@ export async function GET() {
         return NextResponse.json({
             failed_sends: {
                 total: sends.length,
+                capped: sendsRes.truncated,
                 by_kind: countBy(sends, s => `${s.channel}|${s.event}`).map(({ key, count }) => {
                     const [channel, event] = key.split("|");
                     return { channel, event, count };
@@ -68,10 +72,12 @@ export async function GET() {
             errors: {
                 enabled: switchRes.data?.value === true,
                 total: errors.length,
+                capped: errorsRes.truncated,
                 by_code: countBy(errors, e => e.code).map(({ key, count }) => ({ code: key, label: errorText(key, "staff"), count })),
                 recent: errors.slice(0, 50).map(e => ({ at: e.created_at, code: e.code, place: e.place, audience: e.audience })),
             },
             usage: {
+                capped: turnsRes.truncated,
                 week: summariseUsage(turns.filter(t => t.created_at >= weekAgo), names, USD_TO_GHS),
                 month: summariseUsage(turns, names, USD_TO_GHS),
             },

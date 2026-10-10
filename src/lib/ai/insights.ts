@@ -48,3 +48,23 @@ export function summariseUsage(
         .map(([id, v]) => ({ name: names.get(id) ?? "Team member", questions: v.questions, cost_ghs: parseFloat((v.usd * usdToGhs).toFixed(2)), last_used: v.last }))
         .sort((a, b) => b.cost_ghs - a.cost_ghs || b.questions - a.questions);
 }
+
+/**
+ * Reads every page of a query: PostgREST stops each response at 1000 rows.
+ * Stops after maxPages and says so, rather than reading without end.
+ */
+export async function pageAll<T>(
+    fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+    pageSize: number,
+    maxPages: number,
+): Promise<{ rows: T[]; truncated: boolean; error: unknown }> {
+    const rows: T[] = [];
+    for (let p = 0; p < maxPages; p++) {
+        const { data, error } = await fetchPage(p * pageSize, (p + 1) * pageSize - 1);
+        if (error) return { rows, truncated: false, error };
+        const got = data ?? [];
+        rows.push(...got);
+        if (got.length < pageSize) return { rows, truncated: false, error: null };
+    }
+    return { rows, truncated: true, error: null };
+}
