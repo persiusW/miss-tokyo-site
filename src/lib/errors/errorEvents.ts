@@ -3,9 +3,13 @@
 // Off unless ai_settings.mtai_error_log_enabled is true.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import type { Audience } from "@/lib/errors/catalogue";
+import { ErrorEventGate } from "@/lib/errors/errorPlace";
 
 const SWITCH_TTL_MS = 60_000;
 let cached: { on: boolean; at: number } | null = null;
+// Anyone can reach a route that fails: keep repeats once a minute and at most
+// 30 events a minute per server instance, so a flood can't bury real errors.
+const gate = new ErrorEventGate(30, 60_000);
 
 async function loggingOn(): Promise<boolean> {
     if (cached && Date.now() - cached.at < SWITCH_TTL_MS) return cached.on;
@@ -18,6 +22,7 @@ async function loggingOn(): Promise<boolean> {
 export async function recordErrorEvent(code: string, place: string | null, audience: Audience): Promise<void> {
     try {
         if (!(await loggingOn())) return;
+        if (!gate.allow(`${code}|${place}|${audience}`, Date.now())) return;
         const { error } = await supabaseAdmin.from("app_error_events").insert({ code: code.slice(0, 10), place, audience });
         if (error) console.error("[error-events] insert failed", error.code);
     } catch {

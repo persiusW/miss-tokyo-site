@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { failureReason, maskRecipient, summariseUsage, countBy } from "../../../src/lib/ai/insights";
-import { audienceForPath, cleanPlace, PAGE_ROUTES } from "../../../src/lib/errors/errorPlace";
+import { audienceForPath, cleanPlace, ErrorEventGate, PAGE_ROUTES } from "../../../src/lib/errors/errorPlace";
 import fs from "fs";
 import path from "path";
 
@@ -83,5 +83,15 @@ test("every page in src/app is a known error place", () => {
     walk(root);
     const missing = found.filter(r => !PAGE_ROUTES.includes(r));
     expect(missing).toEqual([]);
+});
+
+test("error recording is throttled per instance and repeats collapse", () => {
+    const g = new ErrorEventGate(3, 60_000);
+    expect(g.allow("GEN-00|/pos|staff", 0)).toBe(true);
+    expect(g.allow("GEN-00|/pos|staff", 1000)).toBe(false);
+    expect(g.allow("PAY-01|/pos|staff", 1000)).toBe(true);
+    expect(g.allow("PAY-02|/pos|staff", 1000)).toBe(true);
+    expect(g.allow("PAY-03|/pos|staff", 1000)).toBe(false);
+    expect(g.allow("GEN-00|/pos|staff", 61_000)).toBe(true);
 });
 

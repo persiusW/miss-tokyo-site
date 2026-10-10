@@ -137,3 +137,27 @@ export function audienceForPath(path: string): "staff" | "customer" {
     return STAFF_PREFIXES.some(p => path === p || path.startsWith(p + "/")) ? "staff" : "customer";
 }
 
+/**
+ * Per-instance write limit for error events: the same code/page/audience is
+ * kept once a window, and at most `max` events are kept a window in total.
+ */
+export class ErrorEventGate {
+    private seen = new Map<string, number>();
+    private windowStart = 0;
+    private count = 0;
+    constructor(private max: number, private windowMs: number) {}
+
+    allow(key: string, now: number): boolean {
+        if (now - this.windowStart >= this.windowMs) {
+            this.windowStart = now;
+            this.count = 0;
+            for (const [k, t] of this.seen) if (now - t >= this.windowMs) this.seen.delete(k);
+        }
+        const last = this.seen.get(key);
+        if (last !== undefined && now - last < this.windowMs) return false;
+        if (this.count >= this.max) return false;
+        this.count += 1;
+        this.seen.set(key, now);
+        return true;
+    }
+}
