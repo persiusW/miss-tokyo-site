@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { completionBanner, deliveryHeadline, deliveryToast, TILL_GENERIC, TILL_SERVER_UNREACHABLE } from "../../../src/lib/pos/tillMessages";
+import { completionBanner, deliveryHeadline, deliveryToast, liveStatusText, TILL_GENERIC, TILL_SERVER_UNREACHABLE } from "../../../src/lib/pos/tillMessages";
 import { readJson } from "../../../src/lib/http/readJson";
 
 test("headline says what actually went out", () => {
@@ -60,4 +60,12 @@ test("an unclear cash outcome never invites a blind retry", async () => {
     const { unclearOutcome } = await import("../../../src/lib/pos/tillMessages");
     expect(unclearOutcome("cash")).toBe("We couldn't confirm the cash sale. Check POS History before trying again, so it isn't recorded twice.");
     expect(unclearOutcome("link")).toBe(TILL_SERVER_UNREACHABLE);
+});
+
+test("live link status: says when it stopped updating instead of freezing", () => {
+    expect(liveStatusText({ state: "paid", failures: 0, orderRef: "AB12" }, null)).toBe("Paid ✓ · Order #AB12");
+    expect(liveStatusText({ state: "settling", failures: 0 }, null)).toBe("Paid, finishing up…");
+    expect(liveStatusText({ state: "settling", failures: 0 }, "settling_limit")).toBe("Paid. Check Orders for the order number.");
+    expect(liveStatusText({ state: "declined", failures: 3 }, null)).toBe("Declined (2 of 2)");
+    expect(liveStatusText({ state: "waiting", failures: 0 }, "signed_out")).toBe("Waiting for the customer… (not updating — sign in again)");
 });

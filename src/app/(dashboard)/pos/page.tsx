@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
-import { completedViaFrom, completionBanner, deliveryHeadline, deliveryToast, TILL_GENERIC, TILL_SERVER_UNREACHABLE, unclearOutcome, type Delivery } from '@/lib/pos/tillMessages';
+import { completedViaFrom, completionBanner, deliveryHeadline, deliveryToast, liveStatusText, TILL_GENERIC, TILL_SERVER_UNREACHABLE, unclearOutcome, type Delivery, type LiveStopped } from '@/lib/pos/tillMessages';
 import { readJson } from '@/lib/http/readJson';
 import type { PosProduct, PosItem, PosDeliveryMethod, PosAppliedDiscount } from '@/types/pos';
 import { computeDiscountSplit } from '@/lib/discountSplit';
@@ -161,6 +161,7 @@ export default function POSPage() {
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [liveStatusOn, setLiveStatusOn] = useState(false);
     const [live, setLive] = useState<{ state: string; failures: number; orderRef?: string } | null>(null);
+    const [liveStopped, setLiveStopped] = useState<LiveStopped>(null);
     // Cash is irreversible once recorded, so the button arms on the first tap
     // and fires on the second. A native confirm() would block the whole till.
     const [cashArmed, setCashArmed] = useState(false);
@@ -282,6 +283,7 @@ export default function POSPage() {
         let stop = false;
         let lastState = "";
         let settlingSince: number | null = null;
+        setLiveStopped(null);
         const tick = async () => {
             try {
                 const res = await fetch(`/api/pos/session/${sessionId}/payment`);
@@ -289,14 +291,17 @@ export default function POSPage() {
                 if (stop) return;
                 if (!res.ok || !data) {
                     // Signed out or not allowed: asking again won't help.
-                    if (stopPolling({ state: "", httpStatus: res.status, settlingSince, now: Date.now() })) stop = true;
+                    if (stopPolling({ state: "", httpStatus: res.status, settlingSince, now: Date.now() })) { stop = true; setLiveStopped("signed_out"); }
                     return;
                 }
                 setLive(data);
                 if (data.state === "declined" && lastState !== "declined") toast.code("PAY-04", { audience: "staff", ask: { posSessionId: sessionId, saleKey } });
                 if (data.state === "settling" && settlingSince === null) settlingSince = Date.now();
                 lastState = data.state;
-                if (stopPolling({ state: data.state, httpStatus: res.status, settlingSince, now: Date.now() })) stop = true;
+                if (stopPolling({ state: data.state, httpStatus: res.status, settlingSince, now: Date.now() })) {
+                    stop = true;
+                    if (data.state === "settling") setLiveStopped("settling_limit");
+                }
             } catch { /* next tick */ }
         };
         void tick();
@@ -855,11 +860,7 @@ export default function POSPage() {
                                 <p style={{ fontSize: 10, color: "var(--ac-ink-3)", wordBreak: "break-all", fontFamily: "var(--f-mono)" }}>{paymentUrl}</p>
                                 {liveStatusOn && live && (
                                     <p role="status" style={{ fontSize: 11, fontWeight: 600, marginTop: 6, color: live.state === "declined" || live.state === "expired" ? "var(--ac-warn)" : "var(--ac-ink)" }}>
-                                        {live.state === "paid" ? `Paid ✓${live.orderRef ? ` · Order #${live.orderRef}` : ""}`
-                                            : live.state === "settling" ? "Paid, finishing up…"
-                                            : live.state === "declined" ? `Declined (${Math.min(Math.max(live.failures, 1), 2)} of 2)`
-                                            : live.state === "expired" ? "Link expired"
-                                            : "Waiting for the customer…"}
+                                        {liveStatusText(live, liveStopped)}
                                     </p>
                                 )}
                             </div>); })()}
