@@ -64,7 +64,8 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
             // A tool call we won't answer (truncated, paused, out of context) never enters the transcript.
             if (toolUses.length > 0 && response.stop_reason !== "tool_use") { fixed = LINES.slow; break; }
 
-            messages.push({ role: "assistant", content: response.content });
+            // A blank text block is rejected by the API on every later turn.
+            messages.push({ role: "assistant", content: response.content.filter(b => !(b.type === "text" && !b.text.trim())) });
 
             if (response.stop_reason === "tool_use" && toolUses.length > 0) {
                 // One at a time, in order: the caps and lockouts read and write shared chat state.

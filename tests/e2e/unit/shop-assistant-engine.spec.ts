@@ -125,3 +125,13 @@ test("blank text blocks never reach the saved chat", async () => {
     expect(last.content.some((b: any) => b.type === "text" && !b.text.trim())).toBe(false);
     expect(last.content.some((b: any) => b.type === "text" && b.text === LINES.generic)).toBe(true);
 });
+
+test("a blank text block beside a tool call is not saved", async () => {
+    const r: any = await mini([
+        { content: [{ type: "text", text: "  " }, { type: "tool_use", id: "t1", name: "find_products", input: {} }], stop_reason: "tool_use", usage },
+        say("Done."),
+    ]);
+    const first = r.messages.find((m: any) => m.role === "assistant");
+    expect(first.content.some((b: any) => b.type === "text" && !b.text.trim())).toBe(false);
+    expect(first.content.some((b: any) => b.type === "tool_use")).toBe(true);
+});
