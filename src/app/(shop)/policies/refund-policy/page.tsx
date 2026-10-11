@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { REFUND_POLICY as R } from "@/content/shopInfo";
 
 export const metadata: Metadata = {
     title: "Refund Policy — Miss Tokyo",
@@ -13,8 +14,7 @@ export default function RefundPolicyPage() {
             <div className="space-y-12 text-sm text-neutral-700 leading-relaxed">
                 <section>
                     <p>
-                        At Miss Tokyo, customer satisfaction is important to us. If you are not fully satisfied
-                        with your purchase, you may request a return within 72 hours of receiving your order.
+                        {R.intro}
                     </p>
                 </section>
 
@@ -23,15 +23,7 @@ export default function RefundPolicyPage() {
                         Eligibility
                     </h2>
                     <ul className="space-y-3 list-none">
-                        <li className="pl-4 border-l border-neutral-200">
-                            Items must be unused, unworn, and in original condition with tags attached.
-                        </li>
-                        <li className="pl-4 border-l border-neutral-200">
-                            Returns must be requested within the 72-hour return window after delivery.
-                        </li>
-                        <li className="pl-4 border-l border-neutral-200">
-                            Items damaged due to misuse or normal wear are not eligible for return.
-                        </li>
+                        {R.eligibility.map(t => <li key={t} className="pl-4 border-l border-neutral-200">{t}</li>)}
                     </ul>
                 </section>
 
@@ -40,10 +32,7 @@ export default function RefundPolicyPage() {
                         Once Your Return Is Approved
                     </h2>
                     <ul className="space-y-3 list-none">
-                        <li className="pl-4 border-l border-neutral-200">Offer an exchange, or</li>
-                        <li className="pl-4 border-l border-neutral-200">
-                            Provide store credit equal to the purchase value.
-                        </li>
+                        {R.approved.map(t => <li key={t} className="pl-4 border-l border-neutral-200">{t}</li>)}
                     </ul>
                 </section>
 
@@ -52,8 +41,7 @@ export default function RefundPolicyPage() {
                         Please Note
                     </h2>
                     <p>
-                        Delivery fees are non-refundable, and customers may be responsible for return shipping
-                        costs unless the item received was incorrect or defective.
+                        {R.note}
                     </p>
                 </section>
 
@@ -64,10 +52,10 @@ export default function RefundPolicyPage() {
                     <p>
                         To initiate a return, contact us at{" "}
                         <a
-                            href="mailto:orders@misstokyo.shop"
+                            href={`mailto:${R.contactEmail}`}
                             className="border-b border-black hover:text-neutral-500 transition-colors"
                         >
-                            orders@misstokyo.shop
+                            {R.contactEmail}
                         </a>
                         {" "}within 72 hours of delivery.
                     </p>

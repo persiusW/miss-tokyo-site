@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { normaliseWaNumber, SHOP_SETTING_VALIDATORS } from "../../../src/lib/ai/shopAssistant/settingsRules";
 import { cleanTrackQuery } from "../../../src/lib/orders/trackQuery";
+import { FAQS, SIZE_CHART, shopInfoText, SHOP_INFO_TOPICS } from "../../../src/content/shopInfo";
 
 test("WhatsApp numbers normalise to 233 + 9 digits, or null", () => {
     expect(normaliseWaNumber("055 389 8704")).toBe("233553898704");
@@ -38,4 +39,14 @@ test("order lookups clean refs, emails and phones the way /track always has", ()
     expect(cleanTrackQuery({ ref: "3BBB1012", email: "not-an-email" }).email).toBeNull();
     expect(cleanTrackQuery({ ref: "3BBB1012", phone: "0241" }).phone).toBeNull();
     expect(cleanTrackQuery({})).toEqual({ ref: null, email: null, phone: null });
+});
+
+test("shop info: every topic has text, payment never mentions cash", () => {
+    for (const t of SHOP_INFO_TOPICS) expect(shopInfoText(t).length).toBeGreaterThan(20);
+    expect(shopInfoText("payment")).not.toMatch(/cash/i);
+    expect(shopInfoText("payment")).toMatch(/Paystack/);
+    expect(shopInfoText("returns")).toMatch(/72 hours/);
+    expect(shopInfoText("sizing")).toMatch(/XL — 14/);
+    expect(FAQS.length).toBe(18);
+    expect(SIZE_CHART.length).toBe(6);
 });
