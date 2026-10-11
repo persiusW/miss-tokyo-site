@@ -40,12 +40,12 @@ export default defineConfig({
         // ── 1. Storefront — no auth required ────────────────────────────────
         {
             name: "storefront-chrome",
-            testMatch: /\/(checkout|wholesale-exclusion|storefront|account-portal)\.spec\.ts/,
+            testMatch: /\/(checkout|wholesale-exclusion|storefront|account-portal|shop-assistant)\.spec\.ts/,
             use: { ...devices["Desktop Chrome"] },
         },
         {
             name: "storefront-mobile",
-            testMatch: /\/(storefront|checkout)\.spec\.ts/,
+            testMatch: /\/(storefront|checkout|shop-assistant)\.spec\.ts/,
             use: { ...devices["iPhone 14"] },
         },
 

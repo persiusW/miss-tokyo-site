@@ -19,6 +19,9 @@ export function AskMissTokyo({ enabled }: { enabled: boolean }) {
     const buttonRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => { if (open) setLoaded(true); }, [open]);
+    useEffect(() => {
+        if (process.env.NODE_ENV !== "production") (window as any).__openCart = () => useCart.getState().setIsOpen(true);
+    }, []);
     if (!enabled || widgetHiddenOn(pathname) || cartOpen) return null;
 
     return (
