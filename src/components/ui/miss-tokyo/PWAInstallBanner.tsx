@@ -42,6 +42,12 @@ export function PWAInstallBanner() {
         return () => window.removeEventListener("beforeinstallprompt", handler);
     }, []);
 
+    useEffect(() => {
+        if (!show) return;
+        document.documentElement.dataset.pwaBanner = "1";
+        return () => { delete document.documentElement.dataset.pwaBanner; };
+    }, [show]);
+
     const dismiss = () => {
         haptic("light");
         setVisible(false);
