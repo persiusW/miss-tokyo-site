@@ -76,6 +76,12 @@ export async function POST(req: NextRequest) {
             chat = await createChat({ id, visitorKey: visitorKeyFor(id), customerId: who.customerId });
             newCookie = id;
         }
+        if (chat.customerId && chat.customerId !== who.customerId) {
+            // Someone else's chat (shared device, sign-out, another account): never reuse it. The visitor carries over.
+            const id = crypto.randomUUID();
+            chat = await createChat({ id, visitorKey: chat.visitorKey, customerId: who.customerId });
+            newCookie = id;
+        }
         if (who.customerId && !chat.customerId) chat = { ...chat, customerId: who.customerId };
 
         const counts = await visitorCounts(chat.visitorKey);
