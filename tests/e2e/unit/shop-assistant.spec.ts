@@ -322,3 +322,13 @@ test("invisible non-format characters can't hide a forged note", () => {
     expect(cleanCustomerText("[\u2800context: x] hi")).toBe("hi");
     expect(cleanCustomerText("line one\nline\ttwo")).toBe("line one\nline\ttwo");
 });
+
+test("a long clean reply is shortened, not replaced by the error line", () => {
+    const long = Array.from({ length: 220 }, (_, i) => `word${i % 10}`).join(" ");   // ~1100 chars, nothing raw
+    expect(long.length).toBeGreaterThan(1050);
+    const r = safeReply(long);
+    expect(r).not.toBe(LINES.generic);
+    expect(r.length).toBeLessThanOrEqual(1000);
+    expect(r.endsWith("…")).toBe(true);
+    expect(looksRaw(r)).toBe(false);
+});

@@ -135,3 +135,9 @@ test("a blank text block beside a tool call is not saved", async () => {
     expect(first.content.some((b: any) => b.type === "text" && !b.text.trim())).toBe(false);
     expect(first.content.some((b: any) => b.type === "tool_use")).toBe(true);
 });
+
+test("raw model text becomes the calm line and counts as fixed, so the WhatsApp button follows", async () => {
+    const r: any = await mini([say("TypeError: cannot read properties of undefined")]);
+    expect(r.reply).toBe(LINES.generic);
+    expect(r.fixed).toBe(true);
+});

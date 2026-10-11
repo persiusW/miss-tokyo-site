@@ -30,7 +30,8 @@ export const BUTTON_LABELS = {
 
 /** The model's text as a customer may see it: plain, short, nothing internal or technical. */
 export function safeReply(text: string): string {
-    const t = scrubReply(String(text ?? ""), 1200);
+    // 950 keeps a shortened answer (plus "…") under looksRaw's 1000-char limit.
+    const t = scrubReply(String(text ?? ""), 950);
     if (!t || looksRaw(t)) return LINES.generic;
     return t;
 }

@@ -103,5 +103,6 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
         // An assistant message with no text (empty reply) would 400 every later turn.
         messages[messages.length - 1] = { ...last, content: [...last.content, { type: "text", text }] };
     }
-    return { ok: true, messages, reply: text, fixed: fixed !== null, usage };
+    // The model's text being unusable (raw, empty) is a fixed line too: the customer gets the WhatsApp button.
+    return { ok: true, messages, reply: text, fixed: fixed !== null || text === LINES.generic, usage };
 }
