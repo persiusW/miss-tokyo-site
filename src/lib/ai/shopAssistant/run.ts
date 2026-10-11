@@ -13,6 +13,7 @@ import { runCustomerTool, type ShopToolContext } from "./tools";
 import { mergeChatState, trimTranscript } from "./limits";
 import { dedupeButtons, talkButton, waSummary } from "./format";
 import { LINES } from "./lines";
+import { settleQuote } from "./guards";
 import { loadChat, saveChat, saveStateOnly } from "./store";
 import type { ShopButton, ShopChannel, ShopChat, ShopIdentity } from "./types";
 
@@ -62,8 +63,14 @@ export async function runShopAssistant(args: {
     }
 
     // Orders, lockouts and verified refs are kept even when the reply failed;
-    // the transcript only when the turn completed.
-    const next: ShopChat = { ...work, transcript: result.ok ? result.messages : chat.transcript };
+    // the transcript only when the turn completed. A total quoted this turn
+    // stands only if the customer saw it (the model's own reply, not a fixed line).
+    const shown = result.ok && !result.fixed;
+    const next: ShopChat = {
+        ...work,
+        lastQuote: settleQuote(chat.lastQuote, work.lastQuote, chat.turns, shown),
+        transcript: result.ok ? result.messages : chat.transcript,
+    };
     let saved = false;
     try { saved = await saveChat(next, chat.turns, result.ok); } catch (e) { logCause("SHOP-01", e, { chat: chat.id.slice(0, 8), step: "save" }); }
     if (!saved) {

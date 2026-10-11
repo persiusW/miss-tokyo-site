@@ -9,7 +9,7 @@ import { checkoutCustomerLine, ERRORS, isErrorCode } from "../../../src/lib/erro
 import { LINES, safeReply } from "../../../src/lib/ai/shopAssistant/lines";
 import { looksRaw } from "../../../src/lib/errors/looksRaw";
 import { stockWord, publicProduct, publicOrder, paymentState, waSummary, talkButton, dedupeButtons, cartLineFor } from "../../../src/lib/ai/shopAssistant/format";
-import { stampQuote, quoteKey, quoteHolds, sameTotal, canOpenAnother, trackLocked, QUOTE_TTL_MS } from "../../../src/lib/ai/shopAssistant/guards";
+import { stampQuote, settleQuote, quoteKey, quoteHolds, sameTotal, canOpenAnother, trackLocked, QUOTE_TTL_MS } from "../../../src/lib/ai/shopAssistant/guards";
 import { visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor, mergeChatState } from "../../../src/lib/ai/shopAssistant/limits";
 
 test("WhatsApp numbers normalise to 233 + 9 digits, or null", () => {
@@ -331,4 +331,15 @@ test("a long clean reply is shortened, not replaced by the error line", () => {
     expect(r.length).toBeLessThanOrEqual(1000);
     expect(r.endsWith("…")).toBe(true);
     expect(looksRaw(r)).toBe(false);
+});
+
+test("a quote stamped on a turn the customer never saw is not kept", () => {
+    const prev = { key: "old", total: 40, at: 500, turn: 1 };
+    const thisTurn = { key: "new", total: 60, at: 2000, turn: 3 };
+    const earlier = { key: "k", total: 50, at: 1000, turn: 2 };
+    expect(settleQuote(prev, thisTurn, 3, true)).toEqual(thisTurn);    // shown: the new quote stands
+    expect(settleQuote(prev, thisTurn, 3, false)).toEqual(prev);       // not shown: back to what the customer last saw
+    expect(settleQuote(prev, earlier, 3, false)).toEqual(earlier);     // an earlier turn's stamp (kept by stampQuote) still stands
+    expect(settleQuote(prev, null, 3, false)).toBeNull();              // placed (cleared): stays cleared
+    expect(settleQuote(null, thisTurn, 3, false)).toBeNull();
 });

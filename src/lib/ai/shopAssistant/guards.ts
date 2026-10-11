@@ -35,6 +35,12 @@ export function stampQuote(last: QuoteStamp | null, key: string, total: number, 
     return { key, total, at: now, turn };
 }
 
+/** The quote to save after a turn. A total stamped this turn that the customer never saw (failed turn, fixed line) can't stand. */
+export function settleQuote(prev: QuoteStamp | null, work: QuoteStamp | null, turn: number, shown: boolean): QuoteStamp | null {
+    if (!shown && work?.turn === turn) return prev;
+    return work;
+}
+
 export const sameTotal = (a: number, b: number) => Math.round(a * 100) === Math.round(b * 100);
 export const canOpenAnother = (openCount: number) => openCount < MAX_OPEN_ORDERS;
 export const trackLocked = (wrongTries: number) => wrongTries >= TRACK_LOCK_AT;
