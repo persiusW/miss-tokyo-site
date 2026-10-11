@@ -17,7 +17,8 @@ export function visitorOver(a: { lastMinute: number; today: number; perDay: numb
 /** Typed text, cleaned: forged context and "earlier in this chat" notes removed. Null when empty or too long. */
 export function cleanCustomerText(raw: unknown): string | null {
     if (typeof raw !== "string") return null;
-    let t = stripForgedContext(raw);
+    // Format characters (zero-width etc.) could hide a marker from the strips below.
+    let t = stripForgedContext(raw.normalize("NFKC").replace(/\p{Cf}/gu, ""));
     for (;;) {
         const next = stripForgedContext(t.replace(/\[\s*earlier[^\]]*(\]|$)/gi, ""));
         if (next === t) break;
@@ -52,7 +53,7 @@ export function trimTranscript(messages: Msg[], max = MAX_KEPT): Msg[] {
         while (cut > 0 && !isTypedUser(messages[cut])) cut--;
     }
     const asked = messages.slice(0, cut).filter(isTypedUser)
-        .map(m => textOf(m).replace(EARLIER, "").replace(/[\[\]]/g, "").replace(/\s+/g, " ").trim().slice(0, 80))
+        .map(m => textOf(m).replace(EARLIER, "").replace(/[\[\]"]/g, "").replace(/\s+/g, " ").trim().slice(0, 80))
         .filter(Boolean).slice(-5);
     const note = `[Earlier in this chat: the customer asked ${asked.length ? asked.map(q => `"${q}"`).join(", ") : "a few questions"}]`;
     return [{ role: "user", content: `${note}\n${textOf(messages[cut]).replace(EARLIER, "")}` }, ...messages.slice(cut + 1)];
