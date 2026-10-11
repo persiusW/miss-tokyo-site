@@ -70,7 +70,7 @@ export async function runShopAssistant(args: {
         logCause("SHOP-01", result.cause, { chat: chat.id.slice(0, 8) });
         return { reply: LINES.generic, buttons: dedupeButtons([...ctx.buttons.filter(b => b.kind === "pay_now"), ...talk(ctx.notes)]), chat: next, failed: true };
     }
-    const wantsTalk = ctx.buttons.some(b => b.kind === "talk_to_us");
+    const wantsTalk = result.fixed || ctx.buttons.some(b => b.kind === "talk_to_us");
     const buttons = dedupeButtons(wantsTalk ? [...ctx.buttons.filter(b => b.kind !== "talk_to_us"), ...talk(ctx.notes)] : ctx.buttons);
     return { reply: result.reply, buttons, chat: { ...next, turns: chat.turns + 1 }, failed: false };
 }

@@ -109,3 +109,11 @@ test("tool calls on a paused turn never enter the transcript", async () => {
     expect(r.reply).toBe(LINES.slow);
     expect(JSON.stringify(r.messages)).not.toMatch(/tool_use/);
 });
+
+test("fixed is true for our own lines and false for model text", async () => {
+    const capped: any = await mini([say("x")], () => false);
+    expect(capped.reply).toBe(LINES.cantChat);
+    expect(capped.fixed).toBe(true);
+    const normal: any = await mini([say("Hello there.")]);
+    expect(normal.fixed).toBe(false);
+});

@@ -19,7 +19,7 @@ export type EngineDeps = {
 };
 export type EngineUsage = { input: number; output: number; cacheRead: number; cacheWrite: number; costUsd: number; toolCalls: { name: string; ok: boolean }[] };
 export type EngineResult =
-    | { ok: true; messages: Msg[]; reply: string; usage: EngineUsage }
+    | { ok: true; messages: Msg[]; reply: string; fixed: boolean; usage: EngineUsage }
     | { ok: false; usage: EngineUsage; cause: unknown };
 
 const ALLOWED = new Set<string>(CUSTOMER_TOOL_NAMES);
@@ -60,7 +60,7 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
             usage.costUsd += costUsd(response.usage);
 
             const toolUses = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-            if (response.stop_reason === "refusal") { fixed = "I can't help with that one. You can message us on WhatsApp."; break; }
+            if (response.stop_reason === "refusal") { fixed = LINES.refusal; break; }
             // A tool call we won't answer (truncated, paused, out of context) never enters the transcript.
             if (toolUses.length > 0 && response.stop_reason !== "tool_use") { fixed = LINES.slow; break; }
 
@@ -97,5 +97,5 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
         // An assistant message with no text (empty reply) would 400 every later turn.
         messages[messages.length - 1] = { ...last, content: [...last.content, { type: "text", text }] };
     }
-    return { ok: true, messages, reply: text, usage };
+    return { ok: true, messages, reply: text, fixed: fixed !== null, usage };
 }

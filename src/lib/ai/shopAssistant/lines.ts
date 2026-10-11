@@ -17,6 +17,7 @@ export const LINES = {
     empty: "Please type a question.",
     refresh: "Please refresh the page and try again.",
     slow: "I couldn't finish that one. Could you ask it a different way?",
+    refusal: "I can't help with that one. You can message us on WhatsApp.",
     greeting: "Hi, I'm Ask Miss Tokyo. I can help you find a piece in your size, check delivery, track an order, or place one.",
 } as const;
 
