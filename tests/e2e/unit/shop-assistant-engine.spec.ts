@@ -91,3 +91,21 @@ test("several tool calls in one response run one at a time, in order, answered i
     expect(users).toHaveLength(1);
     expect(users[0].content.map((x: any) => x.tool_use_id)).toEqual(["a", "b"]);
 });
+
+const mini = (script: any[], fits = () => true) => runShopTurn(
+    { system: "s", tools: CUSTOMER_TOOL_DEFS, model: "m", messages: [{ role: "user", content: "hi" }] },
+    { client: fakeClient(script), runTool: async () => ({ content: "{}", isError: false }), fits });
+
+test("an empty end_turn reply is closed with text so the chat stays valid", async () => {
+    const r: any = await mini([{ content: [], stop_reason: "end_turn", usage }]);
+    expect(r.reply).toBe(LINES.generic);
+    const last = r.messages[r.messages.length - 1];
+    expect(last.role).toBe("assistant");
+    expect(last.content.some((b: any) => b.type === "text" && b.text)).toBe(true);
+});
+
+test("tool calls on a paused turn never enter the transcript", async () => {
+    const r: any = await mini([{ ...toolUse("t1", "find_products"), stop_reason: "pause_turn" }]);
+    expect(r.reply).toBe(LINES.slow);
+    expect(JSON.stringify(r.messages)).not.toMatch(/tool_use/);
+});

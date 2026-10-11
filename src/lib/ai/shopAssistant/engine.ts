@@ -6,7 +6,7 @@ import { CUSTOMER_TOOL_NAMES } from "./toolDefs";
 import { LINES, safeReply } from "./lines";
 
 const MAX_ITERATIONS = 8;
-const MAX_TOKENS = 4000;
+const MAX_TOKENS = 8000;
 const BUDGET_MS = 70_000;
 const CALL_TIMEOUT_MS = 40_000;
 
@@ -61,8 +61,8 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
 
             const toolUses = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
             if (response.stop_reason === "refusal") { fixed = "I can't help with that one. You can message us on WhatsApp."; break; }
-            // A truncated tool call never runs and never enters the transcript.
-            if (response.stop_reason === "max_tokens" && toolUses.length > 0) { fixed = LINES.slow; break; }
+            // A tool call we won't answer (truncated, paused, out of context) never enters the transcript.
+            if (toolUses.length > 0 && response.stop_reason !== "tool_use") { fixed = LINES.slow; break; }
 
             messages.push({ role: "assistant", content: response.content });
 
@@ -91,6 +91,11 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
     const text = fixed ?? safeReply(reply);
     // Keep the transcript alternating: a turn that stopped on tool results
     // (or before answering) is closed by what the customer was told.
-    if (messages[messages.length - 1]?.role === "user") messages.push({ role: "assistant", content: [{ type: "text", text }] });
+    const last = messages[messages.length - 1];
+    if (last?.role === "user") messages.push({ role: "assistant", content: [{ type: "text", text }] });
+    else if (last && Array.isArray(last.content) && !last.content.some(b => b.type === "text" && b.text.trim())) {
+        // An assistant message with no text (empty reply) would 400 every later turn.
+        messages[messages.length - 1] = { ...last, content: [...last.content, { type: "text", text }] };
+    }
     return { ok: true, messages, reply: text, usage };
 }
