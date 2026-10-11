@@ -5,7 +5,8 @@ import { X } from "lucide-react";
 import { useCart } from "@/store/useCart";
 import { LINES } from "@/lib/ai/shopAssistant/lines";
 import type { ShopButton } from "@/lib/ai/shopAssistant/types";
-import { bubbleText, useAskStore, type Bubble } from "./chatStore";
+import { useAskStore, type Bubble } from "./chatStore";
+import { newChatStarted, readAnswer } from "./reply";
 
 const STARTERS = ["Find a dress in my size", "Delivery fees", "Track my order"];
 const id = () => Math.random().toString(36).slice(2);
@@ -38,12 +39,14 @@ export default function AskMissTokyoPanel({ open, onClose }: { open: boolean; on
         setSending(true);
         try {
             const res = await fetch("/api/shop-assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: t }) });
-            const json = res.ok ? await res.json().catch(() => null) : null;
-            if (typeof json?.reply !== "string") {
-                push({ id: id(), who: "assistant", text: LINES.generic, retryText: t });
-            } else {
-                push({ id: id(), who: "assistant", text: bubbleText(json.reply), buttons: json.buttons });
+            const json = await res.json().catch(() => null);
+            const a = readAnswer({ ok: res.ok, status: res.status, json, sent: t });
+            if (a.fresh) {
+                // The server started a new chat (idle, another account): only this message belongs to it.
+                reset();
+                if (!opts?.retry) push({ id: id(), who: "customer", text: t });
             }
+            push({ id: id(), who: "assistant", text: a.text, ...(a.buttons ? { buttons: a.buttons } : {}), ...(a.retryText ? { retryText: a.retryText } : {}) });
         } catch {
             push({ id: id(), who: "assistant", text: LINES.generic, retryText: t });
         } finally {
@@ -52,8 +55,11 @@ export default function AskMissTokyoPanel({ open, onClose }: { open: boolean; on
     }
 
     async function newChat() {
-        await fetch("/api/shop-assistant", { method: "DELETE" }).catch(() => {});
-        reset();
+        const res = await fetch("/api/shop-assistant", { method: "DELETE" }).catch(() => null);
+        const json = res ? await res.json().catch(() => null) : null;
+        // Clearing the bubbles while the old chat lives on would hide what the server still remembers.
+        if (newChatStarted(!!res?.ok, json)) reset();
+        else push({ id: id(), who: "assistant", text: LINES.generic });
     }
 
     function onButton(b: ShopButton) {

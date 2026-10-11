@@ -3,6 +3,7 @@ import { widgetHiddenOn } from "../../../src/components/shop/askMissTokyo/visibi
 import { safeButton } from "../../../src/components/shop/askMissTokyo/buttons";
 import { LINES } from "../../../src/lib/ai/shopAssistant/lines";
 import { maskPersonal, conversationText, firstQuestion } from "../../../src/lib/ai/shopAssistant/adminView";
+import { readAnswer, newChatStarted } from "../../../src/components/shop/askMissTokyo/reply";
 
 // The store persists to sessionStorage, which Node lacks. Give it an in-memory one
 // before the store module loads, so the run stays free of storage warnings.
@@ -119,4 +120,40 @@ test("maskPersonal covers every phone format and leaves dates and prices alone",
         expect(maskPersonal(t), t).toBe(t);
     }
     expect(maskPersonal("Ama.Mensah@Gmail.COM")).toBe("•••@Gmail.COM");
+});
+
+test("a 200 reply is shown as sent, with fresh passed through", () => {
+    const btn = [{ kind: "talk_to_us", label: "Talk to us on WhatsApp", href: "https://wa.me/233553898704" }];
+    expect(readAnswer({ ok: true, status: 200, json: { reply: "Hello there.", buttons: btn }, sent: "hi" }))
+        .toEqual({ fresh: false, text: "Hello there.", buttons: btn });
+    expect(readAnswer({ ok: true, status: 200, json: { reply: "Hello there.", buttons: [], fresh: true }, sent: "hi" }).fresh).toBe(true);
+    expect(readAnswer({ ok: true, status: 200, json: { reply: "Hello there.", fresh: "yes" }, sent: "hi" }).fresh).toBe(false);
+    expect(readAnswer({ ok: true, status: 200, json: null, sent: "hi" })).toEqual({ fresh: false, text: LINES.generic, retryText: "hi" });
+});
+
+test("the busy line always offers Retry", () => {
+    expect(readAnswer({ ok: true, status: 200, json: { reply: LINES.busy, buttons: [] }, sent: "hi" }).retryText).toBe("hi");
+});
+
+test("calm server lines on a non-2xx are shown; Retry only for 429 and 5xx", () => {
+    expect(readAnswer({ ok: false, status: 400, json: { reply: LINES.tooLong, buttons: [] }, sent: "hi" }))
+        .toEqual({ fresh: false, text: LINES.tooLong, buttons: [] });
+    expect(readAnswer({ ok: false, status: 403, json: { reply: LINES.refresh, buttons: [] }, sent: "hi" }).retryText).toBeUndefined();
+    expect(readAnswer({ ok: false, status: 429, json: { reply: LINES.slowDown, buttons: [] }, sent: "hi" }))
+        .toEqual({ fresh: false, text: LINES.slowDown, buttons: [], retryText: "hi" });
+    expect(readAnswer({ ok: false, status: 502, json: { reply: LINES.generic }, sent: "hi" }).retryText).toBe("hi");
+});
+
+test("raw or missing text on a non-2xx becomes the calm line with Retry", () => {
+    expect(readAnswer({ ok: false, status: 500, json: { reply: "TypeError: x is undefined" }, sent: "hi" }))
+        .toEqual({ fresh: false, text: LINES.generic, retryText: "hi" });
+    expect(readAnswer({ ok: false, status: 504, json: null, sent: "hi" })).toEqual({ fresh: false, text: LINES.generic, retryText: "hi" });
+    expect(readAnswer({ ok: false, status: 400, json: { reply: 42 }, sent: "hi" })).toEqual({ fresh: false, text: LINES.generic, retryText: "hi" });
+});
+
+test("New chat clears the bubbles only when the server started one", () => {
+    expect(newChatStarted(true, { ok: true })).toBe(true);
+    expect(newChatStarted(true, { ok: false })).toBe(false);
+    expect(newChatStarted(false, { ok: true })).toBe(false);
+    expect(newChatStarted(true, null)).toBe(false);
 });
