@@ -1,4 +1,7 @@
+import fs from "fs";
+import path from "path";
 import { test, expect } from "@playwright/test";
+import { CUSTOMER_TOOL_DEFS, CUSTOMER_TOOL_NAMES } from "../../../src/lib/ai/shopAssistant/toolDefs";
 import { normaliseWaNumber, SHOP_SETTING_VALIDATORS } from "../../../src/lib/ai/shopAssistant/settingsRules";
 import { cleanTrackQuery } from "../../../src/lib/orders/trackQuery";
 import { FAQS, SIZE_CHART, shopInfoText, SHOP_INFO_TOPICS } from "../../../src/content/shopInfo";
@@ -234,4 +237,18 @@ test("staff signed in on the shop get no customer identity", () => {
     expect(identityFor("u1", "wholesale")).toEqual({ customerId: "u1" });
     for (const r of ["admin", "owner", "sales_staff"]) expect(identityFor("u1", r)).toEqual({ customerId: null });
     expect(identityFor(null, null)).toEqual({ customerId: null });
+});
+
+test("customer tools never overlap the staff tools, and the module never imports them", () => {
+    const staffDir = path.resolve(__dirname, "../../../src/lib/ai/missTokyoAi/tools");
+    const staff = new Set<string>();
+    for (const f of fs.readdirSync(staffDir)) for (const m of fs.readFileSync(path.join(staffDir, f), "utf8").matchAll(/name: "([a-z_]+)"/g)) staff.add(m[1]);
+    expect(staff.has("create_order")).toBe(true);   // sanity: the scan found the staff tools
+    for (const n of CUSTOMER_TOOL_NAMES) expect(staff.has(n), n).toBe(false);
+    expect(CUSTOMER_TOOL_DEFS.map(t => t.name)).toEqual([...CUSTOMER_TOOL_NAMES]);
+
+    const dir = path.resolve(__dirname, "../../../src/lib/ai/shopAssistant");
+    const walk = (d: string): string[] => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+    for (const f of walk(dir)) expect(fs.readFileSync(f, "utf8"), f).not.toMatch(/missTokyoAi\/tools/);
+    expect(JSON.stringify(CUSTOMER_TOOL_DEFS)).not.toMatch(/cash/i);
 });
