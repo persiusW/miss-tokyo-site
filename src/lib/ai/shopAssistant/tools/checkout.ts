@@ -98,6 +98,8 @@ export async function placeOrder(input: any, ctx: ShopToolContext): Promise<Tool
     }
     if (r.saleKey) ctx.chat.saleKey = r.saleKey;
     ctx.chat.openOrders = [...ctx.chat.openOrders, r.orderId];
+    // Verified for this chat, so track_order can bring the Pay button back without asking for details.
+    if (!ctx.chat.verifiedOrders.includes(r.orderId)) ctx.chat.verifiedOrders = [...ctx.chat.verifiedOrders, r.orderId].slice(-20);
     ctx.chat.payLinks = { ...ctx.chat.payLinks, [r.orderId]: r.authorizationUrl };
     ctx.chat.lastQuote = null;
     const ref = r.orderId.slice(0, 8).toUpperCase();

@@ -3,7 +3,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { cleanTrackQuery } from "@/lib/orders/trackQuery";
 import { findOrderByRef } from "@/lib/orders/findOrderByRef";
-import { publicOrder, type OrderRow } from "../format";
+import { publicOrder, repayButton, type OrderRow } from "../format";
 import { trackLocked } from "../guards";
 import { LINES } from "../lines";
 import { ok, pushTalk, type ShopToolContext, type ToolOutcome } from "./context";
@@ -21,6 +21,12 @@ function remember(ctx: ShopToolContext, id: string) {
     ctx.notes.orderRef = id.slice(0, 8).toUpperCase();
 }
 
+/** An order this chat placed and that still waits for payment brings its Pay now button back. */
+function offerPay(ctx: ShopToolContext, row: OrderRow) {
+    const b = repayButton(ctx.chat, row);
+    if (b) ctx.buttons.push(b);
+}
+
 export async function trackOrder(input: any, ctx: ShopToolContext): Promise<ToolOutcome> {
     ctx.notes.topic = "my order";
     if (input?.my_orders === true) {
@@ -28,7 +34,7 @@ export async function trackOrder(input: any, ctx: ShopToolContext): Promise<Tool
         const { data, error } = await supabaseAdmin.from("orders").select(FIELDS)
             .eq("customer_id", ctx.identity.customerId).order("created_at", { ascending: false }).limit(5);
         if (error) throw error;
-        for (const r of data ?? []) remember(ctx, r.id);
+        for (const r of data ?? []) { remember(ctx, r.id); offerPay(ctx, r as OrderRow); }
         return ok({ orders: (data ?? []).map(r => publicOrder(r as OrderRow)) });
     }
 
@@ -38,7 +44,7 @@ export async function trackOrder(input: any, ctx: ShopToolContext): Promise<Tool
     const known = ctx.chat.verifiedOrders.find(id => id.slice(0, 8).toUpperCase() === q.ref);
     if (known) {
         const row = await rowById(known);
-        if (row) { remember(ctx, row.id); return ok({ order: publicOrder(row) }); }
+        if (row) { remember(ctx, row.id); offerPay(ctx, row); return ok({ order: publicOrder(row) }); }
     }
 
     if (trackLocked(ctx.chat.wrongTries)) { pushTalk(ctx); return ok({ reply_with: LINES.trackLocked }); }
@@ -53,5 +59,6 @@ export async function trackOrder(input: any, ctx: ShopToolContext): Promise<Tool
     const row = await rowById(hit.id);
     if (!row) return ok({ reply_with: LINES.wrongDetails });
     remember(ctx, row.id);
+    offerPay(ctx, row);
     return ok({ order: publicOrder(row) });
 }

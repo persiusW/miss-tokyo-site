@@ -108,6 +108,13 @@ export function publicOrder(r: OrderRow) {
     };
 }
 
+/** The Pay now button again for an order this chat placed that is still waiting for payment. */
+export function repayButton(chat: { openOrders: string[]; payLinks: Record<string, string> }, r: OrderRow): ShopButton | null {
+    const href = chat.openOrders.includes(r.id) ? chat.payLinks[r.id] : undefined;
+    if (!href || paymentState(r) !== "waiting") return null;
+    return { kind: "pay_now", label: BUTTON_LABELS.pay, href };
+}
+
 /** The text pre-typed into WhatsApp. Server-written; never an email, address or long number. */
 export function waSummary(a: { topic: string | null; orderRef: string | null }): string {
     const topic = String(a.topic ?? "")

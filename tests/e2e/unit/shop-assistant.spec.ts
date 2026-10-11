@@ -6,9 +6,9 @@ import { normaliseWaNumber, SHOP_SETTING_VALIDATORS } from "../../../src/lib/ai/
 import { cleanTrackQuery } from "../../../src/lib/orders/trackQuery";
 import { FAQS, SIZE_CHART, shopInfoText, SHOP_INFO_TOPICS } from "../../../src/content/shopInfo";
 import { checkoutCustomerLine, ERRORS, isErrorCode } from "../../../src/lib/errors/catalogue";
-import { LINES, safeReply } from "../../../src/lib/ai/shopAssistant/lines";
+import { BUTTON_LABELS, LINES, safeReply } from "../../../src/lib/ai/shopAssistant/lines";
 import { looksRaw } from "../../../src/lib/errors/looksRaw";
-import { stockWord, publicProduct, publicOrder, paymentState, waSummary, talkButton, dedupeButtons, cartLineFor } from "../../../src/lib/ai/shopAssistant/format";
+import { stockWord, publicProduct, publicOrder, paymentState, waSummary, talkButton, dedupeButtons, cartLineFor, repayButton } from "../../../src/lib/ai/shopAssistant/format";
 import { stampQuote, settleQuote, quoteKey, quoteHolds, sameTotal, canOpenAnother, trackLocked, QUOTE_TTL_MS } from "../../../src/lib/ai/shopAssistant/guards";
 import { visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor, mergeChatState } from "../../../src/lib/ai/shopAssistant/limits";
 
@@ -342,4 +342,16 @@ test("a quote stamped on a turn the customer never saw is not kept", () => {
     expect(settleQuote(prev, earlier, 3, false)).toEqual(earlier);     // an earlier turn's stamp (kept by stampQuote) still stands
     expect(settleQuote(prev, null, 3, false)).toBeNull();              // placed (cleared): stays cleared
     expect(settleQuote(null, thisTurn, 3, false)).toBeNull();
+});
+
+test("a placed order still waiting for payment gets its Pay button again", () => {
+    const id = "3bbb1012-0000-4000-8000-000000000000";
+    const chat = { openOrders: [id], payLinks: { [id]: "https://checkout.paystack.com/abc" } };
+    const row = (status: string, payment_status: string | null) =>
+        ({ id, created_at: "2026-10-11T10:00:00Z", total_amount: 305, status, payment_status, items: [], delivery_method: "delivery" });
+    expect(repayButton(chat, row("pending", "pending"))).toEqual({ kind: "pay_now", label: BUTTON_LABELS.pay, href: "https://checkout.paystack.com/abc" });
+    expect(repayButton(chat, row("paid", "paid"))).toBeNull();
+    expect(repayButton(chat, row("reservation_expired", "pending"))).toBeNull();
+    expect(repayButton({ openOrders: [], payLinks: chat.payLinks }, row("pending", "pending"))).toBeNull();   // not this chat's open order
+    expect(repayButton({ openOrders: [id], payLinks: {} }, row("pending", "pending"))).toBeNull();            // no link kept
 });
