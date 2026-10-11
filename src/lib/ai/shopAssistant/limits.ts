@@ -8,7 +8,7 @@ export const MAX_TEXT = 1000;
 export const MAX_KEPT = 30;
 export const IP_PER_MINUTE = 30;
 
-const STAFF_ROLES = new Set(["admin", "owner", "sales_staff"]);
+const CUSTOMER_ROLES = new Set(["customer", "wholesale", "wholesaler"]);
 
 export function visitorOver(a: { lastMinute: number; today: number; perDay: number }): boolean {
     return a.today >= a.perDay || a.lastMinute >= PER_MINUTE;
@@ -78,9 +78,9 @@ export function sameOrigin(h: { origin: string | null; fetchSite: string | null 
     return !!h.origin && h.origin === selfOrigin;
 }
 
-/** Staff accounts get no special powers in the shop chat — and no customer identity either. */
+/** Only customer accounts get a customer identity; staff and any unknown role are visitors. */
 export function identityFor(userId: string | null, role: string | null): ShopIdentity {
-    if (!userId || (role && STAFF_ROLES.has(role))) return { customerId: null };
+    if (!userId || (role !== null && !CUSTOMER_ROLES.has(role))) return { customerId: null };
     return { customerId: userId };
 }
 

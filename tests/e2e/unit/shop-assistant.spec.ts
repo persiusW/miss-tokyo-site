@@ -237,7 +237,7 @@ test("staff signed in on the shop get no customer identity", () => {
     expect(identityFor("u1", "customer")).toEqual({ customerId: "u1" });
     expect(identityFor("u1", null)).toEqual({ customerId: "u1" });
     expect(identityFor("u1", "wholesale")).toEqual({ customerId: "u1" });
-    for (const r of ["admin", "owner", "sales_staff"]) expect(identityFor("u1", r)).toEqual({ customerId: null });
+    for (const r of ["admin", "owner", "sales_staff", "rider", "support", "content_editor", "something_new"]) expect(identityFor("u1", r)).toEqual({ customerId: null });
     expect(identityFor(null, null)).toEqual({ customerId: null });
 });
 

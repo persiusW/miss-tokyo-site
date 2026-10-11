@@ -43,7 +43,8 @@ async function identity() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return identityFor(null, null);
-    const { data: p } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const { data: p, error } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if (error) return identityFor(null, null);   // can't tell who this is: treat as a visitor
     return identityFor(user.id, (p?.role as string | null) ?? null);
 }
 
