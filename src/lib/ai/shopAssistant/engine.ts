@@ -67,13 +67,15 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
             messages.push({ role: "assistant", content: response.content });
 
             if (response.stop_reason === "tool_use" && toolUses.length > 0) {
-                const results = await Promise.all(toolUses.map(async t => {
+                // One at a time, in order: the caps and lockouts read and write shared chat state.
+                const results: Anthropic.ToolResultBlockParam[] = [];
+                for (const t of toolUses) {
                     const outcome = ALLOWED.has(t.name)
                         ? await deps.runTool(t.name, t.input)
                         : { content: "That isn't available here.", isError: true };
                     usage.toolCalls.push({ name: t.name, ok: !outcome.isError });
-                    return { type: "tool_result" as const, tool_use_id: t.id, content: outcome.content, ...(outcome.isError ? { is_error: true } : {}) };
-                }));
+                    results.push({ type: "tool_result" as const, tool_use_id: t.id, content: outcome.content, ...(outcome.isError ? { is_error: true } : {}) });
+                }
                 messages.push({ role: "user", content: results });
                 if (i === MAX_ITERATIONS - 1) fixed = LINES.slow;
                 continue;

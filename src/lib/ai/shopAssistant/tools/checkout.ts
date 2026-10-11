@@ -91,7 +91,7 @@ export async function placeOrder(input: any, ctx: ShopToolContext): Promise<Tool
         return err(checkoutCustomerLine(r.code, r.error));
     }
     if (r.saleKey) ctx.chat.saleKey = r.saleKey;
-    ctx.chat.openOrders = [...open, r.orderId];
+    ctx.chat.openOrders = [...ctx.chat.openOrders, r.orderId];
     ctx.chat.payLinks = { ...ctx.chat.payLinks, [r.orderId]: r.authorizationUrl };
     ctx.chat.lastQuote = null;
     const ref = r.orderId.slice(0, 8).toUpperCase();

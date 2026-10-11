@@ -74,3 +74,20 @@ test("raw model text never reaches the customer", async () => {
         { client: fakeClient([say("TypeError: cannot read properties of undefined")]), runTool: async () => ({ content: "{}", isError: false }), fits: () => true });
     expect(r.ok && r.reply).toBe(LINES.generic);
 });
+
+test("several tool calls in one response run one at a time, in order, answered in one message", async () => {
+    const log: string[] = [];
+    const two = { content: [
+        { type: "tool_use", id: "a", name: "find_products", input: {} },
+        { type: "tool_use", id: "b", name: "shop_info", input: {} },
+    ], stop_reason: "tool_use", usage };
+    const r = await runShopTurn(
+        { system: "s", tools: CUSTOMER_TOOL_DEFS, model: "m", messages: [{ role: "user", content: "hi" }] },
+        { client: fakeClient([two, say("ok")]),
+          runTool: async (n) => { log.push(`start ${n}`); await new Promise(res => setTimeout(res, 5)); log.push(`end ${n}`); return { content: "{}", isError: false }; },
+          fits: () => true });
+    expect(log).toEqual(["start find_products", "end find_products", "start shop_info", "end shop_info"]);
+    const users = (r as any).messages.filter((m: any) => m.role === "user" && Array.isArray(m.content));
+    expect(users).toHaveLength(1);
+    expect(users[0].content.map((x: any) => x.tool_use_id)).toEqual(["a", "b"]);
+});
