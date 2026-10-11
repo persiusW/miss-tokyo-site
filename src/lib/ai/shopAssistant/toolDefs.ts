@@ -1,5 +1,5 @@
 // The only tools the customer model is given. Order is fixed: it is part of
-// the cached prompt. Kept free of imports so the isolation test can read it.
+// the cached prompt. No server or staff-tool imports, so the isolation test can read it.
 import type Anthropic from "@anthropic-ai/sdk";
 import { SHOP_INFO_TOPICS } from "@/content/shopInfo";
 

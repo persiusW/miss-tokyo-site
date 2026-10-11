@@ -298,3 +298,11 @@ test("a merged chat keeps only the last 20 verified orders", () => {
     expect(m.verifiedOrders).toHaveLength(20);
     expect(m.verifiedOrders.slice(-5)).toEqual(ids(5, "w"));
 });
+
+test("shop_info keeps the FAQ answers it quotes", () => {
+    const ans = (q: string) => FAQS.find(f => f.question === q)?.answer;
+    for (const q of ["Do you offer pickup?", "Are delivery fees refundable?", "What payment methods do you accept?"]) expect(ans(q), q).toBeTruthy();
+    expect(shopInfoText("delivery")).toContain(ans("Do you offer pickup?")!);
+    expect(shopInfoText("delivery")).toContain(ans("Are delivery fees refundable?")!);
+    expect(shopInfoText("payment")).toContain(ans("What payment methods do you accept?")!);
+});
