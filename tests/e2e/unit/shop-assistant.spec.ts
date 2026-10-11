@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { normaliseWaNumber, SHOP_SETTING_VALIDATORS } from "../../../src/lib/ai/shopAssistant/settingsRules";
+import { cleanTrackQuery } from "../../../src/lib/orders/trackQuery";
 
 test("WhatsApp numbers normalise to 233 + 9 digits, or null", () => {
     expect(normaliseWaNumber("055 389 8704")).toBe("233553898704");
@@ -27,4 +28,14 @@ test("shop settings validators", () => {
     expect(v.shop_whatsapp_number("233553898704")).toBe(true);
     expect(v.shop_whatsapp_number("0553898704")).toBe(false); // the page normalises before saving
     expect(v.shop_whatsapp_number(233553898704)).toBe(false);
+});
+
+test("order lookups clean refs, emails and phones the way /track always has", () => {
+    expect(cleanTrackQuery({ ref: "#3bbb1012", email: " Ama@Gmail.com " })).toEqual({ ref: "3BBB1012", email: "ama@gmail.com", phone: null });
+    expect(cleanTrackQuery({ ref: "3BBB 1012", phone: "+233 24 123 4567" })).toEqual({ ref: "3BBB1012", email: null, phone: "233241234567" });
+    expect(cleanTrackQuery({ ref: "order 3bbb1012" }).ref).toBe("3BBB1012");      // /track alone would read "DE3BBB1012"
+    expect(cleanTrackQuery({ ref: "3BBB10" }).ref).toBeNull();                     // too short
+    expect(cleanTrackQuery({ ref: "3BBB1012", email: "not-an-email" }).email).toBeNull();
+    expect(cleanTrackQuery({ ref: "3BBB1012", phone: "0241" }).phone).toBeNull();
+    expect(cleanTrackQuery({})).toEqual({ ref: null, email: null, phone: null });
 });
