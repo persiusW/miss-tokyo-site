@@ -4,10 +4,8 @@ const EARLIER = /^\[Earlier in this chat:[^\]]*\]\n?/;
 export function maskPersonal(text: string): string {
     return String(text ?? "")
         .replace(/[A-Z0-9._%+-]+@([A-Z0-9.-]+\.[A-Z]{2,})/gi, (_m, domain) => `•••@${domain}`)
-        .replace(/\+?\d[\d\s-]{7,}\d/g, m => {
-            const d = m.replace(/\D/g, "");
-            return d.length >= 9 ? `•••• ${d.slice(-4)}` : m;
-        });
+        .replace(/(?<!\d)\(?\+?(?:233|0)(?:[\s.\-()]*\d){9,}/g, m => `•••• ${m.replace(/\D/g, "").slice(-4)}`)
+        .replace(/\d{9,}/g, m => `•••• ${m.slice(-4)}`);
 }
 
 export function conversationText(messages: unknown): { who: "customer" | "assistant"; text: string }[] {

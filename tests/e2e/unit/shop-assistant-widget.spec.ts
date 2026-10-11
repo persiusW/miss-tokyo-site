@@ -110,3 +110,13 @@ test("the store drops unsafe buttons on push", async () => {
     expect(useAskStore.getState().bubbles[0].buttons).toEqual([{ kind: "open_product", label: "View", href: "/products/lisa" }]);
     st.reset();
 });
+
+test("maskPersonal covers every phone format and leaves dates and prices alone", () => {
+    for (const p of ["024.123.4567", "(024) 123 4567", "+233 (0)24 123 4567", "0241234567", "233241234567", "024 123 4567", "024-123-4567", "241234567"]) {
+        expect(maskPersonal(p), p).toBe("•••• 4567");
+    }
+    for (const t of ["2026-10-11 14:30", "GH₵ 357.50", "Order 3BBB1012", "100 200 300 400"]) {
+        expect(maskPersonal(t), t).toBe(t);
+    }
+    expect(maskPersonal("Ama.Mensah@Gmail.COM")).toBe("•••@Gmail.COM");
+});

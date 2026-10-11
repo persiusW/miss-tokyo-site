@@ -23,8 +23,8 @@ export async function GET() {
         const today = startOfTodayUtc();
         const weekStart = new Date(new Date(today).getTime() - 6 * 86_400_000).toISOString();
         const [turns, orders, recent] = await Promise.all([
-            pageAll<any>((f, t) => db.from("ai_turns").select("shop_chat_id, cost_usd, created_at").eq("channel", "web").gte("created_at", weekStart).order("created_at").range(f, t), 1000, 20),
-            pageAll<any>((f, t) => supabaseAdmin.from("orders").select("id, payment_status, created_at").eq("source", "web_chat").gte("created_at", weekStart).order("created_at").range(f, t), 1000, 20),
+            pageAll<any>((f, t) => db.from("ai_turns").select("shop_chat_id, cost_usd, created_at").eq("channel", "web").gte("created_at", weekStart).order("created_at").order("id").range(f, t), 1000, 20),
+            pageAll<any>((f, t) => supabaseAdmin.from("orders").select("id, payment_status, created_at").eq("source", "web_chat").gte("created_at", weekStart).order("created_at").order("id").range(f, t), 1000, 20),
             db.from("shop_chats").select("id, transcript, turns, open_orders, verified_orders, last_message_at").order("last_message_at", { ascending: false }).limit(30),
         ]);
         if (turns.error || orders.error || recent.error) {
