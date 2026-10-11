@@ -159,11 +159,13 @@ test("place needs the same quote from the last 10 minutes", () => {
     expect(quoteKey({ ...QI, delivery_zone: "outside" })).not.toBe(key);
     expect(quoteKey({ ...QI, items: [{ ...QI.items[0], quantity: 2 }] })).not.toBe(key);
     const at = 1_000_000;
-    expect(quoteHolds({ key, total: 370, at }, key, at + QUOTE_TTL_MS)).toBe(true);
-    expect(quoteHolds({ key, total: 370, at }, key, at + QUOTE_TTL_MS + 1)).toBe(false);
-    expect(quoteHolds({ key, total: 370, at }, "other", at)).toBe(false);
-    expect(quoteHolds(null, key, at)).toBe(false);
-    expect(quoteHolds({ key, total: 370, at }, key, at - 1)).toBe(false);                     // clock went backwards
+    expect(quoteHolds({ key, total: 370, at, turn: 3 }, key, at + QUOTE_TTL_MS, 4)).toBe(true);
+    expect(quoteHolds({ key, total: 370, at, turn: 3 }, key, at + QUOTE_TTL_MS + 1, 4)).toBe(false);
+    expect(quoteHolds({ key, total: 370, at, turn: 3 }, "other", at, 4)).toBe(false);
+    expect(quoteHolds(null, key, at, 4)).toBe(false);
+    expect(quoteHolds({ key, total: 370, at, turn: 3 }, key, at - 1, 4)).toBe(false);                     // clock went backwards
+    expect(quoteHolds({ key, total: 370, at, turn: 3 }, key, at, 3)).toBe(false);          // quoted in this same message
+    expect(quoteHolds({ key, total: 370, at, turn: 5 }, key, at, 4)).toBe(false);          // stamp from a later turn
     expect(sameTotal(370, 370.004)).toBe(true);
     expect(sameTotal(370, 370.01)).toBe(false);
 });

@@ -42,7 +42,7 @@ export async function priceOrder(input: any, ctx: ShopToolContext): Promise<Tool
     const oi = toInput(input, ctx);
     const r = await quoteCheckoutOrder(oi);
     if (!r.success) return err(checkoutCustomerLine(r.code, r.error));
-    ctx.chat.lastQuote = { key: keyOf(oi), total: r.totals.total, at: Date.now() };
+    ctx.chat.lastQuote = { key: keyOf(oi), total: r.totals.total, at: Date.now(), turn: ctx.chat.turns };
     return ok({ totals_ghs: r.totals, out_of_stock: r.outOfStock, next: "Tell the customer the total and ask them to confirm with a clear yes." });
 }
 
@@ -60,7 +60,7 @@ export async function placeOrder(input: any, ctx: ShopToolContext): Promise<Tool
     if (input?.customer_said_yes !== true) return err("Tell the customer the total from price_order and wait for a clear yes.");
     const oi = toInput(input, ctx);
     const key = keyOf(oi);
-    if (!quoteHolds(ctx.chat.lastQuote, key, Date.now())) {
+    if (!quoteHolds(ctx.chat.lastQuote, key, Date.now(), ctx.chat.turns)) {
         return err("Run price_order for exactly this order, tell the customer the total, and get a clear yes first.");
     }
 
@@ -80,7 +80,7 @@ export async function placeOrder(input: any, ctx: ShopToolContext): Promise<Tool
     const again = await quoteCheckoutOrder(oi);
     if (!again.success) return err(checkoutCustomerLine(again.code, again.error));
     if (!sameTotal(again.totals.total, ctx.chat.lastQuote!.total)) {
-        ctx.chat.lastQuote = { key, total: again.totals.total, at: Date.now() };
+        ctx.chat.lastQuote = { key, total: again.totals.total, at: Date.now(), turn: ctx.chat.turns };
         return ok({ price_changed: true, totals_ghs: again.totals, next: "Tell the customer the total changed to this one and ask them to confirm again." });
     }
 

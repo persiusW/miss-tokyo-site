@@ -4,7 +4,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 export type ShopChannel = "web" | "whatsapp";
 /** Who is chatting. customerId only for a signed-in non-staff account; WhatsApp adds a Meta-verified phone later. */
 export type ShopIdentity = { customerId: string | null; phone?: string | null };
-export type QuoteStamp = { key: string; total: number; at: number };
+export type QuoteStamp = { key: string; total: number; at: number; turn: number };
 
 /** One shop_chats row, as the engine uses it. */
 export type ShopChat = {

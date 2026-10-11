@@ -22,8 +22,9 @@ export function quoteKey(q: QuoteParts): string {
     return JSON.stringify({ items, method: n(q.delivery_method), zone: n(q.delivery_zone), code: n(q.discount_code) });
 }
 
-export function quoteHolds(last: QuoteStamp | null, key: string, now: number): boolean {
-    return !!last && last.key === key && now >= last.at && now - last.at <= QUOTE_TTL_MS;
+export function quoteHolds(last: QuoteStamp | null, key: string, now: number, currentTurn: number): boolean {
+    // The total must have been quoted in an earlier customer message than this one.
+    return !!last && last.turn < currentTurn && last.key === key && now >= last.at && now - last.at <= QUOTE_TTL_MS;
 }
 
 export const sameTotal = (a: number, b: number) => Math.round(a * 100) === Math.round(b * 100);
