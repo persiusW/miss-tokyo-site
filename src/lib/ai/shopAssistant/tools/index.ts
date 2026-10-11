@@ -1,7 +1,7 @@
 // The customer tool registry. Never throws; output is redacted.
 import { redactText } from "@/lib/ai/missTokyoAi/scrub";
 import { CUSTOMER_TOOL_NAMES } from "../toolDefs";
-import { err, type ShopToolContext, type ToolOutcome } from "./context";
+import { err, pushTalk, type ShopToolContext, type ToolOutcome } from "./context";
 import { findProducts } from "./products";
 import { shopInfo } from "./info";
 import { trackOrder } from "./orders";
@@ -24,6 +24,7 @@ export async function runCustomerTool(name: string, input: unknown, ctx: ShopToo
         return { ...out, content: redactText(out.content) };
     } catch (e) {
         console.error(`[shop-assistant] tool ${name} failed`, e instanceof Error ? e.message : e);
-        return err("That lookup didn't work. Say sorry, and offer to try again or to talk to us on WhatsApp.");
+        pushTalk(ctx);
+        return err("That didn't work. Say sorry, and offer to try again or to talk to us on WhatsApp.");
     }
 }

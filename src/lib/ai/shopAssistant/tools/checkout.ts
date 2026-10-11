@@ -10,7 +10,7 @@ import { err, ok, pushTalk, str, type ShopToolContext, type ToolOutcome } from "
 const PAY_CODES = new Set(["gateway", "refused", "payments_unconfigured"]);
 
 function toInput(input: any, ctx: ShopToolContext): CreateCheckoutOrderInput {
-    const items = Array.isArray(input?.items) ? input.items.slice(0, 20) : [];
+    const items = Array.isArray(input?.items) ? input.items : [];
     return {
         items: items.map((i: any) => ({
             product_id: str(i?.product_id, 40),
@@ -33,12 +33,17 @@ function toInput(input: any, ctx: ShopToolContext): CreateCheckoutOrderInput {
     };
 }
 
+const MAX_LINES = 20;
+const tooMany = (input: any) => Array.isArray(input?.items) && input.items.length > MAX_LINES;
+const TOO_MANY = "Orders in chat can have at most 20 lines. Ask the customer to place bigger orders on the website.";
+
 const keyOf = (oi: CreateCheckoutOrderInput) => quoteKey({
     items: oi.items, delivery_method: oi.delivery.method, delivery_zone: oi.delivery.zone ?? null, discount_code: oi.discount_code ?? null,
 });
 
 export async function priceOrder(input: any, ctx: ShopToolContext): Promise<ToolOutcome> {
     ctx.notes.topic = "placing an order";
+    if (tooMany(input)) return err(TOO_MANY);
     const oi = toInput(input, ctx);
     const r = await quoteCheckoutOrder(oi);
     if (!r.success) return err(checkoutCustomerLine(r.code, r.error));
@@ -58,6 +63,7 @@ async function stillOpen(ids: string[]): Promise<string[]> {
 export async function placeOrder(input: any, ctx: ShopToolContext): Promise<ToolOutcome> {
     ctx.notes.topic = "placing an order";
     if (input?.customer_said_yes !== true) return err("Tell the customer the total from price_order and wait for a clear yes.");
+    if (tooMany(input)) return err(TOO_MANY);
     const oi = toInput(input, ctx);
     const key = keyOf(oi);
     if (!quoteHolds(ctx.chat.lastQuote, key, Date.now(), ctx.chat.turns)) {
