@@ -30,8 +30,10 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
     if (q.length >= 2) query = query.ilike("name", `%${q}%`);
     if (catName) {
         const cat = await findCategory(catName);
-        if (!cat) return ok({ products: [], note: `The shop has no "${catName}" category.` });
-        query = query.or(`category_id.eq.${cat.id},category_ids.cs.{"${cat.id}"},category_type.ilike.${clean(cat.name)}`);
+        if (!cat) return ok({ products: [], note: `The shop has no "${clean(catName)}" category.` });
+        // cat.name is trusted DB data; quote it so commas, parentheses and wildcards cannot break the filter.
+        const typeName = cat.name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+        query = query.or(`category_id.eq.${cat.id},category_ids.cs.{"${cat.id}"},category_type.ilike."${typeName}"`);
     }
     const { data, error } = await query.order("created_at", { ascending: false }).limit(12);
     if (error) throw error;
@@ -61,7 +63,9 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
         const { row, out } = products[0];
         const opts = ("options" in out ? out.options : undefined) ?? [];
         const needs = { size: (row.available_sizes ?? []).length > 0, colour: (row.available_colors ?? []).length > 0, brand: (row.available_brands ?? []).length > 0 };
-        if (opts.length === 1 && opts[0].stock !== "Sold out" && (!needs.size || opts[0].size) && (!needs.colour || opts[0].colour) && !needs.brand) {
+        if (opts.length === 1 && opts[0].stock !== "Sold out" && !needs.brand
+            && (!needs.size || (size && opts[0].size && normSize(opts[0].size) === normSize(size)))
+            && (!needs.colour || (colour && opts[0].colour && normAttr(opts[0].colour) === normAttr(colour)))) {
             ctx.buttons.push({ kind: "add_to_cart", label: BUTTON_LABELS.add, item: cartLineFor(row, opts[0], false) });
         }
     }
