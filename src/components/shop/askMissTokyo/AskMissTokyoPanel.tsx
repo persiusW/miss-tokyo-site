@@ -30,16 +30,20 @@ export default function AskMissTokyoPanel({ open, onClose }: { open: boolean; on
         return () => window.removeEventListener("keydown", onKey);
     }, [open, onClose]);
 
-    async function send(message: string) {
+    async function send(message: string, opts?: { retry?: boolean }) {
         const t = message.trim();
         if (!t || sending) return;
-        push({ id: id(), who: "customer", text: t });
+        if (!opts?.retry) push({ id: id(), who: "customer", text: t });
         setText("");
         setSending(true);
         try {
             const res = await fetch("/api/shop-assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: t }) });
-            const json = await res.json().catch(() => null);
-            push({ id: id(), who: "assistant", text: bubbleText(json?.reply), buttons: Array.isArray(json?.buttons) ? json.buttons : [] });
+            const json = res.ok ? await res.json().catch(() => null) : null;
+            if (typeof json?.reply !== "string") {
+                push({ id: id(), who: "assistant", text: LINES.generic, retryText: t });
+            } else {
+                push({ id: id(), who: "assistant", text: bubbleText(json.reply), buttons: json.buttons });
+            }
         } catch {
             push({ id: id(), who: "assistant", text: LINES.generic, retryText: t });
         } finally {
@@ -71,7 +75,7 @@ export default function AskMissTokyoPanel({ open, onClose }: { open: boolean; on
             aria-label="Ask Miss Tokyo"
             data-ask-mt="panel"
             className="fixed z-[150] inset-0 md:inset-auto md:bottom-6 md:right-6 md:w-[380px] md:h-[560px] bg-[#f5f0e8] text-black flex flex-col md:rounded-2xl md:shadow-2xl border border-black/10"
-            style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+            style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
             <div className="flex items-center justify-between px-5 py-4 border-b border-black/10">
                 <p className="font-serif text-sm uppercase tracking-[0.25em]">Ask Miss Tokyo</p>
@@ -90,7 +94,7 @@ export default function AskMissTokyoPanel({ open, onClose }: { open: boolean; on
                         ))}
                     </div>
                 )}
-                {bubbles.map((b: Bubble) => b.who === "customer"
+                {bubbles.map((b: Bubble, idx: number) => b.who === "customer"
                     ? <div key={b.id} className="ml-auto max-w-[85%] bg-black text-[#f5f0e8] rounded-2xl rounded-br-sm px-4 py-2 text-sm whitespace-pre-wrap">{b.text}</div>
                     : (
                         <div key={b.id} className="space-y-2">
@@ -105,7 +109,7 @@ export default function AskMissTokyoPanel({ open, onClose }: { open: boolean; on
                                     ))}
                                 </div>
                             )}
-                            {b.retryText && <button type="button" onClick={() => send(b.retryText!)} className="text-[10px] uppercase tracking-[0.15em] underline">Retry</button>}
+                            {b.retryText && idx === bubbles.length - 1 && <button type="button" onClick={() => send(b.retryText!, { retry: true })} className="text-[10px] uppercase tracking-[0.15em] underline">Retry</button>}
                         </div>
                     ))}
                 {sending && <div className="text-xs text-neutral-500" aria-hidden="true">Ask Miss Tokyo is typing…</div>}
