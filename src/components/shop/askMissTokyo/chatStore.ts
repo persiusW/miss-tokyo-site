@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { looksRaw } from "@/lib/errors/looksRaw";
 import { LINES } from "@/lib/ai/shopAssistant/lines";
+import { safeButtons } from "./buttons";
 import type { ShopButton } from "@/lib/ai/shopAssistant/types";
 
 export type Bubble = { id: string; who: "customer" | "assistant"; text: string; buttons?: ShopButton[]; retryText?: string };
@@ -15,7 +16,9 @@ export function bubbleText(text: unknown): string {
 
 // The store itself refuses raw text in assistant bubbles, so no caller has to remember.
 function cleanBubble(b: Bubble): Bubble {
-    return { ...b, text: b.who === "assistant" ? bubbleText(b.text) : b.text };
+    const clean: Bubble = { ...b, text: b.who === "assistant" ? bubbleText(b.text) : b.text };
+    if (b.buttons !== undefined) clean.buttons = b.who === "assistant" ? safeButtons(b.buttons) : [];
+    return clean;
 }
 
 function wellFormed(b: unknown): b is Bubble {

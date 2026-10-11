@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { widgetHiddenOn } from "../../../src/components/shop/askMissTokyo/visibility";
+import { safeButton } from "../../../src/components/shop/askMissTokyo/buttons";
 import { LINES } from "../../../src/lib/ai/shopAssistant/lines";
 import { maskPersonal, conversationText, firstQuestion } from "../../../src/lib/ai/shopAssistant/adminView";
 
@@ -69,4 +70,43 @@ test("admins see the conversation only, with phones and emails masked", () => {
     ]);
     expect(firstQuestion(msgs)).toBe("My number is •••• 4567");
     expect(conversationText("junk")).toEqual([]);
+});
+
+const item = { id: "i1", productId: "p1", name: "Lisa", slug: "lisa", price: 120, size: "38", imageUrl: "", quantity: 1 };
+
+test("buttons with unsafe links or shapes are dropped", () => {
+    for (const href of ["javascript:alert(1)", "//evil.com/products/x", "http://checkout.paystack.com/x", "https://evil.com/x", "/account"]) {
+        expect(safeButton({ kind: "open_product", label: "x", href }), href).toBeNull();
+    }
+    expect(safeButton({ kind: "pay_now", label: "Pay", href: "https://checkout.paystack.com.evil.com/x" })).toBeNull();
+    expect(safeButton({ kind: "pay_now", label: "Pay", href: "https://evil.com/https://checkout.paystack.com/" })).toBeNull();
+    expect(safeButton({ kind: "talk_to_us", label: "x", href: "http://wa.me/233" })).toBeNull();
+    expect(safeButton({ kind: "open_product", href: "/products/a" })).toBeNull();
+    expect(safeButton({ kind: "other", label: "x" })).toBeNull();
+    expect(safeButton(null)).toBeNull();
+    for (const bad of [{ ...item, quantity: 0 }, { ...item, quantity: 21 }, { ...item, quantity: 1.5 }, { ...item, price: -1 }, { ...item, price: NaN }, { ...item, slug: 5 }, "x"]) {
+        expect(safeButton({ kind: "add_to_cart", label: "Add", item: bad })).toBeNull();
+    }
+});
+
+test("the four valid button shapes are kept", () => {
+    const ok = [
+        { kind: "open_product", label: "View", href: "/products/lisa" },
+        { kind: "pay_now", label: "Pay", href: "https://checkout.paystack.com/abc" },
+        { kind: "talk_to_us", label: "WhatsApp", href: "https://wa.me/233241234567?text=hi" },
+        { kind: "add_to_cart", label: "Add", item },
+    ];
+    for (const b of ok) expect(safeButton(b)).toEqual(b);
+});
+
+test("the store drops unsafe buttons on push", async () => {
+    const { useAskStore } = await loadStore();
+    const st = useAskStore.getState();
+    st.reset();
+    st.push({ id: "a", who: "assistant", text: "Here", buttons: [
+        { kind: "pay_now", label: "Pay", href: "javascript:alert(1)" },
+        { kind: "open_product", label: "View", href: "/products/lisa" },
+    ] as never });
+    expect(useAskStore.getState().bubbles[0].buttons).toEqual([{ kind: "open_product", label: "View", href: "/products/lisa" }]);
+    st.reset();
 });
