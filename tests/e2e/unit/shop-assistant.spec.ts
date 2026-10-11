@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { normaliseWaNumber, SHOP_SETTING_VALIDATORS } from "../../../src/lib/ai/shopAssistant/settingsRules";
 import { cleanTrackQuery } from "../../../src/lib/orders/trackQuery";
 import { FAQS, SIZE_CHART, shopInfoText, SHOP_INFO_TOPICS } from "../../../src/content/shopInfo";
+import { checkoutCustomerLine, ERRORS, isErrorCode } from "../../../src/lib/errors/catalogue";
 
 test("WhatsApp numbers normalise to 233 + 9 digits, or null", () => {
     expect(normaliseWaNumber("055 389 8704")).toBe("233553898704");
@@ -49,4 +50,19 @@ test("shop info: every topic has text, payment never mentions cash", () => {
     expect(shopInfoText("sizing")).toMatch(/XL — 14/);
     expect(FAQS.length).toBe(18);
     expect(SIZE_CHART.length).toBe(6);
+});
+
+test("checkout failures read as customer text: no codes, no cash, no raw text", () => {
+    expect(checkoutCustomerLine("gateway", "Paystack 502")).toBe(ERRORS["PAY-01"].customer);
+    expect(checkoutCustomerLine("refused", "x")).toBe(ERRORS["PAY-02"].customer);
+    expect(checkoutCustomerLine("internal", "TypeError: boom")).toBe(ERRORS["ORD-01"].customer);
+    expect(checkoutCustomerLine("invalid", "Delivery needs an address and a zone (within Accra or outside Accra).")).toMatch(/^Delivery needs/);
+    expect(checkoutCustomerLine("invalid", "duplicate key value violates unique constraint")).toBe(ERRORS["GEN-00"].customer);
+    expect(checkoutCustomerLine("unavailable", "Lisa Heels in size 38 is sold out.")).toBe("Lisa Heels in size 38 is sold out.");
+    for (const c of ["gateway", "refused", "payments_unconfigured", "unavailable", "internal", "invalid", "weird"]) {
+        const line = checkoutCustomerLine(c, "Something odd");
+        expect(line).not.toMatch(/\([A-Z]{3,4}-\d{2}\)/);
+        expect(line).not.toMatch(/cash/i);
+    }
+    expect(isErrorCode("SHOP-01")).toBe(true);
 });

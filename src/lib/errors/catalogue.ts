@@ -1,8 +1,9 @@
 // Every error the app can show, with one stable code each. Staff see the text
 // plus the code, so they can quote it; customers see their own text only.
 // Codes are never reused. Wording approved in spec B (2026-10-09).
+import { looksRaw } from "@/lib/errors/looksRaw";
 
-export type ErrorArea = "pay" | "pos" | "sms" | "email" | "stock" | "order" | "auth" | "net" | "gen";
+export type ErrorArea = "pay" | "pos" | "sms" | "email" | "stock" | "order" | "auth" | "net" | "gen" | "shop";
 export type ErrorDef = { area: ErrorArea; staff: string; customer: string; steps?: string[]; aiHelp?: boolean };
 
 const GENERIC_CUSTOMER = "Something happened. Please try again shortly.";
@@ -41,6 +42,7 @@ export const ERRORS = {
     "ORD-01": { area: "order", staff: "The order couldn't be created. Nothing was charged. Please try again.", customer: "We couldn't place your order. You haven't been charged. Please try again." },
     "AUTH-01": { area: "auth", staff: "Your sign-in expired. Please sign in again.", customer: "Please sign in again." },
     "NET-01": { area: "net", staff: "Couldn't reach the server. Please try again.", customer: "We couldn't connect. Please check your connection and try again." },
+    "SHOP-01": { area: "shop", staff: "The shop assistant couldn't answer.", customer: GENERIC_CUSTOMER },
     "GEN-00": { area: "gen", staff: "Something happened. Please try again shortly.", customer: GENERIC_CUSTOMER },
 } satisfies Record<string, ErrorDef>;
 
@@ -76,6 +78,17 @@ export function checkoutErrorLine(code: string, error: string): string {
     if (code === "invalid" || !c) return error;
     if (code === "unavailable") return `${error} (${c})`;
     return staffLine(c);
+}
+
+/** What a customer is told when a chat order fails: never a code. Hand-written
+ *  validation and stock lines are kept (they say what to fix) unless they look raw. */
+export function checkoutCustomerLine(code: string, error: string): string {
+    const c = fromCheckoutCode(code);
+    if (code === "invalid" || code === "unavailable") {
+        if (!looksRaw(error)) return error;
+        return c ? ERRORS[c].customer : GENERIC_CUSTOMER;
+    }
+    return c ? ERRORS[c].customer : GENERIC_CUSTOMER;
 }
 
 /** createCheckoutOrder's own codes → catalogue codes. "invalid" keeps its hand-written text. */
