@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { widgetHiddenOn } from "../../../src/components/shop/askMissTokyo/visibility";
 import { LINES } from "../../../src/lib/ai/shopAssistant/lines";
+import { maskPersonal, conversationText, firstQuestion } from "../../../src/lib/ai/shopAssistant/adminView";
 
 // The store persists to sessionStorage, which Node lacks. Give it an in-memory one
 // before the store module loads, so the run stays free of storage warnings.
@@ -50,4 +51,22 @@ test("the store keeps only the last 40 bubbles", async () => {
     expect(b).toHaveLength(40);
     expect(b[0].id).toBe("5");
     st.reset();
+});
+
+test("admins see the conversation only, with phones and emails masked", () => {
+    expect(maskPersonal("Call 024 123 4567 or ama.mensah@gmail.com")).toBe("Call •••• 4567 or •••@gmail.com");
+    expect(maskPersonal("+233241234567")).toBe("•••• 4567");
+    expect(maskPersonal("Order 3BBB1012 total GH₵ 357.50")).toBe("Order 3BBB1012 total GH₵ 357.50");
+    const msgs = [
+        { role: "user", content: "[Earlier in this chat: the customer asked \"x\"]\nMy number is 0241234567" },
+        { role: "assistant", content: [{ type: "thinking", thinking: "secret" }, { type: "tool_use", id: "t", name: "track_order", input: { phone: "0241234567" } }] },
+        { role: "user", content: [{ type: "tool_result", tool_use_id: "t", content: "{\"order\":1}" }] },
+        { role: "assistant", content: [{ type: "text", text: "Found it." }] },
+    ];
+    expect(conversationText(msgs)).toEqual([
+        { who: "customer", text: "My number is •••• 4567" },
+        { who: "assistant", text: "Found it." },
+    ]);
+    expect(firstQuestion(msgs)).toBe("My number is •••• 4567");
+    expect(conversationText("junk")).toEqual([]);
 });
