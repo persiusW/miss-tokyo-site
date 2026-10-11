@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "@/lib/toast";
 import AiInsights from "./AiInsights";
+import ShopAssistantCard from "./ShopAssistantCard";
 
 type Turn = { created_at: string; channel: string; model: string | null; input_tokens: number | null; output_tokens: number | null; cost_ghs: number };
 type Data = {
@@ -204,6 +205,8 @@ export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }
                     </button>
                 </div>
             </div>
+
+            <ShopAssistantCard settings={data.settings} onSaved={load} />
 
             <div className="ac-card">
                 <div className="ac-card-head"><div className="ac-card-title">Miss Tokyo AI extras</div></div>
