@@ -26,6 +26,7 @@ export function AskMissTokyo({ enabled }: { enabled: boolean }) {
 
     return (
         <>
+            {/* Phones: a 48px round icon button, clear of the shop's own buttons. md and up: the labelled pill. */}
             {!open && (
                 <button
                     ref={buttonRef}
@@ -33,10 +34,10 @@ export function AskMissTokyo({ enabled }: { enabled: boolean }) {
                     data-ask-mt="launcher"
                     aria-label="Ask Miss Tokyo — chat with our shop assistant"
                     onClick={() => setOpen(true)}
-                    className="ask-mt-launcher fixed right-4 md:right-6 z-[45] flex items-center gap-2 rounded-full bg-black text-[#f5f0e8] pl-4 pr-5 h-12 shadow-xl text-[11px] uppercase tracking-[0.2em] font-semibold"
+                    className="ask-mt-launcher fixed right-4 md:right-6 z-[45] flex items-center justify-center md:justify-start w-12 md:w-auto h-12 md:gap-2 md:pl-4 md:pr-5 rounded-full bg-black text-[#f5f0e8] shadow-xl text-[11px] uppercase tracking-[0.2em] font-semibold"
                 >
                     <MessageCircle size={18} aria-hidden="true" />
-                    <span>Ask Miss Tokyo</span>
+                    <span className="sr-only md:not-sr-only">Ask Miss Tokyo</span>
                 </button>
             )}
             {loaded && <Panel open={open} onClose={() => { setOpen(false); requestAnimationFrame(() => buttonRef.current?.focus()); }} />}
