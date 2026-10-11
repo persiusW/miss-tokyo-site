@@ -365,3 +365,9 @@ test("a chat idle for more than 4 hours is stale", () => {
     expect(chatIsStale(undefined, now)).toBe(false);
     expect(chatIsStale("not a date", now)).toBe(false);
 });
+
+test("the busy line says what to do next", () => {
+    expect(LINES.busy).toBe("I'm still answering your last message. Please send that again in a moment.");
+    expect(looksRaw(LINES.busy)).toBe(false);
+    expect(LINES.busy).not.toMatch(/cash/i);
+});

@@ -11,7 +11,7 @@ export const LINES = {
     payProblem: "Please try again, or pay another way.",
     openOrderWaiting: "You already have an order waiting for payment.",
     held: "Your items are held for 15 minutes.",
-    busy: "Just a moment, I'm still answering your last message.",
+    busy: "I'm still answering your last message. Please send that again in a moment.",
     slowDown: "You're sending messages quickly. Please wait a minute and try again.",
     tooLong: "Please keep your message under 1000 characters.",
     empty: "Please type a question.",
