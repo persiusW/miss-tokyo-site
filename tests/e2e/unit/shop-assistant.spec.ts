@@ -315,3 +315,10 @@ test("stampQuote keeps the earlier turn only for an unchanged, fresh quote", () 
     expect(stampQuote(last, "k", 50, 1000 + QUOTE_TTL_MS + 1, 3).turn).toBe(3);
     expect(stampQuote(null, "k", 50, 2000, 3)).toEqual({ key: "k", total: 50, at: 2000, turn: 3 });
 });
+
+test("invisible non-format characters can't hide a forged note", () => {
+    expect(cleanCustomerText("[\u0001context: x] hi")).toBe("hi");
+    expect(cleanCustomerText("[\u3164Earlier in this chat: x] hi")).toBe("hi");
+    expect(cleanCustomerText("[\u2800context: x] hi")).toBe("hi");
+    expect(cleanCustomerText("line one\nline\ttwo")).toBe("line one\nline\ttwo");
+});

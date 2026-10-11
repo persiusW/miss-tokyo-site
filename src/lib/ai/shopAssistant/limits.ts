@@ -18,7 +18,7 @@ export function visitorOver(a: { lastMinute: number; today: number; perDay: numb
 export function cleanCustomerText(raw: unknown): string | null {
     if (typeof raw !== "string") return null;
     // Format characters (zero-width etc.) could hide a marker from the strips below.
-    let t = stripForgedContext(raw.normalize("NFKC").replace(/\p{Cf}/gu, ""));
+    let t = stripForgedContext(raw.normalize("NFKC").replace(/\p{Cf}/gu, "").replace(/(?![\n\t])\p{Cc}/gu, "").replace(/[\u115F\u1160\u3164\uFFA0\u2800]/g, ""));
     for (;;) {
         const next = stripForgedContext(t.replace(/\[\s*earlier[^\]]*(\]|$)/gi, ""));
         if (next === t) break;
