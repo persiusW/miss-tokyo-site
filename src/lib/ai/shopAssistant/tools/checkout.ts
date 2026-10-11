@@ -3,7 +3,7 @@
 import { createCheckoutOrder, quoteCheckoutOrder, type CreateCheckoutOrderInput } from "@/lib/checkout/createCheckoutOrder";
 import { checkoutCustomerLine } from "@/lib/errors/catalogue";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { canOpenAnother, quoteHolds, quoteKey, sameTotal } from "../guards";
+import { canOpenAnother, quoteHolds, stampQuote, quoteKey, sameTotal } from "../guards";
 import { BUTTON_LABELS, LINES } from "../lines";
 import { err, ok, pushTalk, str, type ShopToolContext, type ToolOutcome } from "./context";
 
@@ -47,7 +47,7 @@ export async function priceOrder(input: any, ctx: ShopToolContext): Promise<Tool
     const oi = toInput(input, ctx);
     const r = await quoteCheckoutOrder(oi);
     if (!r.success) return err(checkoutCustomerLine(r.code, r.error));
-    ctx.chat.lastQuote = { key: keyOf(oi), total: r.totals.total, at: Date.now(), turn: ctx.chat.turns };
+    ctx.chat.lastQuote = stampQuote(ctx.chat.lastQuote, keyOf(oi), r.totals.total, Date.now(), ctx.chat.turns);
     return ok({ totals_ghs: r.totals, out_of_stock: r.outOfStock, next: "Tell the customer the total and ask them to confirm with a clear yes." });
 }
 

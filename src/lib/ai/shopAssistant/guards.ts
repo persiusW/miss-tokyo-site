@@ -27,6 +27,14 @@ export function quoteHolds(last: QuoteStamp | null, key: string, now: number, cu
     return !!last && last.turn < currentTurn && last.key === key && now >= last.at && now - last.at <= QUOTE_TTL_MS;
 }
 
+/** The stamp price_order saves. Re-checking an unchanged, fresh total keeps the original turn so the customer's earlier yes still counts. */
+export function stampQuote(last: QuoteStamp | null, key: string, total: number, now: number, turn: number): QuoteStamp {
+    if (last && last.key === key && sameTotal(last.total, total) && now >= last.at && now - last.at <= QUOTE_TTL_MS) {
+        return { ...last, at: now };
+    }
+    return { key, total, at: now, turn };
+}
+
 export const sameTotal = (a: number, b: number) => Math.round(a * 100) === Math.round(b * 100);
 export const canOpenAnother = (openCount: number) => openCount < MAX_OPEN_ORDERS;
 export const trackLocked = (wrongTries: number) => wrongTries >= TRACK_LOCK_AT;

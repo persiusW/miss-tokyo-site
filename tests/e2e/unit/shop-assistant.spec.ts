@@ -9,7 +9,7 @@ import { checkoutCustomerLine, ERRORS, isErrorCode } from "../../../src/lib/erro
 import { LINES, safeReply } from "../../../src/lib/ai/shopAssistant/lines";
 import { looksRaw } from "../../../src/lib/errors/looksRaw";
 import { stockWord, publicProduct, publicOrder, paymentState, waSummary, talkButton, dedupeButtons, cartLineFor } from "../../../src/lib/ai/shopAssistant/format";
-import { quoteKey, quoteHolds, sameTotal, canOpenAnother, trackLocked, QUOTE_TTL_MS } from "../../../src/lib/ai/shopAssistant/guards";
+import { stampQuote, quoteKey, quoteHolds, sameTotal, canOpenAnother, trackLocked, QUOTE_TTL_MS } from "../../../src/lib/ai/shopAssistant/guards";
 import { visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor, mergeChatState } from "../../../src/lib/ai/shopAssistant/limits";
 
 test("WhatsApp numbers normalise to 233 + 9 digits, or null", () => {
@@ -305,4 +305,13 @@ test("shop_info keeps the FAQ answers it quotes", () => {
     expect(shopInfoText("delivery")).toContain(ans("Do you offer pickup?")!);
     expect(shopInfoText("delivery")).toContain(ans("Are delivery fees refundable?")!);
     expect(shopInfoText("payment")).toContain(ans("What payment methods do you accept?")!);
+});
+
+test("stampQuote keeps the earlier turn only for an unchanged, fresh quote", () => {
+    const last = { key: "k", total: 50, at: 1000, turn: 2 };
+    expect(stampQuote(last, "k", 50, 2000, 3)).toEqual({ key: "k", total: 50, at: 2000, turn: 2 });
+    expect(stampQuote(last, "k", 51, 2000, 3).turn).toBe(3);
+    expect(stampQuote(last, "j", 50, 2000, 3).turn).toBe(3);
+    expect(stampQuote(last, "k", 50, 1000 + QUOTE_TTL_MS + 1, 3).turn).toBe(3);
+    expect(stampQuote(null, "k", 50, 2000, 3)).toEqual({ key: "k", total: 50, at: 2000, turn: 3 });
 });
