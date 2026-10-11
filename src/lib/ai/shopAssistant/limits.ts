@@ -90,7 +90,7 @@ export function mergeChatState(saved: ShopChat, work: ShopChat): ShopChat {
     return {
         ...saved,
         openOrders: [...new Set([...saved.openOrders, ...work.openOrders])],
-        verifiedOrders: [...new Set([...saved.verifiedOrders, ...work.verifiedOrders])],
+        verifiedOrders: [...new Set([...saved.verifiedOrders, ...work.verifiedOrders])].slice(-20),
         payLinks: { ...saved.payLinks, ...work.payLinks },
         wrongTries: Math.max(saved.wrongTries, work.wrongTries),
         saleKey: saved.saleKey ?? work.saleKey,

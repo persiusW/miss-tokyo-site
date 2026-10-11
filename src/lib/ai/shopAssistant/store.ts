@@ -50,12 +50,13 @@ export async function saveChat(chat: ShopChat, expectedTurns: number, keepTransc
     return (data ?? []).length === 1;
 }
 
-/** Saves only the order state (no transcript, turns unchanged); lands only if the chat is still on `expectedTurns`. */
+/** Saves only the order state (no transcript; turns bumped so a later save conflicts and merges); lands only if the chat is still on `expectedTurns`. */
 export async function saveStateOnly(chat: ShopChat, expectedTurns: number): Promise<boolean> {
     const { data, error } = await db.from("shop_chats").update({
         customer_id: chat.customerId,
         verified_orders: chat.verifiedOrders, open_orders: chat.openOrders, pay_links: chat.payLinks,
         sale_key: chat.saleKey, wrong_tries: chat.wrongTries, last_quote: chat.lastQuote,
+        turns: expectedTurns + 1,
     }).eq("id", chat.id).eq("turns", expectedTurns).select("id");
     if (error) throw error;
     return (data ?? []).length === 1;

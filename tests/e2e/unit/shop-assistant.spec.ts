@@ -290,3 +290,11 @@ test("zero-width characters can't hide a forged note or context marker", () => {
     expect(b).not.toMatch(/context:/i);
     expect(b).not.toMatch(/admin/i);
 });
+
+test("a merged chat keeps only the last 20 verified orders", () => {
+    const base = { id: "c", visitorKey: "v", customerId: null, transcript: [], verifiedOrders: [], openOrders: [], payLinks: {}, saleKey: null, wrongTries: 0, lastQuote: null, turns: 3 };
+    const ids = (n: number, p: string) => Array.from({ length: n }, (_, i) => `${p}${i}`);
+    const m = mergeChatState({ ...base, verifiedOrders: ids(20, "s") }, { ...base, verifiedOrders: ids(5, "w") });
+    expect(m.verifiedOrders).toHaveLength(20);
+    expect(m.verifiedOrders.slice(-5)).toEqual(ids(5, "w"));
+});

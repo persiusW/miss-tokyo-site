@@ -18,6 +18,7 @@ export async function todaySpendUsd(channel?: "dashboard" | "whatsapp" | "web"):
             .from("ai_turns")
             .select("cost_usd")
             .gte("created_at", startOfTodayUtc())
+            .order("created_at")
             .order("id")
             .range(from, from + PAGE - 1);
         if (channel) q = q.eq("channel", channel);
