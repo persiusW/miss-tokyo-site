@@ -9,7 +9,7 @@ export function startOfTodayUtc(): string {
 }
 
 /** Today's spend in USD, optionally for one channel, or null when it cannot be read (callers fail closed). */
-export async function todaySpendUsd(channel?: "dashboard" | "whatsapp"): Promise<number | null> {
+export async function todaySpendUsd(channel?: "dashboard" | "whatsapp" | "web"): Promise<number | null> {
     let q = supabaseAdmin
         .from("ai_turns")
         .select("cost_usd")
