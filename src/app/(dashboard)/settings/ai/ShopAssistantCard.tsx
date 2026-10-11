@@ -104,6 +104,7 @@ export default function ShopAssistantCard({ settings, onSaved }: { settings: { k
                         {tile("Messages today", String(data.usage.today.messages))}
                         {tile("Cost today", `GHS ${data.usage.today.cost_ghs.toFixed(2)}`)}
                         {tile("Chats (7 days)", String(data.usage.week.chats))}
+                        {tile("Messages (7 days)", String(data.usage.week.messages))}
                         {tile("Cost (7 days)", `GHS ${data.usage.week.cost_ghs.toFixed(2)}`)}
                         {tile("Orders from chat (7 days)", `${data.usage.week.orders} · ${data.usage.week.paid_orders} paid`)}
                     </div>
