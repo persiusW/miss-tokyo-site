@@ -50,6 +50,17 @@ export async function saveChat(chat: ShopChat, expectedTurns: number, keepTransc
     return (data ?? []).length === 1;
 }
 
+/** Saves only the order state (no transcript, turns unchanged); lands only if the chat is still on `expectedTurns`. */
+export async function saveStateOnly(chat: ShopChat, expectedTurns: number): Promise<boolean> {
+    const { data, error } = await db.from("shop_chats").update({
+        customer_id: chat.customerId,
+        verified_orders: chat.verifiedOrders, open_orders: chat.openOrders, pay_links: chat.payLinks,
+        sale_key: chat.saleKey, wrong_tries: chat.wrongTries, last_quote: chat.lastQuote,
+    }).eq("id", chat.id).eq("turns", expectedTurns).select("id");
+    if (error) throw error;
+    return (data ?? []).length === 1;
+}
+
 /** Messages this visitor sent in the last minute and today, across all their chats. Null = can't tell (fail closed). */
 export async function visitorCounts(visitorKey: string): Promise<{ lastMinute: number; today: number } | null> {
     const { data: chats, error } = await db.from("shop_chats").select("id")

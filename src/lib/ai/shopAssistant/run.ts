@@ -10,10 +10,10 @@ import { runShopTurn } from "./engine";
 import { SHOP_SYSTEM_PROMPT } from "./prompt";
 import { CUSTOMER_TOOL_DEFS } from "./toolDefs";
 import { runCustomerTool, type ShopToolContext } from "./tools";
-import { trimTranscript } from "./limits";
+import { mergeChatState, trimTranscript } from "./limits";
 import { dedupeButtons, talkButton, waSummary } from "./format";
 import { LINES } from "./lines";
-import { saveChat } from "./store";
+import { loadChat, saveChat, saveStateOnly } from "./store";
 import type { ShopButton, ShopChannel, ShopChat, ShopIdentity } from "./types";
 
 const RESERVE_USD = 0.08;
@@ -64,8 +64,22 @@ export async function runShopAssistant(args: {
     // Orders, lockouts and verified refs are kept even when the reply failed;
     // the transcript only when the turn completed.
     const next: ShopChat = { ...work, transcript: result.ok ? result.messages : chat.transcript };
-    const saved = await saveChat(next, chat.turns, result.ok);
-    if (!saved) return { reply: LINES.busy, buttons: [], chat, failed: false };
+    let saved = false;
+    try { saved = await saveChat(next, chat.turns, result.ok); } catch (e) { logCause("SHOP-01", e, { chat: chat.id.slice(0, 8), step: "save" }); }
+    if (!saved) {
+        if (!result.ok) logCause("SHOP-01", result.cause, { chat: chat.id.slice(0, 8) });
+        // The chat moved on under us. Keep what this turn did to orders (never lose a placed order), then ask to retry.
+        let merged: ShopChat = next;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const latest = await loadChat(chat.id);
+                if (!latest) break;
+                merged = mergeChatState(latest, work);
+                if (await saveStateOnly(merged, latest.turns)) break;
+            } catch (e) { logCause("SHOP-01", e, { chat: chat.id.slice(0, 8), step: "merge" }); break; }
+        }
+        return { reply: LINES.busy, buttons: dedupeButtons([...ctx.buttons.filter(b => b.kind === "pay_now"), ...talk(ctx.notes)]), chat: merged, failed: false };
+    }
     if (!result.ok) {
         logCause("SHOP-01", result.cause, { chat: chat.id.slice(0, 8) });
         return { reply: LINES.generic, buttons: dedupeButtons([...ctx.buttons.filter(b => b.kind === "pay_now"), ...talk(ctx.notes)]), chat: next, failed: true };

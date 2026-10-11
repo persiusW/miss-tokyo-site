@@ -1,7 +1,7 @@
 // Pure limits and request checks for the shop chat.
 import type Anthropic from "@anthropic-ai/sdk";
 import { stripForgedContext } from "@/lib/ai/missTokyoAi/scrub";
-import type { ShopIdentity } from "./types";
+import type { ShopChat, ShopIdentity } from "./types";
 
 export const PER_MINUTE = 6;
 export const MAX_TEXT = 1000;
@@ -82,4 +82,16 @@ export function sameOrigin(h: { origin: string | null; fetchSite: string | null 
 export function identityFor(userId: string | null, role: string | null): ShopIdentity {
     if (!userId || (role && STAFF_ROLES.has(role))) return { customerId: null };
     return { customerId: userId };
+}
+
+/** A lost save must not lose an order: fold this turn's state into the chat as it now stands. Transcript, turns and quote come from `saved`. */
+export function mergeChatState(saved: ShopChat, work: ShopChat): ShopChat {
+    return {
+        ...saved,
+        openOrders: [...new Set([...saved.openOrders, ...work.openOrders])],
+        verifiedOrders: [...new Set([...saved.verifiedOrders, ...work.verifiedOrders])],
+        payLinks: { ...saved.payLinks, ...work.payLinks },
+        wrongTries: Math.max(saved.wrongTries, work.wrongTries),
+        saleKey: saved.saleKey ?? work.saleKey,
+    };
 }

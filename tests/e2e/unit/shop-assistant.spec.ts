@@ -10,7 +10,7 @@ import { LINES, safeReply } from "../../../src/lib/ai/shopAssistant/lines";
 import { looksRaw } from "../../../src/lib/errors/looksRaw";
 import { stockWord, publicProduct, publicOrder, paymentState, waSummary, talkButton, dedupeButtons, cartLineFor } from "../../../src/lib/ai/shopAssistant/format";
 import { quoteKey, quoteHolds, sameTotal, canOpenAnother, trackLocked, QUOTE_TTL_MS } from "../../../src/lib/ai/shopAssistant/guards";
-import { visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor } from "../../../src/lib/ai/shopAssistant/limits";
+import { visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor, mergeChatState } from "../../../src/lib/ai/shopAssistant/limits";
 
 test("WhatsApp numbers normalise to 233 + 9 digits, or null", () => {
     expect(normaliseWaNumber("055 389 8704")).toBe("233553898704");
@@ -253,4 +253,19 @@ test("customer tools never overlap the staff tools, and the module never imports
     const walk = (d: string): string[] => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
     for (const f of walk(dir)) expect(fs.readFileSync(f, "utf8"), f).not.toMatch(/missTokyoAi\/tools/);
     expect(JSON.stringify(CUSTOMER_TOOL_DEFS)).not.toMatch(/cash/i);
+});
+
+test("a lost save merges order state into the chat as it now stands", () => {
+    const base = { id: "c", visitorKey: "v", customerId: null, transcript: [], verifiedOrders: [], openOrders: [], payLinks: {}, saleKey: null, wrongTries: 0, lastQuote: null, turns: 3 };
+    const saved = { ...base, turns: 4, openOrders: ["A"], verifiedOrders: ["A"], payLinks: { A: "la" }, wrongTries: 2, saleKey: "k1", lastQuote: { key: "q", total: 5, at: 1 } };
+    const work = { ...base, openOrders: ["B", "A"], verifiedOrders: ["B"], payLinks: { B: "lb" }, wrongTries: 1, saleKey: "k2" };
+    const m = mergeChatState(saved, work);
+    expect(m.openOrders).toEqual(["A", "B"]);
+    expect(m.verifiedOrders).toEqual(["A", "B"]);
+    expect(m.payLinks).toEqual({ A: "la", B: "lb" });
+    expect(m.wrongTries).toBe(2);
+    expect(m.saleKey).toBe("k1");
+    expect(m.turns).toBe(4);
+    expect(m.lastQuote).toEqual(saved.lastQuote);
+    expect(mergeChatState({ ...saved, saleKey: null }, work).saleKey).toBe("k2");
 });
