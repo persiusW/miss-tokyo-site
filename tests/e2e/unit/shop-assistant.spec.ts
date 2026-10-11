@@ -10,7 +10,7 @@ import { BUTTON_LABELS, LINES, safeReply } from "../../../src/lib/ai/shopAssista
 import { looksRaw } from "../../../src/lib/errors/looksRaw";
 import { stockWord, publicProduct, publicOrder, paymentState, waSummary, talkButton, dedupeButtons, cartLineFor, repayButton } from "../../../src/lib/ai/shopAssistant/format";
 import { stampQuote, settleQuote, quoteKey, quoteHolds, sameTotal, canOpenAnother, trackLocked, QUOTE_TTL_MS } from "../../../src/lib/ai/shopAssistant/guards";
-import { visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor, mergeChatState } from "../../../src/lib/ai/shopAssistant/limits";
+import { visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor, mergeChatState, chatIsStale, STALE_CHAT_MS } from "../../../src/lib/ai/shopAssistant/limits";
 
 test("WhatsApp numbers normalise to 233 + 9 digits, or null", () => {
     expect(normaliseWaNumber("055 389 8704")).toBe("233553898704");
@@ -354,4 +354,14 @@ test("a placed order still waiting for payment gets its Pay button again", () =>
     expect(repayButton(chat, row("reservation_expired", "pending"))).toBeNull();
     expect(repayButton({ openOrders: [], payLinks: chat.payLinks }, row("pending", "pending"))).toBeNull();   // not this chat's open order
     expect(repayButton({ openOrders: [id], payLinks: {} }, row("pending", "pending"))).toBeNull();            // no link kept
+});
+
+test("a chat idle for more than 4 hours is stale", () => {
+    const now = Date.parse("2026-10-11T18:00:00Z");
+    expect(STALE_CHAT_MS).toBe(4 * 3600_000);
+    expect(chatIsStale("2026-10-11T13:59:59Z", now)).toBe(true);
+    expect(chatIsStale("2026-10-11T14:00:00Z", now)).toBe(false);
+    expect(chatIsStale("2026-10-11T17:30:00Z", now)).toBe(false);
+    expect(chatIsStale(undefined, now)).toBe(false);
+    expect(chatIsStale("not a date", now)).toBe(false);
 });

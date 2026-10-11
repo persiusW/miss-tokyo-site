@@ -21,6 +21,7 @@ const fromRow = (r: any): ShopChat => ({
     verifiedOrders: r.verified_orders ?? [], openOrders: r.open_orders ?? [],
     payLinks: r.pay_links && typeof r.pay_links === "object" ? r.pay_links : {},
     saleKey: r.sale_key ?? null, wrongTries: r.wrong_tries ?? 0, lastQuote: r.last_quote ?? null, turns: r.turns ?? 0,
+    ...(r.last_message_at ? { lastMessageAt: String(r.last_message_at) } : {}),
 });
 
 export async function loadChat(id: string): Promise<ShopChat | null> {

@@ -7,8 +7,15 @@ export const PER_MINUTE = 6;
 export const MAX_TEXT = 1000;
 export const MAX_KEPT = 30;
 export const IP_PER_MINUTE = 30;
+/** A chat idle this long starts fresh: a shared or handed-over device never shows the last person's chat. */
+export const STALE_CHAT_MS = 4 * 3600_000;
 
 const CUSTOMER_ROLES = new Set(["customer", "wholesale", "wholesaler"]);
+
+export function chatIsStale(lastMessageAt: string | null | undefined, now: number): boolean {
+    const at = lastMessageAt ? Date.parse(lastMessageAt) : NaN;
+    return Number.isFinite(at) && now - at > STALE_CHAT_MS;
+}
 
 export function visitorOver(a: { lastMinute: number; today: number; perDay: number }): boolean {
     return a.today >= a.perDay || a.lastMinute >= PER_MINUTE;

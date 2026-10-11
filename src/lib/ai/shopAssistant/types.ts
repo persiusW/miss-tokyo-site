@@ -20,6 +20,8 @@ export type ShopChat = {
     wrongTries: number;
     lastQuote: QuoteStamp | null;
     turns: number;
+    /** When the chat last had a message (read from the row; saveChat never writes it from here). */
+    lastMessageAt?: string;
 };
 
 /** The storefront cart's item shape (src/store/useCart.ts CartItem), minus wholesale fields. */

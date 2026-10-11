@@ -9,7 +9,7 @@ import { recordErrorEvent } from "@/lib/errors/errorEvents";
 import { cleanPlace } from "@/lib/errors/errorPlace";
 import { runShopAssistant } from "@/lib/ai/shopAssistant/run";
 import { createChat, loadChat, shopWhatsappNumber, visitorCounts, visitorKeyFor } from "@/lib/ai/shopAssistant/store";
-import { cleanCustomerText, identityFor, IpGate, IP_PER_MINUTE, MAX_TEXT, sameOrigin, visitorOver } from "@/lib/ai/shopAssistant/limits";
+import { chatIsStale, cleanCustomerText, identityFor, IpGate, IP_PER_MINUTE, MAX_TEXT, sameOrigin, visitorOver } from "@/lib/ai/shopAssistant/limits";
 import { talkButton, waSummary } from "@/lib/ai/shopAssistant/format";
 import { LINES } from "@/lib/ai/shopAssistant/lines";
 import type { ShopButton } from "@/lib/ai/shopAssistant/types";
@@ -21,7 +21,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ipGate = new IpGate(IP_PER_MINUTE, 60_000);
 
 function out(req: NextRequest, body: { reply: string; buttons: ShopButton[] }, status = 200, cookieId?: string) {
-    const res = NextResponse.json(body, { status });
+    // A new cookie means POST created or rotated the chat: the widget starts its bubbles over.
+    const res = NextResponse.json(cookieId ? { ...body, fresh: true } : body, { status });
     if (cookieId) {
         res.cookies.set(COOKIE, cookieId, {
             httpOnly: true, sameSite: "lax", secure: req.nextUrl.protocol === "https:", path: "/", maxAge: 30 * 86_400,
@@ -77,8 +78,8 @@ export async function POST(req: NextRequest) {
             chat = await createChat({ id, visitorKey: visitorKeyFor(id), customerId: who.customerId });
             newCookie = id;
         }
-        if (chat.customerId && chat.customerId !== who.customerId) {
-            // Someone else's chat (shared device, sign-out, another account): never reuse it. The visitor carries over.
+        if ((chat.customerId && chat.customerId !== who.customerId) || chatIsStale(chat.lastMessageAt, Date.now())) {
+            // Someone else's chat (shared device, sign-out, another account) or one left idle: never reuse it. The visitor carries over.
             const id = crypto.randomUUID();
             chat = await createChat({ id, visitorKey: chat.visitorKey, customerId: who.customerId });
             newCookie = id;
