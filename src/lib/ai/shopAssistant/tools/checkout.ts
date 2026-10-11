@@ -67,7 +67,7 @@ export async function placeOrder(input: any, ctx: ShopToolContext): Promise<Tool
     const oi = toInput(input, ctx);
     const key = keyOf(oi);
     if (!quoteHolds(ctx.chat.lastQuote, key, Date.now(), ctx.chat.turns)) {
-        return err("Run price_order for exactly this order, tell the customer the total, and get a clear yes first.");
+        return err("The customer must agree to a total you gave them in an earlier message. If they just said yes to the total you quoted before, call place_order without calling price_order again; if the order changed, quote the new total and wait for their reply.");
     }
 
     const open = await stillOpen(ctx.chat.openOrders);
