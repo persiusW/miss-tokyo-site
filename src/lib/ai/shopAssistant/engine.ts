@@ -91,6 +91,11 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
     const text = fixed ?? safeReply(reply);
     // Keep the transcript alternating: a turn that stopped on tool results
     // (or before answering) is closed by what the customer was told.
+    // A blank text block is rejected by the API on every later turn, so drop them first.
+    const tail = messages[messages.length - 1];
+    if (tail?.role === "assistant" && Array.isArray(tail.content)) {
+        messages[messages.length - 1] = { ...tail, content: tail.content.filter(b => !(b.type === "text" && !b.text.trim())) };
+    }
     const last = messages[messages.length - 1];
     if (last?.role === "user") messages.push({ role: "assistant", content: [{ type: "text", text }] });
     else if (last && Array.isArray(last.content) && !last.content.some(b => b.type === "text" && b.text.trim())) {

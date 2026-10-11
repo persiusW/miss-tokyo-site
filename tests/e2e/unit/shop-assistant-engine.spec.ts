@@ -117,3 +117,11 @@ test("fixed is true for our own lines and false for model text", async () => {
     const normal: any = await mini([say("Hello there.")]);
     expect(normal.fixed).toBe(false);
 });
+
+test("blank text blocks never reach the saved chat", async () => {
+    const r: any = await mini([{ content: [{ type: "text", text: "" }], stop_reason: "end_turn", usage }]);
+    const last = r.messages[r.messages.length - 1];
+    expect(last.role).toBe("assistant");
+    expect(last.content.some((b: any) => b.type === "text" && !b.text.trim())).toBe(false);
+    expect(last.content.some((b: any) => b.type === "text" && b.text === LINES.generic)).toBe(true);
+});
