@@ -2,8 +2,8 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { stockFor } from "@/lib/ai/catalogStock";
 import { preorderEligibleIds } from "@/lib/checkout/createCheckoutOrder";
-import { normAttr, normSize } from "@/lib/utils/normAttr";
-import { cartLineFor, publicProduct, type ProductRow } from "../format";
+import { normAttr } from "@/lib/utils/normAttr";
+import { cartLineFor, publicProduct, sizeMatches, type ProductRow } from "../format";
 import { BUTTON_LABELS } from "../lines";
 import { err, ok, str, type ShopToolContext, type ToolOutcome } from "./context";
 
@@ -49,7 +49,7 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
             const base = publicProduct(p, stock.get(p.id), preorder.has(p.id));
             // Narrow to the asked-for option without mutating the shaped product.
             const out = "options" in base && base.options && (size || colour)
-                ? { ...base, options: base.options.filter(o => (!size || normSize(o.size) === normSize(size)) && (!colour || normAttr(o.colour) === normAttr(colour))) }
+                ? { ...base, options: base.options.filter(o => (!size || sizeMatches(o.size, size)) && (!colour || normAttr(o.colour) === normAttr(colour))) }
                 : base;
             return { row: p, out };
         })
@@ -64,7 +64,7 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
         const opts = ("options" in out ? out.options : undefined) ?? [];
         const needs = { size: (row.available_sizes ?? []).length > 0, colour: (row.available_colors ?? []).length > 0, brand: (row.available_brands ?? []).length > 0 };
         if (opts.length === 1 && opts[0].stock !== "Sold out" && !needs.brand
-            && (!needs.size || (size && opts[0].size && normSize(opts[0].size) === normSize(size)))
+            && (!needs.size || (size && opts[0].size && sizeMatches(opts[0].size, size)))
             && (!needs.colour || (colour && opts[0].colour && normAttr(opts[0].colour) === normAttr(colour)))) {
             ctx.buttons.push({ kind: "add_to_cart", label: BUTTON_LABELS.add, item: cartLineFor(row, opts[0], false) });
         }
