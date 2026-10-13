@@ -46,7 +46,6 @@ next-env.d.ts
 .claude-flow/
 .swarm/
 .mcp.json
-CLAUDE.md
 claude-flow.config.json
 
 # Tooling / AI docs — auto-generated, not source
