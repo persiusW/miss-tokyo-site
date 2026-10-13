@@ -2,6 +2,7 @@
 // private fields, the WhatsApp hand-off. Nothing here reads the database.
 import type { Stock } from "@/lib/ai/catalogStock";
 import type { CartLine, ShopButton } from "./types";
+import { normSize } from "@/lib/utils/normAttr";
 import { BUTTON_LABELS } from "./lines";
 
 export const LOW_STOCK_MAX = 3;
@@ -9,6 +10,30 @@ export const LOW_STOCK_MAX = 3;
 export function stockWord(available: number): string {
     if (!(available > 0)) return "Sold out";
     return available <= LOW_STOCK_MAX ? `Only ${Math.floor(available)} left` : "In stock";
+}
+
+const SIZE_WORDS: Record<string, string> = { small: "s", medium: "m", large: "l", "extra large": "xl", "extra-large": "xl" };
+
+/**
+ * Whether an option's stored size is the size a shopper asked for. The shop
+ * stores most clothing as "M — 10" and free sizes as "Free(8-14)", while a
+ * shopper says "M", "10", "medium" or "free size" — an exact compare matched
+ * none of those, so every option was filtered out of a sized search.
+ */
+export function sizeMatches(optionSize: string | null | undefined, asked: string): boolean {
+    const o = normSize(optionSize);
+    let a = normSize(asked.replace(/^\s*size\s+/i, ""));
+    a = SIZE_WORDS[a] ?? a;
+    if (a === o) return true;
+    const labelled = o.match(/^([a-z]+)-(\d+)$/);            // "m-10"
+    if (labelled) return a === labelled[1] || a === labelled[2] || a === `${labelled[1]}-${labelled[2]}`;
+    const free = o.match(/^free\s*\((\d+)-(\d+)\)$/);         // "free(8-14)"
+    if (free) {
+        if (a === "free" || a === "free size" || a === "free-size") return true;
+        const n = /^\d+$/.test(a) ? Number(a) : NaN;
+        return n >= Number(free[1]) && n <= Number(free[2]);
+    }
+    return false;
 }
 
 export type ProductRow = {
