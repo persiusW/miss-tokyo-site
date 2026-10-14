@@ -25,6 +25,8 @@ export type AssistantDeps = {
     handOff: (conversationId: string, reason: HandoffReason) => Promise<boolean>;
     logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
     chatFor: (c: Conversation, phone: string) => Promise<{ chat: ShopChat; customerId: string | null }>;
+    /** Order updates off (STOP) or back on (START) for this conversation. */
+    setOptOut: (conversationId: string, optedOut: boolean) => Promise<void>;
     /** What a quoted message said, from our own records for this conversation. */
     quoted: (conversationId: string, waMessageId: string) => Promise<string | null>;
     counts: (chat: ShopChat) => Promise<{ lastMinute: number; today: number } | null>;
@@ -67,6 +69,17 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         const raw = m.text ?? "";
         const caption = cleanCustomerText(raw) ?? cleanCustomerText(raw.slice(0, 1000)) ?? "";
         if (!caption && !photo) return;
+        // STOP / START: order updates off or on, answered without the assistant.
+        if (!photo && /^\s*(stop|unsubscribe)\s*[.!]?\s*$/i.test(caption)) {
+            await deps.setOptOut(c.id, true);
+            await reply(c, m.from, WA_LINES.stopped);
+            return;
+        }
+        if (!photo && /^\s*(start|subscribe)\s*[.!]?\s*$/i.test(caption)) {
+            await deps.setOptOut(c.id, false);
+            await reply(c, m.from, WA_LINES.started);
+            return;
+        }
         const text = caption || "(The customer sent this photo.)";
 
         // The quote comes from our records, never from the customer, so the model may trust it.

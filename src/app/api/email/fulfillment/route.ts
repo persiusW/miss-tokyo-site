@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { sendEmail } from "@/lib/email";
+import { notifyOrderOnWhatsApp } from "@/lib/whatsapp/notifyOrder";
+import { ORDER_EVENTS, type OrderEvent } from "@/lib/whatsapp/orderUpdates";
 
 export async function POST(req: NextRequest) {
   try {
@@ -134,6 +136,11 @@ export async function POST(req: NextRequest) {
       if (message) {
         await sendSMSLogged(`fulfillment:${type}`, { to: order.customer_phone, message });
       }
+    }
+
+    // ── WhatsApp (best effort; never fails the update) ────────────────────
+    if ((ORDER_EVENTS as readonly string[]).includes(type)) {
+      await notifyOrderOnWhatsApp(order, type as OrderEvent, { store: bizAddress });
     }
 
     return NextResponse.json({ status: "sent" });
