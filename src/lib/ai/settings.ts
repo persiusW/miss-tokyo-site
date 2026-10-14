@@ -10,6 +10,10 @@ export type AiSettings = {
     whatsappPhoneNumberId: string | null;
     /** Where a WhatsApp chat is forwarded when it goes to a person (233…). Null = the shop's WhatsApp number. */
     whatsappHandoffNumber: string | null;
+    /** Order updates on WhatsApp (also needs whatsapp_enabled). */
+    whatsappStatusNotifications: boolean;
+    /** Approved Chatbots Africa template id for updates outside the 24h window; null = text inside the window only. */
+    whatsappStatusTemplateId: number | null;
     dashboardAgentEnabled: boolean;
     holdMinutesWhatsapp: number;
     adminCostMarkupPct: number;
@@ -59,6 +63,9 @@ export const EDITABLE_AI_SETTINGS = {
     ...SHOP_SETTING_VALIDATORS,
     /** Where WhatsApp chats are forwarded when they go to a person; "" = the shop's WhatsApp number. */
     whatsapp_handoff_number: SHOP_SETTING_VALIDATORS.shop_whatsapp_number,
+    whatsapp_status_notifications: (v: unknown) => typeof v === "boolean",
+    /** "" or the approved template's numeric id. */
+    whatsapp_status_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,12}$/.test(v)),
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
@@ -84,6 +91,8 @@ const OFF: AiSettings = {
     whatsappEnabled: false,
     whatsappPhoneNumberId: null,
     whatsappHandoffNumber: null,
+    whatsappStatusNotifications: false,
+    whatsappStatusTemplateId: null,
     dashboardAgentEnabled: false,
     holdMinutesWhatsapp: 15,
     adminCostMarkupPct: 0,
@@ -111,6 +120,11 @@ export async function getAiSettings(): Promise<AiSettings> {
         whatsappPhoneNumberId: typeof map.get("whatsapp_phone_number_id") === "string" && /^\d{6,30}$/.test(map.get("whatsapp_phone_number_id") as string)
             ? map.get("whatsapp_phone_number_id") as string : null,
         whatsappHandoffNumber: normaliseWaNumber(map.get("whatsapp_handoff_number")),
+        whatsappStatusNotifications: bool("whatsapp_status_notifications"),
+        whatsappStatusTemplateId: (() => {
+            const v = Number(map.get("whatsapp_status_template_id"));
+            return Number.isInteger(v) && v > 0 ? v : null;
+        })(),
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
         holdMinutesWhatsapp: num("hold_minutes_whatsapp", 15),
         adminCostMarkupPct: num("admin_cost_markup_pct", 0),
