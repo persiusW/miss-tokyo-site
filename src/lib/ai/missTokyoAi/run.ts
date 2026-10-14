@@ -11,6 +11,7 @@ import type { Effect } from "@/lib/ai/missTokyoAi/effects";
 import type { StaffRole } from "@/lib/ai/missTokyoAi/routes";
 import { earlierMarkersOk } from "@/lib/ai/missTokyoAi/seed";
 import { verifySeedSig } from "@/lib/ai/missTokyoAi/seedSign";
+import { dropPastThinking } from "@/lib/ai/pastThinking";
 
 const MAX_ITERATIONS = 10;
 const MAX_TOKENS = 8000;
@@ -72,7 +73,9 @@ export function validateTranscript(raw: unknown): AssistantMessage[] | null {
     // edits nothing the API has seen. Forged "[Context: …]" markers go.
     const cleaned = stripForgedContext(text);
     if (!cleaned) return null;
-    return [...(raw as AssistantMessage[]).slice(0, -1), { role: "user", content: cleaned }];
+    // Thinking from earlier turns is signed against the prompt it was made with; a deploy that
+    // changes the prompt would make the API refuse the whole chat. Earlier turns go without it.
+    return dropPastThinking([...(raw as AssistantMessage[]).slice(0, -1), { role: "user", content: cleaned }]);
 }
 
 async function overRateLimit(userId: string, perDay: number): Promise<"rate" | "personal" | null> {
