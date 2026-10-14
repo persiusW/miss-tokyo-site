@@ -1,8 +1,10 @@
 "use client";
 // WhatsApp inbound health: when a message last arrived, how many are waiting,
 // and what was given up. The provider never resends, so this is where staff
-// notice a problem.
+// notice a problem. Also where chats that need a person are forwarded.
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "@/lib/toast";
+import { normaliseWaNumber } from "@/lib/ai/shopAssistant/settingsRules";
 import type { Health, InboundCounts } from "@/lib/whatsapp/health";
 
 type Data = InboundCounts & { health: Health };
@@ -19,9 +21,27 @@ function since(iso: string | null): string {
     return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-export default function WhatsAppHealthCard() {
+export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { key: string; value: unknown }[]; onSaved: () => void }) {
     const [data, setData] = useState<Data | null>(null);
     const [failed, setFailed] = useState(false);
+    const saved = settings.find(s => s.key === "whatsapp_handoff_number");
+    const [handoff, setHandoff] = useState(String(saved?.value ?? ""));
+    const [saving, setSaving] = useState(false);
+
+    async function saveHandoff() {
+        const number = handoff.trim() === "" ? "" : normaliseWaNumber(handoff);
+        if (number === null) { toast.error("Enter a Ghana WhatsApp number, or leave it blank to use the shop's WhatsApp number."); return; }
+        if (number === (saved?.value ?? "")) { toast.info("Nothing to save."); return; }
+        setSaving(true);
+        try {
+            const res = await fetch("/api/ai/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: "whatsapp_handoff_number", value: number }) });
+            if (!res.ok) { const j = await res.json().catch(() => null); toast.error(j?.error ?? "We couldn't save that. Please try again."); return; }
+            setHandoff(number);
+            toast.success("Saved. Chats that need a person now go to that number.");
+        } catch {
+            toast.error("We couldn't save that. Please check your connection and try again.");
+        } finally { setSaving(false); onSaved(); }
+    }
 
     const load = useCallback(() => {
         fetch("/api/ai/whatsapp-health", { cache: "no-store" })
@@ -59,6 +79,19 @@ export default function WhatsAppHealthCard() {
                     </div>
                 </>
             )}
+            <div style={{ marginTop: 18, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
+                <label style={{ flex: "1 1 240px" }}>
+                    <span className="ac-label">Send chats that need a person to</span>
+                    <input className="ac-input" inputMode="tel" placeholder="Blank = the shop's WhatsApp number"
+                        value={handoff} onChange={e => setHandoff(e.target.value)} disabled={!saved} data-wa-handoff />
+                    <span style={{ display: "block", fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>
+                        {saved ? "They get the customer, the reason, recent messages and a link to reply, by WhatsApp and SMS." : "Available once the WhatsApp settings update is applied."}
+                    </span>
+                </label>
+                <button type="button" className="ac-btn ac-btn-primary" onClick={saveHandoff} disabled={saving || !saved}>
+                    {saving ? "Saving…" : "Save"}
+                </button>
+            </div>
         </div>
     );
 }

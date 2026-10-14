@@ -207,7 +207,7 @@ export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }
                 </div>
             </div>
 
-            <WhatsAppHealthCard />
+            <WhatsAppHealthCard settings={data.settings} onSaved={load} />
 
             <ShopAssistantCard settings={data.settings} onSaved={load} />
 
