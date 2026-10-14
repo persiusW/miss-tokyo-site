@@ -33,6 +33,33 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
     const saved = settings.find(s => s.key === "whatsapp_handoff_number");
     const [handoff, setHandoff] = useState(String(saved?.value ?? ""));
     const [saving, setSaving] = useState(false);
+    const updatesRow = settings.find(s => s.key === "whatsapp_status_notifications");
+    const templateRow = settings.find(s => s.key === "whatsapp_status_template_id");
+    const [updatesOn, setUpdatesOn] = useState(updatesRow?.value === true);
+    const [templateId, setTemplateId] = useState(String(templateRow?.value ?? ""));
+    const [savingUpdates, setSavingUpdates] = useState(false);
+
+    async function patch(key: string, value: unknown): Promise<boolean> {
+        const res = await fetch("/api/ai/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, value }) });
+        if (!res.ok) { const j = await res.json().catch(() => null); toast.error(j?.error ?? "We couldn't save that. Please try again."); return false; }
+        return true;
+    }
+
+    async function saveUpdates() {
+        const id = templateId.trim();
+        if (id && !/^\d{1,12}$/.test(id)) { toast.error("The template id is a number from Chatbots Africa's Message Templates."); return; }
+        const changes: [string, unknown][] = [];
+        if (updatesRow && updatesOn !== (updatesRow.value === true)) changes.push(["whatsapp_status_notifications", updatesOn]);
+        if (templateRow && id !== String(templateRow.value ?? "")) changes.push(["whatsapp_status_template_id", id]);
+        if (changes.length === 0) { toast.info("Nothing to save."); return; }
+        setSavingUpdates(true);
+        try {
+            for (const [k, v] of changes) if (!(await patch(k, v))) return;
+            toast.success(updatesOn ? "Saved. Customers now get order updates on WhatsApp." : "Saved. Order updates on WhatsApp are off.");
+        } catch {
+            toast.error("We couldn't save that. Please check your connection and try again.");
+        } finally { setSavingUpdates(false); onSaved(); }
+    }
 
     async function saveHandoff() {
         const number = handoff.trim() === "" ? "" : normaliseWaNumber(handoff);
@@ -98,6 +125,30 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                 <button type="button" className="ac-btn ac-btn-primary" onClick={saveHandoff} disabled={saving || !saved}>
                     {saving ? "Saving…" : "Save"}
                 </button>
+            </div>
+            <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--ac-line)" }} data-wa-updates>
+                <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: updatesRow ? "pointer" : "default" }}>
+                    <input type="checkbox" checked={updatesOn} onChange={e => setUpdatesOn(e.target.checked)} disabled={!updatesRow} style={{ marginTop: 3 }} />
+                    <span>
+                        <span style={{ display: "block", fontSize: 14, color: "var(--ac-ink)" }}>Order updates on WhatsApp</span>
+                        <span style={{ display: "block", fontSize: 12, color: "var(--ac-ink-3)" }}>
+                            Paid, packed, on its way, ready for pickup, delivered and cancelled, sent with the SMS. Customers who reply STOP get none.
+                        </span>
+                    </span>
+                </label>
+                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
+                    <label style={{ flex: "1 1 240px" }}>
+                        <span className="ac-label">Approved template id (order_status_update)</span>
+                        <input className="ac-input" inputMode="numeric" placeholder="From Chatbots Africa, Message Templates"
+                            value={templateId} onChange={e => setTemplateId(e.target.value)} disabled={!templateRow} data-wa-template />
+                        <span style={{ display: "block", fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>
+                            {templateRow ? "Needed after 24 hours without a message from the customer. Blank: those updates go by SMS only." : "Available once the WhatsApp settings update is applied."}
+                        </span>
+                    </label>
+                    <button type="button" className="ac-btn ac-btn-primary" onClick={saveUpdates} disabled={savingUpdates || !updatesRow}>
+                        {savingUpdates ? "Saving…" : "Save"}
+                    </button>
+                </div>
             </div>
         </div>
     );
