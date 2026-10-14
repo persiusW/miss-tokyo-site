@@ -12,6 +12,7 @@ import { systemPromptFor } from "./prompt";
 import { CUSTOMER_TOOL_DEFS } from "./toolDefs";
 import { runCustomerTool, type ShopToolContext } from "./tools";
 import { mergeChatState, trimTranscript } from "./limits";
+import { dropPastThinking } from "@/lib/ai/pastThinking";
 import { dedupeButtons, talkButton, waSummary } from "./format";
 import { LINES } from "./lines";
 import { settleQuote } from "./guards";
@@ -50,7 +51,8 @@ export async function runShopAssistant(args: {
 
     const work: ShopChat = { ...chat, verifiedOrders: [...chat.verifiedOrders], openOrders: [...chat.openOrders], payLinks: { ...chat.payLinks } };
     const ctx: ShopToolContext = { chat: work, identity: args.identity, channel: args.channel, buttons: [], notes: { topic: null, orderRef: null }, whatsappNumber: args.whatsappNumber };
-    const messages = trimTranscript([...chat.transcript, { role: "user", content: args.text }]);
+    // Stored thinking is signed against the prompt it was made with; earlier turns go without it.
+    const messages = trimTranscript([...dropPastThinking(chat.transcript), { role: "user", content: args.text }]);
 
     const result = await runShopTurn(
         { messages, system: systemPromptFor(args.channel, args.identity.phone), tools: CUSTOMER_TOOL_DEFS, model: AI_MODEL },
