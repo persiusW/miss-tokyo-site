@@ -371,3 +371,12 @@ test("the busy line says what to do next", () => {
     expect(looksRaw(LINES.busy)).toBe(false);
     expect(LINES.busy).not.toMatch(/cash/i);
 });
+
+test("the WhatsApp prompt note keeps the customer on WhatsApp and never offers cash", async () => {
+    const { WHATSAPP_PROMPT_NOTE, SHOP_SYSTEM_PROMPT } = await import("../../../src/lib/ai/shopAssistant/prompt");
+    expect(WHATSAPP_PROMPT_NOTE).toMatch(/Never tell them to message us on WhatsApp/);
+    expect(WHATSAPP_PROMPT_NOTE).toMatch(/never write a link yourself/i);
+    expect(WHATSAPP_PROMPT_NOTE).toMatch(/do not ask for it/);
+    expect(WHATSAPP_PROMPT_NOTE).not.toMatch(/cash/i);
+    expect(SHOP_SYSTEM_PROMPT).not.toContain(WHATSAPP_PROMPT_NOTE.trim());
+});

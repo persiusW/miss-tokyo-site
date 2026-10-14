@@ -48,9 +48,11 @@ export async function trackOrder(input: any, ctx: ShopToolContext): Promise<Tool
     }
 
     if (trackLocked(ctx.chat.wrongTries)) { pushTalk(ctx); return ok({ reply_with: LINES.trackLocked }); }
-    if (!q.email && !q.phone) return ok({ note: "Ask for the email or phone number used on the order." });
+    // On WhatsApp the sender's own number counts as the phone on the order.
+    const phone = q.phone ?? (ctx.channel === "whatsapp" ? ctx.identity.phone ?? null : null);
+    if (!q.email && !phone) return ok({ note: "Ask for the email or phone number used on the order." });
 
-    const hit = await findOrderByRef(q);
+    const hit = await findOrderByRef({ ...q, phone });
     if (!hit) {
         ctx.chat.wrongTries += 1;
         if (trackLocked(ctx.chat.wrongTries)) { pushTalk(ctx); return ok({ reply_with: LINES.trackLocked }); }
