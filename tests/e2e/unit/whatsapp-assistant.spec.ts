@@ -30,12 +30,13 @@ const chat = { id: "s1", visitorKey: "v", customerId: null, transcript: [], veri
 const msg = (over: Partial<InboundMessage> = {}): InboundMessage => ({ messageId: "wamid.T", from: PHONE, name: "Test Customer", type: "text", text: "Hi", ...over });
 const conv = { id: "c1", handedOffAt: null };
 
-function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; counts?: { lastMinute: number; today: number } | null; sendOk?: boolean } = {}) {
+function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; counts?: { lastMinute: number; today: number } | null; sendOk?: boolean; photo?: boolean } = {}) {
     const sent: string[] = [];
     const images: string[] = [];
     const logged: string[] = [];
     const handoffs: string[] = [];
     const runs: string[] = [];
+    const runImages: unknown[] = [];
     let human = false;
     const deps: AssistantDeps = {
         send: async (_to, text) => { sent.push(text); return o.sendOk === false ? { ok: false, code: "network" } : { ok: true, messageId: "wamid.OUT" }; },
@@ -44,11 +45,13 @@ function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; 
         logOutbound: async (_id, text) => { logged.push(text); },
         chatFor: async () => ({ chat, customerId: null }),
         counts: async () => (o.counts === undefined ? { lastMinute: 0, today: 0 } : o.counts),
+        quoted: async (convId, id) => (convId === "c1" && id === "wamid.OUTPHOTO1" ? "Lindsy Bodycon · L3 https://misstokyo.shop/products/lindsy-bodycon" : null),
         perDay: 20,
-        run: async a => { runs.push(a.text); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
+        fetchPhoto: async () => (o.photo ? { data: "BASE64", mediaType: "image/jpeg" as const } : null),
+        run: async a => { runs.push(a.text); runImages.push(a.image ?? null); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
         siteUrl: SITE,
     };
-    return { handle: createWhatsAppHandler(deps), sent, images, logged, handoffs, runs };
+    return { handle: createWhatsAppHandler(deps), sent, images, logged, handoffs, runs, runImages };
 }
 
 test("a text gets the assistant's reply, sent and logged, with no handoff", async () => {
@@ -67,9 +70,20 @@ test("asking for a person: the reply plus a handover note, and the chat goes to 
     expect(h.sent).toEqual([`Of course, let me get someone.\n\n${WA_LINES.handedOff}`]);
 });
 
-test("a photo: the chat goes to a person and the customer is told once", async () => {
-    const h = harness();
-    await h.handle(msg({ type: "image", text: null }), conv);
+test("a photo is read by the assistant with its caption, in that turn", async () => {
+    const h = harness({ photo: true });
+    await h.handle(msg({ type: "image", text: "Do you have this in M?", mediaId: "2000000000000001" }), conv);
+    expect(h.runs).toEqual(["Do you have this in M?"]);
+    expect(h.runImages).toEqual([{ data: "BASE64", mediaType: "image/jpeg" }]);
+    expect(h.handoffs).toEqual([]);
+    const bare = harness({ photo: true });
+    await bare.handle(msg({ type: "image", text: null, mediaId: "2000000000000001" }), conv);
+    expect(bare.runs).toEqual(["(The customer sent this photo.)"]);
+});
+
+test("a photo that can't be fetched, a voice note or a file: a person, told once", async () => {
+    const h = harness({ photo: false });
+    await h.handle(msg({ type: "image", text: null, mediaId: "2000000000000001" }), conv);
     await h.handle(msg({ type: "audio", text: null }), conv);
     expect(h.sent).toEqual([WA_LINES.textOnly]);
     expect(h.runs).toEqual([]);
@@ -123,4 +137,25 @@ test("no photos when the reply could not be sent", async () => {
     const h = harness({ sendOk: false, buttons: [{ kind: "open_product", label: "View X", href: "/products/x", productId: "11111111-1111-4111-8111-111111111111" }] });
     await h.handle(msg(), conv);
     expect(h.images).toEqual([]);
+});
+
+test("photos and links follow the pieces the reply names, captioned with the SKU", () => {
+    const btn = (name: string, id: string, sku?: string): ShopButton => ({ kind: "open_product", label: `View ${name}`, href: `/products/${id}`, productId: `${id}0000000-0000-4000-8000-000000000000`.slice(0, 36), ...(sku ? { sku } : {}) });
+    const buttons = [btn("S Buttoned Maxi Dress", "a"), btn("Lindsy Bodycon", "b", "L3"), btn("Balloon-Sleeve Mini Dress", "c", "D7")];
+    const r = renderForWhatsApp("The Balloon-Sleeve Mini Dress is GH₵ 180, or the Lindsy Bodycon is GH₵ 160.", buttons, SITE);
+    expect(r.images.map(i => i.caption.split("\n")[0])).toEqual(["Balloon-Sleeve Mini Dress · D7", "Lindsy Bodycon · L3"]);
+    expect(r.text).toContain(`View Balloon-Sleeve Mini Dress: ${SITE}/products/c`);
+    expect(r.text).not.toContain("S Buttoned Maxi Dress");
+    // A reply that names none falls back to the first pieces.
+    expect(renderForWhatsApp("Here are some options.", buttons, SITE).images.map(i => i.caption.split(" · ")[0].split("\n")[0])).toEqual(["S Buttoned Maxi Dress", "Lindsy Bodycon"]);
+});
+
+test("a reply to an earlier message reaches the model with what was quoted", async () => {
+    const h = harness();
+    await h.handle(msg({ text: "I want this dress", replyTo: "wamid.OUTPHOTO1" }), conv);
+    expect(h.runs[0]).toBe('[Replying to: "Lindsy Bodycon · L3 https://misstokyo.shop/products/lindsy-bodycon"]\nI want this dress');
+    // An unknown or other-conversation message adds nothing.
+    const other = harness();
+    await other.handle(msg({ text: "this one", replyTo: "wamid.UNKNOWN" }), conv);
+    expect(other.runs[0]).toBe("this one");
 });

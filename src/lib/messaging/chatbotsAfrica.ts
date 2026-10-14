@@ -11,6 +11,8 @@ import type { BalanceResult, ListMessage, MessagingProvider, MessagingResult, Qu
 export const CHATBOTS_AFRICA_BASE = "https://api.chatbotsafrica.com/api/v1.0";
 const PROVIDER = "chatbots_africa";
 const TIMEOUT_MS = 15_000;
+/** A customer photo larger than this is not read. */
+export const MAX_MEDIA_BYTES = 5 * 1024 * 1024;
 
 /** WhatsApp's own limits; the provider passes them through to Meta. */
 export const WA_LIMITS = {
@@ -90,9 +92,12 @@ export function shapeTemplate(m: TemplateMessage): Record<string, unknown> | Inv
     return out;
 }
 
-/** The message id, wherever the provider puts it. The success body is undocumented. */
+/**
+ * The message id. Chatbots Africa answers {"success":true,"message":{"message_id":"wamid…",…}}
+ * (seen on a live send, 2026-10-14); the other places are kept as fallbacks.
+ */
 function messageIdFrom(data: any): string | null {
-    const id = data?.message_id ?? data?.messageId ?? data?.wamid ?? data?.data?.message_id ?? data?.data?.wamid
+    const id = data?.message?.message_id ?? data?.message_id ?? data?.messageId ?? data?.wamid ?? data?.data?.message_id ?? data?.data?.wamid
         ?? data?.messages?.[0]?.id ?? data?.data?.messages?.[0]?.id ?? null;
     return id == null ? null : String(id);
 }
@@ -196,6 +201,26 @@ export function createChatbotsAfrica(deps: Deps = {}): MessagingProvider {
             const destination = toDestination(to);
             if (!destination) return { ok: false, code: "invalid", detail: "number" };
             return post("/send/opt/contact", destination, { status: false });
+        },
+
+        async downloadMedia(mediaId) {
+            const apikey = key();
+            if (!apikey) return { ok: false, code: "not_configured" };
+            if (!/^[A-Za-z0-9._:=+/-]{1,200}$/.test(mediaId ?? "")) return { ok: false, code: "invalid" };
+            try {
+                const res = await doFetch(`${CHATBOTS_AFRICA_BASE}/media/download?apikey=${encodeURIComponent(apikey)}&media_id=${encodeURIComponent(mediaId)}`, {
+                    method: "GET", signal: AbortSignal.timeout(TIMEOUT_MS),
+                });
+                if (!res.ok) { console.error("[chatbots-africa] media rejected", { status: res.status }); return { ok: false, code: "rejected" }; }
+                const declared = Number(res.headers.get("content-length"));
+                if (Number.isFinite(declared) && declared > MAX_MEDIA_BYTES) return { ok: false, code: "invalid" };
+                const bytes = new Uint8Array(await res.arrayBuffer());
+                if (bytes.byteLength === 0 || bytes.byteLength > MAX_MEDIA_BYTES) return { ok: false, code: "invalid" };
+                return { ok: true, bytes, contentType: (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase() };
+            } catch (err) {
+                console.error("[chatbots-africa] media network error", { err: String(err) });
+                return { ok: false, code: "network" };
+            }
         },
 
         async balance(): Promise<BalanceResult> {

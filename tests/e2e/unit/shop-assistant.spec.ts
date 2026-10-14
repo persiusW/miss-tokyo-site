@@ -99,17 +99,18 @@ test("stock wording: 'Only N left' only at 3 or fewer", () => {
     expect(stockWord(250)).toBe("In stock");
 });
 
-const P = { id: "11111111-1111-4111-8111-111111111111", name: " Lisa Heels ", slug: "lisa-heels", sku: "LH-38-SECRET", cost_price: 90,
+const P = { id: "11111111-1111-4111-8111-111111111111", name: " Lisa Heels ", slug: "lisa-heels", sku: "D7", cost_price: 90,
     price_ghs: 300, is_sale: true, discount_value: 10, image_urls: ["https://img/1.jpg"], available_sizes: ["38", "39"], available_colors: ["Black"], available_brands: [] };
 
-test("product output: no SKU, cost or exact stock above 3", () => {
+// SKUs are public (printed on the shop's social posts, owner 2026-10-14) and help match screenshots; cost and exact counts stay hidden.
+test("product output: the public SKU, but no cost or exact stock above 3", () => {
     const out = publicProduct(P as any, { tracked: "per_option", options: [
         { size: "38", colour: "Black", brand: null, available: 12 },
         { size: "39", colour: "Black", brand: null, available: 2 },
     ] }, false);
     const json = JSON.stringify(out);
-    expect(json).not.toMatch(/LH-38-SECRET|sku|cost|"available"|12/);
-    expect(out).toMatchObject({ name: "Lisa Heels", price_ghs: 270, was_ghs: 300, url: "/products/lisa-heels", image: "https://img/1.jpg" });
+    expect(json).not.toMatch(/cost|"available"|12|90/);
+    expect(out).toMatchObject({ name: "Lisa Heels", sku: "D7", price_ghs: 270, was_ghs: 300, url: "/products/lisa-heels", image: "https://img/1.jpg" });
     expect(out.options).toEqual([
         { size: "38", colour: "Black", brand: null, stock: "In stock" },
         { size: "39", colour: "Black", brand: null, stock: "Only 2 left" },

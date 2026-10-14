@@ -12,7 +12,7 @@ test("the real text shape: sender, user id, name, text, time, our phone number i
     const p = parse("text-basic.json");
     expect(p.messages).toEqual([{
         messageId: "wamid.TEST0001", from: "233200000001", name: "Test Customer", type: "text", text: "Hi",
-        fromUserId: "GH.0000000000000001", at: "2026-10-14T17:30:00.000Z", mediaId: null, mimeType: null,
+        fromUserId: "GH.0000000000000001", at: "2026-10-14T17:30:00.000Z", mediaId: null, mimeType: null, replyTo: null,
     }]);
     expect(p.phoneNumberIds).toEqual(["1000000000000001"]);
     expect(p.externalId).toBe("wamid.TEST0001");
@@ -100,4 +100,9 @@ test("odd shapes are noted, never thrown", () => {
     expect(parse("odd-empty.json")).toMatchObject({ messages: [], notes: ["ignored: object is missing"] });
     expect(parse("odd-object.json").notes).toEqual(["ignored: object is page"]);
     expect(parse("odd-no-changes.json")).toMatchObject({ messages: [], notes: ["entry without changes"] });
+});
+
+test("a reply carries the id of the message it quotes", () => {
+    expect(parse("reply-to-photo.json").messages[0]).toMatchObject({ text: "I want this dress", replyTo: "wamid.OUTPHOTO1" });
+    expect(parse("text-basic.json").messages[0].replyTo).toBe(null);
 });

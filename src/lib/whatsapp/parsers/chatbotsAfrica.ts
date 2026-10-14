@@ -96,6 +96,7 @@ export function parseChatbotsAfrica(rawBody: string): ParsedInbound {
                     at: epochToIso(m.timestamp),
                     mediaId: MEDIA_TYPES.has(type) ? cleanId(payload.id) : null,
                     mimeType: MEDIA_TYPES.has(type) ? capChars(str(payload.mime_type) ?? "", 100) || null : null,
+                    replyTo: cleanId(isObj(m.context) ? m.context.id : null),
                 };
                 out.messages.push(msg);
             }

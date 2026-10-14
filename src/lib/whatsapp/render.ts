@@ -33,22 +33,35 @@ function absolute(href: string, siteUrl: string): string {
     return /^https:\/\//i.test(href) ? href : `${siteUrl.replace(/\/+$/, "")}${href.startsWith("/") ? "" : "/"}${href}`;
 }
 
+/** The products a reply talks about, in the order it names them; the first ones when it names none. */
+export function namedProducts(reply: string, buttons: ShopButton[], max: number): Extract<ShopButton, { kind: "open_product" }>[] {
+    const products = buttons.filter((b): b is Extract<ShopButton, { kind: "open_product" }> => b.kind === "open_product");
+    const text = reply.toLowerCase();
+    // Labels are cut at 40 characters, so match on the start of the name.
+    const at = (b: { label: string }) => text.indexOf(b.label.replace(/^View /, "").trim().toLowerCase().slice(0, 25));
+    const named = products.filter(b => at(b) >= 0).sort((a, b) => at(a) - at(b));
+    return (named.length > 0 ? named : products).slice(0, max);
+}
+
 export function renderForWhatsApp(reply: string, buttons: ShopButton[], siteUrl: string): WhatsAppReply {
     const body = SWAP[reply.trim()] ?? reply.trim();
+    const site = siteUrl.replace(/\/+$/, "");
     const links: string[] = [];
     const seen = new Set<string>();
     const add = (label: string, url: string) => { if (!seen.has(url)) { seen.add(url); links.push(`${label}: ${url}`); } };
-    let wantsPerson = false;
-    const images: WhatsAppImage[] = [];
+    const wantsPerson = buttons.some(b => b.kind === "talk_to_us");
+
+    // Links and photos for the pieces the reply names (in stock: find_products only gives buttons for those).
+    const shown = namedProducts(body, buttons, MAX_IMAGES);
+    for (const b of shown) add(b.label, absolute(b.href, site));
+    // WhatsApp takes jpg/png only; the shop's photos are webp, so they come through our JPEG route.
+    const images: WhatsAppImage[] = shown.filter(b => b.productId).map(b => ({
+        url: `${site}/api/whatsapp/media/product/${b.productId}`,
+        caption: `${b.label.replace(/^View /, "")}${b.sku ? ` · ${b.sku}` : ""}\n${absolute(b.href, site)}`,
+    }));
     for (const b of buttons) {
-        // WhatsApp takes jpg/png only; the shop's photos are webp, so they come through our JPEG route.
-        if (b.kind === "open_product" && b.productId && images.length < MAX_IMAGES) {
-            images.push({ url: `${siteUrl.replace(/\/+$/, "")}/api/whatsapp/media/product/${b.productId}`, caption: `${b.label.replace(/^View /, "")}\n${absolute(b.href, siteUrl)}` });
-        }
-        if (b.kind === "talk_to_us") { wantsPerson = true; continue; }
         if (b.kind === "pay_now") add("Pay now", b.href);
-        else if (b.kind === "open_product") add(b.label, absolute(b.href, siteUrl));
-        else if (b.kind === "add_to_cart") add(`View ${b.item.name}`, absolute(`/products/${b.item.slug}`, siteUrl));
+        else if (b.kind === "add_to_cart") add(`View ${b.item.name}`, absolute(`/products/${b.item.slug}`, site));
     }
     const text = [body, links.join("\n")].filter(Boolean).join("\n\n");
     return { text: text.length > WA_TEXT_MAX ? text.slice(0, WA_TEXT_MAX - 1) + "…" : text, wantsPerson, images };

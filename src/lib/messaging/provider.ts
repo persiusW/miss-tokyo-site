@@ -33,6 +33,10 @@ export type TemplateMessage = {
     link?: string;
 };
 
+export type MediaResult =
+    | { ok: true; bytes: Uint8Array; contentType: string }
+    | { ok: false; code: "not_configured" | "invalid" | "rejected" | "network" };
+
 export type BalanceResult =
     | { ok: true; balance: number | null; raw: unknown }
     | { ok: false; code: "not_configured" | "rejected" | "network"; detail?: unknown };
@@ -45,6 +49,8 @@ export interface MessagingProvider {
     sendQuickReply(to: string, message: QuickReply, meta?: NotificationMeta): Promise<MessagingResult>;
     sendList(to: string, message: ListMessage, meta?: NotificationMeta): Promise<MessagingResult>;
     sendTemplate(to: string, message: TemplateMessage, meta?: NotificationMeta): Promise<MessagingResult>;
+    /** A customer's photo or file, by the media id in their message. */
+    downloadMedia(mediaId: string): Promise<MediaResult>;
     /** Stops the provider messaging this contact (a STOP request). */
     optOut(to: string): Promise<MessagingResult>;
     balance(): Promise<BalanceResult>;
