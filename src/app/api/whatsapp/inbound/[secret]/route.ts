@@ -30,9 +30,11 @@ const PROVIDER = "chatbots_africa";
 const ipGate = new IpGate(1000, 60_000);
 /** Waits between write retries after the response has gone. */
 const RETRY_DELAYS_MS = [1_000, 3_000, 9_000];
+/** One "rate limited" marker per address per minute: staff see refusals, a flood cannot fill the table. */
+const lastRefusalMarker = new Map<string, number>();
 
 type Ctx = { params: Promise<{ secret: string }> };
-type EventRow = { provider: string; raw_body: string; headers: Record<string, string>; source_ip: string | null; error?: string };
+type EventRow = { provider: string; raw_body: string; headers: Record<string, string>; source_ip: string | null; error?: string; processed_at?: string };
 
 // inbound_events is not in the generated types until the migration is applied.
 const db = supabaseAdmin as any;
@@ -65,6 +67,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const ip = clientIp(req.headers);
     if (!ipGate.allow(ip ?? "unknown", Date.now())) {
         console.error("[whatsapp-inbound] rate limited: delivery dropped and will not be resent");
+        const key = ip ?? "unknown";
+        const now = Date.now();
+        if (now - (lastRefusalMarker.get(key) ?? 0) >= 60_000) {
+            if (lastRefusalMarker.size > 1000) lastRefusalMarker.clear();
+            lastRefusalMarker.set(key, now);
+            // A marker, never the body: done already, so it is not backlog. Staff see it on the health card.
+            await store({ provider: PROVIDER, raw_body: "", headers: {}, source_ip: ip, error: "rate limited: delivery refused", processed_at: new Date(now).toISOString() });
+        }
         return new NextResponse("Too many requests", { status: 429 });
     }
 
@@ -72,7 +82,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const rawBody = await readCapped(req, MAX_INBOUND_BYTES);
     // An oversized delivery is still recorded, as a marker, so staff can see one went missing.
     const row: EventRow = rawBody === null
-        ? { provider: PROVIDER, raw_body: "", headers, source_ip: ip, error: `body over ${MAX_INBOUND_BYTES} bytes (declared ${req.headers.get("content-length") ?? "unknown"})` }
+        ? { provider: PROVIDER, raw_body: "", headers, source_ip: ip, processed_at: new Date().toISOString(),
+            error: `body over ${MAX_INBOUND_BYTES} bytes (declared ${req.headers.get("content-length") ?? "unknown"})` }
         : { provider: PROVIDER, raw_body: rawBody, headers, source_ip: ip };
 
     // Persist first. Only a failed write waits on anything after the response.
