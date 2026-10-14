@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendSMSLogged } from "@/lib/sms";
+import { notifyOrderOnWhatsApp } from "@/lib/whatsapp/notifyOrder";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendEmail } from "@/lib/email";
 import { apiError } from "@/lib/errors/apiError";
@@ -149,6 +150,9 @@ export async function POST(req: NextRequest) {
       });
 
     await Promise.allSettled(smsPromises);
+
+    // ── WhatsApp (best effort) ────────────────────────────────────────────
+    await Promise.allSettled(orders.map(order => notifyOrderOnWhatsApp(order, "ready_for_pickup", { store: bizAddress })));
 
     // ── Log Activity ────────────────────────────────────────────────────────
     const logPromises = orders.map(order => {

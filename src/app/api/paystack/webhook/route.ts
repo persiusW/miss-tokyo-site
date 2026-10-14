@@ -7,6 +7,7 @@ import { confirmSale, fallbackDecrementFromItems, decrementDirect } from "@/lib/
 import { isReclaimableCancellation } from "@/lib/reclaimCancelled";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMSLogged, injectSmsVars } from "@/lib/sms";
+import { notifyOrderOnWhatsApp } from "@/lib/whatsapp/notifyOrder";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { activateAndDeliverGiftCard } from "@/lib/giftCardDelivery";
 import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
@@ -388,6 +389,9 @@ export async function POST(req: Request) {
                             "New Order Received!",
                             `Order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${fullName || customerEmail} has been paid.`,
                         ),
+                        // WhatsApp order update, once, alongside the confirmation SMS (best effort).
+                        (emailAlreadySent || !phone) ? Promise.resolve() : notifyOrderOnWhatsApp(
+                            { id: orderId, customer_name: fullName, customer_phone: phone, delivery_method: deliveryMethod }, "paid"),
                     ]);
                     if (emailResult.status === "rejected") console.error("[webhook] sendOrderConfirmation failed:", emailResult.reason);
                     if (smsResult.status === "rejected") console.error("[webhook] sendSMS failed:", smsResult.reason);
