@@ -154,6 +154,11 @@ export default async function PosPaymentPage({ params }: { params: Promise<{ pos
                     Pay Now — GH&#8373;{Number(session.total_amount).toFixed(2)}
                 </a>
 
+                <p className="text-center text-[11px] text-neutral-500 leading-relaxed" data-pay-terms>
+                    By paying, you agree to Miss Tokyo&apos;s{" "}
+                    <a href="/terms" target="_blank" rel="noopener" className="border-b border-neutral-400 hover:text-black transition-colors">Terms of Service and Conditions</a>.
+                </p>
+
                 <p className="text-center text-[10px] text-neutral-400 uppercase tracking-widest">
                     Secure payment by Paystack
                 </p>

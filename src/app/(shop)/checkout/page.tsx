@@ -1127,6 +1127,10 @@ export default function CheckoutPage() {
                 >
                     {loading ? "Processing..." : stockChecking ? "Checking availability..." : `Pay GHS ${finalTotal.toFixed(2)}`}
                 </button>
+                <p className="mt-3 text-[11px] text-neutral-500 text-center leading-relaxed" data-pay-terms>
+                    By paying, you agree to Miss Tokyo&apos;s{" "}
+                    <a href="/terms" target="_blank" rel="noopener" className="border-b border-neutral-400 hover:text-black transition-colors">Terms of Service and Conditions</a>.
+                </p>
             </div>
         </div>
     );
