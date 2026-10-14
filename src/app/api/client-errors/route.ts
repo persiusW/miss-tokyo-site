@@ -1,7 +1,10 @@
-// Log-only sink for unhandled browser errors. No table; Vercel logs keep them.
-import { NextRequest, NextResponse } from "next/server";
+// Sink for unhandled browser errors. The detail goes to the Vercel log; only
+// the code and page reach app_error_events (when that switch is on).
+import { after, NextRequest, NextResponse } from "next/server";
 import { allowReport, buildReport, oneLine } from "@/lib/errors/clientReport";
 import { redactText } from "@/lib/ai/missTokyoAi/scrub";
+import { recordErrorEvent } from "@/lib/errors/errorEvents";
+import { audienceForPath, cleanPlace } from "@/lib/errors/errorPlace";
 
 export async function POST(req: NextRequest) {
     try {
@@ -15,6 +18,8 @@ export async function POST(req: NextRequest) {
         const r = buildReport(typeof body?.message === "string" ? body.message : "unknown", typeof body?.path === "string" ? body.path : "/");
         const stackTop = typeof body?.stackTop === "string" ? redactText(body.stackTop).slice(0, 200) : "";
         console.error("[client-error]", r.code, oneLine(r.path), oneLine(r.message), oneLine(stackTop));
+        const place = cleanPlace(r.path);
+        after(() => recordErrorEvent(r.code, place, audienceForPath(place ?? "/")));
     } catch {
         // Malformed report: ignore.
     }
