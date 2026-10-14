@@ -39,6 +39,7 @@ export function sizeMatches(optionSize: string | null | undefined, asked: string
 export type ProductRow = {
     id: string; name: string | null; slug: string; price_ghs: number | null; is_sale: boolean | null; discount_value: number | null;
     image_urls: string[] | null; available_sizes: string[] | null; available_colors: string[] | null; available_brands: string[] | null;
+    sku?: string | null;
 };
 
 const salePrice = (p: ProductRow) => {
@@ -57,6 +58,7 @@ export function publicProduct(p: ProductRow, stock: Stock | undefined, takesPreo
     return {
         product_id: p.id,
         name: String(p.name ?? "").trim(),
+        ...(typeof p.sku === "string" && p.sku.trim() ? { sku: p.sku.trim() } : {}),
         price_ghs: price,
         ...(was !== null ? { was_ghs: was } : {}),
         url: `/products/${p.slug}`,
