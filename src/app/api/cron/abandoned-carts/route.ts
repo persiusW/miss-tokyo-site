@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendEmail } from "@/lib/email";
+import { apiError } from "@/lib/errors/apiError";
 
 export async function POST(req: NextRequest) {
     // ── Auth check ────────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     if (fetchError) {
         console.error("[cron/abandoned-carts] fetch error:", fetchError.message);
-        return NextResponse.json({ error: fetchError.message }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: fetchError });
     }
 
     if (!abandoned || abandoned.length === 0) {

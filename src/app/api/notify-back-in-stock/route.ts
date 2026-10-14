@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { apiError } from "@/lib/errors/apiError";
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,6 +50,6 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error("Back in stock notification error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return apiError("GEN-00", { status: 500, audience: "customer", cause: error });
   }
 }

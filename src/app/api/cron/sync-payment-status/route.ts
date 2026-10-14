@@ -6,6 +6,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { confirmSale, releaseReservation } from "@/lib/inventory";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { zoneLabel } from "@/lib/delivery";
+import { apiError } from "@/lib/errors/apiError";
+import { recordResult } from "@/lib/payments/attempts";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 const PAYSTACK_VERIFY = "https://api.paystack.co/transaction/verify";
@@ -88,7 +90,7 @@ export async function GET(req: Request) {
 
     if (error) {
         console.error("[sync-payment-status] DB fetch failed:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
     const orders = pendingOrders ?? [];
@@ -106,6 +108,7 @@ export async function GET(req: Request) {
     await Promise.allSettled(orders.map(async (order) => {
         try {
             const paystackStatus = await verifyReference(order.paystack_reference!);
+            if (paystackStatus) await recordResult(order.paystack_reference, { status: paystackStatus });
 
             if (!paystackStatus) {
                 // Paystack doesn't know this reference. If the order is older than 24h

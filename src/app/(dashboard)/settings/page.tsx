@@ -339,6 +339,8 @@ function StoreTab() {
     const [deliveryAvailable, setDeliveryAvailable] = useState(false);
     const [undoRemoved, setUndoRemoved] = useState(false);
     const [undoRemovedAvailable, setUndoRemovedAvailable] = useState(false);
+    const [liveStatus, setLiveStatus] = useState(false);
+    const [liveStatusAvailable, setLiveStatusAvailable] = useState(false);
 
     useEffect(() => {
         supabase.from("store_settings").select("*").eq("id", "default").single()
@@ -390,6 +392,10 @@ function StoreTab() {
                     setUndoRemoved(sData.checkout_undo_removed_enabled === true);
                     setUndoRemovedAvailable(true);
                 }
+                if (sData && "pos_live_payment_status" in sData) {
+                    setLiveStatus(sData.pos_live_payment_status === true);
+                    setLiveStatusAvailable(true);
+                }
                 setLoading(false);
             });
 
@@ -413,6 +419,16 @@ function StoreTab() {
 
         // Own update, same reasoning as delivery below: a column that is not
         // migrated in yet must not take the whole save down with it.
+        if (liveStatusAvailable) {
+            const { error: liveError } = await supabase.from("store_settings")
+                .update({ pos_live_payment_status: liveStatus })
+                .eq("id", "default");
+            if (liveError) {
+                console.warn("[settings] live payment status not saved:", liveError);
+                toast.error("Live payment status could not be saved. Other settings were saved.");
+            }
+        }
+
         if (undoRemovedAvailable) {
             const { error: undoError } = await supabase.from("store_settings")
                 .update({ checkout_undo_removed_enabled: undoRemoved })
@@ -602,6 +618,16 @@ function StoreTab() {
                             {subLabel("Stock is released automatically when the link expires unpaid.")}
                         </div>
                     </div>
+                    {liveStatusAvailable && (
+                        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                            <input type="checkbox" className="ac-checkbox" checked={liveStatus}
+                                onChange={(e) => setLiveStatus(e.target.checked)} />
+                            <div>
+                                <span className="ac-label">Show live payment status on the till</span>
+                                {subLabel("After Send Link, the till checks Paystack every few seconds and shows Waiting, Paid or Declined.")}
+                            </div>
+                        </label>
+                    )}
                 </div>
 
                 {/* Platform Fees */}

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { logCause } from "@/lib/errors/apiError";
+import { errorBody, errorText } from "@/lib/errors/catalogue";
 
 export async function PATCH(
     req: NextRequest,
@@ -36,7 +38,8 @@ export async function PATCH(
         .eq("id", id);
 
     if (error) {
-        return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+        logCause("GEN-00", error, { route: "contact-submissions" });
+        return NextResponse.json({ success: false, ...errorBody("GEN-00", "staff"), message: errorText("GEN-00", "staff") }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

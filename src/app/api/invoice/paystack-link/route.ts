@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { apiError } from "@/lib/errors/apiError";
 
 /**
  * POST /api/invoice/paystack-link
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
 
         if (!res.ok || !data.status) {
             console.error("[invoice/paystack-link]", data);
-            return NextResponse.json({ error: data.message || "Paystack error" }, { status: 500 });
+            return apiError("PAY-02", { status: 500, audience: "staff", cause: data?.message });
         }
 
         // The offline payment link
@@ -116,6 +117,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ link, reference: data.data?.offline_reference });
     } catch (err: any) {
         console.error("[invoice/paystack-link]", err);
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: err });
     }
 }

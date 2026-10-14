@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendEmail } from "@/lib/email";
+import { apiError } from "@/lib/errors/apiError";
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,6 +60,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: "sent" });
   } catch (err: any) {
     console.error("[abandoned/remind]", err);
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+    return apiError("GEN-00", { status: 500, audience: "staff", cause: err });
   }
 }

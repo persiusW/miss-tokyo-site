@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sendSMS } from "@/lib/sms";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { apiError } from "@/lib/errors/apiError";
 
 export async function POST(req: Request) {
     try {
@@ -22,10 +23,10 @@ export async function POST(req: Request) {
 
         const result = await sendSMS({ to: phone, message: smsMessage });
 
-        if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 });
+        if (!result.ok) return apiError("SMS-01", { status: 500, audience: "staff", cause: result.error });
         return NextResponse.json({ status: "sent" });
     } catch (err: any) {
         console.error("[test-sms]", err);
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: err });
     }
 }

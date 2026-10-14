@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
         }
 
         const result = await runStoreAssistant({ transcript, userId: user.id, role });
-        if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+        // calm-text: runStoreAssistant only returns its own CALM messages.
+        if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status }); // calm-text
         return NextResponse.json({ messages: result.messages, reply: result.reply, effects: result.effects });
     } catch (e) {
         console.error("[api/ai/agent]", e);

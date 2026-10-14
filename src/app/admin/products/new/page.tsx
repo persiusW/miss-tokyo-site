@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabaseBrowser";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { ChevronLeft, X } from "lucide-react";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import { toast } from "@/lib/toast";
 
 type Category = {
   id: string;
@@ -121,13 +121,13 @@ export default function NewProductPage() {
         return data;
     };
 
-    toast.promise(savePromise(), {
-      loading: 'Architecting specimen data...',
-      success: 'Product successfully added to collection.',
-      error: (err) => `Failed to save: ${err.message}`,
-    }).then(() => {
+    savePromise().then(() => {
+      toast.success('Product successfully added to collection.');
       router.push("/admin/products");
       router.refresh();
+    }).catch((err) => {
+      console.error("[admin/products/new] save failed", err);
+      toast.error("That didn't save. Please try again.");
     }).finally(() => {
       setLoading(false);
     });

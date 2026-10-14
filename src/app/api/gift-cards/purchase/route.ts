@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateGiftCardCode } from "@/lib/gift-cards";
+import { errorText } from "@/lib/errors/catalogue";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest) {
             await supabaseAdmin.from("gift_cards").update({ status: "cancelled", is_active: false }).eq("id", card.id);
             console.error("[gift-cards/purchase] Paystack init failed", paystackData);
             return NextResponse.json(
-                { success: false, message: paystackData.message || "Payment initialization failed. Please try again." },
+                { success: false, code: "PAY-02", message: errorText("PAY-02", "customer") },
                 { status: 400 }
             );
         }

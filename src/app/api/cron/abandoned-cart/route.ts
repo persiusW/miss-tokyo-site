@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendEmail } from "@/lib/email";
+import { apiError } from "@/lib/errors/apiError";
 
 export const runtime = "nodejs";
 
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 
     if (fetchError) {
         console.error("[cron/abandoned-cart] fetch error:", fetchError);
-        return NextResponse.json({ error: fetchError.message }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: fetchError });
     }
 
     if (!abandoned || abandoned.length === 0) {

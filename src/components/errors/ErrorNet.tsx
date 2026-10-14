@@ -11,7 +11,7 @@ const post = (r: ClientReport) => fetch("/api/client-errors", {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(r),
     keepalive: true,
-}).then(() => undefined);
+}).then(r => { if (!r.ok) throw new Error(String(r.status)); });
 
 /** For error screens: React does not raise window errors for crashes a boundary catches. */
 export function reportClientError(err: unknown, digest?: string): void {

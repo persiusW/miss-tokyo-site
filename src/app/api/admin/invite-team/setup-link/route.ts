@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { apiError } from "@/lib/errors/apiError";
 
 // POST /api/admin/invite-team/setup-link
 // Regenerates an invite link for a pending (never signed in) team member
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (error || !linkData) {
-        return NextResponse.json({ error: error?.message || "Failed to generate link" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
     const link = (linkData.properties as any)?.action_link;

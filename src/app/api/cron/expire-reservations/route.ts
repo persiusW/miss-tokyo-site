@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { apiError } from "@/lib/errors/apiError";
 
 export async function GET(req: Request) {
     const authHeader = req.headers.get("authorization");
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
 
     if (error) {
         console.error("[cron/expire-reservations]", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
     const orderIds = [...new Set((expiredReservations ?? []).map((r: any) => r.order_id))];

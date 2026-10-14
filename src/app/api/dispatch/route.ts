@@ -5,6 +5,7 @@ import { sendSMSLogged } from "@/lib/sms";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendCustomerPush } from "@/lib/customerPush";
 import { sendEmail } from "@/lib/email";
+import { apiError } from "@/lib/errors/apiError";
 
 /**
  * POST /api/dispatch
@@ -222,6 +223,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ status: "dispatched", count: orderIds.length, customerNotified: shouldNotifyCustomer });
     } catch (err: any) {
         console.error("[dispatch]", err);
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: err });
     }
 }

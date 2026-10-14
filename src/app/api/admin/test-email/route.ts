@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sendEmail } from "@/lib/email";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { apiError } from "@/lib/errors/apiError";
 
 // Dummy values substituted for template variables in test sends
 const DUMMY_VARS: Record<string, string> = {
@@ -101,10 +102,10 @@ export async function POST(req: Request) {
             from: `${bizName} <${fromEmail}>`,
         });
 
-        if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 });
+        if (!result.ok) return apiError("EML-01", { status: 500, audience: "staff", cause: result.error });
         return NextResponse.json({ status: "sent" });
     } catch (err: any) {
         console.error("[test-email]", err);
-        return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: err });
     }
 }

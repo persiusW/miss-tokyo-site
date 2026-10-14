@@ -44,6 +44,8 @@ type AppliedDiscount = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const PENDING_ORDER_KEY = "miss-tokyo-pending-order";
+// One id per sale in this tab, so retries count as the same sale.
+const SALE_KEY = "miss-tokyo-sale-key";
 
 export default function CheckoutPage() {
     const items = useCart(s => s.items);
@@ -546,6 +548,11 @@ export default function CheckoutPage() {
                 // Which attempt this one supersedes, so its hold can be freed
                 // before the new reservation is taken.
                 previousOrderId: sessionStorage.getItem(PENDING_ORDER_KEY) || undefined,
+                saleKey: (() => {
+                    let k = sessionStorage.getItem(SALE_KEY);
+                    if (!k) { k = crypto.randomUUID(); sessionStorage.setItem(SALE_KEY, k); }
+                    return k;
+                })(),
                 email: form.email,
                 amount: finalTotal,
                 cartItems: items,
@@ -598,7 +605,7 @@ export default function CheckoutPage() {
             } else if (res.status === 409) {
                 toast.error(data.error || "An item in your cart is out of stock. Please update your cart.");
             } else {
-                toast.error(data.error || "Failed to initialize checkout. Please try again.");
+                toast.fromResponse(data, { audience: "customer", fallback: "ORD-01" });
             }
         } catch (err) {
             console.error(err);

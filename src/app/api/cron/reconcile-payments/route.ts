@@ -3,6 +3,7 @@ export const maxDuration = 300; // 5 min — may re-verify a full day of referen
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { verifyReference, applyPaystackSuccess, loadBizIdentity, recordPaystackCharge } from "@/lib/paystackReconcile";
+import { apiError } from "@/lib/errors/apiError";
 
 /**
  * End-of-day payment reconciliation.
@@ -53,7 +54,7 @@ export async function GET(req: Request) {
 
     if (error) {
         console.error("[reconcile-payments] DB fetch failed:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
     const orders = candidates ?? [];

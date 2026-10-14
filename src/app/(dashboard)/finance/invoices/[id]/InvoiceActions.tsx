@@ -32,13 +32,14 @@ export function InvoiceActions({ docId, docAmount, customerEmail }: Props) {
                 }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed");
+            if (!res.ok) { toast.fromResponse(data, { audience: "staff", fallback: "PAY-02" }); setGeneratingPaystack(false); return; }
 
             setPaystackUrl(data.link);
             navigator.clipboard.writeText(data.link);
             toast.success("Paystack link generated and copied.");
         } catch (err: any) {
-            toast.error(err.message || "Could not generate Paystack link.");
+            console.error("[invoice] Paystack link failed", err);
+            toast.error("Could not generate the Paystack link. Please try again.");
         }
         setGeneratingPaystack(false);
     };

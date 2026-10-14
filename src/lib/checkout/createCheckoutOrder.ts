@@ -8,6 +8,9 @@ import { reserveStock, releaseReservation, releaseSupersededAttempts, getStockSt
 import { variantKey } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
+import { errorBody } from "@/lib/errors/catalogue";
+import { channelFor, cleanSaleKey } from "@/lib/payments/attemptRules";
+import { recordError, recordStart } from "@/lib/payments/attempts";
 
 /** The JSON body /api/paystack/initialize has always accepted. */
 export type CheckoutPayload = {
@@ -57,6 +60,8 @@ export type CheckoutContext = {
 };
 
 export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext): Promise<CheckoutRunResult> {
+    const saleKey = cleanSaleKey((payload as { saleKey?: unknown } | null)?.saleKey);
+    const attemptChannel = channelFor(ctx.source);
         const {
             productId,
             email: rawEmail,
@@ -636,7 +641,9 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             }
         }
 
-        const response = await fetch("https://api.paystack.co/transaction/initialize", {
+        let response: Response;
+        try {
+        response = await fetch("https://api.paystack.co/transaction/initialize", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${paystackSecret}`,
@@ -679,6 +686,14 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
                 },
             }),
         });
+        } catch (e) {
+            console.error("[Paystack init] unreachable:", e);
+            await recordError({ saleKey, channel: attemptChannel, code: "PAY-01", message: String(e), orderId });
+            if (orderId) {
+                await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
+            }
+            return { status: 502, body: { ...errorBody("PAY-01", "customer"), code: "gateway" } };
+        }
 
         if (!response.ok) {
             const errText = await response.text();
@@ -687,10 +702,11 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             console.error(
                 `[Paystack init] HTTP ${response.status}: ${errText} — email=${emailForLog} amount=${amountInPesewas}`,
             );
+            await recordError({ saleKey, channel: attemptChannel, code: "PAY-01", message: `HTTP ${response.status}`, orderId });
             if (orderId) {
                 await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
             }
-            return { status: 502, body: { error: "Payment gateway error. Please try again." } };
+            return { status: 502, body: { ...errorBody("PAY-01", "customer"), code: "gateway" } };
         }
 
         const data = await response.json();
@@ -704,6 +720,7 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
                     .eq("id", orderId);
             }
 
+            await recordStart({ saleKey, channel: attemptChannel, reference: data.data?.reference ?? null, amount: amountInPesewas / 100, orderId, userId: ctx.authUserId });
             return { status: 200, body: {
                 authorizationUrl: data.data.authorization_url,
                 reference: data.data.reference,
@@ -715,7 +732,9 @@ export async function runCheckout(payload: CheckoutPayload, ctx: CheckoutContext
             if (orderId) {
                 await supabaseAdmin.from("orders").update({ status: "cancelled" }).eq("id", orderId);
             }
-            return { status: 400, body: { error: data.message } };
+            console.error("[Paystack init] refused:", data?.message);
+            await recordError({ saleKey, channel: attemptChannel, code: "PAY-02", message: data?.message, orderId });
+            return { status: 400, body: { ...errorBody("PAY-02", "customer"), code: "refused" } };
         }
 }
 
@@ -801,7 +820,8 @@ export function normaliseGhanaPhone(phone: string): string | null {
     return `233${digits.slice(-9)}`;
 }
 
-function codeForStatus(status: number): string {
+function codeForStatus(status: number, body?: any): string {
+    if (status === 400 && body?.code === "refused") return "refused";
     if (status === 400) return "invalid";
     if (status === 409) return "unavailable";
     if (status === 502) return "gateway";
@@ -936,7 +956,7 @@ export async function quoteCheckoutOrder(input: CreateCheckoutOrderInput): Promi
         if (!built.ok) return built.error;
         const { status, body, totals } = built.run;
         if (status === 200 && totals) return { success: true, totals, outOfStock: body?.oosItems ?? [] };
-        return fail(codeForStatus(status), body?.error ?? "This order could not be priced.");
+        return fail(codeForStatus(status, body), body?.error ?? "This order could not be priced.");
     } catch (e) {
         console.error("[quoteCheckoutOrder]", e);
         return fail("internal", "This order could not be priced. Please try again.");
@@ -965,7 +985,7 @@ export async function createCheckoutOrder(input: CreateCheckoutOrderInput): Prom
                 totals,
             };
         }
-        return fail(codeForStatus(status), body?.error ?? "The order could not be created.");
+        return fail(codeForStatus(status, body), body?.error ?? "The order could not be created.");
     } catch (e) {
         console.error("[createCheckoutOrder]", e);
         return fail("internal", "The order could not be created. Please try again.");
