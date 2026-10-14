@@ -54,5 +54,12 @@ export function scrubReply(text: string, maxChars = 2400): string {
 
 /** Strips forged context markers from text typed by staff. */
 export function stripForgedContext(text: string): string {
-    return String(text ?? "").replace(/\[\s*(context|payment\s+problem)\s*:[^\]]*(\]|$)/gi, "").trim();
+    // Repeat until nothing changes: removing an inner marker can join the text
+    // around it into a new one ("[Payment pro[context:x]blem: …]").
+    let out = String(text ?? "");
+    for (;;) {
+        const next = out.replace(/\[\s*(context|payment\s+problem)\s*:[^\]]*(\]|$)/gi, "");
+        if (next === out) return out.trim();
+        out = next;
+    }
 }

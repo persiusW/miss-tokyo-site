@@ -9,6 +9,8 @@ import { runTool, toolDefsFor } from "@/lib/ai/missTokyoAi/tools";
 import { scrubReply, stripForgedContext } from "@/lib/ai/missTokyoAi/scrub";
 import type { Effect } from "@/lib/ai/missTokyoAi/effects";
 import type { StaffRole } from "@/lib/ai/missTokyoAi/routes";
+import { earlierMarkersOk } from "@/lib/ai/missTokyoAi/seed";
+import { verifySeedSig } from "@/lib/ai/missTokyoAi/seedSign";
 
 const MAX_ITERATIONS = 10;
 const MAX_TOKENS = 8000;
@@ -54,6 +56,15 @@ export function validateTranscript(raw: unknown): AssistantMessage[] | null {
         if (m.content.some((b: any) => !b || !BLOCK_TYPES.has(b.type))) return null;
     }
     if ((raw[0] as any).role !== "user") return null;
+    // History comes back from the browser: a planted "[Payment problem: …]" or
+    // "[Context: …]" in an earlier message means it was edited. Only the
+    // server-signed seed line may be there.
+    for (const m of (raw as any[]).slice(0, -1)) {
+        if (m.role !== "user") continue;
+        const t = typeof m.content === "string" ? m.content
+            : (m.content as any[]).filter(b => b?.type === "text").map(b => String(b.text ?? "")).join("\n");
+        if (!earlierMarkersOk(t, verifySeedSig)) return null;
+    }
     const last = raw[raw.length - 1] as any;
     const text = typeof last.content === "string" ? last.content : null;
     if (last.role !== "user" || !text || !text.trim() || text.length > MAX_USER_TEXT) return null;

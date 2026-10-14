@@ -51,3 +51,26 @@ export function liveState(i: { sessionStatus: string; expiresAt: string | null; 
     if (i.attemptStatus === "failed") return "declined";
     return "waiting";
 }
+
+/** "Paid, finishing up" waits for the webhook; after this long the till stops asking. */
+export const SETTLING_POLL_LIMIT_MS = 2 * 60_000;
+
+export function stopPolling(i: { state: string; httpStatus: number; settlingSince: number | null; now: number }): boolean {
+    if (i.httpStatus === 401 || i.httpStatus === 403) return true;
+    if (i.state === "paid" || i.state === "expired") return true;
+    return i.state === "settling" && i.settlingSince !== null && i.now - i.settlingSince > SETTLING_POLL_LIMIT_MS;
+}
+
+/** A sale key whose sale already paid can't be reused: the next order is a new sale. */
+export function saleKeyFor(requested: string, alreadyPaid: boolean): string {
+    return alreadyPaid ? cleanSaleKey(undefined) : requested;
+}
+
+/**
+ * When the server replaced the key, tell the caller: the checkout page keeps
+ * its key in sessionStorage and would otherwise start a fresh sale every retry.
+ */
+export function withSaleKey<T extends { status: number; body: any }>(result: T, requested: string, used: string): T {
+    if (used === requested || !result.body || typeof result.body !== "object") return result;
+    return { ...result, body: { ...result.body, saleKey: used } };
+}

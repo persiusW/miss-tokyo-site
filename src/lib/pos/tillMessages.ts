@@ -59,3 +59,16 @@ export function unclearOutcome(mode: "cash" | "link"): string {
         ? "We couldn't confirm the cash sale. Check POS History before trying again, so it isn't recorded twice."
         : TILL_SERVER_UNREACHABLE;
 }
+
+export type LiveStopped = "settling_limit" | "signed_out" | null;
+
+/** The line under a sent link. Once polling stops, it says so rather than freezing. */
+export function liveStatusText(live: { state: string; failures: number; orderRef?: string }, stopped: LiveStopped): string {
+    if (live.state === "settling" && stopped === "settling_limit") return "Paid. Check Orders for the order number.";
+    const text = live.state === "paid" ? `Paid ✓${live.orderRef ? ` · Order #${live.orderRef}` : ""}`
+        : live.state === "settling" ? "Paid, finishing up…"
+        : live.state === "declined" ? `Declined (${Math.min(Math.max(live.failures, 1), 2)} of 2)`
+        : live.state === "expired" ? "Link expired"
+        : "Waiting for the customer…";
+    return stopped === "signed_out" ? `${text} (not updating — sign in again)` : text;
+}

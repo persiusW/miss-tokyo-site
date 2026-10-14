@@ -47,3 +47,22 @@ export function seedLine(s: Seed, label: string): string {
     ].filter(Boolean).join(", ");
     return `[Payment problem: ${s.code} on ${label} — ${ids}]`;
 }
+
+const MARKER = /\[\s*(context|payment\s+problem)\s*:[^\]]*(\]|$)/gi;
+
+/**
+ * Earlier user messages come back from the browser on every turn, so a
+ * modified client could plant a "[Payment problem: …]" line there. Only the
+ * server-signed seed line (signed when it was written) may appear; any other
+ * marker — or any "[Context: …]" — means the history was edited.
+ */
+export function earlierMarkersOk(text: string, verify: (unsigned: string, sig: string) => boolean): boolean {
+    for (const m of text.matchAll(MARKER)) {
+        if (/^\[\s*context/i.test(m[0])) return false;
+        const full = m[0].endsWith("]") ? m[0] : `${m[0]}]`;
+        const at = full.lastIndexOf(" · ");
+        if (at < 0) return false;
+        if (!verify(`${full.slice(0, at)}]`, full.slice(at + 3, -1))) return false;
+    }
+    return true;
+}
