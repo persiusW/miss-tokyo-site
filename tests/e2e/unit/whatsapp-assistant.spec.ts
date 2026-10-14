@@ -124,3 +124,14 @@ test("no photos when the reply could not be sent", async () => {
     await h.handle(msg(), conv);
     expect(h.images).toEqual([]);
 });
+
+test("photos and links follow the pieces the reply names, captioned with the SKU", () => {
+    const btn = (name: string, id: string, sku?: string): ShopButton => ({ kind: "open_product", label: `View ${name}`, href: `/products/${id}`, productId: `${id}0000000-0000-4000-8000-000000000000`.slice(0, 36), ...(sku ? { sku } : {}) });
+    const buttons = [btn("S Buttoned Maxi Dress", "a"), btn("Lindsy Bodycon", "b", "L3"), btn("Balloon-Sleeve Mini Dress", "c", "D7")];
+    const r = renderForWhatsApp("The Balloon-Sleeve Mini Dress is GH₵ 180, or the Lindsy Bodycon is GH₵ 160.", buttons, SITE);
+    expect(r.images.map(i => i.caption.split("\n")[0])).toEqual(["Balloon-Sleeve Mini Dress · D7", "Lindsy Bodycon · L3"]);
+    expect(r.text).toContain(`View Balloon-Sleeve Mini Dress: ${SITE}/products/c`);
+    expect(r.text).not.toContain("S Buttoned Maxi Dress");
+    // A reply that names none falls back to the first pieces.
+    expect(renderForWhatsApp("Here are some options.", buttons, SITE).images.map(i => i.caption.split(" · ")[0].split("\n")[0])).toEqual(["S Buttoned Maxi Dress", "Lindsy Bodycon"]);
+});
