@@ -7,7 +7,13 @@ import { toast } from "@/lib/toast";
 import { normaliseWaNumber } from "@/lib/ai/shopAssistant/settingsRules";
 import type { Health, InboundCounts } from "@/lib/whatsapp/health";
 
-type Data = InboundCounts & { health: Health };
+type Wallet = { state: "ok" | "not_configured" | "rejected" | "network"; balance: number | null };
+type Data = InboundCounts & { health: Health; wallet?: Wallet };
+
+const WALLET_TEXT: Record<Wallet["state"], string> = {
+    ok: "", not_configured: "Not set up", rejected: "Key not accepted", network: "Couldn't check",
+};
+const walletText = (w?: Wallet) => !w ? "…" : w.state === "ok" ? (w.balance === null ? "Connected" : `GHS ${w.balance.toFixed(2)}`) : WALLET_TEXT[w.state];
 
 const LEVEL_COLOUR: Record<Health["level"], string> = { ok: "var(--ac-ink-3)", warning: "var(--ac-warn)", problem: "var(--ac-danger)" };
 
@@ -76,6 +82,7 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                         {tile("Waiting", String(data.waiting))}
                         {tile("Being retried", String(data.retrying))}
                         {tile("Given up (7 days)", String(data.gaveUp7d))}
+                        {tile("Chatbots Africa wallet", walletText(data.wallet))}
                     </div>
                 </>
             )}
