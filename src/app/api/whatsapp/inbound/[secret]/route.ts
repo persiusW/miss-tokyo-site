@@ -4,8 +4,9 @@
 // before we answer, a failed write keeps retrying after the response, and
 // nothing that could fail (parsing, AI, sending) runs before the 200.
 //
-// Capture runs whether or not whatsapp_enabled is on; processing, when it
-// lands, is gated on that switch.
+// Capture always runs. Processing (in after(), never before the 200) needs
+// whatsapp_enabled on and a parser registered; until then events are stored
+// only. Whatever fails here is retried by the inbound sweep cron.
 //
 // The path secret is the only gate. A wrong or missing secret, or an unset or
 // short WHATSAPP_INBOUND_SECRET, is a 404 that stores nothing. Never log the
@@ -13,7 +14,10 @@
 import { after, NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { IpGate } from "@/lib/ai/shopAssistant/limits";
+import { getAiSettings } from "@/lib/ai/settings";
 import { clientIp, inboundSecretMatches, MAX_INBOUND_BYTES, readCapped, redactHeaders } from "@/lib/whatsapp/inbound";
+import { processInboundEvent } from "@/lib/whatsapp/pipeline";
+import { pipelineFor } from "@/lib/whatsapp/processing";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -73,6 +77,18 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
     // Persist first. Only a failed write waits on anything after the response.
     const id = await store(row);
+    if (id && rawBody !== null) {
+        after(async () => {
+            try {
+                const settings = await getAiSettings();
+                const pipeline = pipelineFor(PROVIDER, settings.whatsappEnabled);
+                if (pipeline) await processInboundEvent(id, pipeline);
+            } catch (e) {
+                // Stored already: the sweep picks it up.
+                console.error("[whatsapp-inbound] processing failed; left for the sweep", { err: String(e) });
+            }
+        });
+    }
     if (!id) {
         after(async () => {
             for (const wait of RETRY_DELAYS_MS) {
