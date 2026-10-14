@@ -456,7 +456,12 @@ function CheckoutSuccessContent() {
     }, [polling, checks, verify]);
 
     // Only a confirmed payment empties the bag.
-    useEffect(() => { if (outcome === "paid") clearCart(); }, [outcome, clearCart]);
+    useEffect(() => {
+        if (outcome !== "paid") return;
+        clearCart();
+        // The next purchase in this tab is a new sale: its failures start from zero.
+        try { sessionStorage.removeItem("miss-tokyo-sale-key"); } catch { /* storage blocked */ }
+    }, [outcome, clearCart]);
 
     const checkAgain = () => { setOutcome("checking"); setChecks(0); setPolling(true); void verify(); };
     const shownRef = orderRef || reference.substring(0, 8).toUpperCase();

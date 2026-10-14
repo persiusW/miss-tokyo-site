@@ -13,6 +13,7 @@ import { Spotlight } from "./Spotlight";
 import { WalkthroughRunner } from "./WalkthroughRunner";
 import { Spark } from "./icons";
 import "./mtai.css";
+import { setAskHandler } from "@/lib/toast";
 
 const TIP_KEY = "mt.assistant.tipSeen";
 
@@ -60,6 +61,7 @@ export function MissTokyoAi() {
                     bell: d.features.bell === true,
                     walkthroughs: d.features.walkthroughs === true,
                     voice: d.features.voice === true,
+                    errorHelp: d.features.errorHelp === true,
                 });
                 setAvailability(d?.available ? "ready" : d?.reason === "off" ? "off" : d?.reason === "not_set_up" ? "not_set_up" : "ready");
             })
@@ -77,11 +79,26 @@ export function MissTokyoAi() {
 
     const openPanel = () => { dismissTip(); setOpen(true); setOpenCount(c => c + 1); };
 
+    // Payment error toasts get "Ask Miss Tokyo AI" only while the switch is on.
+    const errorHelpOn = useMissTokyoAi(s => s.features.errorHelp);
+    useEffect(() => {
+        setAskHandler(errorHelpOn ? (ask) => window.dispatchEvent(new CustomEvent("mtai:ask", { detail: ask })) : null);
+        return () => setAskHandler(null);
+    }, [errorHelpOn]);
+
     // The topbar bell (and anything else) can ask for the panel.
     useEffect(() => {
         const onOpen = () => { if (!onAgentPage) openPanel(); };
         window.addEventListener("mtai:open", onOpen);
-        return () => window.removeEventListener("mtai:open", onOpen);
+        // "Ask Miss Tokyo AI" on a payment error toast.
+        const onAsk = (e: Event) => {
+            const ask = (e as CustomEvent).detail;
+            if (onAgentPage || !ask) return;
+            openPanel();
+            void useMissTokyoAi.getState().askAboutError(ask);
+        };
+        window.addEventListener("mtai:ask", onAsk);
+        return () => { window.removeEventListener("mtai:open", onOpen); window.removeEventListener("mtai:ask", onAsk); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [onAgentPage]);
     const closePanel = () => { setOpen(false); setDrag(0); setTimeout(() => launcherRef.current?.focus(), 0); };

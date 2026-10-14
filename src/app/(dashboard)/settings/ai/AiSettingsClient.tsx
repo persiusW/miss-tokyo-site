@@ -14,6 +14,7 @@ const EXTRAS = [
     { key: "mtai_bell_enabled", label: "Bell count", description: "The topbar bell shows unread replies (staff and owners) or open questions (admin)." },
     { key: "mtai_walkthroughs_enabled", label: "Walkthroughs", description: "Miss Tokyo AI can start a step-by-step tour that highlights each control in turn." },
     { key: "mtai_voice_enabled", label: "Voice input", description: "A microphone button fills the chat box from speech. It never sends by itself." },
+    { key: "mtai_error_help_enabled", label: "Help on payment errors", description: "Payment error messages for staff get an \"Ask Miss Tokyo AI\" button. It only suggests another way to pay after 2 failures or a Paystack outage, and never cash." },
 ] as const;
 type ExtraKey = (typeof EXTRAS)[number]["key"];
 

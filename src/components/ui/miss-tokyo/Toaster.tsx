@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { subscribe, getSnapshot, dismiss, Toast } from "@/lib/toast";
+import { subscribe, getSnapshot, dismiss, getAskHandler, Toast } from "@/lib/toast";
 
 const EMPTY_TOASTS: Toast[] = [];
 
@@ -22,7 +22,15 @@ export function Toaster() {
                     key={t.id}
                     className={`px-5 py-3 text-xs uppercase tracking-widest font-semibold shadow-lg toast-enter flex items-start gap-3 ${STYLES[t.type]}`}
                 >
-                    <span className="flex-1">{t.message}</span>
+                    <span className="flex-1">
+                        {t.message}
+                        {t.ask && getAskHandler() && (
+                            <button type="button" className="block mt-2 underline underline-offset-2"
+                                onClick={() => { const h = getAskHandler(); if (h && t.ask) h(t.ask); dismiss(t.id); }}>
+                                Ask Miss Tokyo AI
+                            </button>
+                        )}
+                    </span>
                     {t.type === "error" && (
                         <button type="button" onClick={() => dismiss(t.id)} aria-label="Dismiss" className="opacity-80 hover:opacity-100 leading-none">×</button>
                     )}

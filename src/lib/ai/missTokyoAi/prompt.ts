@@ -58,8 +58,12 @@ const SEND_TO_ADMIN = `
 
 When you cannot answer (nothing in the tools, find_in_guide or the guide), say so in one sentence and call send_to_admin with their question, so they get a "Send to admin" button. Never claim a question was sent: only their tap sends it.`;
 
+const PAYMENT_HELP = `
+
+Payment problems: for any failed, declined, expired or stuck payment, call payment_help first. Suggest another way to pay only when its rule.allowed is true, and only the options it lists (options_explained). Never suggest cash, ever. If link_expired is true, the link can't be paid any more: the fix is simply to send a new link from the till (that is not an alternative way to pay). If it is not allowed, do not mention other ways to pay at all (no new link, card, other network or gift card); just help them retry: ask the customer to check their phone for the mobile money prompt, or resend the same link. Use its steps in your own words.`;
+
 /** Deterministic per role and switch set, so prompt caching works. */
 export function buildSystemPrompt(role: StaffRole, features: MtaiFeatures): string {
-    const extra = (role === "admin" ? ADMIN_DATA : "") + (features.sendToAdmin && role !== "admin" ? SEND_TO_ADMIN : "");
+    const extra = (role === "admin" ? ADMIN_DATA : "") + (features.sendToAdmin && role !== "admin" ? SEND_TO_ADMIN : "") + (features.errorHelp ? PAYMENT_HELP : "");
     return `${CORE}${extra}\n\nYou are talking to ${ROLE_LABEL[role]}.\n\n${guideText(role)}`;
 }

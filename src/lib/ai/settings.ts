@@ -21,9 +21,11 @@ export type MtaiFeatures = {
     bell: boolean;
     walkthroughs: boolean;
     voice: boolean;
+    /** Ask Miss Tokyo AI on payment error toasts (spec B Part 5). */
+    errorHelp: boolean;
 };
 
-export const MTAI_FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false };
+export const MTAI_FEATURES_OFF: MtaiFeatures = { sendToAdmin: false, bell: false, walkthroughs: false, voice: false, errorHelp: false };
 
 /** Keys staff may change from the AI Settings page, with their validators. */
 export const EDITABLE_AI_SETTINGS = {
@@ -36,6 +38,7 @@ export const EDITABLE_AI_SETTINGS = {
     mtai_bell_enabled: (v: unknown) => typeof v === "boolean",
     mtai_walkthroughs_enabled: (v: unknown) => typeof v === "boolean",
     mtai_voice_enabled: (v: unknown) => typeof v === "boolean",
+    mtai_error_help_enabled: (v: unknown) => typeof v === "boolean",
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
@@ -92,6 +95,7 @@ export async function getAiSettings(): Promise<AiSettings> {
             bell: bool("mtai_bell_enabled"),
             walkthroughs: bool("mtai_walkthroughs_enabled"),
             voice: bool("mtai_voice_enabled"),
+            errorHelp: bool("mtai_error_help_enabled"),
         },
     };
 }

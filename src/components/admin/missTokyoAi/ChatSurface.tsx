@@ -206,11 +206,11 @@ export function ChatSurface({
                         )}
                     </div>
                 ) : null}
-                {/* Admin replies still reach the asker while the assistant is off. */}
-                {unavailable && bubbles.filter(b => b.role === "team").map(b => (
-                    <div key={b.id} className="mtai-msg team">
-                        <div className="mtai-team-label">Miss Tokyo team{b.question ? <> · re: <span>{b.question}</span></> : null}</div>
-                        <div className="mtai-bubble"><ReplyText text={b.text} /></div>
+                {/* Admin replies, and fixed payment-help steps, still show while the assistant is off. */}
+                {unavailable && bubbles.filter(b => b.role === "team" || b.fallback).map(b => (
+                    <div key={b.id} className={`mtai-msg ${b.role}`}>
+                        {b.role === "team" && <div className="mtai-team-label">Miss Tokyo team{b.question ? <> · re: <span>{b.question}</span></> : null}</div>}
+                        <div className="mtai-bubble">{b.role === "user" ? b.text : <ReplyText text={b.text} />}</div>
                     </div>
                 ))}
                 {unavailable ? null : bubbles.length === 0 ? (
