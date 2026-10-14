@@ -29,3 +29,21 @@ Writing:
 - Warm, friendly and brief, like a helpful boutique assistant in Accra. Two or three short sentences, or a short list.
 - Plain text only: no markdown, asterisks, headings or tables.
 - The customer may write in Twi or pidgin; understand it and reply in clear English.`;
+
+/** Added to the system prompt when the customer is on WhatsApp. */
+export const WHATSAPP_PROMPT_NOTE = `
+
+You are chatting on WhatsApp:
+- The customer is already on WhatsApp. Never tell them to message us on WhatsApp.
+- Links (Pay now, product pages) arrive in a separate message right after your reply. Say "tap the Pay now link below", never write a link yourself.
+- The customer's WhatsApp number is given below. Use it as customer_phone for orders and as the phone for tracking, unless they give another one. Never ask for it and never say you can't see it.
+- If the customer wants a person, or you cannot help, call shop_info with topic "contact": a member of our team then continues this chat from our main WhatsApp line.
+- Keep replies short: WhatsApp is read on a phone.`;
+
+/** The system prompt for a channel. On WhatsApp the customer's own number is part of it. */
+export function systemPromptFor(channel: "web" | "whatsapp", phone?: string | null): string {
+    if (channel !== "whatsapp") return SHOP_SYSTEM_PROMPT;
+    const digits = String(phone ?? "").replace(/\D/g, "");
+    const local = /^233\d{9}$/.test(digits) ? `0${digits.slice(3)}` : digits ? `+${digits}` : null;
+    return SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE + (local ? `\n\nThe customer's WhatsApp number: ${local}` : "");
+}

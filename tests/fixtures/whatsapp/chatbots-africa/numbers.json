@@ -1,0 +1,75 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "100000000000001",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "233200000099",
+              "phone_number_id": "1000000000000001"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Test Customer"
+                },
+                "wa_id": "233200000001",
+                "user_id": "GH.0000000000000001"
+              },
+              {
+                "profile": {
+                  "name": "Test Customer"
+                },
+                "wa_id": "233200000002",
+                "user_id": "GH.0000000000000002"
+              },
+              {
+                "profile": {
+                  "name": "Test Customer"
+                },
+                "wa_id": "233200000003",
+                "user_id": "GH.0000000000000003"
+              }
+            ],
+            "messages": [
+              {
+                "from": "+233 20 000 0001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TESTN001",
+                "timestamp": "1791999000",
+                "text": {
+                  "body": "Hi"
+                },
+                "type": "text"
+              },
+              {
+                "from": "0200000002",
+                "from_user_id": "GH.0000000000000002",
+                "id": "wamid.TESTN002",
+                "timestamp": "1791999000",
+                "text": {
+                  "body": "Hi"
+                },
+                "type": "text"
+              },
+              {
+                "from": "447700900000",
+                "from_user_id": "GH.0000000000000003",
+                "id": "wamid.TESTN003",
+                "timestamp": "1791999000",
+                "text": {
+                  "body": "Hi"
+                },
+                "type": "text"
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}

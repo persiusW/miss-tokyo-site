@@ -1,3 +1,4 @@
+import { SHOP_SYSTEM_PROMPT, systemPromptFor, WHATSAPP_PROMPT_NOTE } from "../../../src/lib/ai/shopAssistant/prompt";
 import fs from "fs";
 import path from "path";
 import { test, expect } from "@playwright/test";
@@ -8,7 +9,7 @@ import { FAQS, SIZE_CHART, shopInfoText, SHOP_INFO_TOPICS } from "../../../src/c
 import { checkoutCustomerLine, ERRORS, isErrorCode } from "../../../src/lib/errors/catalogue";
 import { BUTTON_LABELS, LINES, safeReply } from "../../../src/lib/ai/shopAssistant/lines";
 import { looksRaw } from "../../../src/lib/errors/looksRaw";
-import { stockWord, publicProduct, publicOrder, paymentState, waSummary, talkButton, dedupeButtons, cartLineFor, repayButton } from "../../../src/lib/ai/shopAssistant/format";
+import { stockWord, publicProduct, publicOrder, paymentState, waSummary, talkButton, dedupeButtons, cartLineFor, repayButton, sizeMatches } from "../../../src/lib/ai/shopAssistant/format";
 import { stampQuote, settleQuote, quoteKey, quoteHolds, sameTotal, canOpenAnother, trackLocked, QUOTE_TTL_MS } from "../../../src/lib/ai/shopAssistant/guards";
 import { visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor, mergeChatState, chatIsStale, STALE_CHAT_MS } from "../../../src/lib/ai/shopAssistant/limits";
 
@@ -370,4 +371,42 @@ test("the busy line says what to do next", () => {
     expect(LINES.busy).toBe("I'm still answering your last message. Please send that again in a moment.");
     expect(looksRaw(LINES.busy)).toBe(false);
     expect(LINES.busy).not.toMatch(/cash/i);
+});
+
+test("the WhatsApp prompt note keeps the customer on WhatsApp and never offers cash", () => {
+    expect(WHATSAPP_PROMPT_NOTE).toMatch(/Never tell them to message us on WhatsApp/);
+    expect(WHATSAPP_PROMPT_NOTE).toMatch(/never write a link yourself/i);
+    expect(WHATSAPP_PROMPT_NOTE).toMatch(/Never ask for it and never say you can't see it/);
+    expect(WHATSAPP_PROMPT_NOTE).not.toMatch(/cash/i);
+    expect(SHOP_SYSTEM_PROMPT).not.toContain(WHATSAPP_PROMPT_NOTE.trim());
+});
+
+test("on WhatsApp the model is told the customer's own number; the website prompt never is", () => {
+    expect(systemPromptFor("whatsapp", "233200000001")).toMatch(/The customer's WhatsApp number: 0200000001$/);
+    expect(systemPromptFor("whatsapp", null)).toBe(SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE);
+    expect(systemPromptFor("web", "233200000001")).toBe(SHOP_SYSTEM_PROMPT);
+});
+
+test("a size the shopper names matches the shop's stored size labels", () => {
+    // The shop stores most clothing as "M — 10"; a shopper says "M", "10" or "medium".
+    for (const asked of ["M", "m", "10", "size 10", "Size M", "medium", "M — 10", "M-10"]) {
+        expect(sizeMatches("M — 10", asked), asked).toBe(true);
+    }
+    expect(sizeMatches("M — 10", "L")).toBe(false);
+    expect(sizeMatches("M — 10", "12")).toBe(false);
+    expect(sizeMatches("XL — 14", "L")).toBe(false);
+    expect(sizeMatches("XL — 14", "extra large")).toBe(true);
+    expect(sizeMatches("S — 8", "small")).toBe(true);
+    // Free sizes cover a range of numbers.
+    expect(sizeMatches("Free(8-14)", "10")).toBe(true);
+    expect(sizeMatches("Free(8-14)", "free size")).toBe(true);
+    expect(sizeMatches("Free(8-14)", "16")).toBe(false);
+    expect(sizeMatches("Free(8-14)", "M")).toBe(false);
+    // Shoe sizes and plain labels stay exact.
+    expect(sizeMatches("39", "39")).toBe(true);
+    expect(sizeMatches("39", "3")).toBe(false);
+    expect(sizeMatches("XXXL", "xxxl")).toBe(true);
+    // No size on the option and "One Size" asked are the same thing.
+    expect(sizeMatches(null, "One Size")).toBe(true);
+    expect(sizeMatches(null, "M")).toBe(false);
 });

@@ -1,0 +1,125 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "100000000000001",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "233200000099",
+              "phone_number_id": "1000000000000001"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Test Customer"
+                },
+                "wa_id": "233200000001",
+                "user_id": "GH.0000000000000001"
+              }
+            ],
+            "messages": [
+              {
+                "from": "233200000001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TESTU001",
+                "timestamp": "1791999300",
+                "type": "image",
+                "image": {
+                  "id": "2000000000000002",
+                  "mime_type": "image/png",
+                  "caption": "Do you have this?"
+                }
+              },
+              {
+                "from": "233200000001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TESTU002",
+                "timestamp": "1791999300",
+                "type": "audio",
+                "audio": {
+                  "id": "2000000000000003",
+                  "mime_type": "audio/ogg; codecs=opus",
+                  "voice": true
+                }
+              },
+              {
+                "from": "233200000001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TESTU003",
+                "timestamp": "1791999300",
+                "type": "document",
+                "document": {
+                  "id": "2000000000000004",
+                  "mime_type": "application/pdf",
+                  "filename": "list.pdf"
+                }
+              },
+              {
+                "from": "233200000001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TESTU004",
+                "timestamp": "1791999300",
+                "type": "location",
+                "location": {
+                  "latitude": 5.6,
+                  "longitude": -0.18
+                }
+              },
+              {
+                "from": "233200000001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TESTU005",
+                "timestamp": "1791999300",
+                "type": "interactive",
+                "interactive": {
+                  "type": "button_reply",
+                  "button_reply": {
+                    "id": "x",
+                    "title": "Yes"
+                  }
+                }
+              },
+              {
+                "from": "233200000001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TESTU006",
+                "timestamp": "1791999300",
+                "type": "button",
+                "button": {
+                  "payload": "x",
+                  "text": "Yes"
+                }
+              },
+              {
+                "from": "233200000001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TESTU007",
+                "timestamp": "1791999300",
+                "type": "sticker",
+                "sticker": {
+                  "id": "2000000000000005",
+                  "mime_type": "image/webp"
+                }
+              },
+              {
+                "from": "233200000001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TESTU008",
+                "timestamp": "1791999300",
+                "type": "reaction",
+                "reaction": {
+                  "message_id": "wamid.OUT0001",
+                  "emoji": "👍"
+                }
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}

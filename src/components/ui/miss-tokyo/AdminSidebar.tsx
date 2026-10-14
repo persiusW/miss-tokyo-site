@@ -116,6 +116,7 @@ export function AdminSidebar({ businessName, isFullAccess, isAdmin = false, show
 
     const customerItems: NavItemDef[] = [
         { label: "Contact List",   href: "/customers",          Icon: Ico.Users },
+        { label: "WhatsApp Chats", href: "/customers/whatsapp", Icon: Ico.Chat },
         { label: "Form Submissions", href: "/customers/forms",  Icon: Ico.Mail },
         { label: "Riders",         href: "/sales/riders",       Icon: Ico.Truck },
         ...(showCustomRequests ? [{ label: "Custom Requests", href: "/customers/requests", Icon: Ico.Sparkles }] : []),

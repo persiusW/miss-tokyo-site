@@ -6,6 +6,10 @@ import { normaliseWaNumber, SHOP_SETTING_VALIDATORS } from "@/lib/ai/shopAssista
 export type AiSettings = {
     dailySpendCapGhs: number;
     whatsappEnabled: boolean;
+    /** Our WhatsApp phone_number_id, for the soft check on callbacks. Null skips it. */
+    whatsappPhoneNumberId: string | null;
+    /** Where a WhatsApp chat is forwarded when it goes to a person (233…). Null = the shop's WhatsApp number. */
+    whatsappHandoffNumber: string | null;
     dashboardAgentEnabled: boolean;
     holdMinutesWhatsapp: number;
     adminCostMarkupPct: number;
@@ -53,6 +57,8 @@ export const EDITABLE_AI_SETTINGS = {
     mtai_error_help_enabled: (v: unknown) => typeof v === "boolean",
     mtai_error_log_enabled: (v: unknown) => typeof v === "boolean",
     ...SHOP_SETTING_VALIDATORS,
+    /** Where WhatsApp chats are forwarded when they go to a person; "" = the shop's WhatsApp number. */
+    whatsapp_handoff_number: SHOP_SETTING_VALIDATORS.shop_whatsapp_number,
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
@@ -76,6 +82,8 @@ function envCap(): number {
 const OFF: AiSettings = {
     dailySpendCapGhs: 0,
     whatsappEnabled: false,
+    whatsappPhoneNumberId: null,
+    whatsappHandoffNumber: null,
     dashboardAgentEnabled: false,
     holdMinutesWhatsapp: 15,
     adminCostMarkupPct: 0,
@@ -100,6 +108,9 @@ export async function getAiSettings(): Promise<AiSettings> {
     return {
         dailySpendCapGhs: num("daily_spend_cap_ghs", envCap()),
         whatsappEnabled: bool("whatsapp_enabled"),
+        whatsappPhoneNumberId: typeof map.get("whatsapp_phone_number_id") === "string" && /^\d{6,30}$/.test(map.get("whatsapp_phone_number_id") as string)
+            ? map.get("whatsapp_phone_number_id") as string : null,
+        whatsappHandoffNumber: normaliseWaNumber(map.get("whatsapp_handoff_number")),
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
         holdMinutesWhatsapp: num("hold_minutes_whatsapp", 15),
         adminCostMarkupPct: num("admin_cost_markup_pct", 0),

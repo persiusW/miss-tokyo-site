@@ -31,7 +31,7 @@ export type CartLine = {
 };
 
 export type ShopButton =
-    | { kind: "open_product"; label: string; href: string }
+    | { kind: "open_product"; label: string; href: string; productId?: string }
     | { kind: "add_to_cart"; label: string; item: CartLine }
     | { kind: "pay_now"; label: string; href: string }
     | { kind: "talk_to_us"; label: string; href: string };

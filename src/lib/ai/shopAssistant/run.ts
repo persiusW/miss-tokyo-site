@@ -1,5 +1,6 @@
 // One Ask Miss Tokyo turn: cap check, model loop with customer tools, save,
-// meter. The website route and (later) the WhatsApp webhook both call this.
+// meter. The website route and the WhatsApp pipeline both call this. Each
+// channel has its own switch; both share the shop's slice of the daily cap.
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { AI_MODEL } from "@/lib/ai/pricing";
@@ -7,7 +8,7 @@ import type { AiSettings } from "@/lib/ai/settings";
 import { todaySpendUsd, withinCap } from "@/lib/ai/spend";
 import { logCause } from "@/lib/errors/apiError";
 import { runShopTurn } from "./engine";
-import { SHOP_SYSTEM_PROMPT } from "./prompt";
+import { systemPromptFor } from "./prompt";
 import { CUSTOMER_TOOL_DEFS } from "./toolDefs";
 import { runCustomerTool, type ShopToolContext } from "./tools";
 import { mergeChatState, trimTranscript } from "./limits";
@@ -24,6 +25,8 @@ export type ShopRunResult = { reply: string; buttons: ShopButton[]; chat: ShopCh
 export async function runShopAssistant(args: {
     channel: ShopChannel; identity: ShopIdentity; chat: ShopChat; text: string;
     settings: AiSettings; whatsappNumber: string | null;
+    /** WhatsApp only: the whatsapp_conversations row, so the turn is metered against it. */
+    waConversationId?: string | null;
 }, deps: { client?: Pick<Anthropic, "messages"> } = {}): Promise<ShopRunResult> {
     const { chat, settings } = args;
     const talk = (notes: { topic: string | null; orderRef: string | null }) => {
@@ -33,9 +36,12 @@ export async function runShopAssistant(args: {
     const cant = (): ShopRunResult => ({ reply: LINES.cantChat, buttons: talk({ topic: null, orderRef: null }), chat, failed: false });
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!settings.shop.enabled || !apiKey) return cant();
-    const [spentToday, spentShop] = await Promise.all([todaySpendUsd(), todaySpendUsd("web")]);
-    if (spentToday === null || spentShop === null) return cant();
+    const switchedOn = args.channel === "whatsapp" ? settings.whatsappEnabled : settings.shop.enabled;
+    if (!switchedOn || !apiKey) return cant();
+    // The shop chat and WhatsApp share one slice of the daily cap.
+    const [spentToday, spentWeb, spentWa] = await Promise.all([todaySpendUsd(), todaySpendUsd("web"), todaySpendUsd("whatsapp")]);
+    if (spentToday === null || spentWeb === null || spentWa === null) return cant();
+    const spentShop = spentWeb + spentWa;
     const shareCapGhs = settings.dailySpendCapGhs * settings.shop.capSharePct / 100;
     const fits = (runningUsd: number) =>
         withinCap({ capGhs: settings.dailySpendCapGhs, spentTodayUsd: spentToday, runningUsd, reserveUsd: RESERVE_USD }) &&
@@ -47,7 +53,7 @@ export async function runShopAssistant(args: {
     const messages = trimTranscript([...chat.transcript, { role: "user", content: args.text }]);
 
     const result = await runShopTurn(
-        { messages, system: SHOP_SYSTEM_PROMPT, tools: CUSTOMER_TOOL_DEFS, model: AI_MODEL },
+        { messages, system: systemPromptFor(args.channel, args.identity.phone), tools: CUSTOMER_TOOL_DEFS, model: AI_MODEL },
         { client: deps.client ?? new Anthropic({ apiKey, maxRetries: 0 }), runTool: (n, i) => runCustomerTool(n, i, ctx), fits },
     );
 
@@ -56,6 +62,7 @@ export async function runShopAssistant(args: {
         // shop_chat_id is not in the generated Supabase types until the migration is applied.
         const { error } = await (supabaseAdmin as any).from("ai_turns").insert({
             channel: args.channel, shop_chat_id: chat.id, user_id: null, model: AI_MODEL,
+            ...(args.channel === "whatsapp" && args.waConversationId ? { conversation_id: args.waConversationId } : {}),
             input_tokens: u.input, output_tokens: u.output, cache_read_tokens: u.cacheRead, cache_write_tokens: u.cacheWrite,
             cost_usd: parseFloat(u.costUsd.toFixed(6)), tool_calls: u.toolCalls,
         });

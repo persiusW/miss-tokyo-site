@@ -19,14 +19,19 @@ function toInput(input: any, ctx: ShopToolContext): CreateCheckoutOrderInput {
             brand: str(i?.brand, 60) || null,
             quantity: i?.quantity,
         })),
-        customer: { name: str(input?.customer_name, 120), phone: str(input?.customer_phone, 30), email: str(input?.customer_email, 160) || null },
+        customer: {
+            name: str(input?.customer_name, 120),
+            // On WhatsApp the sender's number is the phone unless the customer gave another.
+            phone: str(input?.customer_phone, 30) || (ctx.channel === "whatsapp" ? ctx.identity.phone ?? "" : ""),
+            email: str(input?.customer_email, 160) || null,
+        },
         delivery: {
             method: input?.delivery_method === "pickup" ? "pickup" : "delivery",
             address: str(input?.delivery_address, 500) || null,
             zone: input?.delivery_zone === "accra" || input?.delivery_zone === "outside" ? input.delivery_zone : null,
             region: str(input?.region, 60) || null,
         },
-        source: "web_chat",
+        source: ctx.channel === "whatsapp" ? "whatsapp" : "web_chat",
         discount_code: str(input?.discount_code, 60) || null,
         hold_minutes: 15,
         ...(ctx.chat.saleKey ? { saleKey: ctx.chat.saleKey } : {}),

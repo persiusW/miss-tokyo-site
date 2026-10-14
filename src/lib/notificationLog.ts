@@ -1,4 +1,4 @@
-// Record of every SMS and email the app sends (table notification_log).
+// Record of every SMS, email and WhatsApp message the app sends (table notification_log).
 //
 // Written by sendSMS and sendEmail after the provider call. The writer never
 // throws and gives up after LOG_TIMEOUT_MS, so a slow or failing database can
@@ -10,7 +10,7 @@ import { redactText } from "@/lib/ai/missTokyoAi/scrub";
 export type NotificationMeta = { event?: string; orderId?: string | null };
 
 type Row = {
-    channel: "sms" | "email";
+    channel: "sms" | "email" | "whatsapp";
     recipient: string;
     recipient_key: string;
     event: string | null;
@@ -77,7 +77,7 @@ export function htmlToText(html: string): string {
 const cap = (s: string | null | undefined, n: number) => (s == null ? null : String(s).slice(0, n));
 
 export function buildRows(args: {
-    channel: "sms" | "email";
+    channel: "sms" | "email" | "whatsapp";
     recipients: string[];
     subject?: string | null;
     body: string;
@@ -91,7 +91,7 @@ export function buildRows(args: {
     return args.recipients.map(recipient => ({
         channel: args.channel,
         recipient: cap(recipient, 320) ?? "",
-        recipient_key: args.channel === "sms" ? smsRecipientKey(recipient) : emailRecipientKey(recipient),
+        recipient_key: args.channel === "email" ? emailRecipientKey(recipient) : smsRecipientKey(recipient),
         event: cap(args.meta?.event ?? null, 80),
         subject: cap(args.subject ?? null, 300),
         body,

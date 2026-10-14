@@ -15,6 +15,12 @@ export default function TermsPage() {
                 </section>
 
                 <section>
+                    <h2 className="text-xs font-semibold uppercase tracking-widest mb-4 text-neutral-400">WhatsApp, AI Assistant and Notifications</h2>
+                    <p>We use WhatsApp and our AI assistant, Ask Miss Tokyo, to help serve you: answering questions about our pieces, sizes and delivery, taking orders, and helping with payment. By placing an order or messaging us, you agree to receive service messages and notifications about your orders from us on WhatsApp, SMS and email.</p>
+                    <p className="mt-4">Our AI assistant can make mistakes. Prices, stock and totals it gives come from our shop, and a member of our team is available whenever you ask for one. You can ask us to stop WhatsApp messages at any time by messaging us or emailing <a href="mailto:studio@misstokyo.shop" className="border-b border-black hover:text-neutral-500 transition-colors">studio@misstokyo.shop</a>.</p>
+                </section>
+
+                <section>
                     <h2 className="text-xs font-semibold uppercase tracking-widest mb-4 text-neutral-400">Custom Orders</h2>
                     <p>Custom and bespoke orders require a confirmed deposit before production begins. Custom pieces are non-refundable once production has started, except in cases of manufacturing defect.</p>
                 </section>
