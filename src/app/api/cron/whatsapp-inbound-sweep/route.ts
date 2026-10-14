@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     }
     try {
         const settings = await getAiSettings();
-        const pipeline = pipelineFor(PROVIDER, settings.whatsappEnabled);
+        const pipeline = pipelineFor(PROVIDER, settings.whatsappEnabled, settings.whatsappPhoneNumberId);
         if (!pipeline) return NextResponse.json({ ok: true, mode: "capture" });
         const result = await sweepInbound(pipeline, { limit: 25, budgetMs: 45_000 });
         if (result.gave_up || result.expired) console.warn("[cron/whatsapp-inbound-sweep] gave up on events", result);

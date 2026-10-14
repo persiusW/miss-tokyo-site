@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import {
-    FALLBACK_TEXT, MAX_ATTEMPTS, processInboundEvent, REPLY_WINDOW_MS, REPROCESS_WINDOW_MS, RETRY_AFTER_MS, sweepInbound,
+    FALLBACK_TEXT, MAX_ATTEMPTS, MAX_CLOCK_SKEW_MS, messageTime, NO_PHONE_REASON, processInboundEvent, REPLY_WINDOW_MS, REPROCESS_WINDOW_MS, RETRY_AFTER_MS, sweepInbound,
     type InboundEvent, type InboundMessage, type InboundStore, type ParsedInbound, type PipelineDeps,
 } from "../../../src/lib/whatsapp/pipeline";
 
@@ -11,9 +11,9 @@ const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
 function fakeStore(events: Partial<InboundEvent>[]) {
     const ev = new Map(events.map((e, i) => {
         const id = e.id ?? `e${i}`;
-        return [id, { id, provider: "chatbots_africa", raw_body: "{}", headers: {}, received_at: ago(60_000), attempts: 0, last_attempt_at: null, processed_at: null, gave_up_at: null, error: null as string | null, wa_phone: null as string | null, conversation_id: null as string | null, ...e }];
+        return [id, { id, provider: "chatbots_africa", raw_body: "{}", headers: {}, received_at: ago(60_000), attempts: 0, last_attempt_at: null, processed_at: null, gave_up_at: null, error: null as string | null, wa_phone: null as string | null, conversation_id: null as string | null, parsed: null as unknown, ...e }];
     }));
-    const convs = new Map<string, { id: string; phone: string; last_inbound_at: string; handed_off_at: string | null; state: Record<string, unknown> }>();
+    const convs = new Map<string, { id: string; phone: string; last_inbound_at: string; handed_off_at: string | null; state: Record<string, unknown>; user_id?: string | null }>();
     const logged: { conversationId: string; m: InboundMessage }[] = [];
     const store: InboundStore = {
         async claim(id, now) {
@@ -23,15 +23,16 @@ function fakeStore(events: Partial<InboundEvent>[]) {
             e.attempts++; e.last_attempt_at = now.toISOString();
             return { ...e };
         },
-        async touchConversation(phone, _name, receivedAt) {
+        async touchConversation(phone, _name, at, _provider, userId) {
             let c = [...convs.values()].find(x => x.phone === phone);
-            if (!c) { c = { id: `c-${phone}`, phone, last_inbound_at: receivedAt, handed_off_at: null, state: {} }; convs.set(c.id, c); }
-            if (c.last_inbound_at < receivedAt) c.last_inbound_at = receivedAt;
+            if (!c) { c = { id: `c-${phone}`, phone, last_inbound_at: at, handed_off_at: null, state: {}, user_id: null as string | null }; convs.set(c.id, c); }
+            if (c.last_inbound_at < at) c.last_inbound_at = at;
+            if (userId) c.user_id = userId;
             return { id: c.id, handedOffAt: c.handed_off_at };
         },
         async seen(id) { return logged.some(l => l.m.messageId === id); },
         async logInbound(conversationId, m) { logged.push({ conversationId, m }); },
-        async markProcessed(id, f) { Object.assign(ev.get(id)!, { processed_at: NOW.toISOString(), error: null, wa_phone: f.waPhone, conversation_id: f.conversationId }); },
+        async markProcessed(id, f) { Object.assign(ev.get(id)!, { processed_at: NOW.toISOString(), error: f.note ?? null, wa_phone: f.waPhone, conversation_id: f.conversationId, parsed: f.parsed }); },
         async markFailed(id, error, f) { Object.assign(ev.get(id)!, { error, wa_phone: f.waPhone, conversation_id: f.conversationId }); },
         async giveUp(id, error, f) { Object.assign(ev.get(id)!, { gave_up_at: NOW.toISOString(), error, wa_phone: f.waPhone, conversation_id: f.conversationId }); },
         async handOff(conversationId, reason, now) {
@@ -56,7 +57,7 @@ function fakeStore(events: Partial<InboundEvent>[]) {
 
 const msg = (over: Partial<InboundMessage> = {}): InboundMessage => ({ messageId: "wamid.1", from: "233241234567", name: "Abena", type: "text", text: "Do you have this in M?", ...over });
 
-function deps(store: InboundStore, opts: { parsed?: ParsedInbound; parseThrows?: boolean; handleThrows?: boolean } = {}) {
+function deps(store: InboundStore, opts: { parsed?: ParsedInbound; parseThrows?: boolean; handleThrows?: boolean; expected?: string } = {}) {
     const handled: InboundMessage[] = [];
     const fallbacks: string[] = [];
     const d: PipelineDeps = {
@@ -64,6 +65,7 @@ function deps(store: InboundStore, opts: { parsed?: ParsedInbound; parseThrows?:
         parse: () => { if (opts.parseThrows) throw new Error("unreadable body"); return opts.parsed ?? { externalId: "evt-1", messages: [msg()] }; },
         handle: async m => { if (opts.handleThrows) throw new Error("model timeout"); handled.push(m); },
         sendFallback: async to => { fallbacks.push(to); return { ok: true, messageId: null }; },
+        expectedPhoneNumberId: opts.expected ?? null,
         now: () => NOW,
     };
     return { d, handled, fallbacks };
@@ -160,4 +162,44 @@ test("the sweep retries what is due, skips what is too recent, and expires what 
     expect(ev.get("recent")!.processed_at).toBeNull();
     expect(ev.get("old")!.gave_up_at).not.toBeNull();
     expect(ev.get("old")!.attempts).toBe(0);
+});
+
+test("the window runs from the customer's own message time, unless it is missing or ahead of our clock", () => {
+    const received = ago(60_000);
+    expect(messageTime(ago(4 * 60_000), received)).toBe(ago(4 * 60_000));
+    expect(messageTime(null, received)).toBe(received);
+    expect(messageTime(new Date(NOW.getTime() + MAX_CLOCK_SKEW_MS + 60_000).toISOString(), received)).toBe(received);
+});
+
+test("message time and the WhatsApp user id reach the conversation", async () => {
+    const { store, convs } = fakeStore([{ id: "a", received_at: ago(60_000) }]);
+    const { d } = deps(store, { parsed: { externalId: "w", messages: [msg({ at: ago(3 * 60_000), fromUserId: "GH.0000000000000001" })] } });
+    await processInboundEvent("a", d);
+    expect(convs.get("c-233241234567")).toMatchObject({ last_inbound_at: ago(3 * 60_000), user_id: "GH.0000000000000001" });
+});
+
+test("a hidden number is processed with a reason, not backlog, and opens no conversation", async () => {
+    const { store, ev, convs } = fakeStore([{ id: "a" }]);
+    const { d, handled } = deps(store, { parsed: { externalId: "w", messages: [msg({ from: "" })] } });
+    expect(await processInboundEvent("a", d)).toBe("processed");
+    expect(ev.get("a")).toMatchObject({ error: NO_PHONE_REASON, attempts: 1 });
+    expect(ev.get("a")!.processed_at).not.toBeNull();
+    expect(convs.size).toBe(0);
+    expect(handled).toHaveLength(0);
+});
+
+test("receipts alone are processed with nothing handled, so they never show as backlog", async () => {
+    const { store, ev } = fakeStore([{ id: "a" }]);
+    const { d, handled } = deps(store, { parsed: { externalId: "wamid.OUT:read", messages: [], statuses: [{ messageId: "wamid.OUT", status: "read", at: null, recipient: "233200000001" }] } });
+    expect(await processInboundEvent("a", d)).toBe("processed");
+    expect(ev.get("a")!.error).toBeNull();
+    expect(handled).toHaveLength(0);
+});
+
+test("a delivery for another phone_number_id is warned about, not refused", async () => {
+    const { store, ev } = fakeStore([{ id: "a" }]);
+    const { d, handled } = deps(store, { expected: "1000000000000001", parsed: { externalId: "w", messages: [msg()], phoneNumberIds: ["1999999999999999"] } });
+    expect(await processInboundEvent("a", d)).toBe("processed");
+    expect(handled).toHaveLength(1);
+    expect((ev.get("a")!.parsed as ParsedInbound).notes).toContain("phone_number_id is not ours");
 });

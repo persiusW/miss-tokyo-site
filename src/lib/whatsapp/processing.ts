@@ -19,7 +19,7 @@ export function processingMode(whatsappEnabled: boolean, provider: string) {
 }
 
 /** The pipeline for a provider, or null while events are stored only. */
-export function pipelineFor(provider: string, whatsappEnabled: boolean): PipelineDeps | null {
+export function pipelineFor(provider: string, whatsappEnabled: boolean, expectedPhoneNumberId: string | null = null): PipelineDeps | null {
     const reg = INBOUND_HANDLERS[provider];
     if (!reg || !whatsappEnabled) return null;
     const sender = createChatbotsAfrica();
@@ -28,5 +28,6 @@ export function pipelineFor(provider: string, whatsappEnabled: boolean): Pipelin
         parse: reg.parse,
         handle: reg.handle,
         sendFallback: to => sender.sendText(to, FALLBACK_TEXT, { event: "whatsapp_handoff_fallback" }),
+        expectedPhoneNumberId,
     };
 }

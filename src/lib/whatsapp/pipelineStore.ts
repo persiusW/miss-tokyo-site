@@ -26,23 +26,25 @@ export const supabaseInboundStore: InboundStore = {
         return (claimed as InboundEvent | null) ?? null;
     },
 
-    async touchConversation(phone, name, receivedAt, provider) {
-        const pick = "id, handed_off_at, last_inbound_at, wa_contact_name";
+    async touchConversation(phone, name, at, provider, userId) {
+        const pick = "id, handed_off_at, last_inbound_at, wa_contact_name, wa_user_id";
         const read = () => db.from("whatsapp_conversations").select(pick).eq("wa_phone_number", phone).maybeSingle();
         let { data: row, error } = await read();
         if (error) fail("read conversation", error);
         if (!row) {
             const ins = await db.from("whatsapp_conversations")
-                .insert({ wa_phone_number: phone, wa_contact_name: name, provider, last_inbound_at: receivedAt, last_message_at: receivedAt })
+                .insert({ wa_phone_number: phone, wa_contact_name: name, wa_user_id: userId ?? null, provider, last_inbound_at: at, last_message_at: at })
                 .select(pick).single();
             if (ins.error?.code === "23505") ({ data: row, error } = await read());   // opened by a parallel run
             else if (ins.error) fail("open conversation", ins.error);
             else row = ins.data;
             if (error) fail("read conversation", error);
         }
-        if (!row.last_inbound_at || new Date(row.last_inbound_at) < new Date(receivedAt)) {
-            const patch: Record<string, unknown> = { last_inbound_at: receivedAt, last_message_at: receivedAt };
-            if (!row.wa_contact_name && name) patch.wa_contact_name = name;
+        const patch: Record<string, unknown> = {};
+        if (!row.last_inbound_at || new Date(row.last_inbound_at) < new Date(at)) Object.assign(patch, { last_inbound_at: at, last_message_at: at });
+        if (!row.wa_contact_name && name) patch.wa_contact_name = name;
+        if (userId && row.wa_user_id !== userId) patch.wa_user_id = userId;
+        if (Object.keys(patch).length > 0) {
             const { error: upError } = await db.from("whatsapp_conversations").update(patch).eq("id", row.id);
             if (upError) fail("touch conversation", upError);
         }
@@ -64,7 +66,7 @@ export const supabaseInboundStore: InboundStore = {
 
     async markProcessed(id, f) {
         const { error } = await db.from("inbound_events").update({
-            processed_at: new Date().toISOString(), error: null, parsed: f.parsed, external_id: f.externalId,
+            processed_at: new Date().toISOString(), error: f.note ?? null, parsed: f.parsed, external_id: f.externalId,
             wa_phone: f.waPhone, conversation_id: f.conversationId,
         }).eq("id", id);
         if (error?.code === "23505") {
