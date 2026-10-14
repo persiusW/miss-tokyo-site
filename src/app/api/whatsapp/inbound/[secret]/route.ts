@@ -92,7 +92,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         after(async () => {
             try {
                 const settings = await getAiSettings();
-                const pipeline = pipelineFor(PROVIDER, settings.whatsappEnabled, settings.whatsappPhoneNumberId);
+                const pipeline = await pipelineFor(PROVIDER, settings);
                 if (pipeline) await processInboundEvent(id, pipeline);
             } catch (e) {
                 // Stored already: the sweep picks it up.
