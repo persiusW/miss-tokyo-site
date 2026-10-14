@@ -14,6 +14,7 @@ import { sendSMS } from "@/lib/sms";
 import { createWhatsAppHandler } from "./assistantHandler";
 import { chatForConversation, loadWaConversation, logOutbound, quotedMessage, recentHistory } from "./conversationStore";
 import { forwardToTeam, type HandoffReason } from "./handoff";
+import { toModelPhoto } from "./photo";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
 import { FALLBACK_TEXT, type InboundParser, type PipelineDeps } from "./pipeline";
 import { supabaseInboundStore } from "./pipelineStore";
@@ -72,10 +73,15 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
         },
         counts: chat => visitorCounts(chat.visitorKey),
         quoted: quotedMessage,
+        fetchPhoto: async mediaId => {
+            const r = await sender.downloadMedia(mediaId);
+            if (!r.ok || !r.contentType.startsWith("image/")) return null;
+            return toModelPhoto(r.bytes);
+        },
         perDay: settings.shop.dailyMessagesPerVisitor,
         run: a => runShopAssistant({
             channel: "whatsapp", identity: { customerId: a.customerId, phone: a.phone }, chat: a.chat, text: a.text,
-            settings, whatsappNumber: teamNumber, waConversationId: a.conversationId,
+            settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, image: a.image,
         }),
         siteUrl: site,
     });

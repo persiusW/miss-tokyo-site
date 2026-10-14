@@ -103,3 +103,15 @@ export function mergeChatState(saved: ShopChat, work: ShopChat): ShopChat {
         saleKey: saved.saleKey ?? work.saleKey,
     };
 }
+
+/**
+ * A customer's photo is read once, in the turn it arrives. The stored chat keeps
+ * a note instead of the image, so it is not sent (and paid for) on every later turn.
+ */
+export function photoAsNote(messages: Msg[]): Msg[] {
+    return messages.map(m => {
+        if (m.role !== "user" || !Array.isArray(m.content) || !(m.content as any[]).some(b => b?.type === "image")) return m;
+        const said = textOf(m).trim();
+        return { role: "user", content: `[The customer sent a photo]${said ? ` ${said}` : ""}` };
+    });
+}

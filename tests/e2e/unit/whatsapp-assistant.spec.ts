@@ -30,12 +30,13 @@ const chat = { id: "s1", visitorKey: "v", customerId: null, transcript: [], veri
 const msg = (over: Partial<InboundMessage> = {}): InboundMessage => ({ messageId: "wamid.T", from: PHONE, name: "Test Customer", type: "text", text: "Hi", ...over });
 const conv = { id: "c1", handedOffAt: null };
 
-function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; counts?: { lastMinute: number; today: number } | null; sendOk?: boolean } = {}) {
+function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; counts?: { lastMinute: number; today: number } | null; sendOk?: boolean; photo?: boolean } = {}) {
     const sent: string[] = [];
     const images: string[] = [];
     const logged: string[] = [];
     const handoffs: string[] = [];
     const runs: string[] = [];
+    const runImages: unknown[] = [];
     let human = false;
     const deps: AssistantDeps = {
         send: async (_to, text) => { sent.push(text); return o.sendOk === false ? { ok: false, code: "network" } : { ok: true, messageId: "wamid.OUT" }; },
@@ -46,10 +47,11 @@ function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; 
         counts: async () => (o.counts === undefined ? { lastMinute: 0, today: 0 } : o.counts),
         quoted: async (convId, id) => (convId === "c1" && id === "wamid.OUTPHOTO1" ? "Lindsy Bodycon · L3 https://misstokyo.shop/products/lindsy-bodycon" : null),
         perDay: 20,
-        run: async a => { runs.push(a.text); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
+        fetchPhoto: async () => (o.photo ? { data: "BASE64", mediaType: "image/jpeg" as const } : null),
+        run: async a => { runs.push(a.text); runImages.push(a.image ?? null); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
         siteUrl: SITE,
     };
-    return { handle: createWhatsAppHandler(deps), sent, images, logged, handoffs, runs };
+    return { handle: createWhatsAppHandler(deps), sent, images, logged, handoffs, runs, runImages };
 }
 
 test("a text gets the assistant's reply, sent and logged, with no handoff", async () => {
@@ -68,9 +70,20 @@ test("asking for a person: the reply plus a handover note, and the chat goes to 
     expect(h.sent).toEqual([`Of course, let me get someone.\n\n${WA_LINES.handedOff}`]);
 });
 
-test("a photo: the chat goes to a person and the customer is told once", async () => {
-    const h = harness();
-    await h.handle(msg({ type: "image", text: null }), conv);
+test("a photo is read by the assistant with its caption, in that turn", async () => {
+    const h = harness({ photo: true });
+    await h.handle(msg({ type: "image", text: "Do you have this in M?", mediaId: "2000000000000001" }), conv);
+    expect(h.runs).toEqual(["Do you have this in M?"]);
+    expect(h.runImages).toEqual([{ data: "BASE64", mediaType: "image/jpeg" }]);
+    expect(h.handoffs).toEqual([]);
+    const bare = harness({ photo: true });
+    await bare.handle(msg({ type: "image", text: null, mediaId: "2000000000000001" }), conv);
+    expect(bare.runs).toEqual(["(The customer sent this photo.)"]);
+});
+
+test("a photo that can't be fetched, a voice note or a file: a person, told once", async () => {
+    const h = harness({ photo: false });
+    await h.handle(msg({ type: "image", text: null, mediaId: "2000000000000001" }), conv);
     await h.handle(msg({ type: "audio", text: null }), conv);
     expect(h.sent).toEqual([WA_LINES.textOnly]);
     expect(h.runs).toEqual([]);

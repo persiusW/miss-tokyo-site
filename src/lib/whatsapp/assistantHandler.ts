@@ -13,6 +13,7 @@ import { cleanCustomerText, visitorOver } from "@/lib/ai/shopAssistant/limits";
 import type { ShopRunResult } from "@/lib/ai/shopAssistant/run";
 import type { ShopChat } from "@/lib/ai/shopAssistant/types";
 import type { MessagingResult } from "@/lib/messaging/provider";
+import type { ModelPhoto } from "./photo";
 import type { HandoffReason } from "./handoff";
 import type { Conversation, InboundMessage } from "./pipeline";
 import { renderForWhatsApp, WA_LINES } from "./render";
@@ -28,7 +29,9 @@ export type AssistantDeps = {
     quoted: (conversationId: string, waMessageId: string) => Promise<string | null>;
     counts: (chat: ShopChat) => Promise<{ lastMinute: number; today: number } | null>;
     perDay: number;
-    run: (a: { chat: ShopChat; text: string; phone: string; customerId: string | null; conversationId: string }) => Promise<ShopRunResult>;
+    run: (a: { chat: ShopChat; text: string; phone: string; customerId: string | null; conversationId: string; image?: ModelPhoto | null }) => Promise<ShopRunResult>;
+    /** A customer's photo, ready for the model; null when it can't be fetched or isn't an image. */
+    fetchPhoto: (mediaId: string) => Promise<ModelPhoto | null>;
     siteUrl: string;
 };
 
@@ -46,15 +49,25 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         if (text) await reply(c, to, text);
     }
 
+    async function notReadable(c: Conversation, m: InboundMessage): Promise<void> {
+        const moved = await deps.handOff(c.id, "unsupported_message");
+        if (moved && m.from) await reply(c, m.from, WA_LINES.textOnly);
+    }
+
     return async (m: InboundMessage, c: Conversation): Promise<void> => {
-        if (m.type !== "text") {
-            const moved = await deps.handOff(c.id, "unsupported_message");
-            if (moved && m.from) await reply(c, m.from, WA_LINES.textOnly);
-            return;
+        // Photos are read (a screenshot's SKU, or the style and colour); voice notes, files and the rest go to a person.
+        let photo: ModelPhoto | null = null;
+        if (m.type === "image") {
+            photo = m.mediaId ? await deps.fetchPhoto(m.mediaId).catch(() => null) : null;
+            if (!photo) return notReadable(c, m);
+        } else if (m.type !== "text") {
+            return notReadable(c, m);
         }
         if (!m.from) return;
-        const text = cleanCustomerText(m.text ?? "") ?? cleanCustomerText((m.text ?? "").slice(0, 1000));
-        if (!text) return;
+        const raw = m.text ?? "";
+        const caption = cleanCustomerText(raw) ?? cleanCustomerText(raw.slice(0, 1000)) ?? "";
+        if (!caption && !photo) return;
+        const text = caption || "(The customer sent this photo.)";
 
         // The quote comes from our records, never from the customer, so the model may trust it.
         const quote = m.replyTo ? await deps.quoted(c.id, m.replyTo).catch(() => null) : null;
@@ -65,7 +78,7 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         if (!counts) return toPerson(c, m.from, "assistant_failed", WA_LINES.cantChat);
         if (visitorOver({ ...counts, perDay: deps.perDay })) return toPerson(c, m.from, "daily_limit", WA_LINES.limit);
 
-        const result = await deps.run({ chat, text: said, phone: m.from, customerId, conversationId: c.id });
+        const result = await deps.run({ chat, text: said, phone: m.from, customerId, conversationId: c.id, image: photo });
         const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
         if (result.failed) return toPerson(c, m.from, "assistant_failed", out.text);
         if (out.wantsPerson) return toPerson(c, m.from, "customer_asked", out.text);

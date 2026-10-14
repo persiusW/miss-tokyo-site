@@ -11,7 +11,7 @@ import { runShopTurn } from "./engine";
 import { systemPromptFor } from "./prompt";
 import { CUSTOMER_TOOL_DEFS } from "./toolDefs";
 import { runCustomerTool, type ShopToolContext } from "./tools";
-import { mergeChatState, trimTranscript } from "./limits";
+import { mergeChatState, photoAsNote, trimTranscript } from "./limits";
 import { dropPastThinking } from "@/lib/ai/pastThinking";
 import { dedupeButtons, talkButton, waSummary } from "./format";
 import { LINES } from "./lines";
@@ -28,6 +28,8 @@ export async function runShopAssistant(args: {
     settings: AiSettings; whatsappNumber: string | null;
     /** WhatsApp only: the whatsapp_conversations row, so the turn is metered against it. */
     waConversationId?: string | null;
+    /** WhatsApp only: a photo the customer sent with this message, read in this turn only. */
+    image?: { data: string; mediaType: "image/jpeg" | "image/png" } | null;
 }, deps: { client?: Pick<Anthropic, "messages"> } = {}): Promise<ShopRunResult> {
     const { chat, settings } = args;
     const talk = (notes: { topic: string | null; orderRef: string | null }) => {
@@ -53,6 +55,13 @@ export async function runShopAssistant(args: {
     const ctx: ShopToolContext = { chat: work, identity: args.identity, channel: args.channel, buttons: [], notes: { topic: null, orderRef: null }, whatsappNumber: args.whatsappNumber };
     // Stored thinking is signed against the prompt it was made with; earlier turns go without it.
     const messages = trimTranscript([...dropPastThinking(chat.transcript), { role: "user", content: args.text }]);
+    if (args.image) {
+        const last = messages.length - 1;
+        messages[last] = { role: "user", content: [
+            { type: "image", source: { type: "base64", media_type: args.image.mediaType, data: args.image.data } },
+            { type: "text", text: args.text },
+        ] };
+    }
 
     const result = await runShopTurn(
         { messages, system: systemPromptFor(args.channel, args.identity.phone), tools: CUSTOMER_TOOL_DEFS, model: AI_MODEL },
@@ -78,7 +87,7 @@ export async function runShopAssistant(args: {
     const next: ShopChat = {
         ...work,
         lastQuote: settleQuote(chat.lastQuote, work.lastQuote, chat.turns, shown),
-        transcript: result.ok ? result.messages : chat.transcript,
+        transcript: result.ok ? photoAsNote(result.messages) : chat.transcript,
     };
     let saved = false;
     try { saved = await saveChat(next, chat.turns, result.ok); } catch (e) { logCause("SHOP-01", e, { chat: chat.id.slice(0, 8), step: "save" }); }
