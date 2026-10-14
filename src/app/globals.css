@@ -290,3 +290,12 @@ html, body { overflow-x: clip; }
   animation: dot-rise 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   pointer-events: none;
 }
+
+/* ─── Ask Miss Tokyo launcher ─────────────────────────────────────────────── */
+/* Desktop: bottom-right, under toasts (z-50). Phones: above the tab bar, and
+   higher still while the install banner is showing. */
+.ask-mt-launcher { bottom: 24px; }
+@media (max-width: 768px) {
+  .ask-mt-launcher { bottom: calc(68px + env(safe-area-inset-bottom, 0px) + 12px); }
+  html[data-pwa-banner] .ask-mt-launcher { bottom: calc(76px + 92px + env(safe-area-inset-bottom, 0px)); }
+}

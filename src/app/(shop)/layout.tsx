@@ -7,6 +7,7 @@ import { MobileTabBar } from "@/components/ui/miss-tokyo/MobileTabBar";
 import { PWAInstallBanner } from "@/components/ui/miss-tokyo/PWAInstallBanner";
 import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { AskMissTokyo } from "@/components/shop/askMissTokyo/AskMissTokyo";
 
 export const revalidate = 60;
 
@@ -34,12 +35,29 @@ const getMaintenanceMode = unstable_cache(
     { revalidate: 60 }
 );
 
+// The chat switch, cached like maintenance mode so pages stay static.
+// SHOP_ASSISTANT_FORCE_ENABLED=1 shows it in local development only (browser tests).
+const getShopAssistantEnabled = unstable_cache(
+    async () => {
+        try {
+            const { data } = await supabaseAdmin.from("ai_settings").select("value").eq("key", "shop_assistant_enabled").maybeSingle();
+            return data?.value === true;
+        } catch {
+            return false;
+        }
+    },
+    ["shop-assistant-enabled"],
+    { revalidate: 60 }
+);
+
 export default async function ShopLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
     const isMaintenanceMode = await getMaintenanceMode();
+    const askEnabled = (process.env.NODE_ENV !== "production" && process.env.SHOP_ASSISTANT_FORCE_ENABLED === "1")
+        || ((await getShopAssistantEnabled()) && !!process.env.ANTHROPIC_API_KEY);
 
     if (isMaintenanceMode) {
         return (
@@ -71,6 +89,7 @@ export default async function ShopLayout({
             <Toaster />
             <ErrorNet />
             <CartDrawer />
+            <AskMissTokyo enabled={askEnabled} />
             <MobileTabBar />
             <PWAInstallBanner />
         </div>
