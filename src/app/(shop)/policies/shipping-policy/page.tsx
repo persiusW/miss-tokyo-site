@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SHIPPING_POLICY as S } from "@/content/shopInfo";
 
 export const metadata: Metadata = {
     title: "Shipping Policy — Miss Tokyo",
@@ -13,7 +14,7 @@ export default function ShippingPolicyPage() {
             <div className="space-y-12 text-sm text-neutral-700 leading-relaxed">
                 <section>
                     <p>
-                        Miss Tokyo aims to deliver your order quickly and reliably.
+                        {S.intro}
                     </p>
                 </section>
 
@@ -22,15 +23,7 @@ export default function ShippingPolicyPage() {
                         Processing & Delivery
                     </h2>
                     <ul className="space-y-3 list-none">
-                        <li className="pl-4 border-l border-neutral-200">
-                            Orders are processed after payment confirmation.
-                        </li>
-                        <li className="pl-4 border-l border-neutral-200">
-                            Delivery is completed within 2–3 business days after the order is confirmed.
-                        </li>
-                        <li className="pl-4 border-l border-neutral-200">
-                            Delivery times may vary slightly due to location, weekends, or public holidays.
-                        </li>
+                        {S.processing.map(t => <li key={t} className="pl-4 border-l border-neutral-200">{t}</li>)}
                     </ul>
                 </section>
 
@@ -41,10 +34,10 @@ export default function ShippingPolicyPage() {
                     <p>
                         For shipping enquiries, contact us at{" "}
                         <a
-                            href="mailto:orders@misstokyo.shop"
+                            href={`mailto:${S.contactEmail}`}
                             className="border-b border-black hover:text-neutral-500 transition-colors"
                         >
-                            orders@misstokyo.shop
+                            {S.contactEmail}
                         </a>
                         .
                     </p>

@@ -39,7 +39,7 @@ export type OrderTotals = {
 export type CheckoutRunResult = { status: number; body: any; totals?: OrderTotals };
 
 /** Where an order came from. Stored on orders.source. */
-export type CheckoutSource = "storefront" | "whatsapp" | "pos" | "dashboard";
+export type CheckoutSource = "storefront" | "whatsapp" | "pos" | "dashboard" | "web_chat";
 
 export type CheckoutContext = {
     source: CheckoutSource;
@@ -813,14 +813,16 @@ export type CreateCheckoutOrderInput = {
         zone?: "accra" | "outside" | null;
         region?: string | null;
     };
-    source: "web" | "whatsapp" | "pos" | "dashboard";
+    source: "web" | "web_chat" | "whatsapp" | "pos" | "dashboard";
     notes?: string | null;
     discount_code?: string | null;
     hold_minutes?: number;
+    /** Payment-attempt grouping for this sale (the chat keeps one per chat). */
+    saleKey?: string;
 };
 
 export type CreateCheckoutOrderResult =
-    | { success: true; orderId: string; authorizationUrl: string; paystackReference: string; totals: OrderTotals }
+    | { success: true; orderId: string; authorizationUrl: string; paystackReference: string; totals: OrderTotals; saleKey?: string }
     | { success: false; error: string; code: string };
 
 export type QuoteCheckoutOrderResult =
@@ -939,6 +941,7 @@ async function buildRun(input: CreateCheckoutOrderInput, dryRun: boolean): Promi
 
     const run = await runCheckout(
         {
+            ...(input.saleKey ? { saleKey: input.saleKey } : {}),
             email,
             cartItems,
             metadata: {
@@ -952,7 +955,7 @@ async function buildRun(input: CreateCheckoutOrderInput, dryRun: boolean): Promi
                 ...(input.source === "whatsapp" ? { whatsapp: phone } : {}),
                 ...(input.discount_code ? { discount_code: String(input.discount_code).trim() } : {}),
             },
-        },
+        } as CheckoutPayload & { saleKey?: string },
         {
             source,
             authUserId: null,
@@ -1000,6 +1003,7 @@ export async function createCheckoutOrder(input: CreateCheckoutOrderInput): Prom
                 authorizationUrl: body.authorizationUrl,
                 paystackReference: body.reference,
                 totals,
+                ...(typeof body.saleKey === "string" ? { saleKey: body.saleKey } : {}),
             };
         }
         return fail(codeForStatus(status, body), body?.error ?? "The order could not be created.");

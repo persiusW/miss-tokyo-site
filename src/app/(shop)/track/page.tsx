@@ -1,5 +1,6 @@
 import { Metadata } from "next";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { cleanTrackQuery } from "@/lib/orders/trackQuery";
+import { findOrderByRef } from "@/lib/orders/findOrderByRef";
 import Image from "next/image";
 import Link from "next/link";
 import { Check } from "lucide-react";
@@ -110,36 +111,12 @@ function statusLabel(status: string): string {
 // ── Server-side order lookup ──────────────────────────────────────────────────
 
 async function lookupOrder(ref: string, email: string, phone?: string): Promise<Order | null> {
-    if (!ref) return null;
-
-    // Sanitise: strip non-hex chars (handles # prefix, spaces), require exactly 8
-    const cleanRef = ref.trim().toUpperCase().replace(/[^A-F0-9]/g, "");
-    if (cleanRef.length !== 8) return null;
-
-    const cleanEmail = email.trim().toLowerCase();
-    const hasEmail = cleanEmail.includes("@");
-
-    // Digits only; also try last 9 digits to handle +233 vs 0 prefix variants
-    const cleanPhone = phone ? phone.trim().replace(/\D/g, "") : "";
-    const hasPhone = cleanPhone.length >= 9;
-
-    if (!hasEmail && !hasPhone) return null;
-
-    // Use an RPC function so the UUID → text cast happens inside PostgreSQL directly.
-    // PostgREST filter chaining with "id::text" column expressions is unreliable across
-    // Supabase JS versions; the RPC approach is version-independent and tested.
-    const { data, error } = await supabaseAdmin.rpc("find_order_by_ref", {
-        p_ref:   cleanRef,
-        p_email: hasEmail ? cleanEmail : null,
-        p_phone: hasPhone ? cleanPhone : null,
-    });
-
-    if (error) {
-        console.error("[track] find_order_by_ref RPC error:", error.message);
+    try {
+        return (await findOrderByRef(cleanTrackQuery({ ref, email, phone }))) as Order | null;
+    } catch (e) {
+        console.error("[track] order lookup failed:", e instanceof Error ? e.message : e);
         return null;
     }
-
-    return (data as Order[] | null)?.[0] ?? null;
 }
 
 // ── Timeline Component ────────────────────────────────────────────────────────

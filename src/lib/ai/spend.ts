@@ -9,18 +9,28 @@ export function startOfTodayUtc(): string {
 }
 
 /** Today's spend in USD, optionally for one channel, or null when it cannot be read (callers fail closed). */
-export async function todaySpendUsd(channel?: "dashboard" | "whatsapp"): Promise<number | null> {
-    let q = supabaseAdmin
-        .from("ai_turns")
-        .select("cost_usd")
-        .gte("created_at", startOfTodayUtc());
-    if (channel) q = q.eq("channel", channel);
-    const { data, error } = await q;
-    if (error) {
-        console.error("[ai/spend] could not read ai_turns", error);
-        return null;
+export async function todaySpendUsd(channel?: "dashboard" | "whatsapp" | "web"): Promise<number | null> {
+    // PostgREST stops at 1000 rows a request, so page through the whole day.
+    const PAGE = 1000;
+    let total = 0;
+    for (let from = 0; ; from += PAGE) {
+        let q = supabaseAdmin
+            .from("ai_turns")
+            .select("cost_usd")
+            .gte("created_at", startOfTodayUtc())
+            .order("created_at")
+            .order("id")
+            .range(from, from + PAGE - 1);
+        if (channel) q = q.eq("channel", channel);
+        const { data, error } = await q;
+        if (error) {
+            console.error("[ai/spend] could not read ai_turns", error);
+            return null;
+        }
+        const rows = data ?? [];
+        total += rows.reduce((sum: number, r: any) => sum + (Number(r.cost_usd) || 0), 0);
+        if (rows.length < PAGE) return total;
     }
-    return (data ?? []).reduce((sum: number, r: any) => sum + (Number(r.cost_usd) || 0), 0);
 }
 
 /**
