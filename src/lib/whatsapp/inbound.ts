@@ -23,11 +23,21 @@ export function inboundSecretMatches(given: string | null | undefined, expected:
 // Credentials never reach the table. Signature headers are kept on purpose:
 // they are how we will learn whether the provider signs its callbacks.
 const REDACT = /^(authorization|proxy-authorization|cookie|set-cookie)$|api[-_]?key|token|secret|password|session|bypass/i;
+/** A credential inside any header's value, e.g. Vercel's x-vercel-sc-headers JSON carries an Authorization bearer. */
+const CREDENTIAL_VALUE = /\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}/i;
+/**
+ * Vercel adds its own x-vercel-* headers to every request: internal tokens,
+ * proxy signatures and geolocation of the caller. Only these say anything
+ * about the delivery; the rest are dropped.
+ */
+const VERCEL_KEEP = new Set(["x-vercel-id", "x-vercel-forwarded-for", "x-vercel-ip-country"]);
 
 export function redactHeaders(headers: Headers): Record<string, string> {
     const out: Record<string, string> = {};
     headers.forEach((value, name) => {
-        out[name] = REDACT.test(name) ? "[redacted]" : value;
+        const n = name.toLowerCase();
+        if (n.startsWith("x-vercel-") && !VERCEL_KEEP.has(n)) return;
+        out[n] = REDACT.test(n) || CREDENTIAL_VALUE.test(value) ? "[redacted]" : value;
     });
     return out;
 }

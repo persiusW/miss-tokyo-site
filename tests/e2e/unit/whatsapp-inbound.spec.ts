@@ -23,14 +23,35 @@ test("credentials are redacted from stored headers; signatures and routing heade
         "x-signature": "sha256=deadbeef", "x-hub-signature-256": "sha256=feed",
     });
     const out = redactHeaders(h);
-    for (const k of ["authorization", "cookie", "x-api-key", "apikey", "x-auth-token", "x-vercel-protection-bypass", "x-webhook-secret"]) {
+    for (const k of ["authorization", "cookie", "x-api-key", "apikey", "x-auth-token", "x-webhook-secret"]) {
         expect(out[k], k).toBe("[redacted]");
     }
+    expect(out["x-vercel-protection-bypass"]).toBeUndefined();   // Vercel headers are dropped outright
     expect(out["content-type"]).toBe("application/json");
     expect(out["user-agent"]).toBe("ChatbotsAfrica/1.0");
     expect(out["x-forwarded-for"]).toBe("1.2.3.4");
     expect(out["x-signature"]).toBe("sha256=deadbeef");
     expect(out["x-hub-signature-256"]).toBe("sha256=feed");
+});
+
+test("Vercel's internal headers are dropped and a credential inside any header value is redacted", () => {
+    const h = new Headers({
+        // Shape seen on a real preview request: a JSON header carrying an Authorization bearer.
+        "x-vercel-sc-headers": JSON.stringify({ Authorization: "Bearer eyJhbGciOiJSUzI1NiJ9.fake.fake", "x-vercel-ept": "1" }),
+        "x-vercel-proxy-signature": "Bearer abcdefghijklmnop", "x-vercel-proxy-signature-ts": "1791999999",
+        "x-vercel-oidc-token": "t", "x-vercel-ja4-digest": "d", "x-vercel-ip-latitude": "5.6",
+        "x-vercel-id": "cpt1::abc", "x-vercel-forwarded-for": "41.66.1.2", "x-vercel-ip-country": "GH",
+        "x-custom-meta": '{"auth":"Basic dXNlcjpwYXNzd29yZA=="}',
+        "x-signature": "sha256=deadbeef",
+    });
+    const out = redactHeaders(h);
+    for (const k of ["x-vercel-sc-headers", "x-vercel-proxy-signature", "x-vercel-proxy-signature-ts", "x-vercel-oidc-token", "x-vercel-ja4-digest", "x-vercel-ip-latitude"]) {
+        expect(out[k], k).toBeUndefined();
+    }
+    expect(out).toMatchObject({ "x-vercel-id": "cpt1::abc", "x-vercel-forwarded-for": "41.66.1.2", "x-vercel-ip-country": "GH" });
+    expect(out["x-custom-meta"]).toBe("[redacted]");
+    expect(out["x-signature"]).toBe("sha256=deadbeef");
+    expect(JSON.stringify(out)).not.toMatch(/bearer|basic /i);
 });
 
 test("the caller address is the first forwarded hop", () => {
