@@ -10,6 +10,8 @@ export const WA_TEXT_MAX = 4096;
 /** Lines for people already on WhatsApp. Each mirrors a website line that sends them to WhatsApp. */
 export const WA_LINES = {
     textOnly: "Thanks! I can only read text messages right now. A member of our team will follow up here shortly.",
+    stopped: "Done. You won't get order updates from us on WhatsApp anymore. You can still chat with us here. Reply START to turn them back on.",
+    started: "Order updates on WhatsApp are back on. Reply STOP at any time to turn them off.",
     handedOff: "A member of our team will continue this chat with you shortly.",
     limit: "We've reached today's chat limit with our assistant. A member of our team will follow up with you here.",
     cantChat: "Our assistant can't chat right now. A member of our team will follow up with you here.",

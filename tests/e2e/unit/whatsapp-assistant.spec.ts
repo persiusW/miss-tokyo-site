@@ -37,6 +37,7 @@ function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; 
     const handoffs: string[] = [];
     const runs: string[] = [];
     const runImages: unknown[] = [];
+    const optOuts: boolean[] = [];
     let human = false;
     const deps: AssistantDeps = {
         send: async (_to, text) => { sent.push(text); return o.sendOk === false ? { ok: false, code: "network" } : { ok: true, messageId: "wamid.OUT" }; },
@@ -45,13 +46,14 @@ function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; 
         logOutbound: async (_id, text) => { logged.push(text); },
         chatFor: async () => ({ chat, customerId: null }),
         counts: async () => (o.counts === undefined ? { lastMinute: 0, today: 0 } : o.counts),
+        setOptOut: async (_id, out) => { optOuts.push(out); },
         quoted: async (convId, id) => (convId === "c1" && id === "wamid.OUTPHOTO1" ? "Lindsy Bodycon · L3 https://misstokyo.shop/products/lindsy-bodycon" : null),
         perDay: 20,
         fetchPhoto: async () => (o.photo ? { data: "BASE64", mediaType: "image/jpeg" as const } : null),
         run: async a => { runs.push(a.text); runImages.push(a.image ?? null); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
         siteUrl: SITE,
     };
-    return { handle: createWhatsAppHandler(deps), sent, images, logged, handoffs, runs, runImages };
+    return { handle: createWhatsAppHandler(deps), sent, images, logged, handoffs, runs, runImages, optOuts };
 }
 
 test("a text gets the assistant's reply, sent and logged, with no handoff", async () => {
@@ -158,4 +160,14 @@ test("a reply to an earlier message reaches the model with what was quoted", asy
     const other = harness();
     await other.handle(msg({ text: "this one", replyTo: "wamid.UNKNOWN" }), conv);
     expect(other.runs[0]).toBe("this one");
+});
+
+test("STOP and START turn order updates off and on, without the assistant", async () => {
+    const h = harness();
+    await h.handle(msg({ text: "STOP" }), conv);
+    await h.handle(msg({ text: "start." }), conv);
+    await h.handle(msg({ text: "Please stop sending me the wrong dress" }), conv);
+    expect(h.optOuts).toEqual([true, false]);
+    expect(h.sent.slice(0, 2)).toEqual([WA_LINES.stopped, WA_LINES.started]);
+    expect(h.runs).toEqual(["Please stop sending me the wrong dress"]);
 });

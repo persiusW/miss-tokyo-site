@@ -42,6 +42,14 @@ export async function logOutbound(conversationId: string, text: string, waMessag
     if (error) console.error("[whatsapp] could not log an outbound message", { code: error.code });
 }
 
+/** STOP / START: when the customer turned order updates off, or null when they are on. */
+export async function setOptOut(conversationId: string, optedOut: boolean): Promise<void> {
+    const { error } = await db.from("whatsapp_conversations")
+        .update({ opted_out_at: optedOut ? new Date().toISOString() : null, ...(optedOut ? {} : { opted_in_at: new Date().toISOString(), opt_in_source: "start_reply" }) })
+        .eq("id", conversationId);
+    if (error) throw error;
+}
+
 /** What an earlier message in this conversation said, for a customer's reply to it. Null when unknown. */
 export async function quotedMessage(conversationId: string, waMessageId: string): Promise<string | null> {
     const { data, error } = await db.from("message_log").select("content, message_type")

@@ -12,7 +12,7 @@ import type { AiSettings } from "@/lib/ai/settings";
 import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { sendSMS } from "@/lib/sms";
 import { createWhatsAppHandler } from "./assistantHandler";
-import { chatForConversation, loadWaConversation, logOutbound, quotedMessage, recentHistory } from "./conversationStore";
+import { chatForConversation, loadWaConversation, logOutbound, quotedMessage, recentHistory, setOptOut } from "./conversationStore";
 import { forwardToTeam, type HandoffReason } from "./handoff";
 import { toModelPhoto } from "./photo";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
@@ -73,6 +73,7 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
         },
         counts: chat => visitorCounts(chat.visitorKey),
         quoted: quotedMessage,
+        setOptOut,
         fetchPhoto: async mediaId => {
             const r = await sender.downloadMedia(mediaId);
             if (!r.ok || !r.contentType.startsWith("image/")) return null;
