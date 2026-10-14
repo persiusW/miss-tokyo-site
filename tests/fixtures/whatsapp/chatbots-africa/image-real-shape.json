@@ -1,0 +1,44 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "100000000000001",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "233200000099",
+              "phone_number_id": "1000000000000001"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Test Customer"
+                },
+                "wa_id": "233200000001",
+                "user_id": "GH.0000000000000001"
+              }
+            ],
+            "messages": [
+              {
+                "from": "233200000001",
+                "from_user_id": "GH.0000000000000001",
+                "id": "wamid.TEST0002",
+                "timestamp": "1791999030",
+                "type": "image",
+                "image": {
+                  "id": "2000000000000001",
+                  "mime_type": "image/jpeg",
+                  "sha256": "ZmFrZS1zaGEyNTYtZm9yLXRlc3RzLW9ubHk=",
+                  "url": "https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=TEST&ext=1&hash=TEST"
+                }
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+array (
+  'object' => 'whatsapp_business_account',
+  'entry' => 
+  array (
+  ),
+)

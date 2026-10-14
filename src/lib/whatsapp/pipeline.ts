@@ -22,8 +22,31 @@ export const REPROCESS_WINDOW_MS = 20 * 3600_000;
 export const REPLY_WINDOW_MS = 24 * 3600_000;
 export const FALLBACK_TEXT = "Thanks for your message. A member of our team will reply to you here shortly.";
 
-export type InboundMessage = { messageId: string | null; from: string; name: string | null; type: string; text: string | null };
-export type ParsedInbound = { externalId: string | null; messages: InboundMessage[] };
+export type InboundMessage = {
+    messageId: string | null;
+    /** 233XXXXXXXXX (or another international number), "" when the sender's number is hidden. */
+    from: string;
+    name: string | null;
+    type: string;
+    text: string | null;
+    /** WhatsApp user id ("GH.<digits>"), kept beside the number. */
+    fromUserId?: string | null;
+    /** When the customer sent it (the provider's timestamp), ISO. */
+    at?: string | null;
+    mediaId?: string | null;
+    mimeType?: string | null;
+};
+/** A delivery or read receipt for a message we sent. */
+export type InboundStatus = { messageId: string | null; status: string; at: string | null; recipient: string | null };
+export type ParsedInbound = {
+    externalId: string | null;
+    messages: InboundMessage[];
+    statuses?: InboundStatus[];
+    /** metadata.phone_number_id values seen, for the soft check against our number. */
+    phoneNumberIds?: string[];
+    /** Things skipped or odd about the payload, kept with the event. */
+    notes?: string[];
+};
 /** Throws when the body cannot be read; returns no messages for receipts and other non-message events. */
 export type InboundParser = (rawBody: string, headers: Record<string, string>) => ParsedInbound;
 
