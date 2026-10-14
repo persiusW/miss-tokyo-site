@@ -8,7 +8,7 @@ import type { AiSettings } from "@/lib/ai/settings";
 import { todaySpendUsd, withinCap } from "@/lib/ai/spend";
 import { logCause } from "@/lib/errors/apiError";
 import { runShopTurn } from "./engine";
-import { SHOP_SYSTEM_PROMPT, WHATSAPP_PROMPT_NOTE } from "./prompt";
+import { systemPromptFor } from "./prompt";
 import { CUSTOMER_TOOL_DEFS } from "./toolDefs";
 import { runCustomerTool, type ShopToolContext } from "./tools";
 import { mergeChatState, trimTranscript } from "./limits";
@@ -53,7 +53,7 @@ export async function runShopAssistant(args: {
     const messages = trimTranscript([...chat.transcript, { role: "user", content: args.text }]);
 
     const result = await runShopTurn(
-        { messages, system: args.channel === "whatsapp" ? SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE : SHOP_SYSTEM_PROMPT, tools: CUSTOMER_TOOL_DEFS, model: AI_MODEL },
+        { messages, system: systemPromptFor(args.channel, args.identity.phone), tools: CUSTOMER_TOOL_DEFS, model: AI_MODEL },
         { client: deps.client ?? new Anthropic({ apiKey, maxRetries: 0 }), runTool: (n, i) => runCustomerTool(n, i, ctx), fits },
     );
 

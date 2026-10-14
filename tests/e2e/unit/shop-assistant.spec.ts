@@ -1,4 +1,4 @@
-import { SHOP_SYSTEM_PROMPT, WHATSAPP_PROMPT_NOTE } from "../../../src/lib/ai/shopAssistant/prompt";
+import { SHOP_SYSTEM_PROMPT, systemPromptFor, WHATSAPP_PROMPT_NOTE } from "../../../src/lib/ai/shopAssistant/prompt";
 import fs from "fs";
 import path from "path";
 import { test, expect } from "@playwright/test";
@@ -376,7 +376,13 @@ test("the busy line says what to do next", () => {
 test("the WhatsApp prompt note keeps the customer on WhatsApp and never offers cash", () => {
     expect(WHATSAPP_PROMPT_NOTE).toMatch(/Never tell them to message us on WhatsApp/);
     expect(WHATSAPP_PROMPT_NOTE).toMatch(/never write a link yourself/i);
-    expect(WHATSAPP_PROMPT_NOTE).toMatch(/do not ask for it/);
+    expect(WHATSAPP_PROMPT_NOTE).toMatch(/Never ask for it and never say you can't see it/);
     expect(WHATSAPP_PROMPT_NOTE).not.toMatch(/cash/i);
     expect(SHOP_SYSTEM_PROMPT).not.toContain(WHATSAPP_PROMPT_NOTE.trim());
+});
+
+test("on WhatsApp the model is told the customer's own number; the website prompt never is", () => {
+    expect(systemPromptFor("whatsapp", "233200000001")).toMatch(/The customer's WhatsApp number: 0200000001$/);
+    expect(systemPromptFor("whatsapp", null)).toBe(SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE);
+    expect(systemPromptFor("web", "233200000001")).toBe(SHOP_SYSTEM_PROMPT);
 });
