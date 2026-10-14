@@ -44,6 +44,7 @@ function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; 
         logOutbound: async (_id, text) => { logged.push(text); },
         chatFor: async () => ({ chat, customerId: null }),
         counts: async () => (o.counts === undefined ? { lastMinute: 0, today: 0 } : o.counts),
+        quoted: async (convId, id) => (convId === "c1" && id === "wamid.OUTPHOTO1" ? "Lindsy Bodycon · L3 https://misstokyo.shop/products/lindsy-bodycon" : null),
         perDay: 20,
         run: async a => { runs.push(a.text); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
         siteUrl: SITE,
@@ -134,4 +135,14 @@ test("photos and links follow the pieces the reply names, captioned with the SKU
     expect(r.text).not.toContain("S Buttoned Maxi Dress");
     // A reply that names none falls back to the first pieces.
     expect(renderForWhatsApp("Here are some options.", buttons, SITE).images.map(i => i.caption.split(" · ")[0].split("\n")[0])).toEqual(["S Buttoned Maxi Dress", "Lindsy Bodycon"]);
+});
+
+test("a reply to an earlier message reaches the model with what was quoted", async () => {
+    const h = harness();
+    await h.handle(msg({ text: "I want this dress", replyTo: "wamid.OUTPHOTO1" }), conv);
+    expect(h.runs[0]).toBe('[Replying to: "Lindsy Bodycon · L3 https://misstokyo.shop/products/lindsy-bodycon"]\nI want this dress');
+    // An unknown or other-conversation message adds nothing.
+    const other = harness();
+    await other.handle(msg({ text: "this one", replyTo: "wamid.UNKNOWN" }), conv);
+    expect(other.runs[0]).toBe("this one");
 });

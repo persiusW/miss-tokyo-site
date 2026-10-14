@@ -24,6 +24,8 @@ export type AssistantDeps = {
     handOff: (conversationId: string, reason: HandoffReason) => Promise<boolean>;
     logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
     chatFor: (c: Conversation, phone: string) => Promise<{ chat: ShopChat; customerId: string | null }>;
+    /** What a quoted message said, from our own records for this conversation. */
+    quoted: (conversationId: string, waMessageId: string) => Promise<string | null>;
     counts: (chat: ShopChat) => Promise<{ lastMinute: number; today: number } | null>;
     perDay: number;
     run: (a: { chat: ShopChat; text: string; phone: string; customerId: string | null; conversationId: string }) => Promise<ShopRunResult>;
@@ -54,12 +56,16 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         const text = cleanCustomerText(m.text ?? "") ?? cleanCustomerText((m.text ?? "").slice(0, 1000));
         if (!text) return;
 
+        // The quote comes from our records, never from the customer, so the model may trust it.
+        const quote = m.replyTo ? await deps.quoted(c.id, m.replyTo).catch(() => null) : null;
+        const said = quote ? `[Replying to: "${quote}"]\n${text}` : text;
+
         const { chat, customerId } = await deps.chatFor(c, m.from);
         const counts = await deps.counts(chat);
         if (!counts) return toPerson(c, m.from, "assistant_failed", WA_LINES.cantChat);
         if (visitorOver({ ...counts, perDay: deps.perDay })) return toPerson(c, m.from, "daily_limit", WA_LINES.limit);
 
-        const result = await deps.run({ chat, text, phone: m.from, customerId, conversationId: c.id });
+        const result = await deps.run({ chat, text: said, phone: m.from, customerId, conversationId: c.id });
         const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
         if (result.failed) return toPerson(c, m.from, "assistant_failed", out.text);
         if (out.wantsPerson) return toPerson(c, m.from, "customer_asked", out.text);

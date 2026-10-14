@@ -42,6 +42,17 @@ export async function logOutbound(conversationId: string, text: string, waMessag
     if (error) console.error("[whatsapp] could not log an outbound message", { code: error.code });
 }
 
+/** What an earlier message in this conversation said, for a customer's reply to it. Null when unknown. */
+export async function quotedMessage(conversationId: string, waMessageId: string): Promise<string | null> {
+    const { data, error } = await db.from("message_log").select("content, message_type")
+        .eq("conversation_id", conversationId).eq("wa_message_id", waMessageId).limit(1);
+    if (error) throw error;
+    const row = (data ?? [])[0];
+    if (!row) return null;
+    const text = String(row.content ?? "").replace(/\s+/g, " ").replace(/"/g, "'").trim().slice(0, 300);
+    return text || `[${row.message_type ?? "message"}]`;
+}
+
 export async function recentHistory(conversationId: string, limit = 10): Promise<HistoryLine[]> {
     const { data, error } = await db.from("message_log").select("direction, content, message_type, created_at")
         .eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(limit);

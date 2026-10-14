@@ -38,6 +38,8 @@ export type InboundMessage = {
     at?: string | null;
     mediaId?: string | null;
     mimeType?: string | null;
+    /** The message this one replies to (WhatsApp's context.id), if the customer quoted one. */
+    replyTo?: string | null;
 };
 /** A delivery or read receipt for a message we sent. */
 export type InboundStatus = { messageId: string | null; status: string; at: string | null; recipient: string | null };
