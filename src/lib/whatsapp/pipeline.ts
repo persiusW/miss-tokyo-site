@@ -88,6 +88,8 @@ export type PipelineDeps = {
     sendFallback: (to: string) => Promise<MessagingResult>;
     /** Our WhatsApp phone_number_id. A delivery for another number is only warned about, never refused. */
     expectedPhoneNumberId?: string | null;
+    /** Runs after a give-up moved the chat to a person (forwards it to the team). Never throws. */
+    afterHandOff?: (conversationId: string) => Promise<void>;
     now?: () => Date;
 };
 
@@ -141,6 +143,7 @@ export async function processInboundEvent(id: string, deps: PipelineDeps): Promi
         await deps.store.giveUp(ev.id, error, found);
         if (conversation && found.waPhone) {
             const moved = await deps.store.handOff(conversation.id, "processing_failed", now);
+            if (moved) await deps.afterHandOff?.(conversation.id).catch(() => undefined);
             // One note per handoff, and only while WhatsApp still allows a free-form reply.
             if (moved && age(now, ev.received_at) < REPLY_WINDOW_MS) {
                 await deps.sendFallback(found.waPhone).catch(() => null);
