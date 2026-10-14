@@ -62,6 +62,7 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
 
     const handle = createWhatsAppHandler({
         send: (to, text) => sender.sendText(to, text, { event: "whatsapp_reply" }),
+        sendImage: (to, url, caption) => sender.sendImage(to, url, caption, { event: "whatsapp_reply_image" }),
         handOff,
         logOutbound,
         chatFor: async c => {

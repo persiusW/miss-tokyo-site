@@ -19,9 +19,10 @@ import { renderForWhatsApp, WA_LINES } from "./render";
 
 export type AssistantDeps = {
     send: (to: string, text: string) => Promise<MessagingResult>;
+    sendImage: (to: string, url: string, caption: string) => Promise<MessagingResult>;
     /** True only for the call that moved the chat to a person (it also forwards the chat to the team). */
     handOff: (conversationId: string, reason: HandoffReason) => Promise<boolean>;
-    logOutbound: (conversationId: string, text: string, waMessageId: string | null) => Promise<void>;
+    logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
     chatFor: (c: Conversation, phone: string) => Promise<{ chat: ShopChat; customerId: string | null }>;
     counts: (chat: ShopChat) => Promise<{ lastMinute: number; today: number } | null>;
     perDay: number;
@@ -62,6 +63,12 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
         if (result.failed) return toPerson(c, m.from, "assistant_failed", out.text);
         if (out.wantsPerson) return toPerson(c, m.from, "customer_asked", out.text);
-        if (!(await reply(c, m.from, out.text))) await deps.handOff(c.id, "assistant_failed");
+        if (!(await reply(c, m.from, out.text))) { await deps.handOff(c.id, "assistant_failed"); return; }
+        // Photos after the answer. A photo that fails is only logged: the text already has the links.
+        for (const img of out.images) {
+            const r = await deps.sendImage(m.from, img.url, img.caption);
+            if (r.ok) await deps.logOutbound(c.id, img.caption, r.messageId, "image");
+            else console.error("[whatsapp] product photo not sent", { code: r.code });
+        }
     };
 }

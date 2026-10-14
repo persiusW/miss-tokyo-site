@@ -35,9 +35,9 @@ export async function chatForConversation(c: WaConversation): Promise<ShopChat> 
 }
 
 /** Logs a message we sent, so the inbox shows both sides. Never throws. */
-export async function logOutbound(conversationId: string, text: string, waMessageId: string | null): Promise<void> {
+export async function logOutbound(conversationId: string, text: string, waMessageId: string | null, type = "text"): Promise<void> {
     const { error } = await db.from("message_log").insert({
-        conversation_id: conversationId, direction: "outbound", content: text, wa_message_id: waMessageId, message_type: "text",
+        conversation_id: conversationId, direction: "outbound", content: text, wa_message_id: waMessageId, message_type: type,
     });
     if (error) console.error("[whatsapp] could not log an outbound message", { code: error.code });
 }

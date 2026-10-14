@@ -56,7 +56,7 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
         .filter(x => x.out.price_ghs <= max)
         .slice(0, 6);
 
-    for (const { out } of products.slice(0, 2)) ctx.buttons.push({ kind: "open_product", label: `${BUTTON_LABELS.open} ${out.name}`.slice(0, 40), href: out.url });
+    for (const { out } of products.slice(0, 2)) ctx.buttons.push({ kind: "open_product", label: `${BUTTON_LABELS.open} ${out.name}`.slice(0, 40), href: out.url, ...(out.image ? { productId: out.product_id } : {}) });
 
     // One product, one exact in-stock option: offer to add it to the bag.
     if (products.length === 1 && (size || colour)) {

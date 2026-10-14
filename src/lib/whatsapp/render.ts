@@ -23,7 +23,11 @@ const SWAP: Record<string, string> = {
     [LINES.refusal]: WA_LINES.refusal,
 };
 
-export type WhatsAppReply = { text: string; wantsPerson: boolean };
+export type WhatsAppImage = { url: string; caption: string };
+export type WhatsAppReply = { text: string; wantsPerson: boolean; images: WhatsAppImage[] };
+
+/** Product photos sent after a reply, at most this many. */
+export const MAX_IMAGES = 2;
 
 function absolute(href: string, siteUrl: string): string {
     return /^https:\/\//i.test(href) ? href : `${siteUrl.replace(/\/+$/, "")}${href.startsWith("/") ? "" : "/"}${href}`;
@@ -35,12 +39,17 @@ export function renderForWhatsApp(reply: string, buttons: ShopButton[], siteUrl:
     const seen = new Set<string>();
     const add = (label: string, url: string) => { if (!seen.has(url)) { seen.add(url); links.push(`${label}: ${url}`); } };
     let wantsPerson = false;
+    const images: WhatsAppImage[] = [];
     for (const b of buttons) {
+        // WhatsApp takes jpg/png only; the shop's photos are webp, so they come through our JPEG route.
+        if (b.kind === "open_product" && b.productId && images.length < MAX_IMAGES) {
+            images.push({ url: `${siteUrl.replace(/\/+$/, "")}/api/whatsapp/media/product/${b.productId}`, caption: `${b.label.replace(/^View /, "")}\n${absolute(b.href, siteUrl)}` });
+        }
         if (b.kind === "talk_to_us") { wantsPerson = true; continue; }
         if (b.kind === "pay_now") add("Pay now", b.href);
         else if (b.kind === "open_product") add(b.label, absolute(b.href, siteUrl));
         else if (b.kind === "add_to_cart") add(`View ${b.item.name}`, absolute(`/products/${b.item.slug}`, siteUrl));
     }
     const text = [body, links.join("\n")].filter(Boolean).join("\n\n");
-    return { text: text.length > WA_TEXT_MAX ? text.slice(0, WA_TEXT_MAX - 1) + "…" : text, wantsPerson };
+    return { text: text.length > WA_TEXT_MAX ? text.slice(0, WA_TEXT_MAX - 1) + "…" : text, wantsPerson, images };
 }
