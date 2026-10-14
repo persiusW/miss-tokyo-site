@@ -141,3 +141,17 @@ test("the message id comes from message.message_id, as a live send returned it",
     const { provider } = harness({ json: { success: true, channel: "whatsapp", message: { input: "0200000001", whatsapp_id: "233200000001", message_id: "wamid.TESTLIVE==", status: 200, message_status: "sent" } } });
     expect(await provider.sendText("0200000001", "hi")).toEqual({ ok: true, messageId: "wamid.TESTLIVE==" });
 });
+
+test("media downloads by id with the key in the query, capped in size", async () => {
+    const calls: string[] = [];
+    const mk = (body: Uint8Array, headers: Record<string, string> = {}, status = 200) => createChatbotsAfrica({
+        apiKey: "test-key", record: async () => {},
+        fetchImpl: (async (url: string) => { calls.push(url); return new Response(body, { status, headers }); }) as unknown as typeof fetch,
+    });
+    const ok = await mk(new Uint8Array([1, 2, 3]), { "content-type": "image/jpeg; charset=binary" }).downloadMedia("2000000000000001");
+    expect(ok).toMatchObject({ ok: true, contentType: "image/jpeg" });
+    expect(calls[0]).toBe(`${CHATBOTS_AFRICA_BASE}/media/download?apikey=test-key&media_id=2000000000000001`);
+    expect(await mk(new Uint8Array([1]), { "content-length": String(6 * 1024 * 1024) }).downloadMedia("2000000000000001")).toEqual({ ok: false, code: "invalid" });
+    expect(await mk(new Uint8Array([1]), {}, 404).downloadMedia("2000000000000001")).toEqual({ ok: false, code: "rejected" });
+    expect(await mk(new Uint8Array([1])).downloadMedia("bad id with spaces")).toEqual({ ok: false, code: "invalid" });
+});
