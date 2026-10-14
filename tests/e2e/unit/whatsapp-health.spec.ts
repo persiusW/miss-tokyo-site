@@ -3,7 +3,7 @@ import { inboundHealth, STUCK_AFTER_MS, type InboundCounts } from "../../../src/
 
 const NOW = new Date("2026-10-14T12:00:00Z");
 const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
-const base: InboundCounts = { mode: "processing", parserReady: true, switchOn: true, lastReceivedAt: ago(60_000), waiting: 0, oldestWaitingAt: null, retrying: 0, gaveUp7d: 0, oversized7d: 0 };
+const base: InboundCounts = { mode: "processing", parserReady: true, switchOn: true, lastReceivedAt: ago(60_000), waiting: 0, oldestWaitingAt: null, retrying: 0, gaveUp7d: 0, oversized7d: 0, refused7d: 0, noPhone7d: 0 };
 
 test("store-only mode says so and why, and waiting messages are not an alarm there", () => {
     const h = inboundHealth({ ...base, mode: "capture", parserReady: false, waiting: 12, oldestWaitingAt: ago(3 * 3600_000) }, NOW);
@@ -35,4 +35,14 @@ test("retries, give-ups and oversized deliveries are warnings with plain notes",
 
 test("all quiet while processing is ok", () => {
     expect(inboundHealth(base, NOW)).toEqual({ level: "ok", summary: "Working: messages are being answered.", notes: [] });
+});
+
+test("refused deliveries and hidden numbers are shown to staff in plain words", () => {
+    const h = inboundHealth({ ...base, refused7d: 2, noPhone7d: 1 }, NOW);
+    expect(h.level).toBe("warning");
+    expect(h.notes).toEqual([
+        "Deliveries were refused for arriving too fast this week (2 times). Those messages were not resent: check WhatsApp.",
+        "1 message came from a hidden number this week. Reply to it in WhatsApp.",
+    ]);
+    expect(inboundHealth({ ...base, mode: "capture", switchOn: false, refused7d: 1 }, NOW).level).toBe("warning");
 });
