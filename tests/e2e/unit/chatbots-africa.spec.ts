@@ -128,3 +128,11 @@ test("provider failures map to the shared result codes", async () => {
     // An undocumented success body still counts as sent, with no id.
     expect(await harness({ json: {} }).provider.sendText("0241234567", "hi")).toEqual({ ok: true, messageId: null });
 });
+
+test("an image goes as image_url with an optional caption, https only", async () => {
+    const { provider, calls } = harness();
+    await provider.sendImage("0241234567", "https://misstokyo.shop/api/whatsapp/media/product/x", "Lindsy Bodycon");
+    expect(calls[0].url).toBe(`${CHATBOTS_AFRICA_BASE}/send/image`);
+    expect(calls[0].body).toEqual({ apikey: "test-key", destination: "233241234567", image_url: "https://misstokyo.shop/api/whatsapp/media/product/x", caption: "Lindsy Bodycon" });
+    expect(await provider.sendImage("0241234567", "http://insecure/x.jpg")).toMatchObject({ ok: false, code: "invalid" });
+});

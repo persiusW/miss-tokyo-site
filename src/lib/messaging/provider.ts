@@ -40,6 +40,8 @@ export type BalanceResult =
 export interface MessagingProvider {
     readonly name: string;
     sendText(to: string, text: string, meta?: NotificationMeta): Promise<MessagingResult>;
+    /** A jpg or png at a public https URL, with an optional caption. */
+    sendImage(to: string, imageUrl: string, caption?: string, meta?: NotificationMeta): Promise<MessagingResult>;
     sendQuickReply(to: string, message: QuickReply, meta?: NotificationMeta): Promise<MessagingResult>;
     sendList(to: string, message: ListMessage, meta?: NotificationMeta): Promise<MessagingResult>;
     sendTemplate(to: string, message: TemplateMessage, meta?: NotificationMeta): Promise<MessagingResult>;

@@ -26,6 +26,7 @@ export const WA_LIMITS = {
     listButton: 20,
     listHeader: 60,
     listFooter: 60,
+    imageCaption: 1024,
 } as const;
 
 type Invalid = { ok: false; code: "invalid"; detail: string };
@@ -169,6 +170,14 @@ export function createChatbotsAfrica(deps: Deps = {}): MessagingProvider {
             const t = String(text ?? "").trim();
             const fields = !t || tooLong(t, WA_LIMITS.text) ? invalid("text") : { message: t };
             return send("/send/message", to, fields, t, meta);
+        },
+
+        sendImage(to, imageUrl, caption, meta) {
+            const c = String(caption ?? "").trim();
+            const fields = !/^https:\/\//i.test(imageUrl ?? "") ? invalid("image url")
+                : tooLong(c, WA_LIMITS.imageCaption) ? invalid("caption")
+                : { image_url: imageUrl, ...(c ? { caption: c } : {}) };
+            return send("/send/image", to, fields, `[image] ${c}`.trim(), meta);
         },
 
         sendQuickReply(to, message, meta) {
