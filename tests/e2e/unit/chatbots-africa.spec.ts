@@ -136,3 +136,8 @@ test("an image goes as image_url with an optional caption, https only", async ()
     expect(calls[0].body).toEqual({ apikey: "test-key", destination: "233241234567", image_url: "https://misstokyo.shop/api/whatsapp/media/product/x", caption: "Lindsy Bodycon" });
     expect(await provider.sendImage("0241234567", "http://insecure/x.jpg")).toMatchObject({ ok: false, code: "invalid" });
 });
+
+test("the message id comes from message.message_id, as a live send returned it", async () => {
+    const { provider } = harness({ json: { success: true, channel: "whatsapp", message: { input: "0200000001", whatsapp_id: "233200000001", message_id: "wamid.TESTLIVE==", status: 200, message_status: "sent" } } });
+    expect(await provider.sendText("0200000001", "hi")).toEqual({ ok: true, messageId: "wamid.TESTLIVE==" });
+});

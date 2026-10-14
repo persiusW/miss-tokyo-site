@@ -90,9 +90,12 @@ export function shapeTemplate(m: TemplateMessage): Record<string, unknown> | Inv
     return out;
 }
 
-/** The message id, wherever the provider puts it. The success body is undocumented. */
+/**
+ * The message id. Chatbots Africa answers {"success":true,"message":{"message_id":"wamid…",…}}
+ * (seen on a live send, 2026-10-14); the other places are kept as fallbacks.
+ */
 function messageIdFrom(data: any): string | null {
-    const id = data?.message_id ?? data?.messageId ?? data?.wamid ?? data?.data?.message_id ?? data?.data?.wamid
+    const id = data?.message?.message_id ?? data?.message_id ?? data?.messageId ?? data?.wamid ?? data?.data?.message_id ?? data?.data?.wamid
         ?? data?.messages?.[0]?.id ?? data?.data?.messages?.[0]?.id ?? null;
     return id == null ? null : String(id);
 }
