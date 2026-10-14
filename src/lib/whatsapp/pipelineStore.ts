@@ -57,9 +57,9 @@ export const supabaseInboundStore: InboundStore = {
         return (data ?? []).length > 0;
     },
 
-    async logInbound(conversationId, m) {
+    async logInbound(conversationId, m, at) {
         const { error } = await db.from("message_log").insert({
-            conversation_id: conversationId, direction: "inbound", content: m.text, wa_message_id: m.messageId, message_type: m.type,
+            conversation_id: conversationId, direction: "inbound", content: m.text, wa_message_id: m.messageId, message_type: m.type, created_at: at,
         });
         if (error && error.code !== "23505") fail("log message", error);   // 23505: already logged by a replay
     },

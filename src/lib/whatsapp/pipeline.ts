@@ -67,7 +67,8 @@ export interface InboundStore {
     /** Finds or opens the sender's conversation, moves last_inbound_at forward to `at`, and records the user id. */
     touchConversation(phone: string, name: string | null, at: string, provider: string, userId?: string | null): Promise<Conversation>;
     seen(waMessageId: string): Promise<boolean>;
-    logInbound(conversationId: string, m: InboundMessage): Promise<void>;
+    /** `at`: when the customer sent it, so the inbox shows it before our reply. */
+    logInbound(conversationId: string, m: InboundMessage, at: string): Promise<void>;
     /** `note` is kept in error for a processed event that still needs a look (e.g. a hidden number). */
     markProcessed(id: string, f: Found & { externalId: string | null; parsed: ParsedInbound; note?: string | null }): Promise<void>;
     markFailed(id: string, error: string, f: Found): Promise<void>;
@@ -130,7 +131,7 @@ export async function processInboundEvent(id: string, deps: PipelineDeps): Promi
             found.conversationId = conversation.id;
             if (m.messageId && await deps.store.seen(m.messageId)) continue;
             if (!conversation.handedOffAt) await deps.handle(m, conversation);
-            await deps.store.logInbound(conversation.id, m);
+            await deps.store.logInbound(conversation.id, m, messageTime(m.at, ev.received_at));
         }
         await deps.store.markProcessed(ev.id, { ...found, externalId: parsed.externalId, parsed: { ...parsed, notes }, note: notes.includes(NO_PHONE_REASON) ? NO_PHONE_REASON : null });
         return "processed";
