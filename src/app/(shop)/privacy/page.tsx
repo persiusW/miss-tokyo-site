@@ -16,7 +16,7 @@ export default function PrivacyPage() {
 
                 <section>
                     <h2 className="text-xs font-semibold uppercase tracking-widest mb-4 text-neutral-400">WhatsApp and Our AI Assistant</h2>
-                    <p>When you message us on WhatsApp or chat with Ask Miss Tokyo on our website, your messages, your WhatsApp name and number, and any order details you give are processed to answer you, take orders and help with payment. WhatsApp messages reach us through Chatbots Africa, our WhatsApp provider, and our integration is operated by Dashttp. Replies are written with the help of an AI model provided by Anthropic. A member of our team can see these conversations and will take over whenever you ask.</p>
+                    <p>When you message us on WhatsApp or chat with Ask Miss Tokyo on our website, your messages (including photos you send), your WhatsApp name and number, and any order details you give are processed to answer you, take orders and help with payment. WhatsApp messages reach us through Chatbots Africa, our WhatsApp provider, and our integration is operated by Dashttp. Replies are written with the help of an AI model provided by Anthropic. A member of our team can see these conversations and will take over whenever you ask.</p>
                     <p className="mt-4">The raw messages we receive and our assistant&apos;s chat records are deleted after 30 days. Your conversation history with us is kept so our team can serve you; you can ask us to delete it at any time.</p>
                 </section>
 
