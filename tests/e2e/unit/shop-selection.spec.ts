@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { categoriesOf, inStock, normaliseSku, phraseMatches, pickResults, searchWords, similarTo, skuMatches, stem, wordScore, type Candidate, type Shown } from "../../../src/lib/ai/shopAssistant/selection";
+import { categoriesOf, inStock, normaliseSku, phraseMatches, pickResults, searchWords, similarTo, skuMatches, skuRuns, stem, wordScore, type Candidate, type Shown } from "../../../src/lib/ai/shopAssistant/selection";
 
 const p = (id: string, price: number, stock: string[], over: Partial<Shown> = {}): Shown => ({
     product_id: id, name: id, price_ghs: price, takes_preorders: false,
@@ -77,4 +77,32 @@ test("the whole phrase in a name is the customer naming that piece", () => {
     expect(phraseMatches(rows, "Lisa  heels")).toEqual([{ name: "Lisa Heels " }]);
     expect(phraseMatches(rows, "heel")).toHaveLength(3);
     expect(phraseMatches(rows, "x")).toEqual([]);
+});
+
+// ── SKU runs ────────────────────────────────────────────────────────────────
+// Real formats from the catalogue (2026-10-16).
+
+test("a code inside a stored run or list matches its product", () => {
+    expect(skuMatches("F32-F35", "SKU: F32")).toBe(true);
+    expect(skuMatches("F32-F35", "f34")).toBe(true);
+    expect(skuMatches("F32-F35", "F35")).toBe(true);
+    expect(skuMatches("F32-F35", "F36")).toBe(false);
+    expect(skuMatches("F32-F35", "G33")).toBe(false);
+    expect(skuMatches("E11-12", "E12")).toBe(true);
+    expect(skuMatches("A09-A10", "A9")).toBe(true);
+    expect(skuMatches("F17- F18", "F18")).toBe(true);
+    expect(skuMatches("D16–D18", "D17")).toBe(true);
+    expect(skuMatches("N2, M5-M8", "M7")).toBe(true);
+    expect(skuMatches("N2, M5-M8", "N2")).toBe(true);
+    expect(skuMatches("F17 IN THE SHOP ", "F17")).toBe(true);
+    expect(skuMatches("F32-F35", "sku f-033")).toBe(true);
+    expect(skuMatches("F32-F35", "F32-F35")).toBe(true);
+});
+
+test("cross-letter and absurd runs cover only their ends", () => {
+    expect(skuRuns("C10-D12")).toEqual([{ letter: "C", lo: 10, hi: 10 }, { letter: "D", lo: 12, hi: 12 }]);
+    expect(skuMatches("C10-D12", "C11")).toBe(false);
+    expect(skuMatches("C10-D12", "D12")).toBe(true);
+    expect(skuMatches("K4-J6", "J6")).toBe(true);
+    expect(skuRuns("A1-A500")).toEqual([{ letter: "A", lo: 1, hi: 1 }, { letter: "A", lo: 500, hi: 500 }]);
 });

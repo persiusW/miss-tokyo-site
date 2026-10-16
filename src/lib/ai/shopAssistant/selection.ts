@@ -33,9 +33,45 @@ export function normaliseSku(raw: unknown): string | null {
     return s || null;
 }
 
+// The shop often writes one SKU for a run of codes: "F32-F35", "E11-12",
+// "D14–E18", "F17- F18", "N2, M5-M8", "F17 IN THE SHOP". A customer quoting
+// one code from a post ("SKU: F32") means the product whose run holds it.
+
+/** A same-letter run wider than this is read as its two ends only (a typo, not 500 pieces). */
+const MAX_RUN = 60;
+
+export type SkuRun = { letter: string; lo: number; hi: number };
+
+/** The codes a stored SKU covers, as runs. Cross-letter runs ("C10-D12") cover their two ends only. */
+export function skuRuns(raw: unknown): SkuRun[] {
+    const s = String(raw ?? "").toUpperCase().replace(/[\u2010-\u2015\u2212]/g, "-").replace(/^\s*SKU\s*[:#.\-]?\s*/, "");
+    const runs: SkuRun[] = [];
+    const re = /([A-Z]+)\s*0*(\d+)(?:\s*-\s*([A-Z]*)\s*0*(\d+))?/g;
+    for (let m: RegExpExecArray | null; (m = re.exec(s)); ) {
+        const letter = m[1], lo = Number(m[2]);
+        if (m[4] === undefined) { runs.push({ letter, lo, hi: lo }); continue; }
+        const letter2 = m[3] || letter, hi = Number(m[4]);
+        if (letter2 === letter && hi >= lo && hi - lo <= MAX_RUN) runs.push({ letter, lo, hi });
+        else runs.push({ letter, lo, hi: lo }, { letter: letter2, lo: hi, hi });
+    }
+    return runs;
+}
+
+/** The one code a customer asked for ("SKU: f-032" → F32); the first, if they quoted a run. */
+function askedCode(asked: unknown): { letter: string; n: number } | null {
+    const m = (normaliseSku(asked) ?? "").match(/^([A-Z]+)(\d+)$/);
+    if (m) return { letter: m[1], n: Number(m[2]) };
+    const r = skuRuns(asked)[0];
+    return r ? { letter: r.letter, n: r.lo } : null;
+}
+
+/** The stored SKU is the asked code, or a run or list that holds it. */
 export function skuMatches(stored: unknown, asked: unknown): boolean {
     const a = normaliseSku(asked), b = normaliseSku(stored);
-    return !!a && a === b;
+    if (!a) return false;
+    if (a === b) return true;
+    const code = askedCode(asked);
+    return !!code && skuRuns(stored).some(r => r.letter === code.letter && r.lo <= code.n && code.n <= r.hi);
 }
 
 /** The categories a product sits in: its category, its extra categories, and its type. */

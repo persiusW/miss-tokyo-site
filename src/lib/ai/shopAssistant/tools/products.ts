@@ -71,7 +71,7 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
         // ~160 products: read them all, so "SKU: D-07" finds "D7".
         const { data, error } = await shopRows().not("sku", "is", null).limit(1000);
         if (error) throw error;
-        rows = ((data ?? []) as Row[]).filter(r => skuMatches(r.sku, sku));
+        rows = ((data ?? []) as Row[]).filter(r => skuMatches(r.sku, input?.sku));
         if (rows.length === 0) return ok({ products: [], note: `No product has SKU ${sku}. Ask the customer to check it, or search by name.` });
         named = true;
     } else {
