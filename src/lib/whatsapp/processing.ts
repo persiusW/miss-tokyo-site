@@ -12,7 +12,8 @@ import type { AiSettings } from "@/lib/ai/settings";
 import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { sendSMS } from "@/lib/sms";
 import { createWhatsAppHandler } from "./assistantHandler";
-import { chatForConversation, loadWaConversation, logOutbound, quotedMessage, recentHistory, setOptOut } from "./conversationStore";
+import { providerMessage } from "./choices";
+import { chatForConversation, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, setOptOut } from "./conversationStore";
 import { forwardToTeam, type HandoffReason } from "./handoff";
 import { toModelPhoto } from "./photo";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
@@ -64,6 +65,13 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
     const handle = createWhatsAppHandler({
         send: (to, text) => sender.sendText(to, text, { event: "whatsapp_reply" }),
         sendImage: (to, url, caption) => sender.sendImage(to, url, caption, { event: "whatsapp_reply_image" }),
+        sendChoices: (to, plan) => {
+            const p = providerMessage(plan);
+            return p.kind === "buttons"
+                ? sender.sendQuickReply(to, p.message, { event: "whatsapp_reply_choices" })
+                : sender.sendList(to, p.message, { event: "whatsapp_reply_choices" });
+        },
+        offered: offeredOptions,
         handOff,
         logOutbound,
         chatFor: async c => {

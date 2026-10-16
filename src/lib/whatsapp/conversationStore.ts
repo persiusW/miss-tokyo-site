@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createChat, loadChat, visitorKeyFor } from "@/lib/ai/shopAssistant/store";
 import { chatIsStale } from "@/lib/ai/shopAssistant/limits";
 import type { ShopChat } from "@/lib/ai/shopAssistant/types";
+import { optionsFrom } from "./choices";
 import type { HistoryLine } from "./handoff";
 
 // The new whatsapp_conversations columns are not in the generated types yet.
@@ -59,6 +60,15 @@ export async function quotedMessage(conversationId: string, waMessageId: string)
     if (!row) return null;
     const text = String(row.content ?? "").replace(/\s+/g, " ").replace(/"/g, "'").trim().slice(0, 300);
     return text || `[${row.message_type ?? "message"}]`;
+}
+
+/** The options we offered on one of our tappable questions in this conversation; [] when it wasn't one. */
+export async function offeredOptions(conversationId: string, waMessageId: string): Promise<string[]> {
+    const { data, error } = await db.from("message_log").select("content")
+        .eq("conversation_id", conversationId).eq("wa_message_id", waMessageId)
+        .eq("direction", "outbound").eq("message_type", "interactive").limit(1);
+    if (error) throw error;
+    return optionsFrom((data ?? [])[0]?.content);
 }
 
 export async function recentHistory(conversationId: string, limit = 10): Promise<HistoryLine[]> {
