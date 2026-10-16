@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { categoriesOf, inStock, normaliseSku, pickResults, similarTo, skuMatches, type Candidate, type Shown } from "../../../src/lib/ai/shopAssistant/selection";
+import { categoriesOf, inStock, normaliseSku, phraseMatches, pickResults, searchWords, similarTo, skuMatches, stem, wordScore, type Candidate, type Shown } from "../../../src/lib/ai/shopAssistant/selection";
 
 const p = (id: string, price: number, stock: string[], over: Partial<Shown> = {}): Shown => ({
     product_id: id, name: id, price_ghs: price, takes_preorders: false,
@@ -51,4 +51,30 @@ test("a named sold-out piece comes back marked, with similar pieces in stock fro
 test("categories include extra categories and the type", () => {
     expect(categoriesOf({ category_id: "a", category_ids: ["a", "b"], category_type: " Dresses " })).toEqual(["a", "b", "type:dresses"]);
     expect(categoriesOf({})).toEqual([]);
+});
+
+// ── Word search ─────────────────────────────────────────────────────────────
+
+test("search words: lower case, singular, no stop words, at most 5", () => {
+    expect(searchWords("Red BODYCON dresses for a party")).toEqual(["red", "bodycon", "dress", "party"]);
+    expect(searchWords("heels")).toEqual(["heel"]);
+    expect(searchWords("shoes, bags & glasses")).toEqual(["shoe", "bag", "glass"]);
+    expect(searchWords("a b the")).toEqual([]);
+    expect(searchWords("one two three four five six")).toHaveLength(5);
+    expect([stem("dress"), stem("boss"), stem("sets"), stem("bus")]).toEqual(["dress", "boss", "set", "bus"]);
+});
+
+test("pieces matching more words rank first; type and brand count", () => {
+    const words = searchWords("red bodycon dress");
+    expect(wordScore({ name: "Lindsy Bodycon  ", category_type: "Dresses" }, words)).toBe(2);
+    expect(wordScore({ name: "S Buttoned Maxi Dress", category_type: "Dresses" }, words)).toBe(1);
+    expect(wordScore({ name: "Lala Heel", category_type: "Footwear " }, words)).toBe(0);
+    expect(wordScore({ name: "Slides", category_type: null, brand: "Coach" }, searchWords("coach"))).toBe(1);
+});
+
+test("the whole phrase in a name is the customer naming that piece", () => {
+    const rows = [{ name: "Lisa Heels " }, { name: "Lala Heel" }, { name: "Jiji heel" }];
+    expect(phraseMatches(rows, "Lisa  heels")).toEqual([{ name: "Lisa Heels " }]);
+    expect(phraseMatches(rows, "heel")).toHaveLength(3);
+    expect(phraseMatches(rows, "x")).toEqual([]);
 });

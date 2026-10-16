@@ -6,7 +6,7 @@ import { preorderEligibleIds } from "@/lib/checkout/createCheckoutOrder";
 import { normAttr } from "@/lib/utils/normAttr";
 import { cartLineFor, publicProduct, sizeMatches, type ProductRow } from "../format";
 import { BUTTON_LABELS } from "../lines";
-import { categoriesOf, inStock, NAMED_MAX, normaliseSku, pickResults, skuMatches, type Candidate } from "../selection";
+import { categoriesOf, inStock, NAMED_MAX, normaliseSku, phraseMatches, pickResults, searchWords, skuMatches, wordScore, type Candidate } from "../selection";
 import { err, ok, str, type ShopToolContext, type ToolOutcome } from "./context";
 
 export const PRODUCT_FIELDS = "id, name, slug, sku, price_ghs, is_sale, discount_value, image_urls, preorder_enabled, track_inventory, track_variant_inventory, available_sizes, available_colors, available_brands, category_id, category_ids, category_type";
@@ -30,6 +30,18 @@ async function findCategory(name: string): Promise<{ id: string; name: string } 
 
 const shopRows = () => supabaseAdmin.from("products").select(PRODUCT_FIELDS).eq("is_active", true).eq("is_wholesale_only", false);
 
+/** The kinds of piece the shop sells (product types; categories also hold deals and promotions), for a search that found nothing. */
+async function shopKinds(): Promise<string[]> {
+    const { data, error } = await supabaseAdmin.from("products").select("category_type").eq("is_active", true).eq("is_wholesale_only", false).limit(1000);
+    if (error) throw error;
+    const kinds = new Map<string, string>();
+    for (const t of data ?? []) {
+        const k = String((t as { category_type: unknown }).category_type ?? "").trim();
+        if (k) kinds.set(k.toLowerCase(), k);
+    }
+    return [...kinds.values()].sort();
+}
+
 /** Live stock for the rows, narrowed to the asked-for size and colour. */
 async function shape(rows: Row[], size: string, colour: string): Promise<(Candidate<Out> & { row: Row })[]> {
     if (rows.length === 0) return [];
@@ -47,10 +59,11 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
     const q = clean(input?.query);
     const catName = str(input?.category, 60);
     const sku = normaliseSku(input?.sku);
-    if (!sku && q.length < 2 && !catName) return err("Ask which product or category they want, e.g. dresses, bags or shoes.");
+    const max = typeof input?.max_price_ghs === "number" && input.max_price_ghs > 0 ? input.max_price_ghs : Infinity;
+    // A budget alone is browsing: the newest pieces in stock under it.
+    if (!sku && q.length < 2 && !catName && max === Infinity) return err("Ask which product or category they want, e.g. dresses, bags or shoes.");
     ctx.notes.topic = "a product";
     const size = str(input?.size, 40), colour = str(input?.colour, 60);
-    const max = typeof input?.max_price_ghs === "number" && input.max_price_ghs > 0 ? input.max_price_ghs : Infinity;
 
     let rows: Row[];
     let named: boolean;
@@ -63,7 +76,10 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
         named = true;
     } else {
         let query = shopRows();
-        if (q.length >= 2) query = query.ilike("name", `%${q}%`);
+        // Each word on its own, in the name, type or brand (words come from clean(): no filter syntax).
+        const words = q.length >= 2 ? searchWords(q) : [];
+        if (q.length >= 2 && words.length === 0) return ok({ products: [], note: "Ask what kind of piece they want." });
+        if (words.length > 0) query = query.or(words.flatMap(w => [`name.ilike.%${w}%`, `category_type.ilike.%${w}%`, `brand.ilike.%${w}%`]).join(","));
         if (catName) {
             const cat = await findCategory(catName);
             if (!cat) return ok({ products: [], note: `The shop has no "${clean(catName)}" category.` });
@@ -71,12 +87,17 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
             const typeName = cat.name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
             query = query.or(`category_id.eq.${cat.id},category_ids.cs.{"${cat.id}"},category_type.ilike."${typeName}"`);
         }
-        const { data, error } = await query.order("created_at", { ascending: false }).limit(SEARCH_ROWS);
+        const { data, error } = await query.order("created_at", { ascending: false }).limit(words.length > 1 ? SEARCH_ROWS * 2 : SEARCH_ROWS);
         if (error) throw error;
         rows = (data ?? []) as Row[];
-        if (rows.length === 0) return ok({ products: [], note: "Nothing in the shop matches that." });
-        // A name that matches only a few products is the customer asking for those pieces.
-        named = q.length >= 2 && rows.length <= NAMED_MAX;
+        if (rows.length === 0) return ok({ products: [], shop_sells: await shopKinds(), note: "Nothing in the shop matches that. Suggest one of the kinds of piece the shop sells." });
+        // A name holding the whole phrase, for only a few products, is the customer asking for those pieces.
+        // One word ("heels") names pieces only when it is in every match's name; otherwise it is a kind of piece.
+        const phrase = phraseMatches(rows, q);
+        named = phrase.length > 0 && phrase.length <= NAMED_MAX && (words.length > 1 || phrase.length === rows.length);
+        if (named) rows = phrase;
+        // Otherwise the pieces matching the most words first, newest first among equals (the sort is stable).
+        else if (words.length > 1) rows = rows.map(r => ({ r, s: wordScore(r, words) })).sort((a, b) => b.s - a.s).map(x => x.r).slice(0, SEARCH_ROWS);
     }
 
     const matches = (await shape(rows, size, colour)).filter(c => named || c.out.price_ghs <= max);
