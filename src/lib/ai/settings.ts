@@ -111,6 +111,12 @@ const OFF: AiSettings = {
     shop: { enabled: false, dailyMessagesPerVisitor: 0, capSharePct: 0, whatsappNumber: null },
 };
 
+/** A Chatbots Africa template id kept as a safe integer; anything else is none. */
+function templateId(raw: unknown): number | null {
+    const v = Number(raw);
+    return raw !== "" && Number.isSafeInteger(v) && v > 0 ? v : null;
+}
+
 export async function getAiSettings(): Promise<AiSettings> {
     const { data, error } = await supabaseAdmin.from("ai_settings").select("key, value");
     if (error || !data) {
@@ -130,10 +136,7 @@ export async function getAiSettings(): Promise<AiSettings> {
             ? map.get("whatsapp_phone_number_id") as string : null,
         whatsappHandoffNumber: normaliseWaNumber(map.get("whatsapp_handoff_number")),
         whatsappStatusNotifications: bool("whatsapp_status_notifications"),
-        whatsappStatusTemplateId: (() => {
-            const v = Number(map.get("whatsapp_status_template_id"));
-            return Number.isSafeInteger(v) && v > 0 ? v : null;
-        })(),
+        whatsappStatusTemplateId: templateId(map.get("whatsapp_status_template_id")),
         whatsappChoices: bool("whatsapp_choices_enabled"),
         whatsappUnpaidNudge: bool("whatsapp_unpaid_nudge_enabled"),
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
