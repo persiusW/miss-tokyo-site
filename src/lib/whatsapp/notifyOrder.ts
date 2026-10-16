@@ -30,11 +30,11 @@ export async function notifyOrderOnWhatsApp(order: UpdateOrder, event: OrderEven
         const sender = createChatbotsAfrica();
         return await sendOrderUpdate(order, event, extra, {
             enabled: settings.whatsappEnabled && settings.whatsappStatusNotifications,
-            templateId: settings.whatsappStatusTemplateId,
+            templateIdFor: event => settings.whatsappStatusTemplateIds[event] ?? null,
             conversationFor,
             sendText: (to, text) => sender.sendText(to, text, { event: `order_update:${event}`, orderId: order.id }),
-            sendTemplate: (to, templateId, placeholders) =>
-                sender.sendTemplate(to, { templateId, type: "text", placeholders }, { event: `order_update:${event}`, orderId: order.id }),
+            sendTemplate: (to, templateId) =>
+                sender.sendTemplate(to, { templateId, type: "text" }, { event: `order_update:${event}`, orderId: order.id }),
             logOutbound,
         });
     } catch (e) {

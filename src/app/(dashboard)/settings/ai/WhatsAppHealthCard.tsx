@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "@/lib/toast";
 import { normaliseWaNumber } from "@/lib/ai/shopAssistant/settingsRules";
+import { STATUS_TEMPLATE_EVENTS, STATUS_TEMPLATE_FIELDS, templateIdValue, type StatusTemplateEvent } from "@/lib/ai/templateSettings";
 import type { Health, InboundCounts } from "@/lib/whatsapp/health";
 
 type Wallet = { state: "ok" | "not_configured" | "rejected" | "network"; balance: number | null };
@@ -33,10 +34,14 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
     const saved = settings.find(s => s.key === "whatsapp_handoff_number");
     const [handoff, setHandoff] = useState(String(saved?.value ?? ""));
     const [saving, setSaving] = useState(false);
+    const handoffTemplateRow = settings.find(s => s.key === "whatsapp_handoff_template_id");
+    const [handoffTemplate, setHandoffTemplate] = useState(String(handoffTemplateRow?.value ?? ""));
     const updatesRow = settings.find(s => s.key === "whatsapp_status_notifications");
-    const templateRow = settings.find(s => s.key === "whatsapp_status_template_id");
+    const templatesRow = settings.find(s => s.key === "whatsapp_status_template_ids");
+    const savedIds = (templatesRow?.value && typeof templatesRow.value === "object" ? templatesRow.value : {}) as Record<string, unknown>;
     const [updatesOn, setUpdatesOn] = useState(updatesRow?.value === true);
-    const [templateId, setTemplateId] = useState(String(templateRow?.value ?? ""));
+    const [templateIds, setTemplateIds] = useState<Record<StatusTemplateEvent, string>>(
+        () => Object.fromEntries(STATUS_TEMPLATE_EVENTS.map(e => [e, String(savedIds[e] ?? "")])) as Record<StatusTemplateEvent, string>);
     const [savingUpdates, setSavingUpdates] = useState(false);
 
     async function patch(key: string, value: unknown): Promise<boolean> {
@@ -46,11 +51,11 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
     }
 
     async function saveUpdates() {
-        const id = templateId.trim();
-        if (id && !(/^\d{1,16}$/.test(id) && Number.isSafeInteger(Number(id)))) { toast.error("The template id is a number from Chatbots Africa's Message Templates."); return; }
+        const ids = Object.fromEntries(STATUS_TEMPLATE_EVENTS.map(e => [e, templateIds[e].trim()])) as Record<StatusTemplateEvent, string>;
+        if (!Object.values(ids).every(templateIdValue)) { toast.error("Each template id is a number from Chatbots Africa's Message Templates."); return; }
         const changes: [string, unknown][] = [];
         if (updatesRow && updatesOn !== (updatesRow.value === true)) changes.push(["whatsapp_status_notifications", updatesOn]);
-        if (templateRow && id !== String(templateRow.value ?? "")) changes.push(["whatsapp_status_template_id", id]);
+        if (templatesRow && STATUS_TEMPLATE_EVENTS.some(e => ids[e] !== String(savedIds[e] ?? ""))) changes.push(["whatsapp_status_template_ids", ids]);
         if (changes.length === 0) { toast.info("Nothing to save."); return; }
         setSavingUpdates(true);
         try {
@@ -64,11 +69,15 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
     async function saveHandoff() {
         const number = handoff.trim() === "" ? "" : normaliseWaNumber(handoff);
         if (number === null) { toast.error("Enter a Ghana WhatsApp number, or leave it blank to use the shop's WhatsApp number."); return; }
-        if (number === (saved?.value ?? "")) { toast.info("Nothing to save."); return; }
+        const tpl = handoffTemplate.trim();
+        if (!templateIdValue(tpl)) { toast.error("The template id is a number from Chatbots Africa's Message Templates."); return; }
+        const changes: [string, unknown][] = [];
+        if (number !== (saved?.value ?? "")) changes.push(["whatsapp_handoff_number", number]);
+        if (handoffTemplateRow && tpl !== String(handoffTemplateRow.value ?? "")) changes.push(["whatsapp_handoff_template_id", tpl]);
+        if (changes.length === 0) { toast.info("Nothing to save."); return; }
         setSaving(true);
         try {
-            const res = await fetch("/api/ai/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: "whatsapp_handoff_number", value: number }) });
-            if (!res.ok) { const j = await res.json().catch(() => null); toast.error(j?.error ?? "We couldn't save that. Please try again."); return; }
+            for (const [k, v] of changes) if (!(await patch(k, v))) return;
             setHandoff(number);
             toast.success("Saved. Chats that need a person now go to that number.");
         } catch {
@@ -122,6 +131,14 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                         {saved ? "They get the customer, the reason, recent messages and a link to reply, by WhatsApp and SMS." : "Available once the WhatsApp settings update is applied."}
                     </span>
                 </label>
+                <label style={{ flex: "1 1 240px" }}>
+                    <span className="ac-label">Approved template id (team_chat_alert)</span>
+                    <input className="ac-input" inputMode="numeric" placeholder="From Chatbots Africa, Message Templates"
+                        value={handoffTemplate} onChange={e => setHandoffTemplate(e.target.value)} disabled={!handoffTemplateRow} data-wa-handoff-template />
+                    <span style={{ display: "block", fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>
+                        {handoffTemplateRow ? "WhatsApp only delivers the alert's free text if that number messaged the shop in the last 24 hours. With this set, the template goes instead; the SMS has the details." : "Available once the WhatsApp settings update is applied."}
+                    </span>
+                </label>
                 <button type="button" className="ac-btn ac-btn-primary" onClick={saveHandoff} disabled={saving || !saved}>
                     {saving ? "Saving…" : "Save"}
                 </button>
@@ -136,18 +153,25 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                         </span>
                     </span>
                 </label>
-                <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
-                    <label style={{ flex: "1 1 240px" }}>
-                        <span className="ac-label">Approved template id (order_status_update)</span>
-                        <input className="ac-input" inputMode="numeric" placeholder="From Chatbots Africa, Message Templates"
-                            value={templateId} onChange={e => setTemplateId(e.target.value)} disabled={!templateRow} data-wa-template />
-                        <span style={{ display: "block", fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>
-                            {templateRow ? "Needed after 24 hours without a message from the customer. Blank: those updates go by SMS only." : "Available once the WhatsApp settings update is applied."}
+                <div style={{ marginTop: 12 }}>
+                    <span className="ac-label">Approved template ids, one per status</span>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginTop: 6 }} data-wa-templates>
+                        {STATUS_TEMPLATE_EVENTS.map(e => (
+                            <label key={e}>
+                                <span style={{ display: "block", fontSize: 12, color: "var(--ac-ink-2)" }}>{STATUS_TEMPLATE_FIELDS[e].label}</span>
+                                <input className="ac-input" inputMode="numeric" placeholder={STATUS_TEMPLATE_FIELDS[e].name}
+                                    value={templateIds[e]} onChange={ev => setTemplateIds({ ...templateIds, [e]: ev.target.value })} disabled={!templatesRow} />
+                            </label>
+                        ))}
+                    </div>
+                    <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 11, color: "var(--ac-ink-4)", flex: "1 1 240px" }}>
+                            {templatesRow ? "Needed after 24 hours without a message from the customer. A status left blank goes by SMS only then." : "Available once the WhatsApp settings update is applied."}
                         </span>
-                    </label>
-                    <button type="button" className="ac-btn ac-btn-primary" onClick={saveUpdates} disabled={savingUpdates || !updatesRow}>
-                        {savingUpdates ? "Saving…" : "Save"}
-                    </button>
+                        <button type="button" className="ac-btn ac-btn-primary" onClick={saveUpdates} disabled={savingUpdates || !updatesRow}>
+                            {savingUpdates ? "Saving…" : "Save"}
+                        </button>
+                    </div>
                 </div>
             </div>
             <SettingSwitch settings={settings} onSaved={onSaved} settingKey="whatsapp_choices_enabled" testId="wa-choices"

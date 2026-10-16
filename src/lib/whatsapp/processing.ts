@@ -54,6 +54,8 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
             return { name: c.name, phone: c.phone, history: await recentHistory(id), note };
         },
         sendWhatsApp: (to, text) => sender.sendText(to, text, { event: "whatsapp_handoff_team" }),
+        templateId: settings.whatsappHandoffTemplateId,
+        sendTemplate: (to, templateId) => sender.sendTemplate(to, { templateId, type: "text" }, { event: "whatsapp_handoff_team" }),
         sendSms: (to, text) => sendSMS({ to, message: text }, { event: "whatsapp_handoff_team" }),
         inboxUrl: id => `${site}/customers/whatsapp?c=${id}`,
     }).then(() => undefined);
