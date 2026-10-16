@@ -80,3 +80,38 @@ export function pickResults<T extends Shown>(matches: Candidate<T>[], pool: Cand
     const available = matches.filter(c => inStock(c.out)).slice(0, RESULTS_MAX).map(c => ({ ...c.out, in_stock: true }));
     return available.length > 0 ? { products: available } : { products: [], note: "Nothing matching is in stock right now. Do not suggest sold-out pieces; offer to look at another style, size or colour." };
 }
+
+// ── Word search ─────────────────────────────────────────────────────────────
+// Product text is thin (names and a type such as "Footwear"; few
+// descriptions), so a search is split into words and each word matched on its
+// own, singular: "red bodycon dresses" finds "Lindsy Bodycon" in "Dresses".
+
+const STOP = new Set(["a", "an", "the", "and", "or", "for", "with", "in", "of", "to", "my", "me", "i", "some", "any", "do", "you", "have", "is", "it", "on", "at", "by"]);
+export const MAX_WORDS = 5;
+
+/** A word without its plural ending: "dresses" → "dress", "heels" → "heel". */
+export function stem(w: string): string {
+    if (w.length > 4 && /(ss|sh|ch|x)es$/.test(w)) return w.slice(0, -2);
+    if (w.length > 3 && w.endsWith("s") && !w.endsWith("ss")) return w.slice(0, -1);
+    return w;
+}
+
+/** The words a search is matched on: lower case, no stop words, singular, at most MAX_WORDS. */
+export function searchWords(query: string): string[] {
+    const words = query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 2 && !STOP.has(w)).map(stem);
+    return [...new Set(words)].slice(0, MAX_WORDS);
+}
+
+const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/** How many of the words a product's name, type or brand contains. */
+export function wordScore(row: { name?: unknown; category_type?: unknown; brand?: unknown }, words: string[]): number {
+    const text = `${norm(row.name)} ${norm(row.category_type)} ${norm(row.brand)}`;
+    return words.filter(w => text.includes(w)).length;
+}
+
+/** Products whose name holds the whole phrase: the customer naming them, when there are only a few. */
+export function phraseMatches<T extends { name?: unknown }>(rows: T[], query: string): T[] {
+    const q = norm(query);
+    return q.length >= 2 ? rows.filter(r => norm(r.name).includes(q)) : [];
+}
