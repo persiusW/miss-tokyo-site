@@ -9,7 +9,7 @@ import { BUTTON_LABELS } from "../lines";
 import { categoriesOf, inStock, NAMED_MAX, normaliseSku, pickResults, skuMatches, type Candidate } from "../selection";
 import { err, ok, str, type ShopToolContext, type ToolOutcome } from "./context";
 
-const FIELDS = "id, name, slug, sku, price_ghs, is_sale, discount_value, image_urls, preorder_enabled, track_inventory, track_variant_inventory, available_sizes, available_colors, available_brands, category_id, category_ids, category_type";
+export const PRODUCT_FIELDS = "id, name, slug, sku, price_ghs, is_sale, discount_value, image_urls, preorder_enabled, track_inventory, track_variant_inventory, available_sizes, available_colors, available_brands, category_id, category_ids, category_type";
 /** Rows read per search, so pieces in stock are found even when the newest ones are sold out. */
 const SEARCH_ROWS = 40;
 
@@ -28,7 +28,7 @@ async function findCategory(name: string): Promise<{ id: string; name: string } 
     return rows.find((c: any) => c.name.toLowerCase() === q.toLowerCase()) ?? rows[0] ?? null;
 }
 
-const shopRows = () => supabaseAdmin.from("products").select(FIELDS).eq("is_active", true).eq("is_wholesale_only", false);
+const shopRows = () => supabaseAdmin.from("products").select(PRODUCT_FIELDS).eq("is_active", true).eq("is_wholesale_only", false);
 
 /** Live stock for the rows, narrowed to the asked-for size and colour. */
 async function shape(rows: Row[], size: string, colour: string): Promise<(Candidate<Out> & { row: Row })[]> {

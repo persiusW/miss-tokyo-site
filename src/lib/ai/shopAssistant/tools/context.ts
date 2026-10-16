@@ -11,6 +11,8 @@ export type ShopToolContext = {
     buttons: ShopButton[];
     notes: { topic: string | null; orderRef: string | null };
     whatsappNumber: string | null;
+    /** WhatsApp: the whatsapp_conversations row this chat runs in. */
+    waConversationId?: string | null;
     /** WhatsApp: the tappable question offer_choices recorded; sent after the turn. */
     choices?: ChoicePlan;
 };

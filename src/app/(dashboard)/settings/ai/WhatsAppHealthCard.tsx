@@ -158,6 +158,11 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                 label="Unpaid order reminder"
                 help="One WhatsApp message 30 to 60 minutes after an order placed in a WhatsApp chat goes unpaid, offering a new Pay now link. Not sent to customers who replied STOP or who are talking to a person."
                 savedOn="Saved. Unpaid WhatsApp orders now get one reminder." savedOff="Saved. No reminders for unpaid orders." />
+            <SettingSwitch settings={settings} onSaved={onSaved} settingKey="whatsapp_restock_alerts_enabled" testId="wa-restock"
+                label="Back-in-stock alerts"
+                help="When a piece is sold out, the assistant offers to message the customer when it's back, and sends that message once it is in stock (checked hourly)."
+                savedOn="Saved. Customers can now ask to be told when a piece is back." savedOff="Saved. No back-in-stock alerts."
+                template={{ key: "whatsapp_restock_template_id", label: "Approved template id (back_in_stock)", help: "Needed for alerts more than 24 hours after the customer's last message. Blank: those wait until they message again." }} />
         </div>
     );
 }
@@ -166,17 +171,28 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
 function SettingSwitch(p: {
     settings: { key: string; value: unknown }[]; onSaved: () => void; settingKey: string; testId: string;
     label: string; help: string; savedOn: string; savedOff: string;
+    /** An approved template id saved with the switch. */
+    template?: { key: string; label: string; help: string };
 }) {
     const row = p.settings.find(s => s.key === p.settingKey);
     const [on, setOn] = useState(row?.value === true);
     const [saving, setSaving] = useState(false);
+    const templateRow = p.template ? p.settings.find(s => s.key === p.template!.key) : undefined;
+    const [templateId, setTemplateId] = useState(String(templateRow?.value ?? ""));
 
     async function save() {
-        if (!row || on === (row.value === true)) { toast.info("Nothing to save."); return; }
+        const id = templateId.trim();
+        if (id && !(/^\d{1,16}$/.test(id) && Number.isSafeInteger(Number(id)))) { toast.error("The template id is a number from Chatbots Africa's Message Templates."); return; }
+        const changes: [string, unknown][] = [];
+        if (row && on !== (row.value === true)) changes.push([p.settingKey, on]);
+        if (p.template && templateRow && id !== String(templateRow.value ?? "")) changes.push([p.template.key, id]);
+        if (changes.length === 0) { toast.info("Nothing to save."); return; }
         setSaving(true);
         try {
-            const res = await fetch("/api/ai/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: p.settingKey, value: on }) });
-            if (!res.ok) { const j = await res.json().catch(() => null); toast.error(j?.error ?? "We couldn't save that. Please try again."); return; }
+            for (const [key, value] of changes) {
+                const res = await fetch("/api/ai/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, value }) });
+                if (!res.ok) { const j = await res.json().catch(() => null); toast.error(j?.error ?? "We couldn't save that. Please try again."); return; }
+            }
             toast.success(on ? p.savedOn : p.savedOff);
         } catch {
             toast.error("We couldn't save that. Please check your connection and try again.");
@@ -194,6 +210,14 @@ function SettingSwitch(p: {
                     </span>
                 </span>
             </label>
+            {p.template && (
+                <label style={{ flex: "1 1 240px" }}>
+                    <span className="ac-label">{p.template.label}</span>
+                    <input className="ac-input" inputMode="numeric" placeholder="From Chatbots Africa, Message Templates"
+                        value={templateId} onChange={e => setTemplateId(e.target.value)} disabled={!templateRow} />
+                    <span style={{ display: "block", fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>{p.template.help}</span>
+                </label>
+            )}
             <button type="button" className="ac-btn ac-btn-primary" onClick={save} disabled={saving || !row}>
                 {saving ? "Saving…" : "Save"}
             </button>

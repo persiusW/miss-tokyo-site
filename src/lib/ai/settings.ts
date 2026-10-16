@@ -18,6 +18,10 @@ export type AiSettings = {
     whatsappChoices: boolean;
     /** One WhatsApp reminder for WhatsApp orders unpaid after 30 minutes. */
     whatsappUnpaidNudge: boolean;
+    /** Back-in-stock alerts on WhatsApp (notify_when_back and the hourly run). */
+    whatsappRestockAlerts: boolean;
+    /** Approved template for alerts outside the 24h window; null = they wait for the customer's next message. */
+    whatsappRestockTemplateId: number | null;
     dashboardAgentEnabled: boolean;
     holdMinutesWhatsapp: number;
     adminCostMarkupPct: number;
@@ -73,6 +77,8 @@ export const EDITABLE_AI_SETTINGS = {
     whatsapp_status_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v))),
     whatsapp_choices_enabled: (v: unknown) => typeof v === "boolean",
     whatsapp_unpaid_nudge_enabled: (v: unknown) => typeof v === "boolean",
+    whatsapp_restock_alerts_enabled: (v: unknown) => typeof v === "boolean",
+    whatsapp_restock_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v))),
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
@@ -102,6 +108,8 @@ const OFF: AiSettings = {
     whatsappStatusTemplateId: null,
     whatsappChoices: false,
     whatsappUnpaidNudge: false,
+    whatsappRestockAlerts: false,
+    whatsappRestockTemplateId: null,
     dashboardAgentEnabled: false,
     holdMinutesWhatsapp: 15,
     adminCostMarkupPct: 0,
@@ -110,6 +118,12 @@ const OFF: AiSettings = {
     mtai: MTAI_FEATURES_OFF,
     shop: { enabled: false, dailyMessagesPerVisitor: 0, capSharePct: 0, whatsappNumber: null },
 };
+
+/** A Chatbots Africa template id kept as a safe integer; anything else is none. */
+function templateId(raw: unknown): number | null {
+    const v = Number(raw);
+    return raw !== "" && Number.isSafeInteger(v) && v > 0 ? v : null;
+}
 
 export async function getAiSettings(): Promise<AiSettings> {
     const { data, error } = await supabaseAdmin.from("ai_settings").select("key, value");
@@ -130,12 +144,11 @@ export async function getAiSettings(): Promise<AiSettings> {
             ? map.get("whatsapp_phone_number_id") as string : null,
         whatsappHandoffNumber: normaliseWaNumber(map.get("whatsapp_handoff_number")),
         whatsappStatusNotifications: bool("whatsapp_status_notifications"),
-        whatsappStatusTemplateId: (() => {
-            const v = Number(map.get("whatsapp_status_template_id"));
-            return Number.isSafeInteger(v) && v > 0 ? v : null;
-        })(),
+        whatsappStatusTemplateId: templateId(map.get("whatsapp_status_template_id")),
         whatsappChoices: bool("whatsapp_choices_enabled"),
         whatsappUnpaidNudge: bool("whatsapp_unpaid_nudge_enabled"),
+        whatsappRestockAlerts: bool("whatsapp_restock_alerts_enabled"),
+        whatsappRestockTemplateId: templateId(map.get("whatsapp_restock_template_id")),
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
         holdMinutesWhatsapp: num("hold_minutes_whatsapp", 15),
         adminCostMarkupPct: num("admin_cost_markup_pct", 0),

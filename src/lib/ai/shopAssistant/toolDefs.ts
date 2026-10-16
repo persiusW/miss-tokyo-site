@@ -106,6 +106,23 @@ export const OFFER_CHOICES_TOOL: Anthropic.Tool = {
     },
 };
 
+/** WhatsApp only, behind whatsapp_restock_alerts_enabled: tell the customer when a sold-out piece is back. */
+export const NOTIFY_WHEN_BACK_TOOL: Anthropic.Tool = {
+    name: "notify_when_back",
+    description: "Save a back-in-stock alert: we message the customer here on WhatsApp when a sold-out piece is back in stock. Only for a piece find_products returned with in_stock false, and only when the customer wants to wait for it (not a similar piece or a pre-order). Give the size and colour they want if they said.",
+    input_schema: {
+        type: "object",
+        properties: {
+            product_id: { type: "string", description: "product_id from find_products" },
+            size: { type: "string" },
+            colour: { type: "string" },
+        },
+        required: ["product_id"],
+    },
+};
+
 /** Tools that end the turn: they send the message themselves, so the model says nothing after them. */
 export const END_TURN_TOOL_NAMES = ["offer_choices"] as const;
+/** Tools a turn gets only when its channel and settings allow. */
+export const OPTIONAL_TOOL_NAMES = ["offer_choices", "notify_when_back"] as const;
 

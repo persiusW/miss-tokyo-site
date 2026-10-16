@@ -2,7 +2,7 @@
 // spend check are injected, so it is unit-tested with a fake client.
 import type Anthropic from "@anthropic-ai/sdk";
 import { costUsd } from "@/lib/ai/pricing";
-import { CUSTOMER_TOOL_NAMES, END_TURN_TOOL_NAMES } from "./toolDefs";
+import { CUSTOMER_TOOL_NAMES, END_TURN_TOOL_NAMES, OPTIONAL_TOOL_NAMES } from "./toolDefs";
 import { LINES, safeReply } from "./lines";
 
 const MAX_ITERATIONS = 8;
@@ -23,7 +23,7 @@ export type EngineResult =
     | { ok: true; messages: Msg[]; reply: string; fixed: boolean; usage: EngineUsage; ended: boolean }
     | { ok: false; usage: EngineUsage; cause: unknown };
 
-const KNOWN = new Set<string>([...CUSTOMER_TOOL_NAMES, ...END_TURN_TOOL_NAMES]);
+const KNOWN = new Set<string>([...CUSTOMER_TOOL_NAMES, ...OPTIONAL_TOOL_NAMES]);
 const ENDS_TURN = new Set<string>(END_TURN_TOOL_NAMES);
 
 export async function runShopTurn(args: { messages: Msg[]; system: string; tools: Anthropic.Tool[]; model: string }, deps: EngineDeps): Promise<EngineResult> {
@@ -31,7 +31,7 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
     const started = now();
     const messages: Msg[] = [...args.messages];
     const usage: EngineUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, costUsd: 0, toolCalls: [] };
-    // Only the tools this turn was given: offer_choices is on WhatsApp only, and only when switched on.
+    // Only the tools this turn was given: the optional ones are on WhatsApp only, and only when switched on.
     const allowed = new Set(args.tools.map(t => t.name).filter(n => KNOWN.has(n)));
     let reply = "";
     let fixed: string | null = null;   // one of our own lines: shown as is

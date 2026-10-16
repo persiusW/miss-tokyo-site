@@ -50,10 +50,14 @@ export const CHOICES_PROMPT_NOTE = `
 - When the customer picks from a few known options (which size or colour, which piece, delivery or pickup, yes or no), ask with offer_choices so they can tap instead of typing. Keep each option short. It sends your question, so say nothing else that turn.
 - A message "[tapped: …]" is the option the customer tapped on your last question.`;
 
+/** Added on WhatsApp when back-in-stock alerts are switched on (notify_when_back). */
+export const RESTOCK_PROMPT_NOTE = `
+- When a piece the customer wants is sold out and they would rather wait for it than take a similar piece or pre-order it, offer to message them when it is back, and save it with notify_when_back.`;
+
 /** The system prompt for a channel. On WhatsApp the customer's own number is part of it. */
-export function systemPromptFor(channel: "web" | "whatsapp", phone?: string | null, opts: { choices?: boolean } = {}): string {
+export function systemPromptFor(channel: "web" | "whatsapp", phone?: string | null, opts: { choices?: boolean; restock?: boolean } = {}): string {
     if (channel !== "whatsapp") return SHOP_SYSTEM_PROMPT;
     const digits = String(phone ?? "").replace(/\D/g, "");
     const local = /^233\d{9}$/.test(digits) ? `0${digits.slice(3)}` : digits ? `+${digits}` : null;
-    return SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE + (opts.choices ? CHOICES_PROMPT_NOTE : "") + (local ? `\n\nThe customer's WhatsApp number: ${local}` : "");
+    return SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE + (opts.choices ? CHOICES_PROMPT_NOTE : "") + (opts.restock ? RESTOCK_PROMPT_NOTE : "") + (local ? `\n\nThe customer's WhatsApp number: ${local}` : "");
 }
