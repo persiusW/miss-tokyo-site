@@ -13,7 +13,7 @@ import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { sendSMS } from "@/lib/sms";
 import { createWhatsAppHandler } from "./assistantHandler";
 import { providerMessage } from "./choices";
-import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, setOptOut } from "./conversationStore";
+import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnNote, setOptOut } from "./conversationStore";
 import { forwardToTeam, type HandoffReason } from "./handoff";
 import { toModelPhoto } from "./photo";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
@@ -49,7 +49,9 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
         teamNumber,
         load: async id => {
             const c = await loadWaConversation(id);
-            return c ? { name: c.name, phone: c.phone, history: await recentHistory(id) } : null;
+            if (!c) return null;
+            const note = reason === "return_request" ? await returnNote(id).catch(() => null) : null;
+            return { name: c.name, phone: c.phone, history: await recentHistory(id), note };
         },
         sendWhatsApp: (to, text) => sender.sendText(to, text, { event: "whatsapp_handoff_team" }),
         sendSms: (to, text) => sendSMS({ to, message: text }, { event: "whatsapp_handoff_team" }),

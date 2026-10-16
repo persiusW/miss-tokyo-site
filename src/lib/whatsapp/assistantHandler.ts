@@ -153,7 +153,7 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         const result = await deps.run({ chat, text: said, phone: m.from, customerId, conversationId: c.id, image: photo });
         const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
         if (result.failed) return toPerson(c, m.from, "assistant_failed", out.text);
-        if (out.wantsPerson) return toPerson(c, m.from, "customer_asked", out.text);
+        if (out.wantsPerson) return toPerson(c, m.from, result.handoff ?? "customer_asked", out.text);
         if (result.choices) return ask(c, m.from, out, result.choices);
         if (!(await reply(c, m.from, out.text))) { await deps.handOff(c.id, "assistant_failed"); return; }
         await sendImages(c, m.from, out);

@@ -23,6 +23,7 @@ const REASON_LABEL: Record<string, string> = {
     processing_failed: "Message could not be handled",
     daily_limit: "Reached today's chat limit",
     assistant_failed: "Assistant had a problem",
+    return_request: "Return or exchange",
 };
 
 export function previewText(m: Pick<MessageRow, "content" | "message_type">): string {

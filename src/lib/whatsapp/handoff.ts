@@ -9,7 +9,7 @@
 // SMS goes as well, every time, and the inbox always has the full chat.
 import type { MessagingResult } from "@/lib/messaging/provider";
 
-export type HandoffReason = "customer_asked" | "unsupported_message" | "awaiting_assistant" | "processing_failed" | "daily_limit" | "assistant_failed";
+export type HandoffReason = "customer_asked" | "unsupported_message" | "awaiting_assistant" | "processing_failed" | "daily_limit" | "assistant_failed" | "return_request";
 
 const WHY: Record<HandoffReason, string> = {
     customer_asked: "asked for a person",
@@ -18,6 +18,7 @@ const WHY: Record<HandoffReason, string> = {
     processing_failed: "sent a message the system could not handle",
     daily_limit: "reached today's chat limit with the assistant",
     assistant_failed: "hit a problem with the assistant",
+    return_request: "wants to return or exchange an order",
 };
 
 export type HistoryLine = { direction: "inbound" | "outbound"; content: string | null; type: string | null; at: string };
@@ -37,6 +38,8 @@ function clock(iso: string): string {
 
 export function buildHandoffMessages(a: {
     name: string | null; phone: string; reason: HandoffReason; history: HistoryLine[]; inboxUrl: string;
+    /** One line of detail from our own records, e.g. the return request. */
+    note?: string | null;
 }): { whatsapp: string; sms: string } {
     const who = a.name ? `${a.name} (${localNumber(a.phone)})` : localNumber(a.phone);
     const lines = a.history.slice(-MAX_HISTORY).map(h => {
@@ -46,6 +49,7 @@ export function buildHandoffMessages(a: {
     });
     const whatsapp = [
         `Miss Tokyo WhatsApp: ${who} ${WHY[a.reason]}.`,
+        a.note ?? "",
         lines.length ? `Recent messages:\n${lines.join("\n")}` : "",
         `Reply to them: https://wa.me/${a.phone}`,
         `Full chat: ${a.inboxUrl}`,
@@ -56,7 +60,7 @@ export function buildHandoffMessages(a: {
 
 export type ForwardDeps = {
     teamNumber: string | null;
-    load: (conversationId: string) => Promise<{ name: string | null; phone: string; history: HistoryLine[] } | null>;
+    load: (conversationId: string) => Promise<{ name: string | null; phone: string; history: HistoryLine[]; note?: string | null } | null>;
     sendWhatsApp: (to: string, text: string) => Promise<MessagingResult>;
     sendSms: (to: string, text: string) => Promise<{ ok: boolean }>;
     inboxUrl: (conversationId: string) => string;

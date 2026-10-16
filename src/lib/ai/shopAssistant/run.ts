@@ -22,8 +22,11 @@ import type { ShopButton, ShopChannel, ShopChat, ShopIdentity } from "./types";
 
 const RESERVE_USD = 0.08;
 
-/** choices: WhatsApp only, a tappable question to send after the reply (the turn ended on it). */
-export type ShopRunResult = { reply: string; buttons: ShopButton[]; chat: ShopChat; failed: boolean; choices?: ChoicePlan };
+/**
+ * choices: WhatsApp only, a tappable question to send after the reply (the turn ended on it).
+ * handoff: WhatsApp only, why the chat goes to a person when a tool decided it.
+ */
+export type ShopRunResult = { reply: string; buttons: ShopButton[]; chat: ShopChat; failed: boolean; choices?: ChoicePlan; handoff?: "return_request" };
 
 export async function runShopAssistant(args: {
     channel: ShopChannel; identity: ShopIdentity; chat: ShopChat; text: string;
