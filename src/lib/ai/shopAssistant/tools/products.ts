@@ -30,6 +30,17 @@ async function findCategory(name: string): Promise<{ id: string; name: string } 
 
 const shopRows = () => supabaseAdmin.from("products").select(PRODUCT_FIELDS).eq("is_active", true).eq("is_wholesale_only", false);
 
+/** The kinds of piece the shop sells (product types; categories also hold deals and promotions), for a search that found nothing. */
+async function shopKinds(): Promise<string[]> {
+    const { data, error } = await supabaseAdmin.from("products").select("category_type").eq("is_active", true).eq("is_wholesale_only", false).limit(1000);
+    if (error) throw error;
+    const kinds = new Map<string, string>();
+    for (const t of data ?? []) {
+        const k = String((t as { category_type: unknown }).category_type ?? "").trim();
+        if (k) kinds.set(k.toLowerCase(), k);
+    }
+    return [...kinds.values()].sort();
+}
 
 /** Live stock for the rows, narrowed to the asked-for size and colour. */
 async function shape(rows: Row[], size: string, colour: string): Promise<(Candidate<Out> & { row: Row })[]> {
@@ -48,10 +59,11 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
     const q = clean(input?.query);
     const catName = str(input?.category, 60);
     const sku = normaliseSku(input?.sku);
-    if (!sku && q.length < 2 && !catName) return err("Ask which product or category they want, e.g. dresses, bags or shoes.");
+    const max = typeof input?.max_price_ghs === "number" && input.max_price_ghs > 0 ? input.max_price_ghs : Infinity;
+    // A budget alone is browsing: the newest pieces in stock under it.
+    if (!sku && q.length < 2 && !catName && max === Infinity) return err("Ask which product or category they want, e.g. dresses, bags or shoes.");
     ctx.notes.topic = "a product";
     const size = str(input?.size, 40), colour = str(input?.colour, 60);
-    const max = typeof input?.max_price_ghs === "number" && input.max_price_ghs > 0 ? input.max_price_ghs : Infinity;
 
     let rows: Row[];
     let named: boolean;
@@ -78,7 +90,7 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
         const { data, error } = await query.order("created_at", { ascending: false }).limit(words.length > 1 ? SEARCH_ROWS * 2 : SEARCH_ROWS);
         if (error) throw error;
         rows = (data ?? []) as Row[];
-        if (rows.length === 0) return ok({ products: [], note: "Nothing in the shop matches that." });
+        if (rows.length === 0) return ok({ products: [], shop_sells: await shopKinds(), note: "Nothing in the shop matches that. Suggest one of the kinds of piece the shop sells." });
         // A name holding the whole phrase, for only a few products, is the customer asking for those pieces.
         // One word ("heels") names pieces only when it is in every match's name; otherwise it is a kind of piece.
         const phrase = phraseMatches(rows, q);

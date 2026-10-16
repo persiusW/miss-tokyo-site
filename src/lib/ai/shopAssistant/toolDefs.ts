@@ -35,7 +35,7 @@ const orderSchema = {
 export const CUSTOMER_TOOL_DEFS: Anthropic.Tool[] = [
     {
         name: "find_products",
-        description: "Find products in the shop by SKU, words from the name or kind of piece, or category, optionally for a size, colour or budget. Returns only pieces in stock, unless the customer named a piece (by SKU or exact name): then a sold-out piece comes back with in_stock false, whether it takes pre-orders, and similar pieces in stock.",
+        description: "Find products in the shop by SKU, words from the name or kind of piece, or category, optionally for a size, colour or budget (a budget alone browses the newest pieces under it). Returns only pieces in stock, unless the customer named a piece (by SKU or exact name): then a sold-out piece comes back with in_stock false, whether it takes pre-orders, and similar pieces in stock. When nothing matches it lists the kinds of piece the shop sells.",
         input_schema: {
             type: "object",
             properties: {
