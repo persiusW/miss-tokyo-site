@@ -6,6 +6,7 @@ import { CUSTOMER_TOOL_DEFS, CUSTOMER_TOOL_NAMES } from "../../../src/lib/ai/sho
 import { normaliseWaNumber, SHOP_SETTING_VALIDATORS } from "../../../src/lib/ai/shopAssistant/settingsRules";
 import { cleanTrackQuery } from "../../../src/lib/orders/trackQuery";
 import { FAQS, SIZE_CHART, shopInfoText, SHOP_INFO_TOPICS } from "../../../src/content/shopInfo";
+import { paymentMethodsText } from "../../../src/lib/checkout/paymentChannels";
 import { checkoutCustomerLine, ERRORS, isErrorCode } from "../../../src/lib/errors/catalogue";
 import { BUTTON_LABELS, LINES, safeReply } from "../../../src/lib/ai/shopAssistant/lines";
 import { looksRaw } from "../../../src/lib/errors/looksRaw";
@@ -54,7 +55,7 @@ test("order lookups clean refs, emails and phones the way /track always has", ()
 test("shop info: every topic has text, payment never mentions cash", () => {
     for (const t of SHOP_INFO_TOPICS) expect(shopInfoText(t).length).toBeGreaterThan(20);
     expect(shopInfoText("payment")).not.toMatch(/cash/i);
-    expect(shopInfoText("payment")).toMatch(/Paystack/);
+    expect(shopInfoText("payment")).toBe("We accept mobile money, cards and bank transfer. All payments are encrypted and processed securely.");
     expect(shopInfoText("returns")).toMatch(/72 hours/);
     expect(shopInfoText("sizing")).toMatch(/XL — 14/);
     expect(FAQS.length).toBe(18);
@@ -410,4 +411,15 @@ test("a size the shopper names matches the shop's stored size labels", () => {
     // No size on the option and "One Size" asked are the same thing.
     expect(sizeMatches(null, "One Size")).toBe(true);
     expect(sizeMatches(null, "M")).toBe(false);
+});
+
+test("the prompt names payment methods, never the payment company, and re-checks stock", () => {
+    for (const channel of ["web", "whatsapp"] as const) {
+        const p = systemPromptFor(channel, "233200000001", { choices: true, restock: true, returns: true });
+        expect(p).not.toMatch(/paystack/i);
+        expect(p).toContain("we accept mobile money, cards and bank transfer");
+        expect(p).toMatch(/Never repeat an earlier "not found" or "sold out" without checking/);
+    }
+    expect(paymentMethodsText("or")).toBe("mobile money, cards or bank transfer");
+    expect(FAQS.map(f => f.answer).join(" ").replace(/payment processor \(Paystack\)/, "")).not.toMatch(/paystack/i);
 });

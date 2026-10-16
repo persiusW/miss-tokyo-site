@@ -1,6 +1,7 @@
 // The shop's FAQ and policy text. The FAQ, size guide and policy pages render
 // it, and Ask Miss Tokyo's shop_info tool reads it, so the chat can never say
 // something the pages don't. Change wording here, nowhere else.
+import { paymentMethodsText } from "@/lib/checkout/paymentChannels";
 
 export type Faq = { section: string; question: string; answer: string };
 
@@ -9,12 +10,12 @@ export const FAQS: Faq[] = [
     {
         section: "Orders & Payment",
         question: "How do I place an order?",
-        answer: "Browse our shop and add items to your bag. When you're ready, proceed to checkout and complete payment via Paystack. You will receive an email confirmation with your order reference immediately after.",
+        answer: `Browse our shop and add items to your bag. When you're ready, proceed to checkout and pay by ${paymentMethodsText("or")}. You will receive an email confirmation with your order reference immediately after.`,
     },
     {
         section: "Orders & Payment",
         question: "What payment methods do you accept?",
-        answer: "We accept all major cards and mobile money payments through Paystack. All transactions are encrypted and processed securely.",
+        answer: `We accept ${paymentMethodsText()}. All payments are encrypted and processed securely.`,
     },
     {
         section: "Orders & Payment",
