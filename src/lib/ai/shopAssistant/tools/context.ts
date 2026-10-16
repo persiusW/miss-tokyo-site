@@ -13,6 +13,8 @@ export type ShopToolContext = {
     whatsappNumber: string | null;
     /** WhatsApp: the whatsapp_conversations row this chat runs in. */
     waConversationId?: string | null;
+    /** WhatsApp: why the chat goes to a person, when a tool decided (start_return). */
+    handoff?: "return_request";
     /** WhatsApp: the tappable question offer_choices recorded; sent after the turn. */
     choices?: ChoicePlan;
 };

@@ -54,10 +54,14 @@ export const CHOICES_PROMPT_NOTE = `
 export const RESTOCK_PROMPT_NOTE = `
 - When a piece the customer wants is sold out and they would rather wait for it than take a similar piece or pre-order it, offer to message them when it is back, and save it with notify_when_back.`;
 
+/** Added on WhatsApp when returns intake is switched on (start_return). */
+export const RETURNS_PROMPT_NOTE = `
+- For a return or exchange: read the policy with shop_info topic "returns" and tell them the key points (72 hours from delivery, unworn with tags, exchange or store credit, no cash refunds). Look the order up with track_order, ask what is wrong and whether they'd like an exchange or store credit, and ask for a photo if the piece is faulty or the wrong item. Then call start_return; our team takes it from there.`;
+
 /** The system prompt for a channel. On WhatsApp the customer's own number is part of it. */
-export function systemPromptFor(channel: "web" | "whatsapp", phone?: string | null, opts: { choices?: boolean; restock?: boolean } = {}): string {
+export function systemPromptFor(channel: "web" | "whatsapp", phone?: string | null, opts: { choices?: boolean; restock?: boolean; returns?: boolean } = {}): string {
     if (channel !== "whatsapp") return SHOP_SYSTEM_PROMPT;
     const digits = String(phone ?? "").replace(/\D/g, "");
     const local = /^233\d{9}$/.test(digits) ? `0${digits.slice(3)}` : digits ? `+${digits}` : null;
-    return SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE + (opts.choices ? CHOICES_PROMPT_NOTE : "") + (opts.restock ? RESTOCK_PROMPT_NOTE : "") + (local ? `\n\nThe customer's WhatsApp number: ${local}` : "");
+    return SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE + (opts.choices ? CHOICES_PROMPT_NOTE : "") + (opts.restock ? RESTOCK_PROMPT_NOTE : "") + (opts.returns ? RETURNS_PROMPT_NOTE : "") + (local ? `\n\nThe customer's WhatsApp number: ${local}` : "");
 }
