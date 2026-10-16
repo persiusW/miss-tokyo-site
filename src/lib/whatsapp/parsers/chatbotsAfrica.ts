@@ -13,6 +13,8 @@ import type { InboundMessage, InboundStatus, ParsedInbound } from "../pipeline";
 export const MAX_NAME = 60;
 export const MAX_TEXT = 4096;
 const MEDIA_TYPES = new Set(["image", "audio", "video", "document", "sticker"]);
+/** An option title is at most 24 characters; anything longer is not one of ours. */
+const TAP_TITLE_MAX = 100;
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === "object" && !Array.isArray(v);
@@ -46,6 +48,13 @@ export function epochToIso(v: unknown): string | null {
     if (!s || !/^\d+$/.test(s)) return null;
     const ms = s.length <= 11 ? Number(s) * 1000 : s.length === 13 ? Number(s) : NaN;
     return Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null;
+}
+
+/** A reply button or list row the customer tapped: interactive.button_reply / list_reply = { id, title }. */
+export function tapOf(interactive: Obj): { id: string | null; title: string } | null {
+    const reply = [interactive.button_reply, interactive.list_reply].find(isObj);
+    const title = reply ? cleanName(reply.title) : null;
+    return reply && title ? { id: cleanId(reply.id), title: capChars(title, TAP_TITLE_MAX) } : null;
 }
 
 export function parseChatbotsAfrica(rawBody: string): ParsedInbound {
@@ -97,6 +106,7 @@ export function parseChatbotsAfrica(rawBody: string): ParsedInbound {
                     mediaId: MEDIA_TYPES.has(type) ? cleanId(payload.id) : null,
                     mimeType: MEDIA_TYPES.has(type) ? capChars(str(payload.mime_type) ?? "", 100) || null : null,
                     replyTo: cleanId(isObj(m.context) ? m.context.id : null),
+                    tap: type === "interactive" ? tapOf(payload) : null,
                 };
                 out.messages.push(msg);
             }

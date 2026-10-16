@@ -40,6 +40,8 @@ export type InboundMessage = {
     mimeType?: string | null;
     /** The message this one replies to (WhatsApp's context.id), if the customer quoted one. */
     replyTo?: string | null;
+    /** A button or list tap: the provider's id (Chatbots Africa's own, not ours) and the option's title. */
+    tap?: { id: string | null; title: string } | null;
 };
 /** A delivery or read receipt for a message we sent. */
 export type InboundStatus = { messageId: string | null; status: string; at: string | null; recipient: string | null };
