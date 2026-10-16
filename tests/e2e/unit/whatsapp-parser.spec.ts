@@ -12,7 +12,7 @@ test("the real text shape: sender, user id, name, text, time, our phone number i
     const p = parse("text-basic.json");
     expect(p.messages).toEqual([{
         messageId: "wamid.TEST0001", from: "233200000001", name: "Test Customer", type: "text", text: "Hi",
-        fromUserId: "GH.0000000000000001", at: "2026-10-14T17:30:00.000Z", mediaId: null, mimeType: null, replyTo: null,
+        fromUserId: "GH.0000000000000001", at: "2026-10-14T17:30:00.000Z", mediaId: null, mimeType: null, replyTo: null, tap: null,
     }]);
     expect(p.phoneNumberIds).toEqual(["1000000000000001"]);
     expect(p.externalId).toBe("wamid.TEST0001");
