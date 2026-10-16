@@ -38,3 +38,22 @@ test("the forward goes by WhatsApp and SMS to the team number, and never throws"
     expect(await forwardToTeam("c1", "daily_limit", { ...deps, teamNumber: null })).toEqual({ whatsapp: false, sms: false });
 });
 
+
+test("with team_chat_alert set, the template goes instead of the free text; the SMS still carries the details", async () => {
+    const sent: string[] = [];
+    const deps = {
+        teamNumber: "233553898704",
+        load: async () => ({ name: "Test Customer", phone: PHONE, history: [] }),
+        sendWhatsApp: async (to: string) => { sent.push(`text:${to}`); return { ok: true as const, messageId: "w" }; },
+        templateId: 1668035684678215,
+        sendTemplate: async (to: string, id: number) => { sent.push(`template:${to}:${id}`); return { ok: true as const, messageId: "t" }; },
+        sendSms: async (to: string, text: string) => { sent.push(`sms:${to}:${text}`); return { ok: true }; },
+        inboxUrl: (id: string) => `https://x/customers/whatsapp?c=${id}`,
+    };
+    expect(await forwardToTeam("c1", "customer_asked", deps)).toEqual({ whatsapp: true, sms: true });
+    expect(sent[0]).toBe("template:233553898704:1668035684678215");
+    expect(sent[1]).toMatch(/^sms:233553898704:Miss Tokyo WhatsApp: Test Customer \(.+\) asked for a person\. Reply: wa\.me\/.+ Chat: https:\/\/x\/customers\/whatsapp\?c=c1$/);
+    sent.length = 0;
+    await forwardToTeam("c1", "customer_asked", { ...deps, templateId: null });
+    expect(sent[0]).toBe("text:233553898704");
+});

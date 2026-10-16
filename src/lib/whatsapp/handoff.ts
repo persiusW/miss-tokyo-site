@@ -3,10 +3,12 @@
 // unless whatsapp_handoff_number says otherwise), with a link to the chat in
 // the inbox and a wa.me link to reply from the main phone.
 //
-// The WhatsApp forward is best effort: WhatsApp only delivers a free-form
-// message to the team's number inside its 24-hour window (or as an approved
-// template), and a refusal there arrives later, not on the send. So a short
-// SMS goes as well, every time, and the inbox always has the full chat.
+// WhatsApp only delivers a free-form message to the team's number inside its
+// 24-hour window; outside it Meta drops it (131047 "Re-engagement message",
+// seen 2026-10-16) and the refusal arrives later, not on the send. So with an
+// approved team_chat_alert template (whatsapp_handoff_template_id) that goes
+// instead: no variables, it says the SMS has the details. A short SMS goes as
+// well, every time, and the inbox always has the full chat.
 import type { MessagingResult } from "@/lib/messaging/provider";
 
 export type HandoffReason = "customer_asked" | "unsupported_message" | "awaiting_assistant" | "processing_failed" | "daily_limit" | "assistant_failed" | "return_request";
@@ -62,6 +64,9 @@ export type ForwardDeps = {
     teamNumber: string | null;
     load: (conversationId: string) => Promise<{ name: string | null; phone: string; history: HistoryLine[]; note?: string | null } | null>;
     sendWhatsApp: (to: string, text: string) => Promise<MessagingResult>;
+    /** team_chat_alert: sent instead of the free text when its id is set. */
+    templateId?: number | null;
+    sendTemplate?: (to: string, templateId: number) => Promise<MessagingResult>;
     sendSms: (to: string, text: string) => Promise<{ ok: boolean }>;
     inboxUrl: (conversationId: string) => string;
 };
@@ -74,7 +79,9 @@ export async function forwardToTeam(conversationId: string, reason: HandoffReaso
         if (!c) return { whatsapp: false, sms: false };
         const msg = buildHandoffMessages({ ...c, reason, inboxUrl: deps.inboxUrl(conversationId) });
         const [wa, sms] = await Promise.all([
-            deps.sendWhatsApp(deps.teamNumber, msg.whatsapp).catch(() => ({ ok: false }) as MessagingResult),
+            (deps.templateId && deps.sendTemplate
+                ? deps.sendTemplate(deps.teamNumber, deps.templateId)
+                : deps.sendWhatsApp(deps.teamNumber, msg.whatsapp)).catch(() => ({ ok: false }) as MessagingResult),
             deps.sendSms(deps.teamNumber, msg.sms).catch(() => ({ ok: false })),
         ]);
         return { whatsapp: wa.ok, sms: sms.ok };
