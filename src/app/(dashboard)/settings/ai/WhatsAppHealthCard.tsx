@@ -47,7 +47,7 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
 
     async function saveUpdates() {
         const id = templateId.trim();
-        if (id && !/^\d{1,12}$/.test(id)) { toast.error("The template id is a number from Chatbots Africa's Message Templates."); return; }
+        if (id && !(/^\d{1,16}$/.test(id) && Number.isSafeInteger(Number(id)))) { toast.error("The template id is a number from Chatbots Africa's Message Templates."); return; }
         const changes: [string, unknown][] = [];
         if (updatesRow && updatesOn !== (updatesRow.value === true)) changes.push(["whatsapp_status_notifications", updatesOn]);
         if (templateRow && id !== String(templateRow.value ?? "")) changes.push(["whatsapp_status_template_id", id]);

@@ -65,7 +65,8 @@ export const EDITABLE_AI_SETTINGS = {
     whatsapp_handoff_number: SHOP_SETTING_VALIDATORS.shop_whatsapp_number,
     whatsapp_status_notifications: (v: unknown) => typeof v === "boolean",
     /** "" or the approved template's numeric id. */
-    whatsapp_status_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,12}$/.test(v)),
+    // Meta template ids run to 16 digits (e.g. 1072346328969350); they must stay exact as a number.
+    whatsapp_status_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v))),
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
@@ -123,7 +124,7 @@ export async function getAiSettings(): Promise<AiSettings> {
         whatsappStatusNotifications: bool("whatsapp_status_notifications"),
         whatsappStatusTemplateId: (() => {
             const v = Number(map.get("whatsapp_status_template_id"));
-            return Number.isInteger(v) && v > 0 ? v : null;
+            return Number.isSafeInteger(v) && v > 0 ? v : null;
         })(),
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
         holdMinutesWhatsapp: num("hold_minutes_whatsapp", 15),
