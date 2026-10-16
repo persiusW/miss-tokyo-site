@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/whatsapp-inbound-sweep",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/whatsapp-unpaid-nudge",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

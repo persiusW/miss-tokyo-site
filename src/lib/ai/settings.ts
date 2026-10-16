@@ -16,6 +16,8 @@ export type AiSettings = {
     whatsappStatusTemplateId: number | null;
     /** The WhatsApp assistant may ask with tappable buttons and lists (offer_choices). */
     whatsappChoices: boolean;
+    /** One WhatsApp reminder for WhatsApp orders unpaid after 30 minutes. */
+    whatsappUnpaidNudge: boolean;
     dashboardAgentEnabled: boolean;
     holdMinutesWhatsapp: number;
     adminCostMarkupPct: number;
@@ -70,6 +72,7 @@ export const EDITABLE_AI_SETTINGS = {
     // Meta template ids run to 16 digits (e.g. 1072346328969350); they must stay exact as a number.
     whatsapp_status_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v))),
     whatsapp_choices_enabled: (v: unknown) => typeof v === "boolean",
+    whatsapp_unpaid_nudge_enabled: (v: unknown) => typeof v === "boolean",
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
@@ -98,6 +101,7 @@ const OFF: AiSettings = {
     whatsappStatusNotifications: false,
     whatsappStatusTemplateId: null,
     whatsappChoices: false,
+    whatsappUnpaidNudge: false,
     dashboardAgentEnabled: false,
     holdMinutesWhatsapp: 15,
     adminCostMarkupPct: 0,
@@ -131,6 +135,7 @@ export async function getAiSettings(): Promise<AiSettings> {
             return Number.isSafeInteger(v) && v > 0 ? v : null;
         })(),
         whatsappChoices: bool("whatsapp_choices_enabled"),
+        whatsappUnpaidNudge: bool("whatsapp_unpaid_nudge_enabled"),
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
         holdMinutesWhatsapp: num("hold_minutes_whatsapp", 15),
         adminCostMarkupPct: num("admin_cost_markup_pct", 0),

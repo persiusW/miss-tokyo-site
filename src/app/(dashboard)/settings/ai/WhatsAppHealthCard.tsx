@@ -38,9 +38,6 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
     const [updatesOn, setUpdatesOn] = useState(updatesRow?.value === true);
     const [templateId, setTemplateId] = useState(String(templateRow?.value ?? ""));
     const [savingUpdates, setSavingUpdates] = useState(false);
-    const choicesRow = settings.find(s => s.key === "whatsapp_choices_enabled");
-    const [choicesOn, setChoicesOn] = useState(choicesRow?.value === true);
-    const [savingChoices, setSavingChoices] = useState(false);
 
     async function patch(key: string, value: unknown): Promise<boolean> {
         const res = await fetch("/api/ai/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, value }) });
@@ -62,17 +59,6 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
         } catch {
             toast.error("We couldn't save that. Please check your connection and try again.");
         } finally { setSavingUpdates(false); onSaved(); }
-    }
-
-    async function saveChoices() {
-        if (!choicesRow || choicesOn === (choicesRow.value === true)) { toast.info("Nothing to save."); return; }
-        setSavingChoices(true);
-        try {
-            if (!(await patch("whatsapp_choices_enabled", choicesOn))) return;
-            toast.success(choicesOn ? "Saved. The assistant can now ask with buttons and lists." : "Saved. The assistant asks in plain text.");
-        } catch {
-            toast.error("We couldn't save that. Please check your connection and try again.");
-        } finally { setSavingChoices(false); onSaved(); }
     }
 
     async function saveHandoff() {
@@ -164,20 +150,53 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                     </button>
                 </div>
             </div>
-            <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--ac-line)", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }} data-wa-choices>
-                <label style={{ flex: "1 1 240px", display: "flex", gap: 10, alignItems: "flex-start", cursor: choicesRow ? "pointer" : "default" }}>
-                    <input type="checkbox" checked={choicesOn} onChange={e => setChoicesOn(e.target.checked)} disabled={!choicesRow} style={{ marginTop: 3 }} />
-                    <span>
-                        <span style={{ display: "block", fontSize: 14, color: "var(--ac-ink)" }}>Tappable answers</span>
-                        <span style={{ display: "block", fontSize: 12, color: "var(--ac-ink-3)" }}>
-                            {choicesRow ? "The assistant asks with buttons or a list (size, colour, which piece, delivery or pickup, yes or no), so customers tap instead of typing." : "Available once the WhatsApp settings update is applied."}
-                        </span>
+            <SettingSwitch settings={settings} onSaved={onSaved} settingKey="whatsapp_choices_enabled" testId="wa-choices"
+                label="Tappable answers"
+                help="The assistant asks with buttons or a list (size, colour, which piece, delivery or pickup, yes or no), so customers tap instead of typing."
+                savedOn="Saved. The assistant can now ask with buttons and lists." savedOff="Saved. The assistant asks in plain text." />
+            <SettingSwitch settings={settings} onSaved={onSaved} settingKey="whatsapp_unpaid_nudge_enabled" testId="wa-unpaid-nudge"
+                label="Unpaid order reminder"
+                help="One WhatsApp message 30 to 60 minutes after an order placed in a WhatsApp chat goes unpaid, offering a new Pay now link. Not sent to customers who replied STOP or who are talking to a person."
+                savedOn="Saved. Unpaid WhatsApp orders now get one reminder." savedOff="Saved. No reminders for unpaid orders." />
+        </div>
+    );
+}
+
+/** One on/off AI setting with its own Save, shown only usable once its row exists. */
+function SettingSwitch(p: {
+    settings: { key: string; value: unknown }[]; onSaved: () => void; settingKey: string; testId: string;
+    label: string; help: string; savedOn: string; savedOff: string;
+}) {
+    const row = p.settings.find(s => s.key === p.settingKey);
+    const [on, setOn] = useState(row?.value === true);
+    const [saving, setSaving] = useState(false);
+
+    async function save() {
+        if (!row || on === (row.value === true)) { toast.info("Nothing to save."); return; }
+        setSaving(true);
+        try {
+            const res = await fetch("/api/ai/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: p.settingKey, value: on }) });
+            if (!res.ok) { const j = await res.json().catch(() => null); toast.error(j?.error ?? "We couldn't save that. Please try again."); return; }
+            toast.success(on ? p.savedOn : p.savedOff);
+        } catch {
+            toast.error("We couldn't save that. Please check your connection and try again.");
+        } finally { setSaving(false); p.onSaved(); }
+    }
+
+    return (
+        <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--ac-line)", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }} data-testid={p.testId}>
+            <label style={{ flex: "1 1 240px", display: "flex", gap: 10, alignItems: "flex-start", cursor: row ? "pointer" : "default" }}>
+                <input type="checkbox" checked={on} onChange={e => setOn(e.target.checked)} disabled={!row} style={{ marginTop: 3 }} />
+                <span>
+                    <span style={{ display: "block", fontSize: 14, color: "var(--ac-ink)" }}>{p.label}</span>
+                    <span style={{ display: "block", fontSize: 12, color: "var(--ac-ink-3)" }}>
+                        {row ? p.help : "Available once the WhatsApp settings update is applied."}
                     </span>
-                </label>
-                <button type="button" className="ac-btn ac-btn-primary" onClick={saveChoices} disabled={savingChoices || !choicesRow}>
-                    {savingChoices ? "Saving…" : "Save"}
-                </button>
-            </div>
+                </span>
+            </label>
+            <button type="button" className="ac-btn ac-btn-primary" onClick={save} disabled={saving || !row}>
+                {saving ? "Saving…" : "Save"}
+            </button>
         </div>
     );
 }

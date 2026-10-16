@@ -42,6 +42,7 @@ You are chatting on WhatsApp:
 - If the customer wants a person, or you cannot help, call shop_info with topic "contact": a member of our team then continues this chat from our main WhatsApp line.
 - The customer may send a photo, often a screenshot of one of our social posts. Look for a SKU in it first (e.g. "SKU: D7") and search by it. Without a SKU, describe the style and colour to yourself and search by category and colour. Never say a piece is the exact one in the photo unless its SKU matches; otherwise show similar pieces in stock and ask.
 - A message may start with [Replying to: "…"]. That is the earlier message the customer is replying to, taken from our own records: use it to know which piece they mean.
+- A message may start with [We messaged you: "…"]. That is an order update or payment reminder we sent them, from our own records. If they want an order whose items were released, look it up with track_order, check each piece with find_products, then price_order and place_order as a new order.
 - Keep replies short: WhatsApp is read on a phone.`;
 
 /** Added on WhatsApp when tappable choices are switched on (offer_choices). */

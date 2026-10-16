@@ -176,6 +176,7 @@ function harness(o: { reply?: string; choices?: ChoicePlan; buttons?: any[]; cho
         send: async (_to, text) => { sent.push(text); order.push("text"); return { ok: true, messageId: "wamid.OUT" }; },
         sendImage: async (_to, url) => { images.push(url); order.push("image"); return { ok: true, messageId: "wamid.IMG" }; },
         sendChoices: async (_to, plan) => { asked.push(plan); order.push("choices"); return o.choicesOk === false ? { ok: false, code: "rejected" } : { ok: true, messageId: "wamid.ASK" }; },
+        notice: async () => null,
         offered: async (convId, id) => (convId === "c1" && id === "wamid.OUTASK1" ? o.offered ?? ["Small", "Medium"] : []),
         handOff: async (_id, reason) => { handoffs.push(reason); return true; },
         logOutbound: async (_id, text, _wa, type) => { logged.push([text, type]); },
