@@ -3,6 +3,7 @@
 // createCheckoutOrder(). One path, so stock holds, variant resolution, pricing
 // and the Paystack webhook behave identically wherever an order starts.
 
+import { CHECKOUT_CHANNELS } from "@/lib/checkout/paymentChannels";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { reserveStock, releaseReservation, releaseSupersededAttempts, getStockStatus, ONLINE_HOLD_MINUTES, type ReserveItem } from "@/lib/inventory";
 import { variantKey } from "@/lib/utils/normAttr";
@@ -668,13 +669,8 @@ async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, 
                 amount: amountInPesewas,
                 currency: "GHS",
                 callback_url: `${siteUrl}/checkout/success`,
-                // GHS supports mobile money, card and bank transfer. "bank"
-            // (direct debit) and "ussd" are Nigeria-only, and offering a
-            // channel Paystack cannot render for this currency left the
-            // checkout pane blank next to the channel list — a payment page
-            // that looks broken, which is where dropped orders come from.
-            // Mobile money leads, so it is the channel selected by default.
-            channels: ["mobile_money", "card", "bank_transfer"],
+                // Which channels, and why only these: see paymentChannels.ts.
+                channels: [...CHECKOUT_CHANNELS],
                 ...splitPayload,
                 metadata: {
                     ...clientMetadata,
