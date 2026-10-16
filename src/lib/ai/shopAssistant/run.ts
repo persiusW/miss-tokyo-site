@@ -9,7 +9,8 @@ import { todaySpendUsd, withinCap } from "@/lib/ai/spend";
 import { logCause } from "@/lib/errors/apiError";
 import { runShopTurn } from "./engine";
 import { systemPromptFor } from "./prompt";
-import { CUSTOMER_TOOL_DEFS } from "./toolDefs";
+import { CUSTOMER_TOOL_DEFS, OFFER_CHOICES_TOOL } from "./toolDefs";
+import type { ChoicePlan } from "@/lib/whatsapp/choices";
 import { runCustomerTool, type ShopToolContext } from "./tools";
 import { mergeChatState, photoAsNote, trimTranscript } from "./limits";
 import { dropPastThinking } from "@/lib/ai/pastThinking";
@@ -21,7 +22,8 @@ import type { ShopButton, ShopChannel, ShopChat, ShopIdentity } from "./types";
 
 const RESERVE_USD = 0.08;
 
-export type ShopRunResult = { reply: string; buttons: ShopButton[]; chat: ShopChat; failed: boolean };
+/** choices: WhatsApp only, a tappable question to send after the reply (the turn ended on it). */
+export type ShopRunResult = { reply: string; buttons: ShopButton[]; chat: ShopChat; failed: boolean; choices?: ChoicePlan };
 
 export async function runShopAssistant(args: {
     channel: ShopChannel; identity: ShopIdentity; chat: ShopChat; text: string;
@@ -63,8 +65,13 @@ export async function runShopAssistant(args: {
         ] };
     }
 
+    const choices = args.channel === "whatsapp" && settings.whatsappChoices;
     const result = await runShopTurn(
-        { messages, system: systemPromptFor(args.channel, args.identity.phone), tools: CUSTOMER_TOOL_DEFS, model: AI_MODEL },
+        {
+            messages, model: AI_MODEL,
+            system: systemPromptFor(args.channel, args.identity.phone, { choices }),
+            tools: choices ? [...CUSTOMER_TOOL_DEFS, OFFER_CHOICES_TOOL] : CUSTOMER_TOOL_DEFS,
+        },
         { client: deps.client ?? new Anthropic({ apiKey, maxRetries: 0 }), runTool: (n, i) => runCustomerTool(n, i, ctx), fits },
     );
 
@@ -111,5 +118,8 @@ export async function runShopAssistant(args: {
     }
     const wantsTalk = result.fixed || ctx.buttons.some(b => b.kind === "talk_to_us");
     const buttons = dedupeButtons(wantsTalk ? [...ctx.buttons.filter(b => b.kind !== "talk_to_us"), ...talk(ctx.notes)] : ctx.buttons);
-    return { reply: result.reply, buttons, chat: { ...next, turns: chat.turns + 1 }, failed: false };
+    return {
+        reply: result.reply, buttons, chat: { ...next, turns: chat.turns + 1 }, failed: false,
+        ...(result.ended && ctx.choices ? { choices: ctx.choices } : {}),
+    };
 }

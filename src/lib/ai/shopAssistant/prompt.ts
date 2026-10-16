@@ -44,10 +44,15 @@ You are chatting on WhatsApp:
 - A message may start with [Replying to: "…"]. That is the earlier message the customer is replying to, taken from our own records: use it to know which piece they mean.
 - Keep replies short: WhatsApp is read on a phone.`;
 
+/** Added on WhatsApp when tappable choices are switched on (offer_choices). */
+export const CHOICES_PROMPT_NOTE = `
+- When the customer picks from a few known options (which size or colour, which piece, delivery or pickup, yes or no), ask with offer_choices so they can tap instead of typing. Keep each option short. It sends your question, so say nothing else that turn.
+- A message "[tapped: …]" is the option the customer tapped on your last question.`;
+
 /** The system prompt for a channel. On WhatsApp the customer's own number is part of it. */
-export function systemPromptFor(channel: "web" | "whatsapp", phone?: string | null): string {
+export function systemPromptFor(channel: "web" | "whatsapp", phone?: string | null, opts: { choices?: boolean } = {}): string {
     if (channel !== "whatsapp") return SHOP_SYSTEM_PROMPT;
     const digits = String(phone ?? "").replace(/\D/g, "");
     const local = /^233\d{9}$/.test(digits) ? `0${digits.slice(3)}` : digits ? `+${digits}` : null;
-    return SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE + (local ? `\n\nThe customer's WhatsApp number: ${local}` : "");
+    return SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE + (opts.choices ? CHOICES_PROMPT_NOTE : "") + (local ? `\n\nThe customer's WhatsApp number: ${local}` : "");
 }

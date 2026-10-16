@@ -87,3 +87,25 @@ export const CUSTOMER_TOOL_DEFS: Anthropic.Tool[] = [
 ];
 
 export const CUSTOMER_TOOL_NAMES = ["find_products", "shop_info", "track_order", "price_order", "place_order"] as const;
+
+/**
+ * WhatsApp only, behind whatsapp_choices_enabled: a question the customer
+ * answers by tapping. Added after the customer tools, so their cached prefix
+ * is unchanged.
+ */
+export const OFFER_CHOICES_TOOL: Anthropic.Tool = {
+    name: "offer_choices",
+    description: "Ask the customer a question with tappable options instead of asking them to type: which size or colour, which piece, delivery or pickup, yes or no. 2 to 10 short options, up to 24 characters each (3 or fewer short ones become buttons, more become a list). This sends your question, so call it on its own, after any other tools, and say nothing else this turn. Their tap comes back as \"[tapped: option]\".",
+    input_schema: {
+        type: "object",
+        properties: {
+            question: { type: "string", description: "The question, one or two short lines." },
+            options: { type: "array", items: { type: "string" }, description: "The choices, each up to 24 characters." },
+        },
+        required: ["question", "options"],
+    },
+};
+
+/** Tools that end the turn: they send the message themselves, so the model says nothing after them. */
+export const END_TURN_TOOL_NAMES = ["offer_choices"] as const;
+

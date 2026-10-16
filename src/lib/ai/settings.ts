@@ -14,6 +14,8 @@ export type AiSettings = {
     whatsappStatusNotifications: boolean;
     /** Approved Chatbots Africa template id for updates outside the 24h window; null = text inside the window only. */
     whatsappStatusTemplateId: number | null;
+    /** The WhatsApp assistant may ask with tappable buttons and lists (offer_choices). */
+    whatsappChoices: boolean;
     dashboardAgentEnabled: boolean;
     holdMinutesWhatsapp: number;
     adminCostMarkupPct: number;
@@ -94,6 +96,7 @@ const OFF: AiSettings = {
     whatsappHandoffNumber: null,
     whatsappStatusNotifications: false,
     whatsappStatusTemplateId: null,
+    whatsappChoices: false,
     dashboardAgentEnabled: false,
     holdMinutesWhatsapp: 15,
     adminCostMarkupPct: 0,
@@ -126,6 +129,7 @@ export async function getAiSettings(): Promise<AiSettings> {
             const v = Number(map.get("whatsapp_status_template_id"));
             return Number.isSafeInteger(v) && v > 0 ? v : null;
         })(),
+        whatsappChoices: bool("whatsapp_choices_enabled"),
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
         holdMinutesWhatsapp: num("hold_minutes_whatsapp", 15),
         adminCostMarkupPct: num("admin_cost_markup_pct", 0),

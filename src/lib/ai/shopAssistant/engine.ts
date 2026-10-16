@@ -2,7 +2,7 @@
 // spend check are injected, so it is unit-tested with a fake client.
 import type Anthropic from "@anthropic-ai/sdk";
 import { costUsd } from "@/lib/ai/pricing";
-import { CUSTOMER_TOOL_NAMES } from "./toolDefs";
+import { CUSTOMER_TOOL_NAMES, END_TURN_TOOL_NAMES } from "./toolDefs";
 import { LINES, safeReply } from "./lines";
 
 const MAX_ITERATIONS = 8;
@@ -13,24 +13,29 @@ const CALL_TIMEOUT_MS = 40_000;
 type Msg = Anthropic.MessageParam;
 export type EngineDeps = {
     client: Pick<Anthropic, "messages">;
-    runTool: (name: string, input: unknown) => Promise<{ content: string; isError: boolean }>;
+    /** endTurn: the tool sent the customer a message itself (offer_choices); this text closes the turn in the transcript. */
+    runTool: (name: string, input: unknown) => Promise<{ content: string; isError: boolean; endTurn?: string }>;
     fits: (runningUsd: number) => boolean;
     now?: () => number;
 };
 export type EngineUsage = { input: number; output: number; cacheRead: number; cacheWrite: number; costUsd: number; toolCalls: { name: string; ok: boolean }[] };
 export type EngineResult =
-    | { ok: true; messages: Msg[]; reply: string; fixed: boolean; usage: EngineUsage }
+    | { ok: true; messages: Msg[]; reply: string; fixed: boolean; usage: EngineUsage; ended: boolean }
     | { ok: false; usage: EngineUsage; cause: unknown };
 
-const ALLOWED = new Set<string>(CUSTOMER_TOOL_NAMES);
+const KNOWN = new Set<string>([...CUSTOMER_TOOL_NAMES, ...END_TURN_TOOL_NAMES]);
+const ENDS_TURN = new Set<string>(END_TURN_TOOL_NAMES);
 
 export async function runShopTurn(args: { messages: Msg[]; system: string; tools: Anthropic.Tool[]; model: string }, deps: EngineDeps): Promise<EngineResult> {
     const now = deps.now ?? Date.now;
     const started = now();
     const messages: Msg[] = [...args.messages];
     const usage: EngineUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, costUsd: 0, toolCalls: [] };
+    // Only the tools this turn was given: offer_choices is on WhatsApp only, and only when switched on.
+    const allowed = new Set(args.tools.map(t => t.name).filter(n => KNOWN.has(n)));
     let reply = "";
     let fixed: string | null = null;   // one of our own lines: shown as is
+    let ended: string | null = null;   // a tool sent the message and closed the turn with this text
 
     try {
         for (let i = 0; i < MAX_ITERATIONS; i++) {
@@ -71,13 +76,22 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
                 // One at a time, in order: the caps and lockouts read and write shared chat state.
                 const results: Anthropic.ToolResultBlockParam[] = [];
                 for (const t of toolUses) {
-                    const outcome = ALLOWED.has(t.name)
-                        ? await deps.runTool(t.name, t.input)
-                        : { content: "That isn't available here.", isError: true };
+                    // A tool that sends the message must come last, on its own, or it would ask before the answers are in.
+                    const outcome: { content: string; isError: boolean; endTurn?: string } = !allowed.has(t.name)
+                        ? { content: "That isn't available here.", isError: true }
+                        : ENDS_TURN.has(t.name) && toolUses.length > 1
+                            ? { content: `Call ${t.name} on its own, after the other tools have answered.`, isError: true }
+                            : await deps.runTool(t.name, t.input);
                     usage.toolCalls.push({ name: t.name, ok: !outcome.isError });
                     results.push({ type: "tool_result" as const, tool_use_id: t.id, content: outcome.content, ...(outcome.isError ? { is_error: true } : {}) });
+                    if (!outcome.isError && outcome.endTurn) ended = outcome.endTurn;
                 }
                 messages.push({ role: "user", content: results });
+                if (ended !== null) {
+                    // Any text written before the tool call goes out ahead of the question.
+                    reply = response.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map(b => b.text).join("\n").trim();
+                    break;
+                }
                 if (i === MAX_ITERATIONS - 1) fixed = LINES.slow;
                 continue;
             }
@@ -89,7 +103,9 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
         return { ok: false, usage, cause };
     }
 
-    const text = fixed ?? safeReply(reply);
+    // A turn a tool closed may have no text of its own; unusable text is dropped rather than replaced.
+    const preface = ended !== null && reply ? safeReply(reply) : "";
+    const text = fixed ?? (ended !== null ? (preface === LINES.generic ? "" : preface) : safeReply(reply));
     // Keep the transcript alternating: a turn that stopped on tool results
     // (or before answering) is closed by what the customer was told.
     // A blank text block is rejected by the API on every later turn, so drop them first.
@@ -98,11 +114,11 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
         messages[messages.length - 1] = { ...tail, content: tail.content.filter(b => !(b.type === "text" && !b.text.trim())) };
     }
     const last = messages[messages.length - 1];
-    if (last?.role === "user") messages.push({ role: "assistant", content: [{ type: "text", text }] });
+    if (last?.role === "user") messages.push({ role: "assistant", content: [{ type: "text", text: ended ?? text }] });
     else if (last && Array.isArray(last.content) && !last.content.some(b => b.type === "text" && b.text.trim())) {
         // An assistant message with no text (empty reply) would 400 every later turn.
         messages[messages.length - 1] = { ...last, content: [...last.content, { type: "text", text }] };
     }
     // The model's text being unusable (raw, empty) is a fixed line too: the customer gets the WhatsApp button.
-    return { ok: true, messages, reply: text, fixed: fixed !== null || text === LINES.generic, usage };
+    return { ok: true, messages, reply: text, fixed: fixed !== null || text === LINES.generic, usage, ended: ended !== null };
 }
