@@ -154,6 +154,10 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                 label="Tappable answers"
                 help="The assistant asks with buttons or a list (size, colour, which piece, delivery or pickup, yes or no), so customers tap instead of typing."
                 savedOn="Saved. The assistant can now ask with buttons and lists." savedOff="Saved. The assistant asks in plain text." />
+            <SettingSwitch settings={settings} onSaved={onSaved} settingKey="whatsapp_unpaid_nudge_enabled" testId="wa-unpaid-nudge"
+                label="Unpaid order reminder"
+                help="One WhatsApp message 30 to 60 minutes after an order placed in a WhatsApp chat goes unpaid, offering a new Pay now link. Not sent to customers who replied STOP or who are talking to a person."
+                savedOn="Saved. Unpaid WhatsApp orders now get one reminder." savedOff="Saved. No reminders for unpaid orders." />
         </div>
     );
 }
