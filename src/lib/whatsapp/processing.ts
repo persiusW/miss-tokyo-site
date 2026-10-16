@@ -13,7 +13,7 @@ import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { sendSMS } from "@/lib/sms";
 import { createWhatsAppHandler } from "./assistantHandler";
 import { providerMessage } from "./choices";
-import { chatForConversation, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, setOptOut } from "./conversationStore";
+import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, setOptOut } from "./conversationStore";
 import { forwardToTeam, type HandoffReason } from "./handoff";
 import { toModelPhoto } from "./photo";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
@@ -72,6 +72,7 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
                 : sender.sendList(to, p.message, { event: "whatsapp_reply_choices" });
         },
         offered: offeredOptions,
+        notice: latestNotice,
         handOff,
         logOutbound,
         chatFor: async c => {

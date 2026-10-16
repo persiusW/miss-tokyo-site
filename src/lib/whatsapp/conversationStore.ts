@@ -6,6 +6,7 @@ import { createChat, loadChat, visitorKeyFor } from "@/lib/ai/shopAssistant/stor
 import { chatIsStale } from "@/lib/ai/shopAssistant/limits";
 import type { ShopChat } from "@/lib/ai/shopAssistant/types";
 import { optionsFrom } from "./choices";
+import { unseenNotice } from "./notices";
 import type { HistoryLine } from "./handoff";
 
 // The new whatsapp_conversations columns are not in the generated types yet.
@@ -69,6 +70,14 @@ export async function offeredOptions(conversationId: string, waMessageId: string
         .eq("direction", "outbound").eq("message_type", "interactive").limit(1);
     if (error) throw error;
     return optionsFrom((data ?? [])[0]?.content);
+}
+
+/** The order update or reminder the customer is answering, if our last message was one. */
+export async function latestNotice(conversationId: string): Promise<string | null> {
+    const { data, error } = await db.from("message_log").select("direction, message_type, content")
+        .eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(8);
+    if (error) throw error;
+    return unseenNotice(data ?? []);
 }
 
 export async function recentHistory(conversationId: string, limit = 10): Promise<HistoryLine[]> {

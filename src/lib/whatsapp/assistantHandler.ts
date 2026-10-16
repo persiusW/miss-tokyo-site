@@ -16,6 +16,7 @@ import type { ShopChat } from "@/lib/ai/shopAssistant/types";
 import type { MessagingResult } from "@/lib/messaging/provider";
 import { WA_LIMITS } from "@/lib/messaging/chatbotsAfrica";
 import { numberedText, offeredText, tapText, type ChoicePlan } from "./choices";
+import { withNotice } from "./notices";
 import type { ModelPhoto } from "./photo";
 import type { HandoffReason } from "./handoff";
 import type { Conversation, InboundMessage } from "./pipeline";
@@ -26,6 +27,8 @@ export type AssistantDeps = {
     sendImage: (to: string, url: string, caption: string) => Promise<MessagingResult>;
     /** A tappable question: reply buttons or a list. */
     sendChoices: (to: string, plan: ChoicePlan) => Promise<MessagingResult>;
+    /** Our last message, when it was an order update or reminder the assistant never wrote. */
+    notice: (conversationId: string) => Promise<string | null>;
     /** The options we offered on one of our messages in this conversation; [] when it wasn't an offer. */
     offered: (conversationId: string, waMessageId: string) => Promise<string[]>;
     /** True only for the call that moved the chat to a person (it also forwards the chat to the team). */
@@ -45,14 +48,14 @@ export type AssistantDeps = {
 };
 
 /**
- * "[tapped: …]" and "[Replying to: …]" are written by us and trusted by the
+ * "[tapped: …]", "[Replying to: …]" and "[We messaged you: …]" are written by us and trusted by the
  * model, so customer text never carries them. Stripped until stable: removing
  * one can join the text around it into another.
  */
 export function stripOurMarkers(text: string): string {
     let out = text;
     for (;;) {
-        const next = out.replace(/\[\s*(tapped|replying\s+to)\s*:[^\]]*(\]|$)/gi, "");
+        const next = out.replace(/\[\s*(tapped|replying\s+to|we\s+messaged\s+you)\s*:[^\]]*(\]|$)/gi, "");
         if (next === out) return out.trim();
         out = next;
     }
@@ -138,7 +141,9 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         // The quote comes from our records, never from the customer, so the model may trust it.
         // A tap's context is the question it answers, already in the chat; it is not a quote.
         const quote = m.replyTo && !m.tap ? await deps.quoted(c.id, m.replyTo).catch(() => null) : null;
-        const said = quote ? `[Replying to: "${quote}"]\n${text}` : text;
+        // Otherwise, an order update or reminder they may be answering, also from our records.
+        const notice = quote ? null : await deps.notice(c.id).catch(() => null);
+        const said = quote ? `[Replying to: "${quote}"]\n${text}` : notice ? withNotice(notice, text) : text;
 
         const { chat, customerId } = await deps.chatFor(c, m.from);
         const counts = await deps.counts(chat);

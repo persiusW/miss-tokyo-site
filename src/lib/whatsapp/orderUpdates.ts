@@ -11,6 +11,7 @@
 import { toDestination } from "@/lib/messaging/chatbotsAfrica";
 import type { MessagingResult } from "@/lib/messaging/provider";
 import { REPLY_WINDOW_MS } from "./pipeline";
+import { NOTICE_TYPE } from "./notices";
 
 export type OrderEvent = "paid" | "packed" | "shipped" | "ready_for_pickup" | "fulfilled" | "cancelled";
 export const ORDER_EVENTS: readonly OrderEvent[] = ["paid", "packed", "shipped", "ready_for_pickup", "fulfilled", "cancelled"];
@@ -50,7 +51,7 @@ export type UpdateDeps = {
     conversationFor: (phone: string) => Promise<UpdateConversation>;
     sendText: (to: string, text: string) => Promise<MessagingResult>;
     sendTemplate: (to: string, templateId: number, placeholders: string[]) => Promise<MessagingResult>;
-    logOutbound: (conversationId: string, text: string, waMessageId: string | null) => Promise<void>;
+    logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
     now?: () => number;
 };
 export type UpdateOutcome = "off" | "no_phone" | "opted_out" | "no_template" | "sent_text" | "sent_template" | "failed";
@@ -78,7 +79,7 @@ export async function sendOrderUpdate(order: UpdateOrder, event: OrderEvent, ext
             return "no_template";
         }
         if (!r.ok) return "failed";
-        await deps.logOutbound(conv.id, text, r.messageId);
+        await deps.logOutbound(conv.id, text, r.messageId, NOTICE_TYPE);
         return outcome;
     } catch (e) {
         console.error("[whatsapp] order update failed", { event, order: order.id.slice(0, 8), err: String(e) });
