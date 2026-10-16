@@ -5,6 +5,7 @@ import { toast } from "@/lib/toast";
 import AiInsights from "./AiInsights";
 import ShopAssistantCard from "./ShopAssistantCard";
 import WhatsAppHealthCard from "./WhatsAppHealthCard";
+import WhatsAppResultsCard from "./WhatsAppResultsCard";
 
 type Turn = { created_at: string; channel: string; model: string | null; input_tokens: number | null; output_tokens: number | null; cost_ghs: number };
 type Data = {
@@ -208,6 +209,7 @@ export default function AiSettingsClient({ showMarkup }: { showMarkup: boolean }
             </div>
 
             <WhatsAppHealthCard settings={data.settings} onSaved={load} />
+            <WhatsAppResultsCard />
 
             <ShopAssistantCard settings={data.settings} onSaved={load} />
 
