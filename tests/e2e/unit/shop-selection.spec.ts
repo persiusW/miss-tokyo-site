@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { categoriesOf, inStock, normaliseSku, phraseMatches, pickResults, searchWords, similarTo, skuMatches, skuRuns, stem, wordScore, type Candidate, type Shown } from "../../../src/lib/ai/shopAssistant/selection";
+import { categoriesOf, inStock, NEAR_SKU, normaliseSku, phraseMatches, pickResults, searchWords, similarTo, skuDistance, skuMatches, skuRuns, stem, wordScore, type Candidate, type Shown } from "../../../src/lib/ai/shopAssistant/selection";
 
 const p = (id: string, price: number, stock: string[], over: Partial<Shown> = {}): Shown => ({
     product_id: id, name: id, price_ghs: price, takes_preorders: false,
@@ -105,4 +105,13 @@ test("cross-letter and absurd runs cover only their ends", () => {
     expect(skuMatches("C10-D12", "D12")).toBe(true);
     expect(skuMatches("K4-J6", "J6")).toBe(true);
     expect(skuRuns("A1-A500")).toEqual([{ letter: "A", lo: 1, hi: 1 }, { letter: "A", lo: 500, hi: 500 }]);
+});
+
+test("nearby codes: distance along the same letter, Infinity elsewhere", () => {
+    expect(skuDistance("F27-F29", "F32")).toBe(3);
+    expect(skuDistance("F32-F35", "F33")).toBe(0);
+    expect(skuDistance("F36", "F32")).toBe(4);
+    expect(skuDistance("G30", "F32")).toBe(Infinity);
+    expect(skuDistance(null, "F32")).toBe(Infinity);
+    expect(NEAR_SKU).toBe(3);
 });

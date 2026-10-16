@@ -39,6 +39,8 @@ export function normaliseSku(raw: unknown): string | null {
 
 /** A same-letter run wider than this is read as its two ends only (a typo, not 500 pieces). */
 const MAX_RUN = 60;
+/** How far "nearby" reaches along the same letter when nothing holds the code. */
+export const NEAR_SKU = 3;
 
 export type SkuRun = { letter: string; lo: number; hi: number };
 
@@ -72,6 +74,18 @@ export function skuMatches(stored: unknown, asked: unknown): boolean {
     if (a === b) return true;
     const code = askedCode(asked);
     return !!code && skuRuns(stored).some(r => r.letter === code.letter && r.lo <= code.n && code.n <= r.hi);
+}
+
+/** How far the asked code is from the nearest code on the same letter; Infinity on another letter or none. */
+export function skuDistance(stored: unknown, asked: unknown): number {
+    const code = askedCode(asked);
+    if (!code) return Infinity;
+    let best = Infinity;
+    for (const r of skuRuns(stored)) {
+        if (r.letter !== code.letter) continue;
+        best = Math.min(best, code.n < r.lo ? r.lo - code.n : code.n > r.hi ? code.n - r.hi : 0);
+    }
+    return best;
 }
 
 /** The categories a product sits in: its category, its extra categories, and its type. */

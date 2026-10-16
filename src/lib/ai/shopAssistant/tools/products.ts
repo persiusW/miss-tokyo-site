@@ -6,7 +6,7 @@ import { preorderEligibleIds } from "@/lib/checkout/createCheckoutOrder";
 import { normAttr } from "@/lib/utils/normAttr";
 import { cartLineFor, publicProduct, sizeMatches, type ProductRow } from "../format";
 import { BUTTON_LABELS } from "../lines";
-import { categoriesOf, inStock, NAMED_MAX, normaliseSku, phraseMatches, pickResults, searchWords, skuMatches, wordScore, type Candidate } from "../selection";
+import { categoriesOf, inStock, NAMED_MAX, NEAR_SKU, normaliseSku, phraseMatches, pickResults, searchWords, skuDistance, skuMatches, wordScore, type Candidate } from "../selection";
 import { err, ok, str, type ShopToolContext, type ToolOutcome } from "./context";
 
 export const PRODUCT_FIELDS = "id, name, slug, sku, price_ghs, is_sale, discount_value, image_urls, preorder_enabled, track_inventory, track_variant_inventory, available_sizes, available_colors, available_brands, category_id, category_ids, category_type";
@@ -55,6 +55,17 @@ async function shape(rows: Row[], size: string, colour: string): Promise<(Candid
     });
 }
 
+/** Product links (and photos on WhatsApp, which keeps a few so photos can follow the ones the reply names). */
+function pushOpen(ctx: ShopToolContext, shown: Out[]): void {
+    const limit = ctx.channel === "whatsapp" ? 4 : 2;
+    for (const out of shown.slice(0, limit)) {
+        ctx.buttons.push({
+            kind: "open_product", label: `${BUTTON_LABELS.open} ${out.name}`.slice(0, 40), href: out.url,
+            ...(out.image ? { productId: out.product_id } : {}), ...(out.sku ? { sku: out.sku } : {}),
+        });
+    }
+}
+
 export async function findProducts(input: any, ctx: ShopToolContext): Promise<ToolOutcome> {
     const q = clean(input?.query);
     const catName = str(input?.category, 60);
@@ -71,8 +82,16 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
         // ~160 products: read them all, so "SKU: D-07" finds "D7".
         const { data, error } = await shopRows().not("sku", "is", null).limit(1000);
         if (error) throw error;
-        rows = ((data ?? []) as Row[]).filter(r => skuMatches(r.sku, input?.sku));
-        if (rows.length === 0) return ok({ products: [], note: `No product has SKU ${sku}. Ask the customer to check it, or search by name.` });
+        const all = (data ?? []) as Row[];
+        rows = all.filter(r => skuMatches(r.sku, input?.sku));
+        if (rows.length === 0) {
+            // No product holds that code: pieces in stock with nearby codes on the same row may be it.
+            const near = all.map(r => ({ r, d: skuDistance(r.sku, input?.sku) })).filter(x => x.d <= NEAR_SKU).sort((a, b) => a.d - b.d).map(x => x.r);
+            const shownNear = near.length ? (await shape(near, size, colour)).filter(c => inStock(c.out)).slice(0, NAMED_MAX).map(c => ({ ...c.out, in_stock: true })) : [];
+            if (shownNear.length === 0) return ok({ products: [], note: `No product has SKU ${sku}. Ask the customer to check it, or search by name.` });
+            pushOpen(ctx, shownNear);
+            return ok({ products: shownNear, note: `No product has SKU ${sku} exactly. These pieces in stock have nearby codes; show them as possibly the one in their post and ask the customer to confirm. Never say one of them is SKU ${sku}.` });
+        }
         named = true;
     } else {
         let query = shopRows();
@@ -116,15 +135,8 @@ export async function findProducts(input: any, ctx: ShopToolContext): Promise<To
     }
     const picked = pickResults(matches, pool, { named, colour: colour || null });
 
-    // Links and photos: pieces in stock only. WhatsApp keeps a few so photos can follow the ones the reply names.
-    const shown = picked.products.flatMap(p => (p.in_stock ? [p] : (p.similar_in_stock ?? [])));
-    const limit = ctx.channel === "whatsapp" ? 4 : 2;
-    for (const out of shown.slice(0, limit)) {
-        ctx.buttons.push({
-            kind: "open_product", label: `${BUTTON_LABELS.open} ${out.name}`.slice(0, 40), href: out.url,
-            ...(out.image ? { productId: out.product_id } : {}), ...(out.sku ? { sku: out.sku } : {}),
-        });
-    }
+    // Links and photos: pieces in stock only.
+    pushOpen(ctx, picked.products.flatMap(p => (p.in_stock ? [p] : (p.similar_in_stock ?? []))));
 
     // One product, one exact in-stock option: offer to add it to the bag.
     if (picked.products.length === 1 && picked.products[0].in_stock && (size || colour)) {
