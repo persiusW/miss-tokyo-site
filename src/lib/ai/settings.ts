@@ -18,6 +18,10 @@ export type AiSettings = {
     whatsappChoices: boolean;
     /** One WhatsApp reminder for WhatsApp orders unpaid after 30 minutes. */
     whatsappUnpaidNudge: boolean;
+    /** Back-in-stock alerts on WhatsApp (notify_when_back and the hourly run). */
+    whatsappRestockAlerts: boolean;
+    /** Approved template for alerts outside the 24h window; null = they wait for the customer's next message. */
+    whatsappRestockTemplateId: number | null;
     dashboardAgentEnabled: boolean;
     holdMinutesWhatsapp: number;
     adminCostMarkupPct: number;
@@ -102,6 +106,8 @@ const OFF: AiSettings = {
     whatsappStatusTemplateId: null,
     whatsappChoices: false,
     whatsappUnpaidNudge: false,
+    whatsappRestockAlerts: false,
+    whatsappRestockTemplateId: null,
     dashboardAgentEnabled: false,
     holdMinutesWhatsapp: 15,
     adminCostMarkupPct: 0,
@@ -139,6 +145,8 @@ export async function getAiSettings(): Promise<AiSettings> {
         whatsappStatusTemplateId: templateId(map.get("whatsapp_status_template_id")),
         whatsappChoices: bool("whatsapp_choices_enabled"),
         whatsappUnpaidNudge: bool("whatsapp_unpaid_nudge_enabled"),
+        whatsappRestockAlerts: bool("whatsapp_restock_alerts_enabled"),
+        whatsappRestockTemplateId: templateId(map.get("whatsapp_restock_template_id")),
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
         holdMinutesWhatsapp: num("hold_minutes_whatsapp", 15),
         adminCostMarkupPct: num("admin_cost_markup_pct", 0),

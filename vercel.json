@@ -27,6 +27,10 @@
     {
       "path": "/api/cron/whatsapp-unpaid-nudge",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/whatsapp-restock-alerts",
+      "schedule": "15 * * * *"
     }
   ]
 }
