@@ -22,6 +22,8 @@ export type AiSettings = {
     whatsappRestockAlerts: boolean;
     /** Approved template for alerts outside the 24h window; null = they wait for the customer's next message. */
     whatsappRestockTemplateId: number | null;
+    /** Returns and exchanges taken in WhatsApp chats (start_return), then handed to the team. */
+    whatsappReturns: boolean;
     dashboardAgentEnabled: boolean;
     holdMinutesWhatsapp: number;
     adminCostMarkupPct: number;
@@ -79,6 +81,7 @@ export const EDITABLE_AI_SETTINGS = {
     whatsapp_unpaid_nudge_enabled: (v: unknown) => typeof v === "boolean",
     whatsapp_restock_alerts_enabled: (v: unknown) => typeof v === "boolean",
     whatsapp_restock_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v))),
+    whatsapp_returns_enabled: (v: unknown) => typeof v === "boolean",
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
@@ -110,6 +113,7 @@ const OFF: AiSettings = {
     whatsappUnpaidNudge: false,
     whatsappRestockAlerts: false,
     whatsappRestockTemplateId: null,
+    whatsappReturns: false,
     dashboardAgentEnabled: false,
     holdMinutesWhatsapp: 15,
     adminCostMarkupPct: 0,
@@ -149,6 +153,7 @@ export async function getAiSettings(): Promise<AiSettings> {
         whatsappUnpaidNudge: bool("whatsapp_unpaid_nudge_enabled"),
         whatsappRestockAlerts: bool("whatsapp_restock_alerts_enabled"),
         whatsappRestockTemplateId: templateId(map.get("whatsapp_restock_template_id")),
+        whatsappReturns: bool("whatsapp_returns_enabled"),
         dashboardAgentEnabled: bool("dashboard_agent_enabled"),
         holdMinutesWhatsapp: num("hold_minutes_whatsapp", 15),
         adminCostMarkupPct: num("admin_cost_markup_pct", 0),

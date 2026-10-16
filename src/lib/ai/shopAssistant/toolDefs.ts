@@ -121,8 +121,24 @@ export const NOTIFY_WHEN_BACK_TOOL: Anthropic.Tool = {
     },
 };
 
+/** WhatsApp only, behind whatsapp_returns_enabled: a return or exchange, handed to the team. */
+export const START_RETURN_TOOL: Anthropic.Tool = {
+    name: "start_return",
+    description: "Save a return or exchange request and pass the chat to our team, who arrange it. Only after you read the policy (shop_info topic returns), looked the order up with track_order, and asked what is wrong and whether they'd like an exchange or store credit. Ask for a photo first if the piece is faulty or the wrong item.",
+    input_schema: {
+        type: "object",
+        properties: {
+            order_ref: { type: "string", description: "The 8-character order number." },
+            reason: { type: "string", enum: ["wrong_size", "faulty", "not_as_described", "wrong_item", "changed_mind", "other"] },
+            wants: { type: "string", enum: ["exchange", "store_credit", "unsure"] },
+            details: { type: "string", description: "What the customer said, briefly." },
+        },
+        required: ["order_ref", "reason"],
+    },
+};
+
 /** Tools that end the turn: they send the message themselves, so the model says nothing after them. */
 export const END_TURN_TOOL_NAMES = ["offer_choices"] as const;
 /** Tools a turn gets only when its channel and settings allow. */
-export const OPTIONAL_TOOL_NAMES = ["offer_choices", "notify_when_back"] as const;
+export const OPTIONAL_TOOL_NAMES = ["offer_choices", "notify_when_back", "start_return"] as const;
 

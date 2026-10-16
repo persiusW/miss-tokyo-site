@@ -9,7 +9,7 @@ import { todaySpendUsd, withinCap } from "@/lib/ai/spend";
 import { logCause } from "@/lib/errors/apiError";
 import { runShopTurn } from "./engine";
 import { systemPromptFor } from "./prompt";
-import { CUSTOMER_TOOL_DEFS, NOTIFY_WHEN_BACK_TOOL, OFFER_CHOICES_TOOL } from "./toolDefs";
+import { CUSTOMER_TOOL_DEFS, NOTIFY_WHEN_BACK_TOOL, OFFER_CHOICES_TOOL, START_RETURN_TOOL } from "./toolDefs";
 import type { ChoicePlan } from "@/lib/whatsapp/choices";
 import { runCustomerTool, type ShopToolContext } from "./tools";
 import { mergeChatState, photoAsNote, trimTranscript } from "./limits";
@@ -22,8 +22,11 @@ import type { ShopButton, ShopChannel, ShopChat, ShopIdentity } from "./types";
 
 const RESERVE_USD = 0.08;
 
-/** choices: WhatsApp only, a tappable question to send after the reply (the turn ended on it). */
-export type ShopRunResult = { reply: string; buttons: ShopButton[]; chat: ShopChat; failed: boolean; choices?: ChoicePlan };
+/**
+ * choices: WhatsApp only, a tappable question to send after the reply (the turn ended on it).
+ * handoff: WhatsApp only, why the chat goes to a person when a tool decided it.
+ */
+export type ShopRunResult = { reply: string; buttons: ShopButton[]; chat: ShopChat; failed: boolean; choices?: ChoicePlan; handoff?: "return_request" };
 
 export async function runShopAssistant(args: {
     channel: ShopChannel; identity: ShopIdentity; chat: ShopChat; text: string;
@@ -71,12 +74,16 @@ export async function runShopAssistant(args: {
     const wa = args.channel === "whatsapp";
     const choices = wa && settings.whatsappChoices;
     const restock = wa && settings.whatsappRestockAlerts && !!ctx.waConversationId;
+    const returns = wa && settings.whatsappReturns && !!ctx.waConversationId;
     const result = await runShopTurn(
         {
             messages, model: AI_MODEL,
-            system: systemPromptFor(args.channel, args.identity.phone, { choices, restock }),
+            system: systemPromptFor(args.channel, args.identity.phone, { choices, restock, returns }),
             // Optional tools after the customer tools, so their cached prefix is unchanged.
-            tools: [...CUSTOMER_TOOL_DEFS, ...(choices ? [OFFER_CHOICES_TOOL] : []), ...(restock ? [NOTIFY_WHEN_BACK_TOOL] : [])],
+            tools: [
+                ...CUSTOMER_TOOL_DEFS, ...(choices ? [OFFER_CHOICES_TOOL] : []), ...(restock ? [NOTIFY_WHEN_BACK_TOOL] : []),
+                ...(returns ? [START_RETURN_TOOL] : []),
+            ],
         },
         { client: deps.client ?? new Anthropic({ apiKey, maxRetries: 0 }), runTool: (n, i) => runCustomerTool(n, i, ctx), fits },
     );
@@ -127,5 +134,6 @@ export async function runShopAssistant(args: {
     return {
         reply: result.reply, buttons, chat: { ...next, turns: chat.turns + 1 }, failed: false,
         ...(result.ended && ctx.choices ? { choices: ctx.choices } : {}),
+        ...(ctx.handoff ? { handoff: ctx.handoff } : {}),
     };
 }

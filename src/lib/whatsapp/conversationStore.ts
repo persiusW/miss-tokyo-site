@@ -7,6 +7,7 @@ import { chatIsStale } from "@/lib/ai/shopAssistant/limits";
 import type { ShopChat } from "@/lib/ai/shopAssistant/types";
 import { optionsFrom } from "./choices";
 import { unseenNotice } from "./notices";
+import { returnSummary } from "./returns";
 import type { HistoryLine } from "./handoff";
 
 // The new whatsapp_conversations columns are not in the generated types yet.
@@ -78,6 +79,18 @@ export async function latestNotice(conversationId: string): Promise<string | nul
         .eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(8);
     if (error) throw error;
     return unseenNotice(data ?? []);
+}
+
+/** The latest return request in this conversation from the last day, as one line for the team; null when none. */
+export async function returnNote(conversationId: string): Promise<string | null> {
+    const since = new Date(Date.now() - 86_400_000).toISOString();
+    const { data, error } = await db.from("return_requests").select("order_id, reason, wants, details, created_at")
+        .eq("conversation_id", conversationId).gte("created_at", since).order("created_at", { ascending: false }).limit(1);
+    if (error) throw error;
+    const r = (data ?? [])[0];
+    if (!r) return null;
+    const { data: o } = await db.from("orders").select("updated_at").eq("id", r.order_id).maybeSingle();
+    return returnSummary({ ref: String(r.order_id).slice(0, 8).toUpperCase(), reason: r.reason, wants: r.wants, details: r.details, lastUpdate: o?.updated_at ?? null });
 }
 
 export async function recentHistory(conversationId: string, limit = 10): Promise<HistoryLine[]> {
