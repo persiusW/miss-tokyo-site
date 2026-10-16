@@ -138,7 +138,7 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                 </label>
                 <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
                     <label style={{ flex: "1 1 240px" }}>
-                        <span className="ac-label">Approved template id (order_status_update)</span>
+                        <span className="ac-label">Approved template id (order_status_update_v2)</span>
                         <input className="ac-input" inputMode="numeric" placeholder="From Chatbots Africa, Message Templates"
                             value={templateId} onChange={e => setTemplateId(e.target.value)} disabled={!templateRow} data-wa-template />
                         <span style={{ display: "block", fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>

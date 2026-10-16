@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { sendOrderUpdate, updateText, updateWording, ORDER_EVENTS, type UpdateDeps } from "../../../src/lib/whatsapp/orderUpdates";
+import { sendOrderUpdate, STATUS_TEMPLATE, updateText, updateWording, ORDER_EVENTS, type UpdateDeps } from "../../../src/lib/whatsapp/orderUpdates";
 
 const NOW = Date.parse("2026-10-14T21:00:00Z");
 const ORDER = { id: "4a8ff381-0000-4000-8000-000000000000", customer_name: "Ama Mensah", customer_phone: "0200000001", delivery_method: "pickup" };
@@ -34,10 +34,12 @@ test("inside the 24-hour window: a plain text, logged for the inbox", async () =
     expect(logged).toHaveLength(1);
 });
 
-test("outside the window: the approved template with name, ref, status and next step", async () => {
-    const { d, calls } = deps({ lastInboundAt: null });
+test("outside the window: the approved template with name, ref and status, logged as sent", async () => {
+    const { d, calls, logged } = deps({ lastInboundAt: null });
     expect(await sendOrderUpdate(ORDER, "fulfilled", {}, d)).toBe("sent_template");
-    expect(calls).toEqual(["template:233200000001:4321:Ama|4A8FF381|delivered|We hope you love it. Thank you for shopping with Miss Tokyo!"]);
+    expect(logged).toEqual([STATUS_TEMPLATE("Ama", "4A8FF381", "delivered")]);
+    expect(calls).toEqual(["template:233200000001:4321:Ama|4A8FF381|delivered"]);
+    expect(STATUS_TEMPLATE("Ama", "4A8FF381", "delivered")).toBe("Hi Ama, this is an update on your Miss Tokyo order 4A8FF381.\n\nYour order is now delivered.\n\nIf you have any questions about your order, reply to this message and our team will help you.");
 });
 
 test("nothing is sent when off, opted out, without a number, or outside the window with no template", async () => {

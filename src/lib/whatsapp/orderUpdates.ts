@@ -5,9 +5,9 @@
 //
 // WhatsApp lets a business message first only inside 24 hours of the
 // customer's last message; after that only an approved template goes. So:
-// inside the window a plain text, outside it the order_status_update template
-// (whatsapp_status_template_id), and with no template nothing (the SMS still
-// goes). Never throws: an update must not stop a status change.
+// inside the window a plain text, outside it the order_status_update_v2
+// template (whatsapp_status_template_id), and with no template nothing (the
+// SMS still goes). Never throws: an update must not stop a status change.
 import { toDestination } from "@/lib/messaging/chatbotsAfrica";
 import type { MessagingResult } from "@/lib/messaging/provider";
 import { REPLY_WINDOW_MS } from "./pipeline";
@@ -19,7 +19,7 @@ export const ORDER_EVENTS: readonly OrderEvent[] = ["paid", "packed", "shipped",
 export type UpdateOrder = { id: string; customer_name?: string | null; customer_phone?: string | null; delivery_method?: string | null };
 export type UpdateExtra = { rider?: { name: string; phone?: string | null } | null; store?: string | null };
 
-/** The status and next step for an update; the same words fill the template's {{3}} and {{4}}. */
+/** The status and next step for an update; the status also fills the template's {{3}}. */
 export function updateWording(event: OrderEvent, order: UpdateOrder, extra: UpdateExtra = {}): { status: string; next: string } {
     const pickup = order.delivery_method === "pickup";
     switch (event) {
@@ -37,6 +37,14 @@ export function updateWording(event: OrderEvent, order: UpdateOrder, extra: Upda
 
 const firstName = (o: UpdateOrder) => String(o.customer_name ?? "").trim().split(/\s+/)[0] || "there";
 export const orderRef = (o: UpdateOrder) => o.id.slice(0, 8).toUpperCase();
+
+/**
+ * order_status_update_v2, as Meta approves it: three values, each inside a
+ * sentence (v1, with the next step as a fourth value alone on a line, was
+ * rejected). Kept here so the log shows what the customer actually got.
+ */
+export const STATUS_TEMPLATE = (name: string, ref: string, status: string) =>
+    `Hi ${name}, this is an update on your Miss Tokyo order ${ref}.\n\nYour order is now ${status}.\n\nIf you have any questions about your order, reply to this message and our team will help you.`;
 
 /** The plain text sent inside the 24-hour window. */
 export function updateText(event: OrderEvent, order: UpdateOrder, extra: UpdateExtra = {}): string {
@@ -63,7 +71,7 @@ export async function sendOrderUpdate(order: UpdateOrder, event: OrderEvent, ext
         if (!to) return "no_phone";
         const conv = await deps.conversationFor(to);
         if (conv.optedOut) return "opted_out";
-        const text = updateText(event, order, extra);
+        let text = updateText(event, order, extra);
         const now = deps.now?.() ?? Date.now();
         const inWindow = !!conv.lastInboundAt && now - Date.parse(conv.lastInboundAt) < REPLY_WINDOW_MS;
         let r: MessagingResult;
@@ -73,7 +81,8 @@ export async function sendOrderUpdate(order: UpdateOrder, event: OrderEvent, ext
             outcome = "sent_text";
         } else if (deps.templateId) {
             const w = updateWording(event, order, extra);
-            r = await deps.sendTemplate(to, deps.templateId, [firstName(order), orderRef(order), w.status, w.next]);
+            r = await deps.sendTemplate(to, deps.templateId, [firstName(order), orderRef(order), w.status]);
+            text = STATUS_TEMPLATE(firstName(order), orderRef(order), w.status);
             outcome = "sent_template";
         } else {
             return "no_template";
