@@ -163,6 +163,10 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                 help="When a piece is sold out, the assistant offers to message the customer when it's back, and sends that message once it is in stock (checked hourly)."
                 savedOn="Saved. Customers can now ask to be told when a piece is back." savedOff="Saved. No back-in-stock alerts."
                 template={{ key: "whatsapp_restock_template_id", label: "Approved template id (back_in_stock)", help: "Needed for alerts more than 24 hours after the customer's last message. Blank: those wait until they message again." }} />
+            <SettingSwitch settings={settings} onSaved={onSaved} settingKey="whatsapp_returns_enabled" testId="wa-returns"
+                label="Returns and exchanges"
+                help="The assistant explains the returns policy, confirms the order, asks what's wrong (and for a photo if it's faulty), then passes the chat to your team with a summary to arrange the exchange or store credit."
+                savedOn="Saved. The assistant now takes return requests." savedOff="Saved. Return questions get the policy and a person." />
         </div>
     );
 }

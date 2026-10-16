@@ -81,6 +81,7 @@ export const EDITABLE_AI_SETTINGS = {
     whatsapp_unpaid_nudge_enabled: (v: unknown) => typeof v === "boolean",
     whatsapp_restock_alerts_enabled: (v: unknown) => typeof v === "boolean",
     whatsapp_restock_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v))),
+    whatsapp_returns_enabled: (v: unknown) => typeof v === "boolean",
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
