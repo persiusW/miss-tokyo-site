@@ -69,6 +69,7 @@ export const EDITABLE_AI_SETTINGS = {
     /** "" or the approved template's numeric id. */
     // Meta template ids run to 16 digits (e.g. 1072346328969350); they must stay exact as a number.
     whatsapp_status_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v))),
+    whatsapp_choices_enabled: (v: unknown) => typeof v === "boolean",
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
