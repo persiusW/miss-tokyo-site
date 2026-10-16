@@ -9,7 +9,7 @@ import { todaySpendUsd, withinCap } from "@/lib/ai/spend";
 import { logCause } from "@/lib/errors/apiError";
 import { runShopTurn } from "./engine";
 import { systemPromptFor } from "./prompt";
-import { CUSTOMER_TOOL_DEFS, OFFER_CHOICES_TOOL } from "./toolDefs";
+import { CUSTOMER_TOOL_DEFS, NOTIFY_WHEN_BACK_TOOL, OFFER_CHOICES_TOOL } from "./toolDefs";
 import type { ChoicePlan } from "@/lib/whatsapp/choices";
 import { runCustomerTool, type ShopToolContext } from "./tools";
 import { mergeChatState, photoAsNote, trimTranscript } from "./limits";
@@ -54,7 +54,10 @@ export async function runShopAssistant(args: {
     if (!fits(0)) return cant();
 
     const work: ShopChat = { ...chat, verifiedOrders: [...chat.verifiedOrders], openOrders: [...chat.openOrders], payLinks: { ...chat.payLinks } };
-    const ctx: ShopToolContext = { chat: work, identity: args.identity, channel: args.channel, buttons: [], notes: { topic: null, orderRef: null }, whatsappNumber: args.whatsappNumber };
+    const ctx: ShopToolContext = {
+        chat: work, identity: args.identity, channel: args.channel, buttons: [], notes: { topic: null, orderRef: null }, whatsappNumber: args.whatsappNumber,
+        waConversationId: args.channel === "whatsapp" ? args.waConversationId ?? null : null,
+    };
     // Stored thinking is signed against the prompt it was made with; earlier turns go without it.
     const messages = trimTranscript([...dropPastThinking(chat.transcript), { role: "user", content: args.text }]);
     if (args.image) {
@@ -65,12 +68,15 @@ export async function runShopAssistant(args: {
         ] };
     }
 
-    const choices = args.channel === "whatsapp" && settings.whatsappChoices;
+    const wa = args.channel === "whatsapp";
+    const choices = wa && settings.whatsappChoices;
+    const restock = wa && settings.whatsappRestockAlerts && !!ctx.waConversationId;
     const result = await runShopTurn(
         {
             messages, model: AI_MODEL,
-            system: systemPromptFor(args.channel, args.identity.phone, { choices }),
-            tools: choices ? [...CUSTOMER_TOOL_DEFS, OFFER_CHOICES_TOOL] : CUSTOMER_TOOL_DEFS,
+            system: systemPromptFor(args.channel, args.identity.phone, { choices, restock }),
+            // Optional tools after the customer tools, so their cached prefix is unchanged.
+            tools: [...CUSTOMER_TOOL_DEFS, ...(choices ? [OFFER_CHOICES_TOOL] : []), ...(restock ? [NOTIFY_WHEN_BACK_TOOL] : [])],
         },
         { client: deps.client ?? new Anthropic({ apiKey, maxRetries: 0 }), runTool: (n, i) => runCustomerTool(n, i, ctx), fits },
     );

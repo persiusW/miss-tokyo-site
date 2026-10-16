@@ -1,22 +1,24 @@
 // The customer tool registry. Never throws; output is redacted.
 import { redactText } from "@/lib/ai/missTokyoAi/scrub";
-import { CUSTOMER_TOOL_NAMES, END_TURN_TOOL_NAMES } from "../toolDefs";
+import { CUSTOMER_TOOL_NAMES, OPTIONAL_TOOL_NAMES } from "../toolDefs";
 import { err, pushTalk, type ShopToolContext, type ToolOutcome } from "./context";
 import { findProducts } from "./products";
 import { shopInfo } from "./info";
 import { trackOrder } from "./orders";
 import { placeOrder, priceOrder } from "./checkout";
 import { offerChoices } from "./choices";
+import { notifyWhenBack } from "./restock";
 
 export type { ShopToolContext, ToolOutcome } from "./context";
 
-const RUN: Record<(typeof CUSTOMER_TOOL_NAMES)[number] | (typeof END_TURN_TOOL_NAMES)[number], (input: any, ctx: ShopToolContext) => Promise<ToolOutcome>> = {
+const RUN: Record<(typeof CUSTOMER_TOOL_NAMES)[number] | (typeof OPTIONAL_TOOL_NAMES)[number], (input: any, ctx: ShopToolContext) => Promise<ToolOutcome>> = {
     find_products: findProducts,
     shop_info: shopInfo,
     track_order: trackOrder,
     price_order: priceOrder,
     place_order: placeOrder,
     offer_choices: offerChoices,
+    notify_when_back: notifyWhenBack,
 };
 
 export async function runCustomerTool(name: string, input: unknown, ctx: ShopToolContext): Promise<ToolOutcome> {
