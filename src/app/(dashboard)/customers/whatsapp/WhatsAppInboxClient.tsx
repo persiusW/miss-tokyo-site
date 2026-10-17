@@ -3,7 +3,12 @@
 // WhatsApp inbox: the chat list and one chat's messages. Staff reply from the
 // main WhatsApp phone (the number here runs through the API, so it has no
 // phone app), then hand the chat back to the assistant.
-import { useCallback, useEffect, useState } from "react";
+//
+// Laid out like WhatsApp on desktop and tablet: the inbox fills the space
+// under the page header, and the list and the open chat each scroll on their
+// own, so a long chat never pushes the list out of view. On a phone it shows
+// the list or one chat, with a back button.
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { InboxConversation } from "@/lib/whatsapp/inbox";
 
@@ -12,6 +17,20 @@ type Thread = { conversation: InboxConversation; messages: Message[] };
 
 const CALM = "Something happened. Please refresh and try again.";
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
+const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+/** "Today", "Yesterday", or "16 Oct" (with the year when it isn't this year): the chip between days. */
+export function dayLabel(iso: string, now = new Date()): string {
+    const d = new Date(iso);
+    const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((start(now) - start(d)) / 86_400_000);
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}) });
+}
+/** Within this many pixels of the bottom counts as reading the latest messages. */
+const NEAR_BOTTOM = 120;
+/** Never shorter than this, so a small window still shows a few messages. */
+const MIN_HEIGHT = 420;
 const local = (intl: string) => (/^233\d{9}$/.test(intl) ? `0${intl.slice(3)}` : `+${intl}`);
 
 async function getJson(url: string, init?: RequestInit): Promise<{ ok: boolean; data: any }> {
@@ -45,6 +64,11 @@ export default function WhatsAppInboxClient() {
     const [thread, setThread] = useState<Thread | null>(null);
     const [threadError, setThreadError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [search, setSearch] = useState("");
+    const rootRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const shownChat = useRef<string | null>(null);
+    const lastCount = useRef(0);
 
     const loadList = useCallback(async () => {
         const r = await getJson("/api/whatsapp/inbox");
@@ -66,12 +90,45 @@ export default function WhatsAppInboxClient() {
 
     useEffect(() => {
         if (!selected) { setThread(null); return; }
+        setThread(t => (t?.conversation.id === selected ? t : null));
         loadThread(selected);
         const t = setInterval(() => loadThread(selected), 20_000);
         return () => clearInterval(t);
     }, [selected, loadThread]);
 
+    // Fill the space under the page header: the panes scroll, the page doesn't.
+    useLayoutEffect(() => {
+        const el = rootRef.current;
+        const page = el?.closest(".admin-page") as HTMLElement | null;
+        if (!el || !page) return;
+        page.classList.add("wa-fit");
+        const fit = () => {
+            const top = el.getBoundingClientRect().top - page.getBoundingClientRect().top + page.scrollTop;
+            const bottom = parseFloat(getComputedStyle(page).paddingBottom) || 0;
+            el.style.height = `${Math.max(MIN_HEIGHT, page.clientHeight - top - bottom)}px`;
+        };
+        fit();
+        const ro = new ResizeObserver(fit);
+        ro.observe(page);
+        window.addEventListener("resize", fit);
+        return () => { ro.disconnect(); window.removeEventListener("resize", fit); page.classList.remove("wa-fit"); el.style.height = ""; };
+    }, []);
+
+    // A newly opened chat starts at its latest message; on a refresh, follow new
+    // messages only if the reader was already at the bottom.
+    useLayoutEffect(() => {
+        const box = scrollRef.current;
+        if (!box || !thread) return;
+        const opened = shownChat.current !== thread.conversation.id;
+        const grew = thread.messages.length > lastCount.current;
+        const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < NEAR_BOTTOM;
+        if (opened || (grew && atBottom)) box.scrollTop = box.scrollHeight;
+        shownChat.current = thread.conversation.id;
+        lastCount.current = thread.messages.length;
+    }, [thread]);
+
     const open = (id: string) => router.replace(`/customers/whatsapp?c=${id}`, { scroll: false });
+    const close = () => router.replace("/customers/whatsapp", { scroll: false });
 
     const handBack = async () => {
         if (!thread) return;
@@ -84,89 +141,144 @@ export default function WhatsAppInboxClient() {
         await Promise.all([loadThread(thread.conversation.id), loadList()]);
     };
 
-    return (
-        <div className="wa-inbox" style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0, 1fr)" }} data-wa-inbox>
-            <style>{`@media (min-width: 900px) { .wa-inbox { grid-template-columns: 340px minmax(0, 1fr) !important; } }`}</style>
+    const shown = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const digits = q.replace(/\D/g, "");
+        if (!list || !q) return list;
+        return list.filter(c => (c.name ?? "").toLowerCase().includes(q)
+            || (digits.length >= 3 && (c.phone.includes(digits) || local(c.phone).includes(digits))));
+    }, [list, search]);
 
-            <div className="ac-card" style={{ padding: 0, overflow: "hidden" }}>
-                {listError && <div style={{ padding: 16, fontSize: 13, color: "var(--ac-ink-3)" }}>{listError}</div>}
-                {!listError && !list && <div style={{ padding: 16, fontSize: 13, color: "var(--ac-ink-3)" }}>Loading…</div>}
-                {list && list.length === 0 && (
-                    <div className="ac-empty"><div className="ac-empty-title">No WhatsApp chats yet.</div></div>
-                )}
-                {list?.map(c => (
-                    <button key={c.id} type="button" onClick={() => open(c.id)} data-wa-chat
-                        style={{
-                            display: "block", width: "100%", textAlign: "left", padding: "12px 16px", border: 0, borderBottom: "1px solid var(--ac-line)",
-                            background: c.id === selected ? "var(--ac-line)" : "transparent", cursor: "pointer",
-                        }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-                            <span style={{ fontSize: 14, color: "var(--ac-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {c.name ?? local(c.phone)}
-                            </span>
-                            <ModeBadge c={c} />
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--ac-ink-3)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {c.preview ? `${c.preview.direction === "outbound" ? "You: " : ""}${c.preview.text}` : "No messages yet"}
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2 }}>{when(c.lastMessageAt)}</div>
-                    </button>
-                ))}
+    // Messages with a date chip before the first message of each day.
+    const rows = useMemo(() => {
+        const out: ({ kind: "day"; key: string; label: string } | { kind: "msg"; m: Message })[] = [];
+        let day = "";
+        for (const m of thread?.messages ?? []) {
+            const label = dayLabel(m.at);
+            if (label !== day) { out.push({ kind: "day", key: `day-${m.id}`, label }); day = label; }
+            out.push({ kind: "msg", m });
+        }
+        return out;
+    }, [thread]);
+
+    const muted = { fontSize: 13, color: "var(--ac-ink-3)" } as const;
+
+    return (
+        <div ref={rootRef} className={`wa-inbox${selected ? " has-chat" : ""}`} data-wa-inbox>
+            <style>{`
+                .admin-page.wa-fit { padding-bottom: 16px; }
+                .wa-inbox { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-height: ${MIN_HEIGHT}px; }
+                .wa-pane { display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden; }
+                .wa-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+                .wa-back { display: inline-flex; }
+                .wa-inbox.has-chat .wa-list { display: none; }
+                .wa-inbox:not(.has-chat) .wa-chat { display: none; }
+                @media (min-width: 760px) {
+                    .wa-inbox { grid-template-columns: 300px minmax(0, 1fr); }
+                    .wa-inbox.has-chat .wa-list, .wa-inbox:not(.has-chat) .wa-chat { display: flex; }
+                    .wa-back { display: none; }
+                }
+                @media (min-width: 1100px) { .wa-inbox { grid-template-columns: 360px minmax(0, 1fr); } }
+            `}</style>
+
+            <div className="ac-card wa-pane wa-list" data-wa-list>
+                <div style={{ padding: 12, borderBottom: "1px solid var(--ac-line)", flex: "none" }}>
+                    <input className="ac-input" type="search" placeholder="Search name or number" value={search}
+                        onChange={e => setSearch(e.target.value)} aria-label="Search chats" data-wa-search />
+                </div>
+                <div className="wa-scroll" data-wa-list-scroll>
+                    {listError && <div style={{ padding: 16, ...muted }}>{listError}</div>}
+                    {!listError && !list && <div style={{ padding: 16, ...muted }}>Loading…</div>}
+                    {list && list.length === 0 && <div className="ac-empty"><div className="ac-empty-title">No WhatsApp chats yet.</div></div>}
+                    {list && list.length > 0 && shown?.length === 0 && <div style={{ padding: 16, ...muted }}>No chats match that.</div>}
+                    {shown?.map(c => (
+                        <button key={c.id} type="button" onClick={() => open(c.id)} data-wa-chat aria-current={c.id === selected ? "true" : undefined}
+                            style={{
+                                display: "block", width: "100%", textAlign: "left", padding: "12px 16px", border: 0, borderBottom: "1px solid var(--ac-line)",
+                                background: c.id === selected ? "var(--ac-line)" : "transparent", cursor: "pointer",
+                            }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                                <span style={{ fontSize: 14, color: "var(--ac-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {c.name ?? local(c.phone)}
+                                </span>
+                                <span style={{ fontSize: 11, color: "var(--ac-ink-4)", whiteSpace: "nowrap" }}>{when(c.lastMessageAt)}</span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginTop: 4 }}>
+                                <span style={{ fontSize: 12, color: "var(--ac-ink-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {c.preview ? `${c.preview.direction === "outbound" ? "You: " : ""}${c.preview.text}` : "No messages yet"}
+                                </span>
+                                <ModeBadge c={c} />
+                            </div>
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            <div className="ac-card" style={{ minHeight: 320 }}>
-                {!selected && <div className="ac-empty"><div className="ac-empty-title">Choose a chat to read it.</div></div>}
-                {selected && threadError && <div style={{ fontSize: 13, color: "var(--ac-ink-3)" }}>{threadError}</div>}
-                {selected && !thread && !threadError && <div style={{ fontSize: 13, color: "var(--ac-ink-3)" }}>Loading…</div>}
-                {thread && (
-                    <>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                            <div>
-                                <div style={{ fontSize: 16, color: "var(--ac-ink)" }}>{thread.conversation.name ?? local(thread.conversation.phone)}</div>
-                                <div style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>
-                                    {local(thread.conversation.phone)}{thread.conversation.reason ? ` · ${thread.conversation.reason}` : ""}
+            <div className="ac-card wa-pane wa-chat" data-wa-chat-pane>
+                {!selected && <div className="ac-empty" style={{ margin: "auto" }}><div className="ac-empty-title">Choose a chat to read it.</div></div>}
+                {selected && (
+                    <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--ac-line)", flex: "none" }} data-wa-chat-head>
+                        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                            <button type="button" className="ac-btn wa-back" onClick={close} aria-label="Back to chats" data-wa-back>← Chats</button>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 16, color: "var(--ac-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {thread ? thread.conversation.name ?? local(thread.conversation.phone) : "…"}
                                 </div>
+                                {thread && (
+                                    <div style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>
+                                        {local(thread.conversation.phone)}{thread.conversation.reason ? ` · ${thread.conversation.reason}` : ""}
+                                    </div>
+                                )}
                             </div>
-                            <ModeBadge c={thread.conversation} />
+                            {thread && <ModeBadge c={thread.conversation} />}
                         </div>
-
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-                            <a className="ac-btn ac-btn-primary" href={`https://wa.me/${thread.conversation.phone}`} target="_blank" rel="noopener" data-wa-reply>
-                                Reply on WhatsApp
-                            </a>
-                            {thread.conversation.mode === "person" && (
-                                <button type="button" className="ac-btn" onClick={handBack} disabled={busy} data-wa-hand-back>
-                                    {busy ? "Handing back…" : "Hand back to assistant"}
-                                </button>
-                            )}
-                        </div>
-                        {!thread.conversation.windowOpen && (
-                            <div style={{ fontSize: 12, color: "var(--ac-ink-3)", marginBottom: 12 }}>
+                        {thread && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                                <a className="ac-btn ac-btn-primary" href={`https://wa.me/${thread.conversation.phone}`} target="_blank" rel="noopener" data-wa-reply>
+                                    Reply on WhatsApp
+                                </a>
+                                {thread.conversation.mode === "person" && (
+                                    <button type="button" className="ac-btn" onClick={handBack} disabled={busy} data-wa-hand-back>
+                                        {busy ? "Handing back…" : "Hand back to assistant"}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        {thread && !thread.conversation.windowOpen && (
+                            <div style={{ fontSize: 12, color: "var(--ac-ink-3)", marginTop: 8 }}>
                                 Their last message was over 24 hours ago, so the assistant can't message them first.
                             </div>
                         )}
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }} data-wa-thread>
-                            {thread.messages.length === 0 && <div style={{ fontSize: 13, color: "var(--ac-ink-3)" }}>No messages yet.</div>}
-                            {thread.messages.map(m => {
-                                const out = m.direction === "outbound";
-                                return (
-                                    <div key={m.id} style={{ alignSelf: out ? "flex-end" : "flex-start", maxWidth: "85%" }}>
-                                        <div style={{
-                                            padding: "8px 12px", borderRadius: 12, fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "anywhere",
-                                            background: out ? "var(--ac-ink)" : "var(--ac-surface, #fff)", color: out ? "var(--ac-bg, #fff)" : "var(--ac-ink)",
-                                            border: out ? "none" : "1px solid var(--ac-line)",
-                                        }}>
-                                            {m.text?.trim() ? m.text : <em>[{m.type ?? "message"}]</em>}
-                                        </div>
-                                        <div style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2, textAlign: out ? "right" : "left" }}>
-                                            {out ? "Assistant · " : ""}{when(m.at)}
-                                        </div>
+                    </div>
+                )}
+                {selected && (
+                    // The bottom padding keeps the newest message clear of the floating Miss Tokyo AI button.
+                    <div ref={scrollRef} className="wa-scroll" style={{ padding: "16px 16px 72px", background: "var(--ac-bg-2, transparent)" }} data-wa-thread>
+                        {threadError && <div style={muted}>{threadError}</div>}
+                        {!thread && !threadError && <div style={muted}>Loading…</div>}
+                        {thread && thread.messages.length === 0 && <div style={muted}>No messages yet.</div>}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {rows.map(r => r.kind === "day" ? (
+                                <div key={r.key} style={{ alignSelf: "center", fontSize: 11, color: "var(--ac-ink-3)", padding: "2px 10px", borderRadius: 999, background: "var(--ac-line)", margin: "6px 0" }}>
+                                    {r.label}
+                                </div>
+                            ) : (
+                                <div key={r.m.id} style={{ alignSelf: r.m.direction === "outbound" ? "flex-end" : "flex-start", maxWidth: "85%" }}>
+                                    <div style={{
+                                        padding: "8px 12px", borderRadius: 12, fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "anywhere",
+                                        background: r.m.direction === "outbound" ? "var(--ac-ink)" : "var(--ac-surface, #fff)",
+                                        color: r.m.direction === "outbound" ? "var(--ac-bg, #fff)" : "var(--ac-ink)",
+                                        border: r.m.direction === "outbound" ? "none" : "1px solid var(--ac-line)",
+                                    }}>
+                                        {r.m.text?.trim() ? r.m.text : <em>[{r.m.type ?? "message"}]</em>}
                                     </div>
-                                );
-                            })}
+                                    <div style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2, textAlign: r.m.direction === "outbound" ? "right" : "left" }}>
+                                        {r.m.direction === "outbound" ? "Assistant · " : ""}{clock(r.m.at)}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    </>
+                    </div>
                 )}
             </div>
         </div>
