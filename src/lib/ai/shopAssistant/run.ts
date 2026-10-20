@@ -123,7 +123,8 @@ export async function runShopAssistant(args: {
                 if (await saveStateOnly(merged, latest.turns)) break;
             } catch (e) { logCause("SHOP-01", e, { chat: chat.id.slice(0, 8), step: "merge" }); break; }
         }
-        return { reply: LINES.busy, buttons: dedupeButtons([...ctx.buttons.filter(b => b.kind === "pay_now"), ...talk(ctx.notes)]), chat: merged, failed: false };
+        // On WhatsApp "talk to us" hands the chat to a person; a lost save is not a reason to.
+        return { reply: LINES.busy, buttons: dedupeButtons([...ctx.buttons.filter(b => b.kind === "pay_now"), ...(wa ? [] : talk(ctx.notes))]), chat: merged, failed: false };
     }
     if (!result.ok) {
         logCause("SHOP-01", result.cause, { chat: chat.id.slice(0, 8) });
