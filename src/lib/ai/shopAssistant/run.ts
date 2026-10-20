@@ -33,8 +33,8 @@ export async function runShopAssistant(args: {
     settings: AiSettings; whatsappNumber: string | null;
     /** WhatsApp only: the whatsapp_conversations row, so the turn is metered against it. */
     waConversationId?: string | null;
-    /** WhatsApp only: a photo the customer sent with this message, read in this turn only. */
-    image?: { data: string; mediaType: "image/jpeg" | "image/png" } | null;
+    /** WhatsApp only: photos the customer sent with this message, read in this turn only. */
+    images?: { data: string; mediaType: "image/jpeg" | "image/png" }[];
 }, deps: { client?: Pick<Anthropic, "messages"> } = {}): Promise<ShopRunResult> {
     const { chat, settings } = args;
     const talk = (notes: { topic: string | null; orderRef: string | null }) => {
@@ -63,10 +63,10 @@ export async function runShopAssistant(args: {
     };
     // Stored thinking is signed against the prompt it was made with; earlier turns go without it.
     const messages = trimTranscript([...dropPastThinking(chat.transcript), { role: "user", content: args.text }]);
-    if (args.image) {
+    if (args.images && args.images.length > 0) {
         const last = messages.length - 1;
         messages[last] = { role: "user", content: [
-            { type: "image", source: { type: "base64", media_type: args.image.mediaType, data: args.image.data } },
+            ...args.images.map(i => ({ type: "image" as const, source: { type: "base64" as const, media_type: i.mediaType, data: i.data } })),
             { type: "text", text: args.text },
         ] };
     }
@@ -123,7 +123,8 @@ export async function runShopAssistant(args: {
                 if (await saveStateOnly(merged, latest.turns)) break;
             } catch (e) { logCause("SHOP-01", e, { chat: chat.id.slice(0, 8), step: "merge" }); break; }
         }
-        return { reply: LINES.busy, buttons: dedupeButtons([...ctx.buttons.filter(b => b.kind === "pay_now"), ...talk(ctx.notes)]), chat: merged, failed: false };
+        // On WhatsApp "talk to us" hands the chat to a person; a lost save is not a reason to.
+        return { reply: LINES.busy, buttons: dedupeButtons([...ctx.buttons.filter(b => b.kind === "pay_now"), ...(wa ? [] : talk(ctx.notes))]), chat: merged, failed: false };
     }
     if (!result.ok) {
         logCause("SHOP-01", result.cause, { chat: chat.id.slice(0, 8) });

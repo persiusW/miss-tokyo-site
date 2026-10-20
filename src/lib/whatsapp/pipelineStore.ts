@@ -11,7 +11,19 @@ function fail(what: string, error: { code?: string; message?: string }): never {
     throw new Error(`${what}: ${error.code ?? ""} ${error.message ?? ""}`.trim());
 }
 
-export const supabaseInboundStore: InboundStore = {
+export const supabaseInboundStore: InboundStore & {
+    /** Events from one number received strictly between two times, for photo pairing. */
+    eventsBetween(provider: string, fromIso: string, toIso: string, phone: string): Promise<{ receivedAt: string; rawBody: string }[]>;
+} = {
+    async eventsBetween(provider, fromIso, toIso, phone) {
+        // Meta's payload is compact JSON. Should that change, nothing matches and photos are answered on their own.
+        const { data, error } = await db.from("inbound_events").select("received_at, raw_body")
+            .eq("provider", provider).gt("received_at", fromIso).lt("received_at", toIso)
+            .like("raw_body", `%"from":"${phone.replace(/\D/g, "")}"%`).order("received_at").limit(50);
+        if (error) fail("read nearby events", error);
+        return (data ?? []).map((r: { received_at: string; raw_body: string }) => ({ receivedAt: r.received_at, rawBody: r.raw_body }));
+    },
+
     async claim(id, now) {
         const { data: ev, error } = await db.from("inbound_events").select(EVENT_FIELDS).eq("id", id).maybeSingle();
         if (error) fail("read event", error);

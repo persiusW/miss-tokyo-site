@@ -30,7 +30,10 @@ const chat = { id: "s1", visitorKey: "v", customerId: null, transcript: [], veri
 const msg = (over: Partial<InboundMessage> = {}): InboundMessage => ({ messageId: "wamid.T", from: PHONE, name: "Test Customer", type: "text", text: "Hi", ...over });
 const conv = { id: "c1", handedOffAt: null };
 
-function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; counts?: { lastMinute: number; today: number } | null; sendOk?: boolean; photo?: boolean; notice?: string } = {}) {
+function harness(o: {
+    reply?: string; buttons?: ShopButton[]; failed?: boolean; counts?: { lastMinute: number; today: number } | null; sendOk?: boolean; photo?: boolean; notice?: string;
+    follows?: boolean | "throws"; before?: InboundMessage[];
+} = {}) {
     const sent: string[] = [];
     const images: string[] = [];
     const logged: string[] = [];
@@ -52,8 +55,10 @@ function harness(o: { reply?: string; buttons?: ShopButton[]; failed?: boolean; 
         setOptOut: async (_id, out) => { optOuts.push(out); },
         quoted: async (convId, id) => (convId === "c1" && id === "wamid.OUTPHOTO1" ? "Lindsy Bodycon · L3 https://misstokyo.shop/products/lindsy-bodycon" : null),
         perDay: 20,
-        fetchPhoto: async () => (o.photo ? { data: "BASE64", mediaType: "image/jpeg" as const } : null),
-        run: async a => { runs.push(a.text); runImages.push(a.image ?? null); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
+        fetchPhoto: async id => (o.photo ? { data: `BASE64-${id}`.replace("BASE64-2000000000000001", "BASE64"), mediaType: "image/jpeg" as const } : null),
+        textFollows: async () => { if (o.follows === "throws") throw new Error("db down"); return !!o.follows; },
+        photosBefore: async () => o.before ?? [],
+        run: async a => { runs.push(a.text); runImages.push(a.images); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
         siteUrl: SITE,
     };
     return { handle: createWhatsAppHandler(deps), sent, images, logged, handoffs, runs, runImages, optOuts };
@@ -79,11 +84,44 @@ test("a photo is read by the assistant with its caption, in that turn", async ()
     const h = harness({ photo: true });
     await h.handle(msg({ type: "image", text: "Do you have this in M?", mediaId: "2000000000000001" }), conv);
     expect(h.runs).toEqual(["Do you have this in M?"]);
-    expect(h.runImages).toEqual([{ data: "BASE64", mediaType: "image/jpeg" }]);
+    expect(h.runImages).toEqual([[{ data: "BASE64", mediaType: "image/jpeg" }]]);
     expect(h.handoffs).toEqual([]);
     const bare = harness({ photo: true });
     await bare.handle(msg({ type: "image", text: null, mediaId: "2000000000000001" }), conv);
     expect(bare.runs).toEqual(["(The customer sent this photo.)"]);
+});
+
+const AT = "2026-10-20T22:39:50.884Z";
+const barePhoto = (mediaId: string) => msg({ type: "image", text: null, mediaId, messageId: `wamid.P${mediaId}` });
+
+test("a bare photo with a text right behind it: the photo's turn stands down, the text's turn reads it", async () => {
+    const photo = harness({ photo: true, follows: true });
+    await photo.handle(barePhoto("2000000000000001"), conv, AT);
+    expect(photo.runs).toEqual([]);
+    expect(photo.sent).toEqual([]);
+    expect(photo.handoffs).toEqual([]);
+
+    const text = harness({ photo: true, before: [barePhoto("2000000000000001"), barePhoto("2000000000000002")] });
+    await text.handle(msg({ text: "Do you have this ?" }), conv, AT);
+    expect(text.runs).toEqual(["Do you have this ?"]);
+    expect(text.runImages).toEqual([[{ data: "BASE64", mediaType: "image/jpeg" }, { data: "BASE64-2000000000000002", mediaType: "image/jpeg" }]]);
+    expect(text.handoffs).toEqual([]);
+});
+
+test("pairing that can't be checked answers the photo itself; a text with no photo before it runs alone", async () => {
+    const photo = harness({ photo: true, follows: "throws" });
+    await photo.handle(barePhoto("2000000000000001"), conv, AT);
+    expect(photo.runs).toEqual(["(The customer sent this photo.)"]);
+    const text = harness({ before: [] });
+    await text.handle(msg({ text: "Do you have this ?" }), conv, AT);
+    expect(text.runImages).toEqual([[]]);
+});
+
+test("a text whose photos can't be fetched goes to a person, like a photo would", async () => {
+    const h = harness({ photo: false, before: [barePhoto("2000000000000001")] });
+    await h.handle(msg({ text: "Do you have this ?" }), conv, AT);
+    expect(h.runs).toEqual([]);
+    expect(h.sent).toEqual([WA_LINES.textOnly]);
 });
 
 test("a photo that can't be fetched, a voice note or a file: a person, told once", async () => {

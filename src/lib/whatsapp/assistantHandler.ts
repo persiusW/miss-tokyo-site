@@ -2,7 +2,8 @@
 // Text, photos and taps on our own buttons go to Ask Miss Tokyo and the reply
 // comes back as one WhatsApp text (or a tappable question, ending the turn).
 // Anything else (voice notes, files, locations) goes to a person and the
-// customer is told once that only text is read for now.
+// customer is told once that only text is read for now. A photo sent without
+// words is answered with the text that follows it, when one does (photoPairing).
 //
 // A person takes the chat when the customer asks for one (the assistant's
 // "talk to us"), when the assistant fails, or at the daily limit. The bot then
@@ -20,6 +21,7 @@ import { withNotice } from "./notices";
 import type { ModelPhoto } from "./photo";
 import type { HandoffReason } from "./handoff";
 import type { Conversation, InboundMessage } from "./pipeline";
+import { isBarePhoto } from "./photoPairing";
 import { renderForWhatsApp, WA_LINES, type WhatsAppReply } from "./render";
 
 export type AssistantDeps = {
@@ -41,9 +43,13 @@ export type AssistantDeps = {
     quoted: (conversationId: string, waMessageId: string) => Promise<string | null>;
     counts: (chat: ShopChat) => Promise<{ lastMinute: number; today: number } | null>;
     perDay: number;
-    run: (a: { chat: ShopChat; text: string; phone: string; customerId: string | null; conversationId: string; image?: ModelPhoto | null }) => Promise<ShopRunResult>;
+    run: (a: { chat: ShopChat; text: string; phone: string; customerId: string | null; conversationId: string; images: ModelPhoto[] }) => Promise<ShopRunResult>;
     /** A customer's photo, ready for the model; null when it can't be fetched or isn't an image. */
     fetchPhoto: (mediaId: string) => Promise<ModelPhoto | null>;
+    /** Bare photo: waits out the pairing window; true when a text that arrived inside it will answer the photo. */
+    textFollows?: (m: InboundMessage, receivedAt: string) => Promise<boolean>;
+    /** Text: the bare photos it answers, oldest first. Throws when they can't be read, so the text is retried. */
+    photosBefore?: (m: InboundMessage, receivedAt: string) => Promise<InboundMessage[]>;
     siteUrl: string;
 };
 
@@ -105,9 +111,15 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         if (moved && m.from) await reply(c, m.from, WA_LINES.textOnly);
     }
 
-    return async (m: InboundMessage, c: Conversation): Promise<void> => {
+    async function fetchAll(mediaIds: string[]): Promise<ModelPhoto[]> {
+        const got = await Promise.all(mediaIds.map(id => deps.fetchPhoto(id).catch(() => null)));
+        return got.filter((p): p is ModelPhoto => !!p);
+    }
+
+    /** receivedAt: when we stored the message; without it photos are not paired. */
+    return async (m: InboundMessage, c: Conversation, receivedAt?: string): Promise<void> => {
         // Photos are read (a screenshot's SKU, or the style and colour); voice notes, files and the rest go to a person.
-        let photo: ModelPhoto | null = null;
+        let photos: ModelPhoto[] = [];
         let tapped: string | null = null;   // "[tapped: …]": an option we offered, so ours
         let typed = m.text ?? "";
         if (m.type === "interactive" && m.tap) {
@@ -116,11 +128,20 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
             const t = tapText(m.tap.title, offered);
             if (t === m.tap.title) typed = m.tap.title; else tapped = t;
         } else if (m.type === "image") {
-            photo = m.mediaId ? await deps.fetchPhoto(m.mediaId).catch(() => null) : null;
-            if (!photo) return notReadable(c, m);
+            // The customer's next text answers it. On an error, answer it here: a double reply, never a lost photo.
+            if (receivedAt && isBarePhoto(m) && await deps.textFollows?.(m, receivedAt).catch(() => false)) return;
+            photos = m.mediaId ? await fetchAll([m.mediaId]) : [];
+            if (photos.length === 0) return notReadable(c, m);
         } else if (m.type !== "text") {
             return notReadable(c, m);
+        } else if (receivedAt && deps.photosBefore) {
+            const before = await deps.photosBefore(m, receivedAt);
+            if (before.length > 0) {
+                photos = await fetchAll(before.map(p => p.mediaId!));
+                if (photos.length === 0) return notReadable(c, before[before.length - 1]);
+            }
         }
+        const photo = photos.length > 0;
         if (!m.from) return;
         const raw = tapped ?? stripOurMarkers(typed);
         const caption = cleanCustomerText(raw) ?? cleanCustomerText(raw.slice(0, 1000)) ?? "";
@@ -136,7 +157,7 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
             await reply(c, m.from, WA_LINES.started);
             return;
         }
-        const text = caption || "(The customer sent this photo.)";
+        const text = caption || (photos.length > 1 ? "(The customer sent these photos.)" : "(The customer sent this photo.)");
 
         // The quote comes from our records, never from the customer, so the model may trust it.
         // A tap's context is the question it answers, already in the chat; it is not a quote.
@@ -150,7 +171,7 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         if (!counts) return toPerson(c, m.from, "assistant_failed", WA_LINES.cantChat);
         if (visitorOver({ ...counts, perDay: deps.perDay })) return toPerson(c, m.from, "daily_limit", WA_LINES.limit);
 
-        const result = await deps.run({ chat, text: said, phone: m.from, customerId, conversationId: c.id, image: photo });
+        const result = await deps.run({ chat, text: said, phone: m.from, customerId, conversationId: c.id, images: photos });
         const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
         if (result.failed) return toPerson(c, m.from, "assistant_failed", out.text);
         if (out.wantsPerson) return toPerson(c, m.from, result.handoff ?? "customer_asked", out.text);

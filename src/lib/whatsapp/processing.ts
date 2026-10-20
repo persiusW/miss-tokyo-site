@@ -16,6 +16,7 @@ import { providerMessage } from "./choices";
 import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnNote, setOptOut } from "./conversationStore";
 import { forwardToTeam, type HandoffReason } from "./handoff";
 import { toModelPhoto } from "./photo";
+import { photosBefore, textFollows, type PairingDeps } from "./photoPairing";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
 import { FALLBACK_TEXT, type InboundParser, type PipelineDeps } from "./pipeline";
 import { supabaseInboundStore } from "./pipelineStore";
@@ -66,6 +67,8 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
         return moved;
     };
 
+    const pairing: PairingDeps = { eventsBetween: (from, to, phone) => supabaseInboundStore.eventsBetween(provider, from, to, phone), parse };
+
     const handle = createWhatsAppHandler({
         send: (to, text) => sender.sendText(to, text, { event: "whatsapp_reply" }),
         sendImage: (to, url, caption) => sender.sendImage(to, url, caption, { event: "whatsapp_reply_image" }),
@@ -92,10 +95,12 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
             if (!r.ok || !r.contentType.startsWith("image/")) return null;
             return toModelPhoto(r.bytes);
         },
+        textFollows: (m, at) => textFollows(m, at, pairing),
+        photosBefore: (m, at) => photosBefore(m, at, pairing),
         perDay: settings.shop.dailyMessagesPerVisitor,
         run: a => runShopAssistant({
             channel: "whatsapp", identity: { customerId: a.customerId, phone: a.phone }, chat: a.chat, text: a.text,
-            settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, image: a.image,
+            settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, images: a.images,
         }),
         siteUrl: site,
     });
