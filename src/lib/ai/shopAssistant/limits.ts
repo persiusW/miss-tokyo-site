@@ -112,6 +112,7 @@ export function photoAsNote(messages: Msg[]): Msg[] {
     return messages.map(m => {
         if (m.role !== "user" || !Array.isArray(m.content) || !(m.content as any[]).some(b => b?.type === "image")) return m;
         const said = textOf(m).trim();
-        return { role: "user", content: `[The customer sent a photo]${said ? ` ${said}` : ""}` };
+        const n = (m.content as any[]).filter(b => b?.type === "image").length;
+        return { role: "user", content: `[The customer sent ${n > 1 ? `${n} photos` : "a photo"}]${said ? ` ${said}` : ""}` };
     });
 }
