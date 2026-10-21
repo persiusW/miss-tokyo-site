@@ -23,6 +23,9 @@ export async function sendAsStaff(a: {
     conversationId: string; text: string; staffId: string; staffName: string | null;
     /** Reply myself: the chat goes to the team and the assistant stays quiet in it. */
     takeOver: boolean;
+    /** notification_log event and order, for sends made from somewhere other than the inbox (an order's "Send a note"). */
+    event?: string;
+    orderId?: string | null;
 }): Promise<StaffSendResult> {
     const text = a.text.trim();
     if (!text) return { ok: false, error: "Write a message first.", status: 400 };
@@ -36,7 +39,7 @@ export async function sendAsStaff(a: {
     }
 
     return withTurnLock(a.conversationId, async (): Promise<StaffSendResult> => {
-        const r = await createChatbotsAfrica().sendText(c.wa_phone_number, text, { event: "whatsapp_staff_reply" });
+        const r = await createChatbotsAfrica().sendText(c.wa_phone_number, text, { event: a.event ?? "whatsapp_staff_reply", orderId: a.orderId ?? null });
         if (!r.ok) return { ok: false, error: "WhatsApp didn't take that message. Please try again.", status: 502 };
         const { error: logErr } = await db.from("message_log").insert({
             conversation_id: a.conversationId, direction: "outbound", content: text, wa_message_id: r.messageId,
