@@ -28,16 +28,23 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "invoiceId is required." }, { status: 400 });
         }
 
-        // Fetch invoice amount from DB — never trust client-supplied amount (SEC-17)
-        const { data: invoiceData, error: invoiceError } = await supabaseAdmin
-            .from("invoices")
-            .select("total_amount")
+        // Fetch invoice amount from DB — never trust client-supplied amount (SEC-17).
+        // Invoices, quotes and pay links live in `documents` (amount = the
+        // stored total, tax included); there has never been an `invoices`
+        // table, so this lookup used to fail for every invoice.
+        const { data: doc, error: invoiceError } = await supabaseAdmin
+            .from("documents")
+            .select("amount, status")
             .eq("id", invoiceId)
             .single();
 
-        if (invoiceError || !invoiceData) {
+        if (invoiceError || !doc) {
             return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
         }
+        if (doc.status === "paid" || doc.status === "cancelled") {
+            return NextResponse.json({ error: doc.status === "paid" ? "This invoice has already been paid." : "This invoice was cancelled." }, { status: 409 });
+        }
+        const invoiceData = { total_amount: Number(doc.amount) };
 
         // Fetch fee settings
         const { data: feeData } = await supabaseAdmin
