@@ -9,7 +9,7 @@
 --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s7:32px;--s8:40px;--s9:56px;
 --r1:6px;--r2:10px;--r3:14px;--rp:999px;
 --tap:44px;--ctl:40px;--ctl-sm:34px;
---side-w:248px;--top-h:60px;--content-max:1180px;--panel-w:560px;--panel-wide:760px;
+--side-w:248px;--top-h:60px;--content-max:1600px;--gutter:24px;--panel-w:560px;--panel-wide:760px;
 --ease:cubic-bezier(.2,.7,.2,1);--dur:220ms;
 --bg:#f2efe8;--nav:#e9e5dc;--card:#fffefb;--card-2:#f7f4ee;--card-3:#efebe3;
 --line:rgba(40,32,18,.10);--line-2:rgba(40,32,18,.16);--input-line:#cfc8ba;--input-bg:#fffefb;
@@ -86,7 +86,8 @@
 .adm2 .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s4)}
 .adm2 .grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s4)}
 .adm2 .split{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:var(--s5);align-items:start}
-@media (max-width:980px){.adm2 .grid-4,.adm2 .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:1180px){.adm2 .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:980px){.adm2 .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}
 .adm2 .split{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:620px){.adm2 .grid-2,.adm2 .grid-3,.adm2 .grid-4{grid-template-columns:minmax(0,1fr)}
 .adm2 .hide-sm{display:none!important}}
@@ -108,14 +109,18 @@
 .adm2 .nav-dot{margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--warn-ink)}
 .adm2 .side-foot{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:var(--s3)}
 .adm2 .main{min-width:0;display:flex;flex-direction:column}
-.adm2 .top{position:sticky;top:0;z-index:20;height:var(--top-h);display:flex;align-items:center;gap:var(--s3);padding:0 var(--s7);background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px)}
+.adm2 .top{position:sticky;top:0;z-index:20;height:var(--top-h);display:flex;align-items:center;gap:var(--s3);padding:0 max(var(--gutter),calc((100% - var(--content-max))/2));background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px)}
 .adm2 .top-search{flex:1;max-width:460px;display:flex;align-items:center;gap:var(--s2);height:var(--ctl);padding:0 var(--s3);border:1px solid var(--input-line);border-radius:var(--r2);background:var(--input-bg);color:var(--ink-3);cursor:text;text-align:left}
 .adm2 .top-search svg{width:16px;height:16px;flex:none}
 .adm2 .top-search .lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .adm2 .kbd{font-size:var(--t-xs);border:1px solid var(--input-line);border-radius:var(--r1);padding:0 6px;color:var(--ink-3)}
 .adm2 .avatar{width:34px;height:34px;border-radius:50%;background:var(--card-3);display:grid;place-items:center;font-weight:700;font-size:var(--t-xs);color:var(--ink-2);flex:none}
 .adm2 .avatar.lg{width:52px;height:52px;font-size:var(--t-md)}
-.adm2 .page{width:100%;max-width:calc(var(--content-max) + 2*var(--s7));margin:0 auto;padding:var(--s5) var(--s7) 120px;display:flex;flex-direction:column;gap:var(--s5)}
+/* Full width: one gutter for every page, sidebar expanded or collapsed (the top bar
+   uses the same one so its search lines up with the content). */
+@media (max-width:900px){.adm2{--gutter:20px}}
+@media (max-width:620px){.adm2{--gutter:16px}}
+.adm2 .page{width:100%;max-width:calc(var(--content-max) + 2*var(--gutter));margin:0 auto;padding:20px var(--gutter) 120px;display:flex;flex-direction:column;gap:var(--s5)}
 .adm2 .hamburger{display:none}
 .adm2 .scrim-nav{display:none}
 @media (max-width:900px){.adm2 .app{grid-template-columns:minmax(0,1fr)}
@@ -124,8 +129,6 @@
 .adm2 .scrim-nav{display:block;position:fixed;inset:0;background:var(--scrim);z-index:25;opacity:0;pointer-events:none;transition:opacity var(--dur)}
 .adm2 .scrim-nav.on{opacity:1;pointer-events:auto}
 .adm2 .hamburger{display:inline-flex}
-.adm2 .top{padding:0 var(--s4)}
-.adm2 .page{padding:var(--s4) var(--s4) 120px}
 .adm2 .top-search .kbd,.adm2 .top-search .lbl{display:none}
 .adm2 .top-search{flex:0 0 var(--tap);justify-content:center;padding:0}}
 .adm2 .ph{display:flex;align-items:flex-end;gap:var(--s4);flex-wrap:wrap;padding-top:var(--s3)}
@@ -183,7 +186,7 @@
 .adm2 .link-btn:hover{text-decoration:underline}
 .adm2 .field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .adm2 .label{font-weight:600;font-size:var(--t-sm);color:var(--ink)}
-.adm2 .help{font-size:var(--t-sm);color:var(--ink-3);text-wrap:pretty}
+.adm2 .help{font-size:var(--t-sm);color:var(--ink-3);text-wrap:pretty;max-width:560px}
 .adm2 .input,.adm2 .select,.adm2 .textarea{width:100%;min-height:var(--ctl);padding:0 var(--s3);border:1px solid var(--input-line);border-radius:var(--r2);background:var(--input-bg);color:var(--ink);font:inherit}
 .adm2 .textarea{padding:var(--s3);min-height:96px;resize:vertical;line-height:var(--lh)}
 .adm2 .select{appearance:none;padding-right:36px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23736d62' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
