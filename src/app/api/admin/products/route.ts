@@ -40,6 +40,34 @@ async function deleteVariantsUnlessHeld(variantIds: string[], productId: string)
     if (error) console.error("[admin/products] variant delete failed:", error.message, { productId });
 }
 
+/** Active / Draft / Archived from the new admin, or is_active from the old one. */
+function visibilityFields(status: unknown, isActive: unknown, oldArchivedAt: string | null): { is_active: boolean; archived_at: string | null } {
+    if (status === "active" || status === "draft" || status === "archived") {
+        return {
+            is_active: status === "active",
+            archived_at: status === "archived" ? oldArchivedAt ?? new Date().toISOString() : null,
+        };
+    }
+    const active = isActive ?? true;
+    return { is_active: active !== false, archived_at: active === false ? oldArchivedAt : null };
+}
+
+/** The new admin's optional product fields, written only when the caller sent them. */
+function optionalFields(f: Record<string, any>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    if (f.preorder_enabled !== undefined) {
+        out.preorder_enabled = f.preorder_enabled === true;
+        out.preorder_estimated_date = f.preorder_enabled === true && typeof f.preorder_estimated_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f.preorder_estimated_date)
+            ? f.preorder_estimated_date : null;
+    }
+    if (f.is_wholesale_only !== undefined) out.is_wholesale_only = f.is_wholesale_only === true;
+    if (f.low_stock_at !== undefined) {
+        const n = Math.trunc(Number(f.low_stock_at));
+        if (Number.isFinite(n) && n >= 0 && n <= 1000) out.low_stock_at = n;
+    }
+    return out;
+}
+
 export async function POST(req: NextRequest) {
     // Auth check — only admin/owner can create products
     const serverClient = await createClient();
@@ -79,6 +107,11 @@ export async function POST(req: NextRequest) {
         wholesale_price_tier_2,
         wholesale_price_tier_3,
         variants,
+        status,
+        is_active,
+        compare_at_price_ghs,
+        is_sale,
+        discount_value,
     } = body;
 
     if (!name || !slug || price_ghs == null) {
@@ -100,6 +133,8 @@ export async function POST(req: NextRequest) {
             slug,
             sku: sku ?? null,
             price_ghs: Number(price_ghs),
+            ...(compare_at_price_ghs !== undefined ? { compare_at_price_ghs: compare_at_price_ghs != null && compare_at_price_ghs !== "" ? Number(compare_at_price_ghs) : null } : {}),
+            ...(is_sale !== undefined ? { is_sale: is_sale === true, discount_value: is_sale === true ? Number(discount_value) || 0 : 0 } : {}),
             inventory_count: tracked ? 0 : 9999,
             track_inventory: track_inventory ?? true,
             track_variant_inventory: track_variant_inventory ?? false,
@@ -111,7 +146,8 @@ export async function POST(req: NextRequest) {
             available_colors: available_colors ?? [],
             available_brands: available_brands ?? [],
             brand_variants: brand_variants ?? null,
-            is_active: true,
+            ...visibilityFields(status, is_active ?? true, null),
+            ...optionalFields(body),
             wholesale_override: wholesale_override ?? false,
             wholesale_price_tier_1: wholesale_override && wholesale_price_tier_1 ? Number(wholesale_price_tier_1) : null,
             wholesale_price_tier_2: wholesale_override && wholesale_price_tier_2 ? Number(wholesale_price_tier_2) : null,
@@ -178,6 +214,7 @@ export async function POST(req: NextRequest) {
     revalidatePath("/", "page");
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");
+    revalidatePath("/catalogue", "layout");
     revalidateTag("products", "max");
 
     // Activity logging is telemetry — run after the response so the UI isn't blocked on it
@@ -222,7 +259,9 @@ export async function PATCH(req: NextRequest) {
     // touching any other columns — avoids nulling out price, name, etc.
     const TOGGLE_FIELDS = new Set(["is_active", "is_sale", "discount_value", "compare_at_price_ghs"]);
     if (Object.keys(fields).length > 0 && Object.keys(fields).every(k => TOGGLE_FIELDS.has(k))) {
-        const { error } = await supabaseAdmin.from("products").update(fields).eq("id", id);
+        // Switching a product back on takes it out of Archived too.
+        const patch = fields.is_active === true ? { ...fields, archived_at: null } : fields;
+        const { error } = await supabaseAdmin.from("products").update(patch).eq("id", id);
         if (error) {
             console.error("[admin/products PATCH toggle]", error);
             { const dup = uniqueViolationMessage(error); if (dup) return NextResponse.json({ error: dup }, { status: 409 }); }
@@ -230,6 +269,7 @@ export async function PATCH(req: NextRequest) {
         }
         revalidatePath("/shop", "page");
         revalidatePath("/catalog/products", "page");
+        revalidatePath("/catalogue", "layout");
         revalidateTag("products", "max");
         return NextResponse.json({ success: true });
     }
@@ -260,6 +300,7 @@ export async function PATCH(req: NextRequest) {
         wholesale_price_tier_3,
         variants,
         inventory_baseline,
+        status,
     } = fields;
     const by = { actor: user.id };
 
@@ -304,7 +345,8 @@ export async function PATCH(req: NextRequest) {
         available_colors: available_colors ?? [],
         available_brands: available_brands ?? [],
         brand_variants: brand_variants ?? null,
-        is_active: is_active ?? true,
+        ...visibilityFields(status, is_active, (oldData as any)?.archived_at ?? null),
+        ...optionalFields(fields),
         wholesale_override: wholesale_override ?? false,
         wholesale_price_tier_1: wholesale_override && wholesale_price_tier_1 ? Number(wholesale_price_tier_1) : null,
         wholesale_price_tier_2: wholesale_override && wholesale_price_tier_2 ? Number(wholesale_price_tier_2) : null,
@@ -447,6 +489,7 @@ export async function PATCH(req: NextRequest) {
     revalidatePath("/", "page");
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");
+    revalidatePath("/catalogue", "layout");
     revalidateTag("products", "max");
 
     // Activity logging is telemetry — run after the response so the UI isn't blocked on it
