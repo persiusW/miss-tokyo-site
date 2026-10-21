@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 import {
     addToCart, changeDue, chargedUnitPrice, codeFromReply, mmss, paidByLabel, parseSalesQuery, quickCash, saleProblem,
@@ -67,13 +68,29 @@ test("with no processing fee the new till shows exactly the old till's amount", 
     }
 });
 
-test("the processing fee is on the goods after the code, never on delivery (the 2026-10-20 cash sales)", () => {
-    // Real till orders: 580 → 594.50, 200 + 35 delivery → 240, 4000 − 1000 → 3075.
+test("a pay link's processing fee is on the goods after the code, never on delivery", () => {
+    // The 2026-10-20 till orders as a pay link would charge them: 580 → 594.50, 200 + 35 delivery → 240, 4000 − 1000 → 3075.
     expect(tillTotals({ cart: [line(1, 580)], deliveryFee: 0, applied: null, feePct: 2.5 }).total).toBe(594.5);
     expect(tillTotals({ cart: [line(1, 200)], deliveryFee: 35, applied: null, feePct: 2.5 })).toMatchObject({ fee: 5, total: 240 });
     expect(tillTotals({ cart: [line(1, 4000)], deliveryFee: 0, applied: code("fixed", 1000), feePct: 2.5 }).total).toBe(3075);
     // A gift card that covers goods and delivery leaves nothing to collect, so the till must not ask for cash.
     expect(tillTotals({ cart: [line(1, 80)], deliveryFee: 20, applied: code("gift_card", 100, "gift_card"), feePct: 2.5 }).total).toBe(0);
+});
+
+test("cash carries no processing fee: the till asks for what the order records (owner decision 2026-10-21)", () => {
+    // The same 2026-10-20 cash sales were recorded with 2.5% the drawer never took; now 580, 235 and 3000.
+    expect(tillTotals({ cart: [line(1, 580)], deliveryFee: 0, applied: null, feePct: 2.5, cash: true })).toMatchObject({ fee: 0, total: 580 });
+    expect(tillTotals({ cart: [line(1, 200)], deliveryFee: 35, applied: null, feePct: 2.5, cash: true })).toMatchObject({ fee: 0, total: 235 });
+    expect(tillTotals({ cart: [line(1, 4000)], deliveryFee: 0, applied: code("fixed", 1000), feePct: 2.5, cash: true }).total).toBe(3000);
+    // And it equals the old till's cash amount for every cart, code and delivery fee, whatever the fee setting.
+    for (const cart of CARTS) for (const applied of CODES) for (const deliveryFee of [0, 20, 35]) for (const feePct of [0, 2.5]) {
+        expect(tillTotals({ cart, deliveryFee, applied, feePct, cash: true }).total).toBe(oldTillTotal(cart, deliveryFee, applied));
+    }
+});
+
+test("send-link adds the processing fee to pay links only, never to cash", () => {
+    const src = readFileSync("src/app/api/pos/send-link/route.ts", "utf8");
+    expect(src).toMatch(/feePct > 0 && mode !== 'cash'/);
 });
 
 test("the sale price is the one send-link charges", () => {

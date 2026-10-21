@@ -116,7 +116,7 @@ export function NewSale({ settings, categories, initialProducts, initialCustomer
     const deliveryMethod = how === "now" ? "pickup" : "delivery";
     const zone: DeliveryZone = how === "outside" ? "outside" : "accra";
     const deliveryFee = resolveDeliveryFee({ settings: settings.delivery, country, deliveryMethod, zone });
-    const totals = tillTotals({ cart, deliveryFee, applied, feePct: settings.feePct });
+    const totals = tillTotals({ cart, deliveryFee, applied, feePct: settings.feePct, cash: pay === "cash" });
     const units = cart.reduce((s, i) => s + i.quantity, 0);
 
     const draft: SaleDraft = {

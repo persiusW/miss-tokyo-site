@@ -36,7 +36,7 @@ export type TillTotals = {
     discount: number;
     deliveryDiscount: number;
     payableDelivery: number;
-    /** The processing fee, on the goods after the code, as send-link adds it (cash and pay links alike). */
+    /** The processing fee, on the goods after the code, as send-link adds it: pay links only, never cash. */
     fee: number;
     total: number;
 };
@@ -46,7 +46,7 @@ export type TillTotals = {
  * it records (and, for a pay link, charges):
  *   discountedSubtotal = goods − the code's goods part
  *   payableDelivery    = delivery − the code's delivery part
- *   fee                = discountedSubtotal × fee% (rounded)
+ *   fee                = discountedSubtotal × fee% (rounded); 0 for cash
  *   total              = discountedSubtotal + fee + payableDelivery
  */
 export function tillTotals(args: {
@@ -54,6 +54,8 @@ export function tillTotals(args: {
     deliveryFee: number;
     applied: PosAppliedDiscount | null;
     feePct: number;
+    /** Paying cash: no processing fee, as send-link records it. */
+    cash?: boolean;
 }): TillTotals {
     const goods = args.cart.reduce((s, i) => s + i.price * i.quantity, 0);
     const deliveryFee = args.deliveryFee;
@@ -63,7 +65,7 @@ export function tillTotals(args: {
     const discountedSubtotal = round2(Math.max(0, goods - (split.subtotalAmount ?? 0)));
     const payableDelivery = round2(Math.max(0, deliveryFee - Math.min(split.deliveryAmount ?? 0, deliveryFee)));
     const feePct = Number(args.feePct) || 0;
-    const fee = feePct > 0 ? round2(discountedSubtotal * feePct / 100) : 0;
+    const fee = feePct > 0 && !args.cash ? round2(discountedSubtotal * feePct / 100) : 0;
     const total = round2(discountedSubtotal + fee + payableDelivery);
     return { goods, deliveryFee, discount: split.amount ?? 0, deliveryDiscount: split.deliveryAmount ?? 0, payableDelivery, fee, total };
 }
