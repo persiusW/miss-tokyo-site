@@ -11,7 +11,6 @@
 // own, so a long chat never pushes the list out of view. On a phone it shows
 // the list or one chat, with a back button.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { canAnswerWaiting, mediaKind, waitingFor, waitingMessages, type InboxConversation, type InboxTab, type Standing } from "@/lib/whatsapp/inbox";
 import type { CustomerPanel } from "@/lib/whatsapp/customerPanel";
@@ -229,16 +228,10 @@ export default function WhatsAppInboxClient() {
         <>
         <div className={`wa-top${selected ? " has-chat" : ""}`} data-wa-top>
             <style>{`
-                .wa-top { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
                 .wa-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
                 @media (min-width: 900px) { .wa-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
                 @media (max-width: 759px) { .wa-top.has-chat { display: none; } }
             `}</style>
-            {list?.can?.teach && (
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <Link className="ac-btn" href="/customers/whatsapp/teach" data-wa-teach-link>Teach the assistant</Link>
-                </div>
-            )}
             <StatTiles stats={list?.stats} />
         </div>
         <div ref={rootRef} className={`wa-inbox${selected ? " has-chat" : ""}`} data-wa-inbox>
