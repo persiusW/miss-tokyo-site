@@ -206,7 +206,7 @@ function StoreTab() {
             setLoading(true);
             try {
                 // Fetch settings
-                const { data: sData } = await supabase.from("store_settings").select("*").eq("id", 1).single();
+                const { data: sData } = await supabase.from("store_settings").select("*").eq("id", "default").single();
                 if (sData) {
                     setForm({
                         global_sizes: sData.global_sizes || DEFAULT_STORE.global_sizes,
@@ -240,8 +240,9 @@ function StoreTab() {
                 maintenance_mode
             } = form;
 
+            // Only the 'default' row is read anywhere; row '1' is stale (kept, unused).
             const { error: sError } = await supabase.from("store_settings").upsert({
-                id: 1,
+                id: "default",
                 global_sizes,
                 global_colors,
                 global_brands,

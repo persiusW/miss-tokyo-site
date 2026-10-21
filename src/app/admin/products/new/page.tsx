@@ -49,7 +49,7 @@ export default function NewProductPage() {
     const fetchData = async () => {
       const [{ data: cats }, { data: settings }] = await Promise.all([
         supabase.from("categories").select("id, name"),
-        supabase.from("store_settings").select("global_sizes, global_colors").eq("id", 1).single()
+        supabase.from("store_settings").select("global_sizes, global_colors").eq("id", "default").single()
       ]);
       if (cats) setCategories(cats);
       if (settings) {
