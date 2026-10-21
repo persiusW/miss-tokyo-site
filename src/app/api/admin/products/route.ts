@@ -40,6 +40,51 @@ async function deleteVariantsUnlessHeld(variantIds: string[], productId: string)
     if (error) console.error("[admin/products] variant delete failed:", error.message, { productId });
 }
 
+/** Who may see and set a product's cost (BACKEND_GAPS 7). Sales staff never get it. */
+const COST_ROLES = ["owner", "admin"];
+
+type CostInput = { product?: unknown; variants?: Array<{ size?: string | null; color?: string | null; brand?: string | null; cost?: unknown }> };
+
+const costValue = (v: unknown): number | null => {
+    if (v == null || v === "") return null;
+    const n = Math.round(Number(v) * 100) / 100;
+    return Number.isFinite(n) && n >= 0 && n < 10_000_000 ? n : null;
+};
+
+/**
+ * Cost per item, kept in product_costs (service role only, never read by the
+ * storefront). An empty cost removes the row. Variant costs are matched to the
+ * variant rows by size, colour and brand, the same key the stock uses.
+ */
+async function saveCosts(productId: string, costs: CostInput, userId: string): Promise<void> {
+    const db = supabaseAdmin as any;
+    const rows: { variant_id: string | null; cost: number | null }[] = [{ variant_id: null, cost: costValue(costs.product) }];
+    if (Array.isArray(costs.variants) && costs.variants.length > 0) {
+        const { data: vs } = await supabaseAdmin.from("product_variants").select("id, size, color, brand").eq("product_id", productId).order("id");
+        const keyOf = (v: { size?: string | null; color?: string | null; brand?: string | null }) => `${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+        const ids = new Map<string, string>();
+        for (const v of vs ?? []) if (!ids.has(keyOf(v))) ids.set(keyOf(v), v.id);
+        for (const c of costs.variants) {
+            const id = ids.get(keyOf(c));
+            if (id) rows.push({ variant_id: id, cost: costValue(c.cost) });
+        }
+    }
+    const keep = rows.filter(r => r.cost != null);
+    const drop = rows.filter(r => r.cost == null);
+    if (keep.length) {
+        const { error } = await db.from("product_costs").upsert(
+            keep.map(r => ({ product_id: productId, variant_id: r.variant_id, cost_ghs: r.cost, updated_by: userId, updated_at: new Date().toISOString() })),
+            { onConflict: "product_id,variant_id" },
+        );
+        if (error) console.error("[admin/products] cost save failed:", error.message, { productId });
+    }
+    for (const r of drop) {
+        const q = db.from("product_costs").delete().eq("product_id", productId);
+        const { error } = await (r.variant_id ? q.eq("variant_id", r.variant_id) : q.is("variant_id", null));
+        if (error) console.error("[admin/products] cost clear failed:", error.message, { productId });
+    }
+}
+
 /** Active / Draft / Archived from the new admin, or is_active from the old one. */
 function visibilityFields(status: unknown, isActive: unknown, oldArchivedAt: string | null): { is_active: boolean; archived_at: string | null } {
     if (status === "active" || status === "draft" || status === "archived") {
@@ -112,6 +157,7 @@ export async function POST(req: NextRequest) {
         compare_at_price_ghs,
         is_sale,
         discount_value,
+        costs,
     } = body;
 
     if (!name || !slug || price_ghs == null) {
@@ -210,6 +256,9 @@ export async function POST(req: NextRequest) {
         }
     }
 
+    if (costs && typeof costs === "object" && COST_ROLES.includes(caller.role)) {
+        await saveCosts(data.id, costs as CostInput, user.id);
+    }
 
     revalidatePath("/", "page");
     revalidatePath("/shop", "page");
@@ -301,6 +350,7 @@ export async function PATCH(req: NextRequest) {
         variants,
         inventory_baseline,
         status,
+        costs,
     } = fields;
     const by = { actor: user.id };
 
@@ -484,6 +534,11 @@ export async function PATCH(req: NextRequest) {
         const { data: existingVariants } = await supabaseAdmin
             .from("product_variants").select("id").eq("product_id", id);
         await deleteVariantsUnlessHeld((existingVariants ?? []).map((v: any) => v.id), id);
+    }
+
+    // Sales staff can save the rest of the product; a cost they send is ignored.
+    if (costs && typeof costs === "object" && COST_ROLES.includes(caller.role)) {
+        await saveCosts(id, costs as CostInput, user.id);
     }
 
     revalidatePath("/", "page");
