@@ -1,5 +1,6 @@
 // The Supabase side of the inbound pipeline. Server-only (service role).
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { logConversationEvent } from "./events";
 import { MAX_ATTEMPTS, REPROCESS_WINDOW_MS, RETRY_AFTER_MS, type Conversation, type InboundEvent, type InboundStore } from "./pipeline";
 
 // inbound_events and the new whatsapp_conversations columns are not in the generated types yet.
@@ -110,10 +111,12 @@ export const supabaseInboundStore: InboundStore & {
         const state = { ...(row.state ?? {}), mode: "human", reason, since: now.toISOString() };
         // Only the run that finds it unassigned makes the move, so the customer is told once.
         const { data: moved, error: upError } = await db.from("whatsapp_conversations")
-            .update({ state, handed_off_at: now.toISOString() })
+            .update({ state, handed_off_at: now.toISOString(), dealt_with_at: null })
             .eq("id", conversationId).is("handed_off_at", null).select("id");
         if (upError) fail("hand off", upError);
-        return (moved ?? []).length > 0;
+        const did = (moved ?? []).length > 0;
+        if (did) await logConversationEvent(conversationId, "handed_off", { reason });
+        return did;
     },
 
     async listPending(now, limit) {
