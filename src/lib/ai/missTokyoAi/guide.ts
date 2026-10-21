@@ -102,31 +102,31 @@ export const GUIDE: GuideEntry[] = [
         id: "gift-cards",
         title: "Gift Cards",
         route: "gift_cards",
-        body: `"Issue Gift Card" → amount → "Recipient Email *" → optional name, sender and message → "Issue & Send Email". "View" shows the balance, "Cancel" (permanent) and "Resend". A card's amount or balance cannot be edited. Online gift-card limits are in Content → Pages → Gift cards page (Site Settings → CMS → Gift Cards in the old admin).`,
+        body: `New admin: Products › Gift cards. Totals: Cards issued, Value issued, Still to spend, Used up this month. Search by code, name or email; chips All, Active, Used up, Waiting for payment, Expired, Cancelled. "Issue gift card" → amount (GH₵ 100 / 300 / 500 / Other) → recipient's name and email → From and Message → "Send gift card"; the code is emailed straight away. Tap a card for its balance and every time it was spent; its … menu has "Resend to recipient" and "Cancel gift card" (a confirmation panel: the code stops working, the balance can't be spent, no money is refunded). Old admin: "Issue Gift Card" → amount → "Recipient Email *" → optional name, sender and message → "Issue & Send Email"; "View" shows the balance, "Cancel" (permanent) and "Resend". A card's amount or balance cannot be edited. Online gift-card limits are in Content → Pages → Gift cards page (Site Settings → CMS → Gift Cards in the old admin).`,
     },
     {
         id: "products",
         title: "Products",
         route: "products",
-        body: `Search, "Low Stock", "New Product", status and stock filters. Per row: Pre-Order "Enable" with weeks, the eye icon to hide/show in the shop, edit, delete. Bulk actions: Show, Hide, Wholesale (careful: replaces all the product's categories), Untrack, Delete.`,
+        body: `New admin: Products (tabs Products, Inventory, Categories, Gift cards). Chips All, Active, Draft, Low stock, Sold out, No photo, Pre-order, Archived; search by name or SKU (sizes' SKUs too). Columns: product, status, stock ("12 in stock", "2 sold out · 1 low", "Pre-order · 3 weeks"), category, price and, for owners and admins, margin. Tick products for the bulk bar: Edit prices, Set as draft, Make active, Archive (tap twice; Undo in the toast) and More → Assign wholesale category (keep or replace their other categories), Pre-orders (on/off with weeks), Stop tracking stock. Archived and Draft are both hidden from the shop and the till. Old admin: Search, "Low Stock", "New Product", status and stock filters. Per row: Pre-Order "Enable" with weeks, the eye icon to hide/show in the shop, edit, delete. Bulk actions: Show, Hide, Wholesale (careful: replaces all the product's categories), Untrack, Delete.`,
     },
     {
         id: "product-form",
         title: "Adding or editing a product",
         route: "product_new",
-        body: `Name, slug, categories, description, SKU, price. Variants: switch on Sizes, Colors and/or Brands and tick the options — the options come ONLY from Site Settings → Store global lists (admin/owner add missing sizes, colours or brands there first). For stock per size/colour turn on "Track Inventory" and "Track Inventory by Variant", then fill the stock matrix. A product that never runs out: turn Track Inventory off. Up to 10 photos; the first is the main image. To restock, edit the product, change the stock and "Update Product" — only the difference is applied, so sales made while the form was open are kept. Editing adds Active, Compare-at Price and On Sale with Discount %.`,
+        body: `New admin: one panel for adding and editing, tabs Details (name, web address, description, category, other categories, SKU, photos and video; up to 10, the first is the main photo), Sizes and stock (tap sizes, colours and brands from Settings → Store; "Track stock"; "Separate stock for each size and colour" with an SKU and stock for each; stock typed here is saved as a correction by you, only the difference is applied; "Stock history"; "Warn me when a size drops to"), Pricing (price, was price, On sale with discount %, and for owners and admins Cost per item with the margin; wholesale prices when wholesale is on) and Visibility (Active, Draft or Archived; Take pre-orders with weeks; Wholesale customers only). "Add product" / "Save product"; Archive (tap twice) bottom left; owners and admins can "Delete for good" from the … menu. A new product starts as a Draft. Old admin: Name, slug, categories, description, SKU, price. Variants: switch on Sizes, Colors and/or Brands and tick the options — the options come ONLY from Site Settings → Store global lists (admin/owner add missing sizes, colours or brands there first). For stock per size/colour turn on "Track Inventory" and "Track Inventory by Variant", then fill the stock matrix. A product that never runs out: turn Track Inventory off. Up to 10 photos; the first is the main image. To restock, edit the product, change the stock and "Update Product" — only the difference is applied, so sales made while the form was open are kept. Editing adds Active, Compare-at Price and On Sale with Discount %.`,
     },
     {
         id: "low-stock-page",
         title: "Low Stock page",
         route: "low_stock",
-        body: `Active tracked products whose TOTAL stock is under 5; the edit icon opens the product. A single sold-out size is not listed there — stock_report checks every size and colour.`,
+        body: `New admin: Products › Inventory lists every size and colour with its stock. KPIs: Items in stock, Sizes running low, Sizes sold out (the same numbers as Home). Chips All, Running low (at or under each product's warning level, default 2), Sold out. "Adjust" asks why: "New stock arrived", "I counted it" (sets the number you counted), "Damaged or lost" (a write-off, shown in Analytics › Stock written off) or "Fix a mistake", then shows "Stock goes from X to Y" before saving. "History" shows every sale, return, delivery, count and correction in plain words. "Export stock" downloads a CSV. A warning appears if a product's total no longer matches its sizes. Old admin: Low Stock page — active tracked products whose TOTAL stock is under 5; the edit icon opens the product. A single sold-out size is not listed there — stock_report checks every size and colour.`,
     },
     {
         id: "categories",
         title: "Categories",
         route: "categories",
-        body: `Search and filters; "New Category" with name, slug, description, Wholesale and Pre-Order toggles (with weeks). Per row: Active, Featured, Duplicate as Wholesale, Edit, Delete.`,
+        body: `New admin: Products › Categories. Search and chips (All, In the shop, Hidden, On the home page, Wholesale, Pre-order); each row has an "On home page" switch (at most 3; Undo in the toast). Tap one to edit: name, web address, description, image, Show in the shop, Show on the home page, Wholesale customers only (with tier prices), Take pre-orders with weeks (saving applies it to its products), Position in the shop menu; "Delete" (tap twice) only when no product is in it; … → "Make a wholesale copy". Old admin: Search and filters; "New Category" with name, slug, description, Wholesale and Pre-Order toggles (with weeks). Per row: Active, Featured, Duplicate as Wholesale, Edit, Delete.`,
     },
     {
         id: "customers",
@@ -203,7 +203,7 @@ export const CANNOT_DO: string[] = [
     "Split one till payment between cash and card (a gift card plus a link for the rest does work).",
     "Invite an Owner from the Team page.",
     "Type a new size, colour or brand on the product form (add it to Site Settings → Store first).",
-    "Import stock in bulk.",
+    "Import products or stock from a CSV file (Inventory can export stock, not import it).",
 ];
 
 export function guideFor(role: StaffRole): GuideEntry[] {

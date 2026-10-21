@@ -73,11 +73,37 @@ test("shared paths are never redirected", () => {
     }
 });
 
+test("Products lives at /catalogue and waits for its own switch", () => {
+    expect(v2Redirect("/catalog/products", "status=active", FLAGS_ALL, ALL)).toBe("/catalogue?status=active");
+    expect(v2Redirect("/catalog/products/new", "", FLAGS_ALL, ALL)).toBe("/catalogue/new");
+    expect(v2Redirect("/admin/products/new", "", FLAGS_ALL, ALL)).toBe("/catalogue/new");
+    expect(v2Redirect("/catalog/products/0a1b2c3d-1111-2222-3333-444455556666/edit", "", FLAGS_ALL, ALL)).toBe("/catalogue/0a1b2c3d-1111-2222-3333-444455556666");
+    expect(v2Redirect("/catalog/products/low-stock", "", FLAGS_ALL, ALL)).toBe("/catalogue/inventory?view=low");
+    expect(v2Redirect("/catalog/categories", "", FLAGS_ALL, ALL)).toBe("/catalogue/categories");
+    expect(v2Redirect("/admin/categories", "", FLAGS_ALL, ALL)).toBe("/catalogue/categories");
+    expect(v2Redirect("/catalog/gift-cards", "", FLAGS_ALL, ALL)).toBe("/catalogue/gift-cards");
+    // Built, so the real switch moves them, but only admin_v2_products does.
+    const v2Only = { ...FLAGS_OFF, admin_v2: true };
+    expect(v2Redirect("/catalog/products", "", v2Only)).toBeNull();
+    expect(v2Redirect("/catalog/gift-cards", "", v2Only)).toBeNull();
+    expect(v2Redirect("/catalogue", "", v2Only)).toBe("/catalog/products");
+    expect(v2Redirect("/catalog/products", "", { ...v2Only, admin_v2_products: true })).toBe("/catalogue");
+    // Switched off, every new address goes back.
+    expect(v2Redirect("/catalogue/inventory", "view=low", FLAGS_OFF)).toBe("/catalog/products/low-stock");
+    expect(v2Redirect("/catalogue/0a1b2c3d-1111-2222-3333-444455556666", "", FLAGS_OFF)).toBe("/catalog/products/0a1b2c3d-1111-2222-3333-444455556666/edit");
+    expect(v2Redirect("/catalogue/categories", "", FLAGS_OFF)).toBe("/catalog/categories");
+    expect(v2Redirect("/catalogue/gift-cards", "", FLAGS_OFF)).toBe("/catalog/gift-cards");
+    expect(v2Redirect("/catalogue/new", "", FLAGS_OFF)).toBe("/catalog/products/new");
+    expect(v2Redirect("/catalogue", "view=low", FLAGS_ALL)).toBeNull();
+});
+
 test("no redirect ever loops", () => {
     const paths = ["/overview", "/home", "/sales/orders", "/orders", "/orders/abandoned", "/pos", "/till", "/catalogue", "/catalog/products", "/team", "/staff", "/cms", "/content",
         "/catalog/discounts", "/catalog/auto-discounts", "/discounts", "/discounts/abc",
-        "/sales/analytics", "/analytics", "/sales/payments", "/sales/riders", "/sales/riders/r9", "/analytics/reports/payments"];
-    for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }]) {
+        "/sales/analytics", "/analytics", "/sales/payments", "/sales/riders", "/sales/riders/r9", "/analytics/reports/payments",
+        "/catalog/products/new", "/catalogue/new", "/catalog/products/p1/edit", "/catalogue/p1", "/catalog/products/low-stock", "/catalogue/inventory",
+        "/catalog/categories", "/catalogue/categories", "/admin/categories", "/catalog/gift-cards", "/catalogue/gift-cards", "/admin/products/new"];
+    for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_products: true }]) {
         for (const p of paths) {
             const once = v2Redirect(p, "", flags, ALL);
             if (!once) continue;

@@ -40,6 +40,79 @@ async function deleteVariantsUnlessHeld(variantIds: string[], productId: string)
     if (error) console.error("[admin/products] variant delete failed:", error.message, { productId });
 }
 
+/** Who may see and set a product's cost (BACKEND_GAPS 7). Sales staff never get it. */
+const COST_ROLES = ["owner", "admin"];
+
+type CostInput = { product?: unknown; variants?: Array<{ size?: string | null; color?: string | null; brand?: string | null; cost?: unknown }> };
+
+const costValue = (v: unknown): number | null => {
+    if (v == null || v === "") return null;
+    const n = Math.round(Number(v) * 100) / 100;
+    return Number.isFinite(n) && n >= 0 && n < 10_000_000 ? n : null;
+};
+
+/**
+ * Cost per item, kept in product_costs (service role only, never read by the
+ * storefront). An empty cost removes the row. Variant costs are matched to the
+ * variant rows by size, colour and brand, the same key the stock uses.
+ */
+async function saveCosts(productId: string, costs: CostInput, userId: string): Promise<void> {
+    const db = supabaseAdmin as any;
+    const rows: { variant_id: string | null; cost: number | null }[] = [{ variant_id: null, cost: costValue(costs.product) }];
+    if (Array.isArray(costs.variants) && costs.variants.length > 0) {
+        const { data: vs } = await supabaseAdmin.from("product_variants").select("id, size, color, brand").eq("product_id", productId).order("id");
+        const keyOf = (v: { size?: string | null; color?: string | null; brand?: string | null }) => `${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+        const ids = new Map<string, string>();
+        for (const v of vs ?? []) if (!ids.has(keyOf(v))) ids.set(keyOf(v), v.id);
+        for (const c of costs.variants) {
+            const id = ids.get(keyOf(c));
+            if (id) rows.push({ variant_id: id, cost: costValue(c.cost) });
+        }
+    }
+    const keep = rows.filter(r => r.cost != null);
+    const drop = rows.filter(r => r.cost == null);
+    if (keep.length) {
+        const { error } = await db.from("product_costs").upsert(
+            keep.map(r => ({ product_id: productId, variant_id: r.variant_id, cost_ghs: r.cost, updated_by: userId, updated_at: new Date().toISOString() })),
+            { onConflict: "product_id,variant_id" },
+        );
+        if (error) console.error("[admin/products] cost save failed:", error.message, { productId });
+    }
+    for (const r of drop) {
+        const q = db.from("product_costs").delete().eq("product_id", productId);
+        const { error } = await (r.variant_id ? q.eq("variant_id", r.variant_id) : q.is("variant_id", null));
+        if (error) console.error("[admin/products] cost clear failed:", error.message, { productId });
+    }
+}
+
+/** Active / Draft / Archived from the new admin, or is_active from the old one. */
+function visibilityFields(status: unknown, isActive: unknown, oldArchivedAt: string | null): { is_active: boolean; archived_at: string | null } {
+    if (status === "active" || status === "draft" || status === "archived") {
+        return {
+            is_active: status === "active",
+            archived_at: status === "archived" ? oldArchivedAt ?? new Date().toISOString() : null,
+        };
+    }
+    const active = isActive ?? true;
+    return { is_active: active !== false, archived_at: active === false ? oldArchivedAt : null };
+}
+
+/** The new admin's optional product fields, written only when the caller sent them. */
+function optionalFields(f: Record<string, any>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    if (f.preorder_enabled !== undefined) {
+        out.preorder_enabled = f.preorder_enabled === true;
+        out.preorder_estimated_date = f.preorder_enabled === true && typeof f.preorder_estimated_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f.preorder_estimated_date)
+            ? f.preorder_estimated_date : null;
+    }
+    if (f.is_wholesale_only !== undefined) out.is_wholesale_only = f.is_wholesale_only === true;
+    if (f.low_stock_at !== undefined) {
+        const n = Math.trunc(Number(f.low_stock_at));
+        if (Number.isFinite(n) && n >= 0 && n <= 1000) out.low_stock_at = n;
+    }
+    return out;
+}
+
 export async function POST(req: NextRequest) {
     // Auth check — only admin/owner can create products
     const serverClient = await createClient();
@@ -79,11 +152,25 @@ export async function POST(req: NextRequest) {
         wholesale_price_tier_2,
         wholesale_price_tier_3,
         variants,
+        status,
+        is_active,
+        compare_at_price_ghs,
+        is_sale,
+        discount_value,
+        costs,
     } = body;
 
     if (!name || !slug || price_ghs == null) {
         return NextResponse.json({ error: "name, slug, and price_ghs are required" }, { status: 400 });
     }
+
+    // Opening stock goes through the ledger like every other change: the rows
+    // start at 0 and the typed counts are applied as movements below, so stock
+    // history starts with "Corrected +N by <staff>" instead of a number nobody
+    // recorded. An untracked product still gets the 9999 "not tracked" flag.
+    const tracked = (track_inventory ?? true) !== false;
+    const byVariant = tracked && track_variant_inventory === true;
+    const openingStock = tracked && !byVariant ? Math.max(0, Math.trunc(Number(inventory_count) || 0)) : 0;
 
     const { data, error } = await supabaseAdmin
         .from("products")
@@ -92,7 +179,9 @@ export async function POST(req: NextRequest) {
             slug,
             sku: sku ?? null,
             price_ghs: Number(price_ghs),
-            inventory_count: track_inventory && !track_variant_inventory ? Number(inventory_count) : 9999,
+            ...(compare_at_price_ghs !== undefined ? { compare_at_price_ghs: compare_at_price_ghs != null && compare_at_price_ghs !== "" ? Number(compare_at_price_ghs) : null } : {}),
+            ...(is_sale !== undefined ? { is_sale: is_sale === true, discount_value: is_sale === true ? Number(discount_value) || 0 : 0 } : {}),
+            inventory_count: tracked ? 0 : 9999,
             track_inventory: track_inventory ?? true,
             track_variant_inventory: track_variant_inventory ?? false,
             description,
@@ -103,7 +192,8 @@ export async function POST(req: NextRequest) {
             available_colors: available_colors ?? [],
             available_brands: available_brands ?? [],
             brand_variants: brand_variants ?? null,
-            is_active: true,
+            ...visibilityFields(status, is_active ?? true, null),
+            ...optionalFields(body),
             wholesale_override: wholesale_override ?? false,
             wholesale_price_tier_1: wholesale_override && wholesale_price_tier_1 ? Number(wholesale_price_tier_1) : null,
             wholesale_price_tier_2: wholesale_override && wholesale_price_tier_2 ? Number(wholesale_price_tier_2) : null,
@@ -118,20 +208,31 @@ export async function POST(req: NextRequest) {
         return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
+    const by = { actor: user.id, note: "Opening stock" };
+    if (openingStock > 0) {
+        try {
+            await adjustStock(data.id, null, openingStock, by);
+        } catch (e: any) {
+            console.error("[admin/products POST] opening stock failed:", e?.message, { id: data.id });
+            return NextResponse.json({ error: "The product was added, but its stock wasn't saved. Open it and enter the stock again." }, { status: 500 });
+        }
+    }
+
     // Insert per-variant inventory rows when tracking by variant
-    if (track_inventory && track_variant_inventory && variants && variants.length > 0) {
+    if (byVariant && variants && variants.length > 0) {
         const toInsert = variants.map((v: any) => ({
             product_id: data.id,
             size: v.size || null,
             color: v.color || null,
             brand: v.brand || null,
             sku: v.sku || null,
-            inventory_count: v.inventory_count ?? 0,
+            inventory_count: 0,
         }));
 
-        const { error: insertErr } = await supabaseAdmin
+        const { data: inserted, error: insertErr } = await supabaseAdmin
             .from("product_variants")
-            .insert(toInsert);
+            .insert(toInsert)
+            .select("id, size, color, brand");
 
         if (insertErr) {
             console.error("[admin/products POST] variant insert failed:", insertErr.message);
@@ -139,15 +240,30 @@ export async function POST(req: NextRequest) {
             return apiError("GEN-00", { status: 500, audience: "staff", cause: insertErr });
         }
 
-        // Sync product-level inventory_count to variant sum. The product was
-        // inserted with the 9999 sentinel; leaving it there would read as
-        // unlimited stock for a product that does track inventory.
-        await syncProductStockFromVariants(data.id);
+        // Each size's opening count moves its row and the product roll-up
+        // together, so the roll-up ends up as the sum without a rebuild.
+        const keyOf = (v: { size?: string | null; color?: string | null; brand?: string | null }) => `${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+        const idByKey = new Map((inserted ?? []).map((v: any) => [keyOf(v), v.id as string]));
+        try {
+            for (const v of variants) {
+                const n = Math.max(0, Math.trunc(Number(v.inventory_count) || 0));
+                const vid = idByKey.get(keyOf(v));
+                if (vid && n > 0) await adjustStock(data.id, vid, n, by);
+            }
+        } catch (e: any) {
+            console.error("[admin/products POST] opening variant stock failed:", e?.message, { id: data.id });
+            return NextResponse.json({ error: "The product was added, but some of its stock wasn't saved. Open it and check the stock." }, { status: 500 });
+        }
+    }
+
+    if (costs && typeof costs === "object" && COST_ROLES.includes(caller.role)) {
+        await saveCosts(data.id, costs as CostInput, user.id);
     }
 
     revalidatePath("/", "page");
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");
+    revalidatePath("/catalogue", "layout");
     revalidateTag("products", "max");
 
     // Activity logging is telemetry — run after the response so the UI isn't blocked on it
@@ -192,7 +308,9 @@ export async function PATCH(req: NextRequest) {
     // touching any other columns — avoids nulling out price, name, etc.
     const TOGGLE_FIELDS = new Set(["is_active", "is_sale", "discount_value", "compare_at_price_ghs"]);
     if (Object.keys(fields).length > 0 && Object.keys(fields).every(k => TOGGLE_FIELDS.has(k))) {
-        const { error } = await supabaseAdmin.from("products").update(fields).eq("id", id);
+        // Switching a product back on takes it out of Archived too.
+        const patch = fields.is_active === true ? { ...fields, archived_at: null } : fields;
+        const { error } = await supabaseAdmin.from("products").update(patch).eq("id", id);
         if (error) {
             console.error("[admin/products PATCH toggle]", error);
             { const dup = uniqueViolationMessage(error); if (dup) return NextResponse.json({ error: dup }, { status: 409 }); }
@@ -200,6 +318,7 @@ export async function PATCH(req: NextRequest) {
         }
         revalidatePath("/shop", "page");
         revalidatePath("/catalog/products", "page");
+        revalidatePath("/catalogue", "layout");
         revalidateTag("products", "max");
         return NextResponse.json({ success: true });
     }
@@ -230,7 +349,10 @@ export async function PATCH(req: NextRequest) {
         wholesale_price_tier_3,
         variants,
         inventory_baseline,
+        status,
+        costs,
     } = fields;
+    const by = { actor: user.id };
 
     // Stock is never written as an absolute value from this form.
     //
@@ -273,7 +395,8 @@ export async function PATCH(req: NextRequest) {
         available_colors: available_colors ?? [],
         available_brands: available_brands ?? [],
         brand_variants: brand_variants ?? null,
-        is_active: is_active ?? true,
+        ...visibilityFields(status, is_active, (oldData as any)?.archived_at ?? null),
+        ...optionalFields(fields),
         wholesale_override: wholesale_override ?? false,
         wholesale_price_tier_1: wholesale_override && wholesale_price_tier_1 ? Number(wholesale_price_tier_1) : null,
         wholesale_price_tier_2: wholesale_override && wholesale_price_tier_2 ? Number(wholesale_price_tier_2) : null,
@@ -295,7 +418,7 @@ export async function PATCH(req: NextRequest) {
     // Product-level stock for a product that does not track by variant.
     if (productStockDelta !== 0) {
         try {
-            await adjustStock(id, null, productStockDelta);
+            await adjustStock(id, null, productStockDelta, by);
         } catch (e: any) {
             console.error("[admin/products PATCH] stock adjust failed:", e?.message, { id, productStockDelta });
             return NextResponse.json({ error: "Stock update failed. Nothing was changed." }, { status: 500 });
@@ -340,13 +463,15 @@ export async function PATCH(req: NextRequest) {
             const desired = Number(v.inventory_count ?? 0);
 
             if (!existing) {
+                // A new size starts at 0; its count goes through the ledger below.
                 toInsert.push({
                     product_id: id,
                     size: v.size || null,
                     color: v.color || null,
                     brand: v.brand || null,
                     sku: v.sku || null,
-                    inventory_count: Number.isFinite(desired) ? desired : 0,
+                    inventory_count: 0,
+                    _opening: Number.isFinite(desired) ? Math.max(0, Math.trunc(desired)) : 0,
                 });
                 continue;
             }
@@ -361,7 +486,7 @@ export async function PATCH(req: NextRequest) {
 
             if (delta !== 0) {
                 try {
-                    await adjustStock(id, existing.id, delta);
+                    await adjustStock(id, existing.id, delta, by);
                 } catch (e: any) {
                     console.error("[admin/products PATCH] variant stock adjust failed:", e?.message, { id, variantId: existing.id, delta });
                     return NextResponse.json({ error: "Stock update failed. Nothing was changed." }, { status: 500 });
@@ -375,11 +500,24 @@ export async function PATCH(req: NextRequest) {
         }
 
         if (toInsert.length > 0) {
-            const { error: insertErr } = await supabaseAdmin.from("product_variants").insert(toInsert);
+            const { data: inserted, error: insertErr } = await supabaseAdmin.from("product_variants")
+                .insert(toInsert.map(({ _opening, ...row }) => row))
+                .select("id, size, color, brand");
             if (insertErr) {
                 console.error("[admin/products PATCH] variant insert failed:", insertErr.message);
                 { const dup = uniqueViolationMessage(insertErr); if (dup) return NextResponse.json({ error: dup }, { status: 409 }); }
                 return apiError("GEN-00", { status: 500, audience: "staff", cause: insertErr });
+            }
+            const idByKey = new Map((inserted ?? []).map((v: any) => [keyOf(v), v.id as string]));
+            for (const row of toInsert) {
+                const vid = idByKey.get(keyOf(row));
+                if (!vid || !row._opening) continue;
+                try {
+                    await adjustStock(id, vid, row._opening, { actor: user.id, note: "Opening stock" });
+                } catch (e: any) {
+                    console.error("[admin/products PATCH] new variant stock failed:", e?.message, { id, variantId: vid });
+                    return NextResponse.json({ error: "Stock update failed for a new size. Open the product and check its stock." }, { status: 500 });
+                }
             }
         }
 
@@ -398,9 +536,15 @@ export async function PATCH(req: NextRequest) {
         await deleteVariantsUnlessHeld((existingVariants ?? []).map((v: any) => v.id), id);
     }
 
+    // Sales staff can save the rest of the product; a cost they send is ignored.
+    if (costs && typeof costs === "object" && COST_ROLES.includes(caller.role)) {
+        await saveCosts(id, costs as CostInput, user.id);
+    }
+
     revalidatePath("/", "page");
     revalidatePath("/shop", "page");
     revalidatePath("/catalog/products", "page");
+    revalidatePath("/catalogue", "layout");
     revalidateTag("products", "max");
 
     // Activity logging is telemetry — run after the response so the UI isn't blocked on it

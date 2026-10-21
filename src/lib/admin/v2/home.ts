@@ -56,8 +56,8 @@ async function orderNeeds(now: Date): Promise<Pick<NeedsData, "toPack" | "unpaid
 
 async function stockNeeds(): Promise<Pick<NeedsData, "lowStock" | "noPhoto">> {
     const lowRpc = () => supabaseAdmin.rpc("fn_low_stock_variants", {}, { count: "exact", head: true });
-    // No archive state exists yet, so every product without a photo counts
-    // (active and inactive). Products › No photo should use the same filter.
+    // Every product without a photo counts, active or draft, but not archived
+    // ones: the same rule as the Products › No photo chip.
     const [low, soldOut, lowExample, levelMin, levelMax, photoCount, photoExample] = await Promise.all([
         lowRpc().then(must),
         lowRpc().lte("inventory_count", 0).then(must),
@@ -65,9 +65,9 @@ async function stockNeeds(): Promise<Pick<NeedsData, "lowStock" | "noPhoto">> {
         supabaseAdmin.from("products").select("low_stock_at").eq("is_active", true).order("low_stock_at", { ascending: true }).limit(1).then(must),
         supabaseAdmin.from("products").select("low_stock_at").eq("is_active", true).order("low_stock_at", { ascending: false }).limit(1).then(must),
         supabaseAdmin.from("products").select("id", { count: "exact", head: true })
-            .or("image_urls.is.null,image_urls.eq.{}").or("media.is.null,media.eq.[]").then(must),
+            .or("image_urls.is.null,image_urls.eq.{}").or("media.is.null,media.eq.[]").or("archived_at.is.null,is_active.eq.true").then(must),
         supabaseAdmin.from("products").select("name, is_active")
-            .or("image_urls.is.null,image_urls.eq.{}").or("media.is.null,media.eq.[]")
+            .or("image_urls.is.null,image_urls.eq.{}").or("media.is.null,media.eq.[]").or("archived_at.is.null,is_active.eq.true")
             .order("is_active", { ascending: false }).order("created_at", { ascending: false }).limit(1).then(must),
     ]);
     const levels = [first(levelMin)?.low_stock_at, first(levelMax)?.low_stock_at].filter((x): x is number => typeof x === "number");

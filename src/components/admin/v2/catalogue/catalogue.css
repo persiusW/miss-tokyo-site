@@ -1,0 +1,38 @@
+/* Admin v2 Products (/catalogue). Scoped to .adm2, tokens only. */
+.adm2 .cat-tabs{margin-bottom:var(--s5)}
+.adm2 .cat-tools .search{flex:1 1 260px}
+.adm2 .cat-tbl .cat-name{overflow-wrap:break-word}
+/* The product cell keeps a readable width; the table scrolls sideways on phones instead. */
+.adm2 .cat-tbl .hrow{min-width:200px}
+.adm2 .cat-tbl tbody tr.click:focus-visible td{background:var(--card-2)}
+.adm2 .cat-tbl tbody tr.click:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+/* The visually hidden "Actions" header is absolutely placed; keep it inside the scrolling table on phones. */
+.adm2 .cat-tbl th{position:relative}
+.adm2 .cat-was{text-decoration:line-through}
+.adm2 .cat-warn{color:var(--warn-ink)}
+.adm2 .cat-danger{color:var(--danger-ink)}
+.adm2 .cat-ok{color:var(--ok-ink)}
+.adm2 .cat-kpis{margin-bottom:var(--s5)}
+.adm2 .cat-banners{margin-bottom:var(--s4)}
+.adm2 .cat-inset{background:var(--card-2)}
+.adm2 .cat-opts{display:flex;flex-wrap:wrap;gap:var(--s2)}
+.adm2 .cat-vtbl .input{min-width:0}
+.adm2 .cat-vtbl .cat-stock{width:88px}
+.adm2 .cat-vtbl .cat-stock.is-out{border-color:var(--danger-line);background:var(--danger-bg)}
+.adm2 .cat-vtbl .cat-stock.is-low{border-color:var(--warn-line);background:var(--warn-bg)}
+.adm2 .cat-vtbl .cat-sku{min-width:120px}
+.adm2 .cat-vtbl .input-affix{min-width:110px}
+.adm2 .cat-narrow{max-width:180px}
+.adm2 .cat-qty{max-width:160px}
+.adm2 .cat-margin .kpi-value{font-size:28px}
+.adm2 .cat-photos .help{margin-top:var(--s2)}
+.adm2 .cat-row-btn{background:none;border:0;text-align:left;cursor:pointer;padding:0;min-height:44px;color:inherit;font:inherit}
+.adm2 .cat-row-btn:focus-visible{outline:none;box-shadow:var(--focus);border-radius:var(--r1)}
+.adm2 .cat-hist-more{padding:var(--s3) var(--s4)}
+.adm2 .cat-bulk-tbl .input-affix{min-width:120px}
+.adm2 .cat-gift-code{letter-spacing:.04em}
+.adm2 .cat-bar-wrap{position:sticky;top:calc(var(--top-h) + var(--s2));z-index:3}
+@media (max-width:620px){
+.adm2 .cat-tools .search{flex-basis:100%}
+.adm2 .cat-vtbl .cat-sku{min-width:96px}
+}
