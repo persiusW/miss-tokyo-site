@@ -191,9 +191,11 @@ export default function AnalyticsPage() {
             .order("created_at");
 
         const [{ count: newsletterCount }, { count: inquiryCount }] = await Promise.all([
-            supabase.from("newsletter_subs").select("id", { count: "exact", head: true })
-                .gte("created_at", start.toISOString())
-                .lte("created_at", end.toISOString()),
+            // Sign-ups are written to newsletter_subscribers (api/newsletter/subscribe);
+            // newsletter_subs is an old, empty table.
+            supabase.from("newsletter_subscribers").select("id", { count: "exact", head: true })
+                .gte("subscribed_at", start.toISOString())
+                .lte("subscribed_at", end.toISOString()),
             supabase.from("custom_requests").select("id", { count: "exact", head: true })
                 .gte("created_at", start.toISOString())
                 .lte("created_at", end.toISOString()),
