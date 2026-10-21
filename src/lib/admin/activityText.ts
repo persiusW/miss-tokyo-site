@@ -96,6 +96,7 @@ export function activityText(row: ActivityRow): ActivityText {
 
     switch (row.action_type) {
         case "CREATE_DISCOUNT": return { what: `created the discount code ${s(d.code) || "—"}` };
+        case "UPDATE_DISCOUNT": return { what: `changed the discount code ${s(d.code) || "—"}` };
         case "TOGGLE_DISCOUNT": return { what: `turned the discount code ${s(d.code) || "—"} ${d.is_active ? "on" : "off"}` };
         case "DELETE_DISCOUNT": return { what: `deleted the discount code ${s(d.code) || "—"}` };
         case "CREATE_AUTO_DISCOUNT": return { what: `created the automatic discount ${s(d.title) || "—"}` };
