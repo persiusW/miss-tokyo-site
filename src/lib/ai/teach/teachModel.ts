@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { AI_MODEL, costUsd } from "@/lib/ai/pricing";
 import { getAiSettings } from "@/lib/ai/settings";
 import { todaySpendUsd, withinCap } from "@/lib/ai/spend";
+import { aiPausedByMonthlyCap } from "@/lib/billing/statements";
 import { BODY_MAX, lessonError, TITLE_MAX } from "./lessonRules";
 
 export const TEACH_PER_HOUR = 30;
@@ -28,6 +29,7 @@ async function guard(userId: string): Promise<void> {
     if (error) throw error;
     const used = (data ?? []).filter((r: any) => Array.isArray(r.tool_calls) && r.tool_calls.some((t: any) => String(t?.name ?? "").startsWith("teach_"))).length;
     if (used >= TEACH_PER_HOUR) throw new TeachLimit("That's a lot of teaching for one hour. Please try again a little later.");
+    if (await aiPausedByMonthlyCap()) throw new TeachLimit("This month's AI spending cap has been reached, so teaching is paused. The owner can raise it in Billing.");
     const settings = await getAiSettings();
     const spent = await todaySpendUsd();
     if (spent === null || !withinCap({ capGhs: settings.dailySpendCapGhs, spentTodayUsd: spent, runningUsd: 0, reserveUsd: 0.05 })) {
