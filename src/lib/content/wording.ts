@@ -59,20 +59,41 @@ export const GROUP_LABELS: Record<string, string> = {
     general: "Across the shop",
 };
 
-export type AssetDef = { key: string; label: string; group: string; used: boolean };
+export type AssetDef = {
+    key: string; label: string; group: string;
+    /** The page that shows the image, or null when no page has a place for it. */
+    path: string | null;
+    /** Where on that page, or why it isn't on the shop. */
+    note: string;
+    /** Whether tapping the image can go somewhere. Backgrounds can't. */
+    linkable: boolean;
+};
 
-/** The image slots from the old Site Assets tab. `used` is whether a shop
- *  page reads the slot today; the others are kept for pages still to come. */
+/** The image slots from the old Site Assets tab. Each shows only when an
+ *  image is saved and switched on; with none, the page looks as it always did. */
 export const SITE_ASSETS: AssetDef[] = [
-    { key: "home_hero", label: "Homepage hero", group: "Home page", used: false },
-    { key: "shop_banner", label: "Shop page banner", group: "Shop", used: false },
-    { key: "gift_card_hero", label: "Gift card image", group: "Gift cards", used: false },
-    { key: "about_hero", label: "About hero image", group: "About", used: false },
-    { key: "about_founder", label: "Founder photo", group: "About", used: false },
-    { key: "craft_banner", label: "Craft page banner", group: "The Craft", used: false },
-    { key: "craft_img_1", label: "Craft image 1", group: "The Craft", used: true },
-    { key: "craft_img_2", label: "Craft image 2", group: "The Craft", used: true },
-    { key: "craft_img_3", label: "Craft image 3", group: "The Craft", used: true },
-    { key: "custom_banner", label: "Custom order banner", group: "Custom orders", used: false },
-    { key: "gallery_banner", label: "Gallery banner", group: "Gallery", used: false },
+    { key: "home_hero", label: "Homepage hero", group: "Home page", path: null, linkable: false, note: "The home page hero shows the images in Home page › Hero slides." },
+    { key: "shop_banner", label: "Shop page banner", group: "Shop", path: "/shop", linkable: false, note: "Behind the “All Products” heading at the top of the shop, darkened so the heading stays readable." },
+    { key: "gift_card_hero", label: "Gift card image", group: "Gift cards", path: "/gift-cards", linkable: false, note: "Behind the top of the gift cards page, darkened so the text stays readable." },
+    { key: "about_hero", label: "About photo, tall", group: "About", path: "/about", linkable: true, note: "The tall photo on the left under “The Miss Tokyo Story”." },
+    { key: "about_founder", label: "About photo, top right", group: "About", path: "/about", linkable: true, note: "The top-right photo under “The Miss Tokyo Story”." },
+    { key: "about_photo_3", label: "About photo, bottom right", group: "About", path: "/about", linkable: true, note: "The bottom-right photo under “The Miss Tokyo Story”." },
+    { key: "craft_banner", label: "Craft page banner", group: "The Craft", path: null, linkable: false, note: "The Craft page has no banner; its photos are Craft images 1 to 3." },
+    { key: "craft_img_1", label: "Craft image 1", group: "The Craft", path: "/craft", linkable: true, note: "The first photo beside the Craft page's text." },
+    { key: "craft_img_2", label: "Craft image 2", group: "The Craft", path: "/craft", linkable: true, note: "The second photo beside the Craft page's text." },
+    { key: "craft_img_3", label: "Craft image 3", group: "The Craft", path: "/craft", linkable: true, note: "The third photo beside the Craft page's text." },
+    { key: "custom_banner", label: "Custom order photo", group: "Custom orders", path: "/whitelabel", linkable: true, note: "Beside the form on the white labelling page, unless the customer came from a product." },
+    { key: "gallery_banner", label: "Gallery banner", group: "Gallery", path: null, linkable: false, note: "The gallery is a full-screen video reel with no place for a banner." },
 ];
+
+export type SiteImageRow = { section_key: string; image_url: string | null; alt_text: string | null; link_url: string | null; is_active: boolean | null };
+export type ShownImage = { url: string; alt: string; link: string | null };
+
+/** The image a page shows for a slot: saved, switched on and a secure address. */
+export function shownImage(row: SiteImageRow | null | undefined): ShownImage | null {
+    if (!row || row.is_active === false) return null;
+    const url = (row.image_url ?? "").trim();
+    if (!/^https:\/\//i.test(url)) return null;
+    const link = (row.link_url ?? "").trim();
+    return { url, alt: (row.alt_text ?? "").trim(), link: /^\/(?!\/)/.test(link) || /^https:\/\//i.test(link) ? link : null };
+}

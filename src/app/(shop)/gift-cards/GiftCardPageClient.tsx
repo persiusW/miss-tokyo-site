@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import type { ShownImage } from "@/lib/content/wording";
 import { Check, Copy, CreditCard, ShieldCheck, Mail, Gift } from "lucide-react";
 
 type Config = {
@@ -284,7 +286,8 @@ function SuccessCard({ data, onReset }: { data: SuccessData; onReset: () => void
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export function GiftCardPageClient({ config }: { config: Config }) {
+/** `heroImage`: Content › Images › Gift card image, behind the hero when switched on. */
+export function GiftCardPageClient({ config, heroImage = null }: { config: Config; heroImage?: ShownImage | null }) {
     const [amount, setAmount] = useState(config.presetAmounts[1] ?? 100);
     const [customAmt, setCustomAmt] = useState("");
     const [isCustom, setIsCustom] = useState(false);
@@ -391,8 +394,14 @@ export function GiftCardPageClient({ config }: { config: Config }) {
             {/* ══════════════════════════════════════════════════════════════════
                 1. HERO
             ══════════════════════════════════════════════════════════════════ */}
-            <section style={{ background: "#141210", padding: "72px 48px 80px" }}>
-                <div className="gc-hero-grid" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
+            <section style={{ background: "#141210", padding: "72px 48px 80px", ...(heroImage ? { position: "relative", overflow: "hidden" } : {}) }}>
+                {heroImage && (
+                    <>
+                        <Image src={heroImage.url} alt={heroImage.alt} fill priority sizes="100vw" style={{ objectFit: "cover" }} />
+                        <div aria-hidden="true" style={{ position: "absolute", inset: 0, background: "rgba(20,18,16,0.78)" }} />
+                    </>
+                )}
+                <div className="gc-hero-grid" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center", ...(heroImage ? { position: "relative" } : {}) }}>
                     {/* Left */}
                     <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>

@@ -11,6 +11,7 @@ import { QuickAddModal } from "@/components/ui/miss-tokyo/QuickAddModal";
 import { getApplicableRule } from "@/lib/autoDiscount";
 import type { AutoDiscountRule } from "@/lib/autoDiscount";
 import { haptic } from "@/lib/haptic";
+import type { ShownImage } from "@/lib/content/wording";
 
 // ── Brand-color blur placeholder (1×1 beige SVG) ─────────────────────────────
 const BLUR_PLACEHOLDER = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjxyZWN0IGZpbGw9IiNFOEQ1QzQiLz48L3N2Zz4=";
@@ -358,12 +359,14 @@ interface ShopPageClientProps {
     paginationType: "load_more" | "pagination";
     mobileCols?: 1 | 2;
     autoDiscountRules?: AutoDiscountRule[];
+    /** Content › Images › Shop page banner, behind the heading. None: the plain dark header. */
+    banner?: ShownImage | null;
 }
 
 export function ShopPageClient({
     initialProducts, categories, allColors, allSizes,
     total, minPrice, maxPrice, paginationType, mobileCols = 2,
-    autoDiscountRules = [],
+    autoDiscountRules = [], banner = null,
 }: ShopPageClientProps) {
     const router = useRouter();
     const pathname = usePathname();
@@ -576,6 +579,12 @@ export function ShopPageClient({
         <div style={{ background: "#F7F2EC", minHeight: "100vh" }}>
             {/* Page Header */}
             <div className="relative overflow-hidden py-10 px-6" style={{ background: "#141210" }}>
+                {banner && (
+                    <>
+                        <Image src={banner.url} alt={banner.alt} fill priority sizes="100vw" className="object-cover" />
+                        <div className="absolute inset-0" style={{ background: "rgba(20,18,16,0.7)" }} aria-hidden="true" />
+                    </>
+                )}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
                     <span style={{ fontFamily: "Georgia, serif", fontSize: "clamp(80px,14vw,160px)", fontWeight: 300, color: "rgba(255,255,255,0.03)", letterSpacing: "0.15em", whiteSpace: "nowrap" }}>
                         SHOP

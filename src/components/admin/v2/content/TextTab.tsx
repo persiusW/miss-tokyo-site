@@ -4,7 +4,7 @@
 // as its own view, the site images — the Images / Text split from Site Assets.
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Badge, Btn, Card, Empty, Field, Icon, Panel, Search, Tabs, Thumb, toast, when } from "@/components/admin/ui";
+import { Badge, Btn, Card, Empty, Field, Icon, Panel, SRow, Search, Switch, Tabs, Thumb, toast, when } from "@/components/admin/ui";
 import { ImageUploader } from "@/components/ui/miss-tokyo/ImageUploader";
 import { GROUP_LABELS } from "@/lib/content/wording";
 import type { ImageRow, WordingRow } from "./data";
@@ -103,30 +103,43 @@ function WordingPanel({ row, onClose, onSaved }: { row: WordingRow; onClose: () 
 function ImageList({ rows }: { rows: ImageRow[] }) {
     const router = useRouter();
     const [edit, setEdit] = useState<ImageRow | null>(null);
+    const list = (items: ImageRow[]) => (
+        <div className="rows">
+            {items.map(r => (
+                <button type="button" key={r.key} className="row click" onClick={() => setEdit(r)}>
+                    <Thumb src={r.image_url || null} />
+                    <div className="row-main">
+                        <div className="row-title">{r.label}</div>
+                        <div className="row-sub">{r.group}{!r.image_url ? " · No image yet" : r.updatedAt ? ` · Changed ${when(r.updatedAt)}` : ""}</div>
+                        <div className="row-sub">{r.note}</div>
+                    </div>
+                    {r.used && r.image_url && !r.is_active && <Badge tone="neutral">Switched off</Badge>}
+                    <Icon n="chev" style={{ width: 16, height: 16, color: "var(--ink-3)" }} />
+                </button>
+            ))}
+        </div>
+    );
+    const used = rows.filter(r => r.used);
+    const unused = rows.filter(r => !r.used);
     return (
         <>
             <Card title="Site images">
-                <div className="rows">
-                    {rows.map(r => (
-                        <button type="button" key={r.key} className="row click" onClick={() => setEdit(r)}>
-                            <Thumb src={r.image_url || null} />
-                            <div className="row-main">
-                                <div className="row-title">{r.label}</div>
-                                <div className="row-sub">{r.group}{r.updatedAt ? ` · Changed ${when(r.updatedAt)}` : " · No image yet"}</div>
-                            </div>
-                            {!r.used && <Badge tone="neutral">Not on the shop</Badge>}
-                            <Icon n="chev" style={{ width: 16, height: 16, color: "var(--ink-3)" }} />
-                        </button>
-                    ))}
-                </div>
+                <div className="card-body"><p className="help">An image shows on its page once it&rsquo;s saved and switched on. With none, the page keeps its usual look.</p></div>
+                {list(used)}
             </Card>
+            {unused.length > 0 && (
+                <Card title={NOT_ON_SHOP}>
+                    <div className="card-body"><p className="help">Slots from the old Site Assets tab that no page has a place for. Each says why.</p></div>
+                    {list(unused)}
+                </Card>
+            )}
             {edit && <ImagePanel row={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); router.refresh(); }} />}
         </>
     );
 }
 
 function ImagePanel({ row, onClose, onSaved }: { row: ImageRow; onClose: () => void; onSaved: () => void }) {
-    const [f, setF] = useState({ image_url: row.image_url, alt_text: row.alt_text, link_url: row.link_url });
+    const [f, setF] = useState({ image_url: row.image_url, alt_text: row.alt_text, link_url: row.link_url, is_active: row.is_active });
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const save = async () => {
@@ -138,12 +151,12 @@ function ImagePanel({ row, onClose, onSaved }: { row: ImageRow; onClose: () => v
         onSaved();
     };
     return (
-        <Panel open onClose={onClose} title={row.label} sub={row.group}
+        <Panel open onClose={onClose} title={row.label} sub={row.used ? row.note : "Not on the shop"}
             footer={<>
                 <Btn kind="ghost" onClick={onClose} disabled={saving}>Cancel</Btn>
                 <Btn kind="primary" onClick={save} disabled={saving || uploading}>{saving ? "Saving…" : "Save image"}</Btn>
             </>}>
-            {!row.used && <p className="help">No shop page shows this image at the moment. It&rsquo;s kept for when one does.</p>}
+            {!row.used && <p className="help">No shop page shows this image. {row.note}</p>}
             <div className="ct-upl">
                 <ImageUploader bucket="site-assets" folder="banners" currentUrl={f.image_url || null} onUploading={setUploading}
                     onUpload={url => setF(p => ({ ...p, image_url: url }))} onRemove={() => setF(p => ({ ...p, image_url: "" }))} aspectRatio="banner" label="Image" />
@@ -151,9 +164,18 @@ function ImagePanel({ row, onClose, onSaved }: { row: ImageRow; onClose: () => v
             <Field label="Describe the image" htmlFor="im-alt" help="Read out by screen readers and shown if the image can't load.">
                 <input id="im-alt" className="input" value={f.alt_text} onChange={e => setF(p => ({ ...p, alt_text: e.target.value }))} />
             </Field>
-            <Field label="Tapping the image goes to" htmlFor="im-link" help="Optional. A page on the shop, e.g. /shop">
-                <input id="im-link" className="input" value={f.link_url} onChange={e => setF(p => ({ ...p, link_url: e.target.value }))} />
-            </Field>
+            {row.linkable && (
+                <Field label="Tapping the image goes to" htmlFor="im-link" help="Optional. A page on the shop, e.g. /shop">
+                    <input id="im-link" className="input" value={f.link_url} onChange={e => setF(p => ({ ...p, link_url: e.target.value }))} />
+                </Field>
+            )}
+            {row.used && (
+                <Card inset>
+                    <SRow label="Show on the shop" help={f.is_active ? "Shows once saved, if there's an image." : "Kept here but not shown. The page keeps its usual look."}>
+                        <Switch label="Show this image on the shop" checked={f.is_active} onChange={v => setF(p => ({ ...p, is_active: v }))} />
+                    </SRow>
+                </Card>
+            )}
         </Panel>
     );
 }

@@ -5,7 +5,7 @@ import { getProducts, getCategories, getPopulatedCategoryFilter, deriveColors, d
 import { ShopPageClient } from "@/components/ui/miss-tokyo/ShopPageClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { liveAutoDiscounts } from "@/lib/autoDiscount";
-import { pageSeo } from "@/lib/content/load";
+import { loadSiteImages, pageSeo } from "@/lib/content/load";
 
 const getAutoDiscountRules = unstable_cache(
     async () => {
@@ -102,10 +102,12 @@ export default async function ShopPage({
     // in ShopPageClient can upgrade the view after hydration if needed.
     const role: string | undefined = undefined;
 
-    const [{ paginationSetting, mobileCols }, autoDiscountRules] = await Promise.all([
+    const [{ paginationSetting, mobileCols }, autoDiscountRules, images] = await Promise.all([
         getShopSettings().catch(() => ({ paginationSetting: "load_more" as const, mobileCols: 2 as const })),
         // Dates checked per request against the cached rows, the same rule checkout charges by
         getAutoDiscountRules().then(rules => liveAutoDiscounts(rules)).catch(() => []),
+        // Content › Shop wording › Images › Shop page banner (cached, never fails).
+        loadSiteImages(["shop_banner"] as const),
     ]);
 
     const [{ products, total, minPrice, maxPrice }, allCategories] = await Promise.all([
@@ -194,6 +196,7 @@ export default async function ShopPage({
                 paginationType={paginationSetting}
                 mobileCols={mobileCols}
                 autoDiscountRules={autoDiscountRules}
+                banner={images.shop_banner}
             />
         </Suspense>
     );

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { pageSeo } from "@/lib/content/load";
+import { loadSiteImages, pageSeo } from "@/lib/content/load";
 import { GiftCardPageClient } from "./GiftCardPageClient";
 
 export const revalidate = 60;
@@ -15,13 +15,16 @@ export function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function GiftCardsPage() {
-    const { data: s } = await supabaseAdmin
-        .from("site_settings")
-        .select(
-            "gc_enabled, gc_min_amount, gc_max_amount, gc_preset_amounts, gc_never_expires, gc_delivery_note, store_email"
-        )
-        .eq("id", "singleton")
-        .single();
+    const [{ data: s }, images] = await Promise.all([
+        supabaseAdmin
+            .from("site_settings")
+            .select(
+                "gc_enabled, gc_min_amount, gc_max_amount, gc_preset_amounts, gc_never_expires, gc_delivery_note, store_email"
+            )
+            .eq("id", "singleton")
+            .single(),
+        loadSiteImages(["gift_card_hero"] as const),
+    ]);
 
     const config = {
         enabled: s?.gc_enabled ?? true,
@@ -34,5 +37,5 @@ export default async function GiftCardsPage() {
             "Gift cards are delivered instantly by email and never expire.",
     };
 
-    return <GiftCardPageClient config={config} />;
+    return <GiftCardPageClient config={config} heroImage={images.gift_card_hero} />;
 }

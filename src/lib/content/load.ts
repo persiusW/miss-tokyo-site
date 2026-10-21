@@ -5,10 +5,12 @@ import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { FAQ_COPY_KEY, POLICY_META, SIZE_GUIDE_PAGE_KEY, parseFaqs, parsePolicy, parseSizeGuidePage, type PolicyKey } from "./pageDocs";
 import type { ShopContent } from "./shopInfoText";
+import { shownImage, type ShownImage, type SiteImageRow } from "./wording";
 import { withSeoRow } from "./seo";
 
-/** Cache tag: Content's saves expire it so the shop updates at once. */
+/** Cache tags: Content's saves expire them so the shop updates at once. */
 export const PAGE_SEO_TAG = "page-seo";
+export const SITE_IMAGES_TAG = "site-images";
 
 async function copyValues(keys: string[]): Promise<Record<string, string>> {
     try {
@@ -66,4 +68,22 @@ export async function pageSeo(path: string, fallback: Metadata): Promise<Metadat
     } catch {
         return fallback;
     }
+}
+
+const imageRows = unstable_cache(
+    async () => {
+        const { data, error } = await supabaseAdmin.from("site_assets").select("section_key, image_url, alt_text, link_url, is_active");
+        if (error) throw error;
+        return (data ?? []) as SiteImageRow[];
+    },
+    ["site-images"],
+    { revalidate: 60, tags: [SITE_IMAGES_TAG] },
+);
+
+/** The site images a page shows, by slot. A slot with nothing to show (or a
+ *  failed read) is null, and the page keeps the look it had before. */
+export async function loadSiteImages<K extends string>(keys: readonly K[]): Promise<Record<K, ShownImage | null>> {
+    let rows: SiteImageRow[] = [];
+    try { rows = await imageRows(); } catch { /* the page's own look */ }
+    return Object.fromEntries(keys.map(k => [k, shownImage(rows.find(r => r.section_key === k))])) as Record<K, ShownImage | null>;
 }

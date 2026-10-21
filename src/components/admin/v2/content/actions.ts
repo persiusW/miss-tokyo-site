@@ -14,7 +14,7 @@ import { FAQ_COPY_KEY, POLICY_META, SIZE_GUIDE_PAGE_KEY, SIZE_MODAL_KEY, cleanFa
 import { SITE_ASSETS, WORDING, isConfigCopyKey } from "@/lib/content/wording";
 import { REVIEWS_SOURCE_KEY, type ReviewsSource } from "@/lib/content/homeSections";
 import { NAV_TAG } from "@/lib/content/shopNav";
-import { PAGE_SEO_TAG } from "@/lib/content/load";
+import { PAGE_SEO_TAG, SITE_IMAGES_TAG } from "@/lib/content/load";
 import {
     NAV_KEYS, PDP_KEYS, cleanAbout, cleanCarouselTabs, cleanFeatured, cleanGiftCards, cleanImage, cleanLink, cleanModalRows,
     cleanReview, cleanSeo, cleanSlide, cleanTrustItems, isUuid, type NavKey, type PdpKey, type SeoIn,
@@ -389,21 +389,25 @@ export async function saveWording(key: string, value: string, meta: { label: str
     return OK();
 }
 
-export async function saveSiteImage(key: string, input: { image_url: unknown; alt_text: unknown; link_url: unknown }): Promise<Done> {
+export async function saveSiteImage(key: string, input: { image_url: unknown; alt_text: unknown; link_url: unknown; is_active?: unknown }): Promise<Done> {
     const denied = await gate(); if (denied) return denied;
     const def = SITE_ASSETS.find(a => a.key === key);
     if (!def) return nope("That image slot wasn't found.");
     const row = {
         image_url: cleanImage(input?.image_url) || null,
         alt_text: typeof input?.alt_text === "string" ? input.alt_text.trim().slice(0, 300) || null : null,
-        link_url: cleanLink(input?.link_url) || null,
+        // Backgrounds can't be tapped; a link saved on one is left as it was.
+        ...(def.linkable ? { link_url: cleanLink(input?.link_url) || null } : {}),
+        // "Show on the shop": on unless switched off.
+        is_active: input?.is_active !== false,
         updated_at: now(),
     };
     const { data: existing } = await supabaseAdmin.from("site_assets").select("section_key").eq("section_key", key).maybeSingle();
     const { error } = existing
         ? await supabaseAdmin.from("site_assets").update(row).eq("section_key", key)
-        : await supabaseAdmin.from("site_assets").insert({ section_key: key, label: def.label, is_active: true, ...row });
+        : await supabaseAdmin.from("site_assets").insert({ section_key: key, label: def.label, ...row });
     if (error) return fail("GEN-00", error, { key });
-    revalidatePath("/craft");
+    updateTag(SITE_IMAGES_TAG);
+    if (def.path) revalidatePath(def.path);
     return OK();
 }

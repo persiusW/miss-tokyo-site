@@ -218,7 +218,8 @@ export async function loadReviews(): Promise<{ reviews: Review[]; source: Review
 
 /** `note` says why a row isn't on the shop (and where that text is edited now); null when it is. */
 export type WordingRow = { key: string; label: string; group: string; hint: string | null; value: string; original: string | null; used: boolean; note: string | null; updatedAt: string | null };
-export type ImageRow = { key: string; label: string; group: string; used: boolean; image_url: string; alt_text: string; link_url: string; is_active: boolean | null; updatedAt: string | null };
+/** `note` is where the image shows, or why no page shows it (`used` false). */
+export type ImageRow = { key: string; label: string; group: string; used: boolean; note: string; linkable: boolean; image_url: string; alt_text: string; link_url: string; is_active: boolean; updatedAt: string | null };
 
 export async function loadWording(): Promise<{ wording: WordingRow[]; images: ImageRow[] } | null> {
     const [copy, assets] = await Promise.all([
@@ -237,7 +238,7 @@ export async function loadWording(): Promise<{ wording: WordingRow[]; images: Im
     }
     const images: ImageRow[] = SITE_ASSETS.map(a => {
         const r = (assets.data ?? []).find((x: { section_key: string }) => x.section_key === a.key) as Record<string, any> | undefined;
-        return { ...a, image_url: r?.image_url ?? "", alt_text: r?.alt_text ?? "", link_url: r?.link_url ?? "", is_active: r ? r.is_active : null, updatedAt: r?.updated_at ?? null };
+        return { key: a.key, label: a.label, group: a.group, used: !!a.path, note: a.note, linkable: a.linkable, image_url: r?.image_url ?? "", alt_text: r?.alt_text ?? "", link_url: r?.link_url ?? "", is_active: r ? r.is_active !== false : true, updatedAt: r?.updated_at ?? null };
     });
     return { wording, images };
 }
