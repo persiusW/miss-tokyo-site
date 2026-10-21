@@ -14,6 +14,9 @@ import type { InboundMessage } from "./pipeline";
 const db = supabaseAdmin as any;
 
 export const MEDIA_BUCKET = "whatsapp-media";
+
+/** Kill switch, same name as GlowBook's flag: WHATSAPP_INBOX_MEDIA=off stops copies and shows the text label. On by default. */
+export const mediaEnabled = () => (process.env.WHATSAPP_INBOX_MEDIA ?? "").trim().toLowerCase() !== "off";
 /** Meta keeps a file about 30 days; past this it is not tried again. */
 export const ARCHIVE_WINDOW_MS = 28 * 24 * 3600_000;
 /** A signed link lasts long enough to load and open the file, not to share it around. */
@@ -28,7 +31,7 @@ export type Download = (mediaId: string) => Promise<MediaResult>;
 export async function archiveInboundMedia(
     conversationId: string, m: Pick<InboundMessage, "messageId" | "mediaId" | "mimeType" | "type">, download: Download,
 ): Promise<string | null> {
-    if (!m.mediaId || !m.messageId || !mediaKind(m.type)) return null;
+    if (!mediaEnabled() || !m.mediaId || !m.messageId || !mediaKind(m.type)) return null;
     const r = await download(m.mediaId);
     if (!r.ok) {
         // Too big or refused (expired): marked, so the sweep moves on. A network error is retried.
@@ -76,6 +79,7 @@ export async function mediaLink(mediaUrl: string): Promise<string | null> {
  * kept), newest first, while Meta still has them. Returns how many were stored.
  */
 export async function archiveMissing(download: Download, opts: { limit: number; now: number }): Promise<number> {
+    if (!mediaEnabled()) return 0;
     const since = new Date(opts.now - ARCHIVE_WINDOW_MS).toISOString();
     const { data, error } = await db.from("message_log").select("conversation_id, wa_message_id, message_type")
         .eq("direction", "inbound").is("media_url", null).not("wa_message_id", "is", null)

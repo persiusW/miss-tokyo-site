@@ -8,7 +8,7 @@ import { requireStaff } from "@/lib/ai/requireStaff";
 import { logCause } from "@/lib/errors/apiError";
 import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { mediaState, type MessageRow } from "@/lib/whatsapp/inbox";
-import { archiveInboundMedia, inboundFor, mediaLink } from "@/lib/whatsapp/media";
+import { archiveInboundMedia, inboundFor, mediaEnabled, mediaLink } from "@/lib/whatsapp/media";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     const auth = await requireStaff(["admin", "owner", "sales_staff"]);
     if ("status" in auth) return NextResponse.json({ error: "Please sign in again." }, { status: auth.status });
     const { id, messageId } = await params;
-    if (!UUID.test(id) || !UUID.test(messageId)) return NextResponse.json(GONE, { status: 404 });
+    if (!mediaEnabled() || !UUID.test(id) || !UUID.test(messageId)) return NextResponse.json(GONE, { status: 404 });
     try {
         const { data: row, error } = await db.from("message_log")
             .select("direction, message_type, media_url, wa_message_id").eq("id", messageId).eq("conversation_id", id).maybeSingle();

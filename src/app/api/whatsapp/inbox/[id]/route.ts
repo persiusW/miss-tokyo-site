@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireStaff } from "@/lib/ai/requireStaff";
 import { logCause } from "@/lib/errors/apiError";
 import { handBackState, mediaState, shapeConversation, type ConversationRow, type MessageRow } from "@/lib/whatsapp/inbox";
+import { mediaEnabled } from "@/lib/whatsapp/media";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -36,9 +37,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         if (conv.error || msgs.error) throw conv.error ?? msgs.error;
         if (!conv.data) return NextResponse.json(NOT_FOUND, { status: 404 });
         const messages = ((msgs.data ?? []) as MessageRow[]).reverse();
+        const showMedia = mediaEnabled();
         return NextResponse.json({
             conversation: shapeConversation(conv.data as ConversationRow, messages[messages.length - 1] ?? null, Date.now()),
-            messages: messages.map(m => ({ id: m.id, direction: m.direction, text: m.content, type: m.message_type, at: m.created_at, media: mediaState(m) })),
+            messages: messages.map(m => ({ id: m.id, direction: m.direction, text: m.content, type: m.message_type, at: m.created_at, media: showMedia ? mediaState(m) : null })),
         });
     } catch (e) {
         logCause("GEN-00", e, { route: "whatsapp/inbox/[id]" });
