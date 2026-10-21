@@ -16,6 +16,7 @@ import { settlePosSession } from "@/lib/posSettlement";
 import { recordPaystackCharge } from "@/lib/paystackReconcile";
 import { recordResult } from "@/lib/payments/attempts";
 import { apiError } from "@/lib/errors/apiError";
+import { handleRefundEvent } from "@/lib/orders/refundWebhook";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || "";
 
@@ -51,6 +52,12 @@ export async function POST(req: Request) {
         }
 
         const event = JSON.parse(rawBody);
+
+        // ── Refunds made from the admin: settle the refunds row ───────────
+        if (typeof event.event === "string" && event.event.startsWith("refund.")) {
+            await handleRefundEvent(event);
+            return NextResponse.json({ received: true });
+        }
 
         // ── POS: invoice.payment handler ──────────────────────────────────
         if (event.event === "invoice.payment") {

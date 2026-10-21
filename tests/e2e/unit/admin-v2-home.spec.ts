@@ -230,7 +230,8 @@ test("waiting to pack is exactly the side-nav Orders count", () => {
     applyToPack(r.b);
     expect(r.calls).toEqual([
         ["eq", "payment_status", "paid"],
-        ["in", "fulfillment_status", ["inbox", "processing"]],
+        // "partial": partly packed orders still have items to pack (admin v2 Orders, gap 5).
+        ["in", "fulfillment_status", ["inbox", "processing", "partial"]],
         ["not", "status", "in", "(cancelled,refunded,fulfilled,delivered)"],
     ]);
     const u = recorder(); applyUnpaid(u.b);
@@ -248,6 +249,9 @@ test("activity rows read as sentences, never codes", () => {
     expect(o("UPDATE_STATUS", { order_number: "8677abf7", new_status: "delivered", new_fulfillment_status: "delivered" }).what).toBe("marked order #8677ABF7 as delivered");
     expect(o("UPDATE_STATUS", { order_number: "8677abf7", new_status: "paid", verified_against_paystack: true }).what).toBe("checked order #8677ABF7 with Paystack and marked it paid");
     expect(o("UPDATE_STATUS", { order_number: "8677abf7", new_status: "cancelled" }).what).toBe("cancelled order #8677ABF7");
+    expect(o("UPDATE_STATUS", { order_number: "8677abf7", new_status: "paid", new_fulfillment_status: "partial" }).what).toBe("packed part of order #8677ABF7");
+    expect(o("REFUND_ORDER", { order_number: "8677abf7", amount: 120 }).what).toBe("refunded GH₵ 120.00 on order #8677ABF7");
+    expect(o("NOTE_TO_CUSTOMER", { order_number: "8677abf7", channel: "whatsapp" }).what).toBe("sent the customer a note about order #8677ABF7 on WhatsApp");
     expect(o("CREATE", { order_number: "8677abf7", total: 450, via: "miss_tokyo_ai" }).what).toBe("created order #8677ABF7 for GH₵ 450.00 with Miss Tokyo AI");
     expect(activityText({ action_type: "CREATE", resource: "cash_sale", resource_id: "abc", details: { total: 594.5, orderRef: "8677ABF7", sessionId: "s1" } }).what)
         .toBe("took a cash sale of GH₵ 594.50 at the till (order #8677ABF7)");

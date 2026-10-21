@@ -57,7 +57,15 @@ function orderWhat(row: ActivityRow): string {
         case "DISPATCHED_ORDER": return `sent ${o} out for delivery${rider ? ` with ${rider}` : ""}`;
         case "DELIVERED_ORDER": return `marked ${o} as delivered`;
         case "ASSIGNED_RIDER": return rider ? `gave ${o} to ${rider}` : `changed the rider on ${o}`;
+        // Admin v2 Orders.
+        case "REFUND_ORDER": return `refunded ${money(d.amount) || "money"} on ${o}`;
+        case "CANCEL_ORDER": return `cancelled ${o}${money(d.amount) ? ` and refunded ${money(d.amount)}` : ""}`;
+        case "PARTIAL_FULFILMENT": return `packed part of ${o}${typeof d.units === "number" ? ` (${d.units} ${d.units === 1 ? "item" : "items"})` : ""}`;
+        case "NOTE_TO_CUSTOMER": return `sent the customer a note about ${o}${d.channel === "whatsapp" ? " on WhatsApp" : d.channel === "email" ? " by email" : ""}`;
+        case "STAFF_NOTE": return `changed the staff notes on ${o}`;
     }
+    // A parcel packed from part of the order (admin v2) syncs status 'paid'.
+    if (s(d.new_fulfillment_status) === "partial") return `packed part of ${o}`;
     switch (st) {
         case "paid": return d.verified_against_paystack ? `checked ${o} with Paystack and marked it paid` : `marked ${o} as paid`;
         case "inbox":

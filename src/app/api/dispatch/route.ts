@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
         // ── Fetch orders ──────────────────────────────────────────────────────
         const { data: orders, error: ordersError } = await supabaseAdmin
             .from("orders")
-            .select("id, customer_name, customer_email, customer_phone, shipping_address, total_amount, status, assigned_rider_id, is_mixed_order, items, customer_metadata")
+            .select("id, customer_name, customer_email, customer_phone, shipping_address, total_amount, status, fulfillment_status, assigned_rider_id, is_mixed_order, items, customer_metadata")
             .in("id", orderIds);
 
         if (ordersError || !orders) {
@@ -66,6 +66,9 @@ export async function POST(req: NextRequest) {
         for (const order of orders) {
             const meta = (order.customer_metadata as Record<string, unknown>) ?? {};
             const updatePayload: Record<string, unknown> = { status: "shipped", assigned_rider_id: riderId };
+            // Keep fulfillment_status in step (sales/orders/actions.ts maps). A
+            // partly packed order keeps 'partial': the rest is still to pack.
+            if (order.fulfillment_status !== "partial") updatePayload.fulfillment_status = "shipped";
             if (order.is_mixed_order && !meta.regular_items_dispatched_at) {
                 updatePayload.customer_metadata = { ...meta, regular_items_dispatched_at: now };
             }

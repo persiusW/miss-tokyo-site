@@ -93,7 +93,8 @@ test("the permissions matrix keeps the admin-only rows admin-only", () => {
     const row = (area: string) => PERMS.find(p => p.area === area)!;
     expect(row("AI cost markup and the admin inbox")).toMatchObject({ owner: "no", admin: "yes", sales: "no" });
     expect(row("Staff and billing")).toMatchObject({ owner: "yes", admin: "yes", sales: "no" });
-    expect(row("Mark an order paid after a Paystack check").sales).toBe("no");
+    // Owner decision 2026-10-21: anyone on staff can mark an order paid, as the old status picker allows
+    expect(row("Mark an order paid (after a Paystack check, or by hand)")).toMatchObject({ owner: "yes", admin: "yes", sales: "yes" });
     // Owner, admin and sales staff all change codes (catalog/discounts/actions.ts and the v2 actions)
     expect(row("Discount codes")).toMatchObject({ owner: "yes", admin: "yes", sales: "yes" });
 });

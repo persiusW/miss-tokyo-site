@@ -30,17 +30,20 @@ export async function POST(req: NextRequest) {
         }
 
         // Fetch invoice amount from DB — never trust client-supplied amount (SEC-17).
-        // Invoices live in `documents`; `amount` is the stored total (line items
-        // plus tax), the same figure the invoice page shows. There has never been
-        // an `invoices` table, so this used to answer "Invoice not found" every time.
-        const { data: invoiceData, error: invoiceError } = await supabaseAdmin
+        // Invoices, quotes and pay links live in `documents` (amount = the
+        // stored total, tax included); there has never been an `invoices`
+        // table, so this lookup used to fail for every invoice.
+        const { data: doc, error: invoiceError } = await supabaseAdmin
             .from("documents")
-            .select("amount")
+            .select("amount, status")
             .eq("id", invoiceId)
             .single();
 
-        if (invoiceError || !invoiceData) {
+        if (invoiceError || !doc) {
             return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
+        }
+        if (doc.status === "paid" || doc.status === "cancelled") {
+            return NextResponse.json({ error: doc.status === "paid" ? "This invoice has already been paid." : "This invoice was cancelled." }, { status: 409 });
         }
 
         // Fetch fee settings
@@ -52,7 +55,7 @@ export async function POST(req: NextRequest) {
 
         const feePct = Number(feeData?.platform_fee_percentage) || 0;
         const feeLabel = feeData?.platform_fee_label || "Service Charge";
-        const baseAmount = Number(invoiceData.amount);
+        const baseAmount = Number(doc.amount);
         const feeAmount = parseFloat((baseAmount * (feePct / 100)).toFixed(2));
         const finalAmount = parseFloat((baseAmount + feeAmount).toFixed(2));
 

@@ -66,6 +66,40 @@ test("new URLs go back while their area is off", () => {
     expect(v2Redirect("/home", "", FLAGS_ALL, ALL)).toBeNull();
 });
 
+test("Orders: old pages go forward to the list, its tabs and the panel, and come back", () => {
+    const on = { ...FLAGS_OFF, admin_v2: true, admin_v2_orders: true };
+    expect(v2Redirect("/sales/orders", "tab=pickups&payment=cash", on)).toBe("/orders?tab=pickups&payment=cash");
+    expect(v2Redirect("/sales/orders/0a1b2c3d-1111-2222-3333-444455556666", "", on)).toBe("/orders/0a1b2c3d-1111-2222-3333-444455556666");
+    expect(v2Redirect("/admin/orders/abc", "", on)).toBe("/orders/abc");
+    expect(v2Redirect("/sales/pre-orders", "", on)).toBe("/orders?preorder=1");
+    expect(v2Redirect("/customers/abandoned", "", on)).toBe("/orders/abandoned");
+    expect(v2Redirect("/finance", "", on)).toBe("/orders/invoices");
+    expect(v2Redirect("/finance/links", "", on)).toBe("/orders/invoices?type=link");
+    expect(v2Redirect("/finance/invoices/d1", "", on)).toBe("/orders/invoices/d1");
+    // The real switches: Orders waits for its own.
+    expect(v2Redirect("/sales/orders", "", { ...FLAGS_OFF, admin_v2: true })).toBeNull();
+    expect(v2Redirect("/sales/orders", "", on)).toBe("/orders");
+    // Off: Home's links into Orders land on the matching old tab.
+    expect(v2Redirect("/orders", "view=ready", FLAGS_OFF)).toBe("/sales/orders?tab=pickups");
+    expect(v2Redirect("/orders", "view=to-pack", FLAGS_OFF)).toBe("/sales/orders");
+    expect(v2Redirect("/orders", "view=closed&pay=cash&q=ama", FLAGS_OFF)).toBe("/sales/orders?q=ama&tab=cancelled&payment=cash");
+    expect(v2Redirect("/orders", "preorder=1&view=all", FLAGS_OFF)).toBe("/sales/pre-orders");
+    expect(v2Redirect("/orders/invoices", "type=link", FLAGS_OFF)).toBe("/finance/links");
+    expect(v2Redirect("/orders/invoices", "", FLAGS_OFF)).toBe("/finance/invoices");
+    expect(v2Redirect("/orders/invoices/d1", "", FLAGS_OFF)).toBe("/finance/invoices/d1");
+    expect(v2Redirect("/orders/abandoned", "range=30d", FLAGS_OFF)).toBe("/customers/abandoned?range=30d");
+});
+
+test("Inbox: a chat link keeps working when the Inbox switch is off", () => {
+    expect(v2Redirect("/inbox", "c=whatsapp:0a1b2c3d-1111-2222-3333-444455556666", FLAGS_OFF)).toBe("/customers/whatsapp?c=0a1b2c3d-1111-2222-3333-444455556666");
+    expect(v2Redirect("/inbox", "c=form:9", FLAGS_OFF)).toBe("/customers/forms");
+    expect(v2Redirect("/inbox", "c=request:9", FLAGS_OFF)).toBe("/customers/requests");
+    expect(v2Redirect("/inbox", "f=ai", FLAGS_OFF)).toBe("/ai/inbox");
+    // A bare id (old handoff links) is left as it is.
+    expect(v2Redirect("/inbox", "c=0a1b2c3d", FLAGS_OFF)).toBe("/customers/whatsapp?c=0a1b2c3d");
+    expect(v2Redirect("/inbox", "c=whatsapp:abc", FLAGS_ALL)).toBeNull();
+});
+
 test("shared paths are never redirected", () => {
     for (const p of ["/customers", "/customers/ama%40x.com", "/settings", "/agent", "/test-orders"]) {
         expect(v2Redirect(p, "", FLAGS_ALL, ALL)).toBeNull();
@@ -102,13 +136,26 @@ test("no redirect ever loops", () => {
         "/catalog/discounts", "/catalog/auto-discounts", "/discounts", "/discounts/abc",
         "/sales/analytics", "/analytics", "/sales/payments", "/sales/riders", "/sales/riders/r9", "/analytics/reports/payments",
         "/catalog/products/new", "/catalogue/new", "/catalog/products/p1/edit", "/catalogue/p1", "/catalog/products/low-stock", "/catalogue/inventory",
-        "/catalog/categories", "/catalogue/categories", "/admin/categories", "/catalog/gift-cards", "/catalogue/gift-cards", "/admin/products/new"];
-    for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_products: true }]) {
+        "/catalog/categories", "/catalogue/categories", "/admin/categories", "/catalog/gift-cards", "/catalogue/gift-cards", "/admin/products/new",
+        "/sales/pre-orders", "/customers/abandoned", "/finance", "/finance/links", "/finance/invoices", "/finance/invoices/d1",
+        "/orders/invoices", "/orders/invoices/d1", "/orders/0a1b2c3d-1111-2222-3333-444455556666", "/sales/orders/0a1b2c3d-1111-2222-3333-444455556666",
+        "/inbox", "/customers/whatsapp"];
+    for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_products: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_orders: true }]) {
         for (const p of paths) {
             const once = v2Redirect(p, "", flags, ALL);
             if (!once) continue;
             const [to, q] = once.split("?");
             expect(v2Redirect(to, q ?? "", flags, ALL), `${p} → ${once}`).toBeNull();
+        }
+    }
+    const withQuery: [string, string][] = [["/orders", "preorder=1"], ["/orders", "view=ready&pay=cash"], ["/orders/invoices", "type=link"],
+        ["/inbox", "c=whatsapp:abc"], ["/inbox", "c=form:1"], ["/sales/orders", "tab=pickups"], ["/finance/links", ""]];
+    for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }]) {
+        for (const [p, qs] of withQuery) {
+            const once = v2Redirect(p, qs, flags, ALL);
+            if (!once) continue;
+            const [to, q] = once.split("?");
+            expect(v2Redirect(to, q ?? "", flags, ALL), `${p}?${qs} → ${once}`).toBeNull();
         }
     }
 });

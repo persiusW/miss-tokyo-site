@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { normAttr, variantKey, hasVariantAttrs } from "@/lib/utils/normAttr";
+import { stockTarget, type RefundRow } from "@/lib/orders/refundMath";
 
 export type ReserveItem = {
     productId: string;
@@ -721,12 +722,33 @@ export async function reconcileOrderStock(orderId: string, note?: string): Promi
     const items = Array.isArray(order.items) ? (order.items as any[]) : [];
     if (!items.length) return 0;
 
+    // Refunds (admin v2) can put some units back, or write some off, without
+    // closing the order. The target nets them out so a later status change
+    // never re-takes restocked units or returns written-off ones. With no
+    // refunds the lines and the hold flag come back exactly as before.
+    const target = stockTarget(items, await orderRefundRows(orderId), orderShouldHoldStock(order.status, order.payment_status));
+
     return syncOrderStockPosition(
         orderId,
-        items,
-        orderShouldHoldStock(order.status, order.payment_status),
+        target.items,
+        target.hold,
         note ?? `status=${order.status} payment=${order.payment_status}`,
     );
+}
+
+/** The order's refunds, for reconcileOrderStock. Empty when there are none or the table isn't there yet. */
+async function orderRefundRows(orderId: string): Promise<RefundRow[]> {
+    const { data, error } = await supabaseAdmin
+        .from("refunds")
+        .select("amount_ghs, items, restock, status")
+        .eq("order_id", orderId);
+    if (error) {
+        // Before the refunds migration there is nothing to net out. Anything
+        // else must not reconcile on a guess: fail like the ledger call does.
+        if (error.code === "42P01" || error.code === "PGRST205") return [];
+        throw new Error(error.message);
+    }
+    return (data ?? []) as RefundRow[];
 }
 
 /**
