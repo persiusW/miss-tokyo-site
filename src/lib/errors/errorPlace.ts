@@ -43,6 +43,7 @@ export const PAGE_ROUTES: readonly string[] = [
     "/cms",
     "/communications/emails",
     "/contact",
+    "/content", "/content/menu", "/content/pages", "/content/reviews", "/content/text",
     "/craft",
     "/customers",
     "/customers/[id]",
