@@ -17,7 +17,7 @@ const read = (p: string) => fs.readFileSync(p, "utf8");
 function serverGated(routePath: string): boolean {
     const parts = routePath.split("/").filter(Boolean);
     const page = read(path.join(DASH, ...parts, "page.tsx"));
-    if (/requireStaff\(\s*\[\s*"admin"\s*\]|requireAiAdmin\(|requireStaff\(\[\.\.\.OWNER_ADMIN\]\)/.test(page)) return true;
+    if (/requireStaff\(\s*\[\s*"admin"\s*(,\s*"owner"\s*)?\]|requireAiAdmin\(|requireStaff\(\[\.\.\.OWNER_ADMIN\]\)/.test(page)) return true;
     for (let i = parts.length; i >= 1; i--) {
         const layout = path.join(DASH, ...parts.slice(0, i), "layout.tsx");
         if (fs.existsSync(layout) && /<OwnerAdminGate\b/.test(read(layout))) return true;
@@ -105,5 +105,5 @@ test("invoice pay links read the invoice total from documents", () => {
     const route = read(path.join(ROOT, "src", "app", "api", "invoice", "paystack-link", "route.ts"));
     expect(route).not.toMatch(/from\("invoices"\)/);
     expect(route).toContain('.from("documents")');
-    expect(route).toContain("const baseAmount = Number(invoiceData.amount);");
+    expect(route).toContain("const baseAmount = Number(doc.amount);");
 });
