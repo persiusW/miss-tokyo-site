@@ -203,3 +203,23 @@ test("a delivery for another phone_number_id is warned about, not refused", asyn
     expect(handled).toHaveLength(1);
     expect((ev.get("a")!.parsed as ParsedInbound).notes).toContain("phone_number_id is not ours");
 });
+
+test("a customer file is kept after it is logged, even while a person has the chat; a failed copy never fails the event", async () => {
+    const photo: InboundMessage = { ...msg(), type: "image", text: null, mediaId: "2000000000000001", mimeType: "image/jpeg" };
+    const { store, convs, logged } = fakeStore([{ id: "a" }, { id: "b" }, { id: "c" }]);
+    convs.set("c-233241234567", { id: "c-233241234567", phone: "233241234567", last_inbound_at: ago(3600_000), handed_off_at: ago(3600_000), state: { mode: "human" } });
+    const kept: string[] = [];
+    const order: string[] = [];
+    const base = deps(store, { parsed: { externalId: "evt-1", messages: [photo] } }).d;
+    const d: PipelineDeps = { ...base, afterLog: async (cid, m) => { order.push(`kept after ${logged.length} logged`); kept.push(`${cid}:${m.mediaId}`); } };
+    expect(await processInboundEvent("a", d)).toBe("processed");
+    expect(kept).toEqual(["c-233241234567:2000000000000001"]);
+    expect(order).toEqual(["kept after 1 logged"]);
+
+    const failing: PipelineDeps = { ...base, parse: () => ({ externalId: "evt-2", messages: [{ ...photo, messageId: "wamid.B" }] }), afterLog: async () => { throw new Error("storage down"); } };
+    expect(await processInboundEvent("b", failing)).toBe("processed");
+
+    const text: PipelineDeps = { ...base, parse: () => ({ externalId: "evt-3", messages: [{ ...msg(), messageId: "wamid.C" }] }), afterLog: async () => { kept.push("text?"); } };
+    await processInboundEvent("c", text);
+    expect(kept).not.toContain("text?");
+});

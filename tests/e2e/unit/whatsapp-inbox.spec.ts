@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { canAnswerWaiting, handBackState, MAX_WAITING, MISSED_AFTER_MS, previewText, shapeConversation, waitingMessages, windowOpen, type ConversationRow } from "../../../src/lib/whatsapp/inbox";
+import { canAnswerWaiting, handBackState, mediaKind, mediaPath, mediaState, MAX_WAITING, MISSED_AFTER_MS, previewText, shapeConversation, waitingMessages, windowOpen, type ConversationRow } from "../../../src/lib/whatsapp/inbox";
 
 const NOW = Date.parse("2026-10-14T18:00:00Z");
 const row = (over: Partial<ConversationRow> = {}): ConversationRow => ({
@@ -55,4 +55,21 @@ test("staff are offered a reply: always while a person has the chat, else only o
     expect(canAnswerWaiting("assistant", fresh, AT_2320)).toBe(false);   // it may be answering now
     expect(canAnswerWaiting("person", fresh, AT_2320)).toBe(true);
     expect(canAnswerWaiting("person", [], AT_2320)).toBe(false);
+});
+
+test("media: each kind shown its own way, kept under the chat by message id, never exposing the link", () => {
+    expect(["image", "sticker", "audio", "voice", "video", "document", "text", "interactive", null].map(mediaKind))
+        .toEqual(["photo", "photo", "audio", "audio", "video", "file", null, null, null]);
+    expect(mediaPath("c1", "wamid.HBgM+/x==", "image/jpeg; charset=binary")).toBe("c1/wamid.HBgM__x__.jpg");
+    expect(mediaPath("c1", "wamid.A", "audio/ogg")).toBe("c1/wamid.A.ogg");
+    expect(mediaPath("c1", "wamid.A", null)).toBe("c1/wamid.A.bin");
+
+    const row = (direction: "inbound" | "outbound", message_type: string | null, media_url: string | null) => ({ direction, message_type, media_url });
+    expect(mediaState(row("inbound", "image", "storage:c1/wamid.A.jpg"))).toBe("ready");
+    expect(mediaState(row("outbound", "image", "https://www.misstokyo.shop/api/whatsapp/media/product/p1"))).toBe("ready");
+    expect(mediaState(row("inbound", "audio", null))).toBe("fetch");            // not copied yet: opening it copies it
+    expect(mediaState(row("inbound", "image", "none:rejected"))).toBe("fetch"); // refused once: worth one more try on view
+    expect(mediaState(row("inbound", "video", "none:invalid"))).toBe("missing"); // over 5 MB
+    expect(mediaState(row("outbound", "image", null))).toBe("missing");         // an old product photo without its link
+    expect(mediaState(row("inbound", "text", null))).toBe(null);
 });

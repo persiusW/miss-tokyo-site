@@ -93,6 +93,8 @@ export type PipelineDeps = {
     sendFallback: (to: string) => Promise<MessagingResult>;
     /** Our WhatsApp phone_number_id. A delivery for another number is only warned about, never refused. */
     expectedPhoneNumberId?: string | null;
+    /** After a message is logged: keeps a copy of its file for the inbox. Best effort; a failure never fails the event. */
+    afterLog?: (conversationId: string, m: InboundMessage) => Promise<void>;
     /** Runs after a give-up moved the chat to a person (forwards it to the team). Never throws. */
     afterHandOff?: (conversationId: string) => Promise<void>;
     now?: () => Date;
@@ -136,6 +138,7 @@ export async function processInboundEvent(id: string, deps: PipelineDeps): Promi
             if (m.messageId && await deps.store.seen(m.messageId)) continue;
             if (!conversation.handedOffAt) await deps.handle(m, conversation, ev.received_at);
             await deps.store.logInbound(conversation.id, m, messageTime(m.at, ev.received_at));
+            if (m.mediaId) await deps.afterLog?.(conversation.id, m).catch(e => console.error("[whatsapp] media not kept", { err: String(e) }));
         }
         await deps.store.markProcessed(ev.id, { ...found, externalId: parsed.externalId, parsed: { ...parsed, notes }, note: notes.includes(NO_PHONE_REASON) ? NO_PHONE_REASON : null });
         return "processed";

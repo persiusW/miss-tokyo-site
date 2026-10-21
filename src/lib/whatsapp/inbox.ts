@@ -8,7 +8,10 @@ export type ConversationRow = {
     id: string; wa_phone_number: string; wa_contact_name: string | null; state: Record<string, unknown> | null;
     handed_off_at: string | null; last_message_at: string | null; last_inbound_at: string | null; created_at: string;
 };
-export type MessageRow = { id: string; conversation_id: string; direction: "inbound" | "outbound"; content: string | null; message_type: string | null; created_at: string };
+export type MessageRow = {
+    id: string; conversation_id: string; direction: "inbound" | "outbound"; content: string | null; message_type: string | null; created_at: string;
+    media_url?: string | null;
+};
 
 export type InboxConversation = {
     id: string; name: string | null; phone: string; mode: InboxMode; reason: string | null;
@@ -69,6 +72,50 @@ export function waitingMessages<T extends { direction: "inbound" | "outbound"; a
 export function canAnswerWaiting(mode: InboxMode, waiting: { at: string }[], now: number): boolean {
     if (waiting.length === 0) return false;
     return mode === "person" || now - Date.parse(waiting[waiting.length - 1].at) >= MISSED_AFTER_MS;
+}
+
+// ── Media in the chat ─────────────────────────────────────────────────────────
+
+/** message_log.media_url for a copy in our private bucket; any other value is a public https link. */
+export const STORED_MEDIA = "storage:";
+/** message_log.media_url for a file the provider couldn't give us (too big, expired). */
+export const MISSING_MEDIA = "none:";
+export type MediaKind = "photo" | "audio" | "video" | "file";
+
+/** How the inbox shows a message's file, or null for a message without one. */
+export function mediaKind(type: string | null): MediaKind | null {
+    switch (type) {
+        case "image": case "sticker": return "photo";
+        case "audio": case "voice": return "audio";
+        case "video": return "video";
+        case "document": return "file";
+        default: return null;
+    }
+}
+
+/**
+ * What the inbox can show for a message's file: "ready" (stored or public), "fetch" (a customer
+ * file not copied yet; opening it copies it), "missing", or null for no file. Never the link itself.
+ */
+export function mediaState(m: Pick<MessageRow, "direction" | "message_type" | "media_url">): "ready" | "fetch" | "missing" | null {
+    if (!mediaKind(m.message_type)) return null;
+    const url = m.media_url ?? "";
+    if (url.startsWith(STORED_MEDIA) || /^https:\/\//i.test(url)) return "ready";
+    if (m.direction === "inbound" && (!url || url === `${MISSING_MEDIA}rejected`)) return "fetch";
+    return "missing";
+}
+
+const EXT: Record<string, string> = {
+    "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
+    "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "aac", "audio/amr": "amr",
+    "video/mp4": "mp4", "video/3gpp": "3gp", "application/pdf": "pdf",
+};
+
+/** Where a customer's file is kept: one folder per chat, named by the WhatsApp message id. */
+export function mediaPath(conversationId: string, waMessageId: string, contentType: string | null): string {
+    const type = (contentType ?? "").split(";")[0].trim().toLowerCase();
+    const ext = EXT[type] ?? "bin";
+    return `${conversationId}/${waMessageId.replace(/[^A-Za-z0-9._-]/g, "_")}.${ext}`;
 }
 
 /** Back to the assistant: the person is done. Keeps the rest of state. */

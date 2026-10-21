@@ -16,7 +16,9 @@ import { providerMessage } from "./choices";
 import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnNote, setOptOut, waitingInbound } from "./conversationStore";
 import { forwardToTeam, type HandoffReason } from "./handoff";
 import { canAnswerWaiting } from "./inbox";
+import { archiveInboundMedia, type Download } from "./media";
 import { toModelPhoto } from "./photo";
+import type { MediaResult } from "@/lib/messaging/provider";
 import { photosBefore, textFollows, type PairingDeps } from "./photoPairing";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
 import { FALLBACK_TEXT, type Conversation, type InboundMessage, type InboundParser, type PipelineDeps } from "./pipeline";
@@ -60,10 +62,18 @@ export function siteBaseUrl(): string {
 }
 
 /** The pipeline for a provider, or null while events are stored only. */
-export async function pipelineFor(provider: string, settings: AiSettings): Promise<(PipelineDeps & { answerWaiting: WaitingAnswerer }) | null> {
+export async function pipelineFor(
+    provider: string, settings: AiSettings,
+): Promise<(PipelineDeps & { answerWaiting: WaitingAnswerer; fetchMedia: Download }) | null> {
     const parse = INBOUND_PARSERS[provider];
     if (!parse || !settings.whatsappEnabled) return null;
     const sender = createChatbotsAfrica();
+    // One download per file per event: the photo the assistant reads is the one the inbox keeps.
+    const fetched = new Map<string, Promise<MediaResult>>();
+    const download = (mediaId: string) => {
+        if (!fetched.has(mediaId)) fetched.set(mediaId, sender.downloadMedia(mediaId));
+        return fetched.get(mediaId)!;
+    };
     const site = siteBaseUrl();
     const teamNumber = settings.whatsappHandoffNumber ?? await shopWhatsappNumber(settings);
 
@@ -112,7 +122,7 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
         quoted: quotedMessage,
         setOptOut,
         fetchPhoto: async mediaId => {
-            const r = await sender.downloadMedia(mediaId);
+            const r = await download(mediaId);
             if (!r.ok || !r.contentType.startsWith("image/")) return null;
             return toModelPhoto(r.bytes);
         },
@@ -131,6 +141,11 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
         parse,
         handle,
         answerWaiting: handle.answerWaiting,
+        // The copy is the last use of the file in this event; its bytes are let go after it.
+        afterLog: async (conversationId, m) => {
+            try { await archiveInboundMedia(conversationId, m, download); } finally { if (m.mediaId) fetched.delete(m.mediaId); }
+        },
+        fetchMedia: mediaId => sender.downloadMedia(mediaId),
         sendFallback: to => sender.sendText(to, FALLBACK_TEXT, { event: "whatsapp_handoff_fallback" }),
         afterHandOff: id => forward(id, "processing_failed"),
         expectedPhoneNumberId: settings.whatsappPhoneNumberId,
