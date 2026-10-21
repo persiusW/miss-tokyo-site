@@ -23,6 +23,7 @@ export async function acceptInvite(data: any) {
             .eq("id", data.inviteId)
             .eq("token", data.token)
             .eq("status", "pending")
+            .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
             .single();
 
         if (inviteError || !invite) {
