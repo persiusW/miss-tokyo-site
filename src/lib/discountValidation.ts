@@ -5,7 +5,8 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { computeDiscountSplit } from "@/lib/discountSplit";
-import { couponTimingBlock } from "@/lib/couponRules";
+import { couponTimingBlock, customerKeys, hasCustomerKeys, type CustomerKeys } from "@/lib/couponRules";
+import { POS_FALLBACK_EMAIL } from "@/lib/posContact";
 
 export type ValidatedDiscount = {
     type: "coupon" | "gift_card";
@@ -50,15 +51,37 @@ async function couponUsesAvailable(
 }
 
 /**
+ * Has this customer already used this code on a paid order? For codes set to
+ * one use per customer. Fails open (false) when the check itself can't run, so
+ * an outage never blocks a sale; the caller only asks when it knows who is buying.
+ */
+export async function couponUsedByCustomer(code: string, keys: CustomerKeys): Promise<boolean> {
+    if (!hasCustomerKeys(keys)) return false;
+    const { data, error } = await supabaseAdmin.rpc("fn_coupon_used_by_customer", {
+        p_code: code, p_email: keys.email, p_phone_tail: keys.phoneTail,
+    });
+    if (error) {
+        console.warn("[discount] once-per-customer check unavailable:", error.message);
+        return false;
+    }
+    return data === true;
+}
+
+/** The customer's keys for "one use per customer", without the shop's own stand-in addresses. */
+export const buyerKeys = (who: { email?: string | null; phone?: string | null } | null | undefined) =>
+    customerKeys(who, [POS_FALLBACK_EMAIL]);
+
+/**
  * Validates a discount/gift-card code against the DB and computes its value for
  * an order of `orderAmount` GHS. Returns null when the code is missing, unknown,
- * inactive, not started, ended, over its usage limit, or below its minimum
- * order value.
+ * inactive, not started, ended, over its usage limit, below its minimum order
+ * value, or (for a once-per-customer code) already used by this customer.
  */
 export async function validateDiscountCode(
     code: string | undefined | null,
     orderAmount: number,
     deliveryFee: number = 0,
+    customer?: { email?: string | null; phone?: string | null } | null,
 ): Promise<ValidatedDiscount | null> {
     if (!code || typeof code !== "string") return null;
     const normalized = code.trim().toUpperCase();
@@ -67,7 +90,7 @@ export async function validateDiscountCode(
     const [{ data: coupon }, { data: card }] = await Promise.all([
         supabaseAdmin
             .from("coupons")
-            .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at")
+            .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at, single_use_per_customer")
             .ilike("code", normalized)
             .maybeSingle(),
         supabaseAdmin
@@ -84,6 +107,7 @@ export async function validateDiscountCode(
         const usesLeft = await couponUsesAvailable(coupon.id, coupon.usage_limit, coupon.used_count);
         if (usesLeft !== null && usesLeft < 1) return null;
         if (coupon.min_order_value && orderAmount < Number(coupon.min_order_value)) return null;
+        if (coupon.single_use_per_customer && await couponUsedByCustomer(coupon.code, buyerKeys(customer))) return null;
 
         const split = computeDiscountSplit({
             discountType: coupon.discount_type,

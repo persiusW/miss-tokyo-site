@@ -374,7 +374,7 @@ async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, 
         // recomputed against the server-calculated total.
         let validatedDiscount: ValidatedDiscount | null = null;
         if (clientMetadata?.discount_code && !couponBlocked) {
-            validatedDiscount = await validateDiscountCode(clientMetadata.discount_code, amountInGHS, deliveryFee);
+            validatedDiscount = await validateDiscountCode(clientMetadata.discount_code, amountInGHS, deliveryFee, { email, phone: clientMetadata?.phone });
             const claimedAmount = Number(clientMetadata?.discount_amount) || 0;
             const serverAmount = validatedDiscount?.amount ?? 0;
             if (Math.abs(claimedAmount - serverAmount) > 0.02) {

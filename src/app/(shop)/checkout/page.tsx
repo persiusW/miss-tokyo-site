@@ -381,7 +381,7 @@ export default function CheckoutPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 // Validate against the uncovered portion of the cart only
-                body: JSON.stringify({ code: discountInput.trim(), subtotal: remainingSubtotal, deliveryFee }),
+                body: JSON.stringify({ code: discountInput.trim(), subtotal: remainingSubtotal, deliveryFee, email: form.email, phone: form.phone }),
             });
             const data = await res.json();
             if (data.valid) {
@@ -417,7 +417,7 @@ export default function CheckoutPage() {
                 const res = await fetch("/api/checkout/validate-code", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ code: appliedDiscount.code, subtotal: remainingSubtotal, deliveryFee }),
+                    body: JSON.stringify({ code: appliedDiscount.code, subtotal: remainingSubtotal, deliveryFee, email: form.email, phone: form.phone }),
                 });
                 const data = await res.json();
                 if (cancelled) return;

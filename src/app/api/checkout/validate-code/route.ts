@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { computeDiscountSplit } from "@/lib/discountSplit";
 import { COUPON_BLOCK_TEXT, couponTimingBlock } from "@/lib/couponRules";
+import { buyerKeys, couponUsedByCustomer } from "@/lib/discountValidation";
 
 // PERF-15: cache DB lookups per code for 30 s — avoids repeated round-trips
 // when a customer types / re-submits the same code during checkout.
@@ -12,7 +13,7 @@ const lookupCode = unstable_cache(
         const [{ data: coupon }, { data: card }] = await Promise.all([
             supabaseAdmin
                 .from("coupons")
-                .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at")
+                .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at, single_use_per_customer")
                 .ilike("code", normalized)
                 .maybeSingle(),
             supabaseAdmin
@@ -29,7 +30,9 @@ const lookupCode = unstable_cache(
 
 export async function POST(req: Request) {
     try {
-        const { code, subtotal, deliveryFee } = await req.json();
+        // email and phone are optional: when the page knows who is buying, a
+        // one-use-per-customer code is checked now rather than only at payment.
+        const { code, subtotal, deliveryFee, email, phone } = await req.json();
 
         if (!code || typeof code !== "string") {
             return NextResponse.json({ valid: false, error: "No code provided." }, { status: 400 });
@@ -57,6 +60,12 @@ export async function POST(req: Request) {
                     error: `Minimum order of GH₵ ${Number(coupon.min_order_value).toFixed(2)} required for this code.`,
                 });
             }
+            // Per customer, so never cached with the code itself
+            if (coupon.single_use_per_customer
+                && await couponUsedByCustomer(coupon.code, buyerKeys({ email: typeof email === "string" ? email : null, phone: typeof phone === "string" ? phone : null }))) {
+                return NextResponse.json({ valid: false, error: COUPON_BLOCK_TEXT.used_by_customer });
+            }
+
             const split = computeDiscountSplit({
                 discountType: coupon.discount_type,
                 value: Number(coupon.discount_value),
