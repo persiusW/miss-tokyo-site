@@ -8,19 +8,32 @@ import Papa from "papaparse";
 
 
 
+// The real columns of public.contacts. This page used to read and write
+// first_name, email_subscribed and others that the table doesn't have, so
+// every add and import failed.
 type Contact = {
   id: string;
-  first_name: string | null;
-  last_name: string | null;
+  name: string;
   email: string;
   phone: string | null;
-  address_region: string | null;
-  country: string | null;
-  acquisition_source: string | null;
-  email_subscribed: boolean;
-  sms_subscribed: boolean;
+  address: string | null;
+  source: string;
+  subscribed_status: boolean;
   created_at: string;
 };
+
+const joinParts = (...parts: (string | null)[]) => parts.map(p => (p ?? "").trim()).filter(Boolean).join(" ");
+
+/** Which of these emails (lower-cased) are already contacts. contacts has no unique email index. */
+async function existingEmails(supabase: ReturnType<typeof createClient>, emails: string[]): Promise<Set<string>> {
+  const found = new Set<string>();
+  for (let i = 0; i < emails.length; i += 200) {
+    const { data, error } = await supabase.from("contacts").select("email").in("email", emails.slice(i, i + 200));
+    if (error) throw error;
+    for (const r of data ?? []) found.add(String(r.email).toLowerCase());
+  }
+  return found;
+}
 
 
 
@@ -61,8 +74,7 @@ export default function AdminCustomers() {
   }, [fetchContacts]);
 
   const filteredContacts = contacts.filter(c =>
-    (c.first_name?.toLowerCase().includes(search.toLowerCase()) || false) ||
-    (c.last_name?.toLowerCase().includes(search.toLowerCase()) || false) ||
+    (c.name?.toLowerCase().includes(search.toLowerCase()) || false) ||
     c.email.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -87,17 +99,22 @@ export default function AdminCustomers() {
     setSaving(true);
     
     const savePromise = async () => {
-        const { error } = await supabase.from("contacts").upsert([{
-            first_name: addForm.firstName.trim(),
-            last_name: addForm.lastName.trim(),
-            email: addForm.email.trim().toLowerCase(),
+        const email = addForm.email.trim().toLowerCase();
+        if ((await existingEmails(supabase, [email])).has(email)) return false;
+        // Added by hand: nobody has agreed to marketing email yet.
+        const { error } = await supabase.from("contacts").insert([{
+            name: joinParts(addForm.firstName, addForm.lastName),
+            email,
             phone: addForm.phone.trim() || null,
-            acquisition_source: "Manual"
-        }], { onConflict: 'email' });
+            source: "manual",
+            subscribed_status: false,
+        }]);
         if (error) throw error;
+        return true;
     };
 
-    savePromise().then(() => {
+    savePromise().then((added) => {
+      if (!added) { toast.error("That email is already in your customers."); return; }
       toast.success('Client added to atelier files.');
       setShowAddModal(false);
       setAddForm({ firstName: "", lastName: "", email: "", phone: "" });
@@ -145,22 +162,19 @@ export default function AdminCustomers() {
           };
 
           const email = findVal(["Email", "email", "e-mail"]);
-          if (!email) return null;
+          if (!email || !String(email).includes("@")) return null;
 
+          // Same headers as before, mapped onto the columns contacts really has.
+          const str = (keys: string[]) => { const v = findVal(keys); return v == null ? null : String(v); };
           return {
             email: String(email).toLowerCase().trim(),
-            first_name: findVal(["First Name", "first_name"]),
-            last_name: findVal(["Last Name", "last_name"]),
-            phone: findVal(["Phone", "phone_number", "Mobile"]),
-            address_region: findVal(["Address 1", "Region", "State"]),
-            address_street: findVal(["Address 2", "Street"]),
-            country: findVal(["Country", "country_code"]),
-            email_subscribed: parseBool(["Email Subscription", "email_subscribed", "Subscribed"]),
-            sms_subscribed: parseBool(["SMS Subscription", "sms_subscribed", "SMS"]),
-            acquisition_source: 'Imported',
-            updated_at: new Date().toISOString()
+            name: str(["Name", "Full Name", "name"]) ?? joinParts(str(["First Name", "first_name"]), str(["Last Name", "last_name"])),
+            phone: str(["Phone", "phone_number", "Mobile"]),
+            address: joinParts(str(["Address 1", "Street"]), str(["Address 2"]), str(["Region", "State"]), str(["Country", "country_code"])) || null,
+            subscribed_status: parseBool(["Email Subscription", "email_subscribed", "Subscribed"]),
+            source: "imported",
           };
-        }).filter(Boolean);
+        }).filter((r): r is NonNullable<typeof r> => r !== null);
 
         if (mapped.length === 0) {
           toast.error("No valid customer records found. Ensure the 'Email' header is present.");
@@ -168,17 +182,21 @@ export default function AdminCustomers() {
           return;
         }
 
+        // One row per email: skip repeats in the file and people already here.
         const importPromise = async () => {
-            const { error } = await supabase.from("contacts").upsert(mapped, { 
-                onConflict: 'email',
-                ignoreDuplicates: false 
-            });
-            if (error) throw error;
-            return mapped.length;
+            const seen = new Set<string>();
+            const unique = mapped.filter(r => !seen.has(r.email) && seen.add(r.email));
+            const already = await existingEmails(supabase, unique.map(r => r.email));
+            const fresh = unique.filter(r => !already.has(r.email));
+            for (let i = 0; i < fresh.length; i += 500) {
+                const { error } = await supabase.from("contacts").insert(fresh.slice(i, i + 500));
+                if (error) throw error;
+            }
+            return { added: fresh.length, skipped: mapped.length - fresh.length };
         };
 
-        importPromise().then((n) => {
-          toast.success(`Successfully integrated ${n} customers into the archives.`);
+        importPromise().then(({ added, skipped }) => {
+          toast.success(skipped ? `Added ${added} customers. ${skipped} were already here or repeated.` : `Added ${added} customers.`);
           setShowImportModal(false);
           fetchContacts();
         }).catch((err) => {
@@ -198,17 +216,17 @@ export default function AdminCustomers() {
 
   const downloadCSV = () => {
     const rows = filteredContacts.filter(c => selected.size === 0 || selected.has(c.id));
-    const headers = ["First Name", "Last Name", "Email", "Phone", "Region", "Country", "Source", "Date Joined"];
+    const headers = ["Name", "Email", "Phone", "Address", "Email Subscription", "Source", "Date Joined"];
+    const q = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const csvContent = [
       headers.join(","),
       ...rows.map(c => [
-        `"${c.first_name || ""}"`,
-        `"${c.last_name || ""}"`,
-        `"${c.email}"`,
-        `"${c.phone || ""}"`,
-        `"${c.address_region || ""}"`,
-        `"${c.country || ""}"`,
-        `"${c.acquisition_source || "Order"}"`,
+        q(c.name || ""),
+        q(c.email),
+        q(c.phone || ""),
+        q(c.address || ""),
+        q(c.subscribed_status ? "yes" : "no"),
+        q(c.source || "manual"),
         `"${new Date(c.created_at).toLocaleDateString("en-GB")}"`
       ].join(","))
     ].join("\n");
@@ -280,24 +298,22 @@ export default function AdminCustomers() {
                     </td>
                     <td className="px-4 py-4">
                       <p className="text-xs font-semibold text-gray-900" style={{ fontFamily: "Arial, sans-serif" }}>
-                        {c.first_name || ""} {c.last_name || ""}
+                        {c.name || ""}
                       </p>
                       <p className="text-[10px] text-gray-500">{c.email}</p>
                       {c.phone && <p className="text-[9px] text-gray-400">{c.phone}</p>}
                     </td>
                     <td className="px-4 py-4">
-                      <p className="text-xs text-gray-600">{c.address_region || "—"}</p>
-                      <p className="text-[10px] text-gray-400 uppercase tracking-widest">{c.country || "—"}</p>
+                      <p className="text-xs text-gray-600">{c.address || "—"}</p>
                     </td>
                     <td className="px-4 py-4">
                         <div className="flex gap-2">
-                            <span className={`text-[8px] uppercase tracking-widest px-1.5 py-0.5 border ${c.email_subscribed ? 'border-black text-black' : 'border-gray-100 text-gray-300'}`}>Email</span>
-                            <span className={`text-[8px] uppercase tracking-widest px-1.5 py-0.5 border ${c.sms_subscribed ? 'border-black text-black' : 'border-gray-100 text-gray-300'}`}>SMS</span>
+                            <span className={`text-[8px] uppercase tracking-widest px-1.5 py-0.5 border ${c.subscribed_status ? 'border-black text-black' : 'border-gray-100 text-gray-300'}`}>Email</span>
                         </div>
                     </td>
                     <td className="px-4 py-4">
                       <span className="text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-sm bg-gray-100 text-gray-600" style={{ fontFamily: "Arial, sans-serif" }}>
-                        {c.acquisition_source || "Order"}
+                        {c.source || "manual"}
                       </span>
                     </td>
                     <td className="px-4 py-4 text-xs text-gray-400" style={{ fontFamily: "Arial, sans-serif" }}>
