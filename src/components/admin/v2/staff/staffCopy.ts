@@ -70,7 +70,7 @@ export const PERMS: PermRow[] = [
     { area: "Mark an order paid after a Paystack check", owner: "yes", admin: "yes", sales: "no" },
     { area: "Change or cancel another person's till sale", owner: "yes", admin: "yes", sales: "no" },
     { area: "Products, inventory, categories, gift cards and customers", owner: "yes", admin: "yes", sales: "yes" },
-    { area: "Discount codes", owner: "yes", admin: "no", sales: "yes" },
+    { area: "Discount codes", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Automatic discounts", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Analytics and reports", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Give or remove wholesale prices", owner: "yes", admin: "yes", sales: "no" },

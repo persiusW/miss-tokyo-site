@@ -94,4 +94,6 @@ test("the permissions matrix keeps the admin-only rows admin-only", () => {
     expect(row("AI cost markup and the admin inbox")).toMatchObject({ owner: "no", admin: "yes", sales: "no" });
     expect(row("Staff and billing")).toMatchObject({ owner: "yes", admin: "yes", sales: "no" });
     expect(row("Mark an order paid after a Paystack check").sales).toBe("no");
+    // Owner, admin and sales staff all change codes (catalog/discounts/actions.ts and the v2 actions)
+    expect(row("Discount codes")).toMatchObject({ owner: "yes", admin: "yes", sales: "yes" });
 });

@@ -21,13 +21,12 @@ import { deleteDiscount, findProducts, getRecentOrders, saveAuto, saveCode, setD
 
 type Tab = "setup" | "results";
 
-export function DiscountPanel({ kind, disc, row, data, overlaps, canEdit, onClose, onChanged, onCreated, onDeleted }: {
+export function DiscountPanel({ kind, disc, row, data, overlaps, onClose, onChanged, onCreated, onDeleted }: {
     kind: Kind;
     disc: Discount | null;
     row: CouponRow | AutoRow | null;
     data: DiscountData;
     overlaps: OverlapBanner[];
-    canEdit: boolean;
     onClose: () => void;
     onChanged: () => void;
     onCreated: () => void;
@@ -92,20 +91,22 @@ export function DiscountPanel({ kind, disc, row, data, overlaps, canEdit, onClos
         ? "Starts as soon as you save, unless you pick a later date."
         : `${disc!.statusLabel} · used ${plural(disc!.used, "time")}`;
 
-    const footerLeft = canEdit ? (isNew ? (
+    // Owners, admins and sales staff can all change codes and automatic
+    // discounts (the server actions check again), so there is no read-only view.
+    const footerLeft = isNew ? (
         <span className="hrow-sm"><Switch label="Turn on when saved" checked={f.isActive} onChange={v => up({ isActive: v })} /><span className="sm">Turn on when saved</span></span>
     ) : (
         <>
             <Btn kind="ghost" onClick={toggle} disabled={busy || saving}>{f.isActive ? "Switch off" : "Switch on"}</Btn>
             <TwoTap label="Delete" onConfirm={remove} disabled={busy || saving} />
         </>
-    )) : null;
-    const footer = canEdit ? (
+    );
+    const footer = (
         <>
             <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
             <Btn kind="primary" onClick={save} disabled={saving || busy}>{saving ? "Saving…" : isNew ? "Create discount" : "Save discount"}</Btn>
         </>
-    ) : <Btn onClick={onClose}>Close</Btn>;
+    );
 
     return (
         <Panel open wide onClose={onClose} title={title} sub={sub}
@@ -113,15 +114,12 @@ export function DiscountPanel({ kind, disc, row, data, overlaps, canEdit, onClos
             footerLeft={footerLeft} footer={footer}>
             {tab === "setup" || isNew ? (
                 <>
-                    {!canEdit && (
-                        <Banner tone="info" title="You can look, but not change codes">Only owners and sales staff can create or change discount codes. Automatic discounts are open to admins too.</Banner>
-                    )}
                     <div className="inset" aria-live="polite">
                         <div className="section-t">Summary</div>
                         <div className="ink2">{summary}</div>
                     </div>
                     {overlaps.map(o => <Banner key={o.key} tone="warn" title={o.title}>{o.body}</Banner>)}
-                    <fieldset className="disc-fields stack" disabled={!canEdit}>
+                    <fieldset className="disc-fields stack">
                         <legend className="sr">Discount details</legend>
                         <NameField f={f} up={up} err={err} locked={codeLocked} />
                         <ValueFields f={f} up={up} err={err} />

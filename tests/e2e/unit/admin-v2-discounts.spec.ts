@@ -271,6 +271,15 @@ test.describe("routes and logging", () => {
         expect(v2Redirect("/discounts", "", FLAGS_OFF)).toBe("/catalog/discounts");
         expect(v2Redirect("/discounts/abc", "", FLAGS_OFF)).toBe("/catalog/discounts");
     });
+    test("owners, admins and sales staff can all change codes, in the old admin and the new", () => {
+        // Server actions are public endpoints on the service role, so these role lists are the only gate
+        const oldActions = fs.readFileSync(path.join(ROOT, "src/app/(dashboard)/catalog/discounts/actions.ts"), "utf8");
+        expect(oldActions).toContain('["admin", "owner", "sales_staff"].includes(profile.role)');
+        const v2Actions = fs.readFileSync(path.join(ROOT, "src/components/admin/v2/discounts/actions.ts"), "utf8");
+        expect(v2Actions).toContain('code: ["admin", "owner", "sales_staff"], auto: ["admin", "owner", "sales_staff"]');
+        const panel = fs.readFileSync(path.join(ROOT, "src/components/admin/v2/discounts/DiscountPanel.tsx"), "utf8");
+        expect(panel).not.toContain("You can look, but not change codes");
+    });
     test("every discount action reads plainly in the team activity", () => {
         expect(activityText({ action_type: "UPDATE_DISCOUNT", resource: "discount", details: { code: "HARM20" } }).what).toBe("changed the discount code HARM20");
         expect(activityText({ action_type: "TOGGLE_DISCOUNT", resource: "discount", details: { code: "HARM20", is_active: false } }).what).toBe("turned the discount code HARM20 off");

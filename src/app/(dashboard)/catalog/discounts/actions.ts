@@ -14,7 +14,9 @@ async function getCallerOrFail() {
         .select("role")
         .eq("id", user.id)
         .single();
-    if (!profile || !["owner", "sales_staff"].includes(profile.role)) return null;
+    // Owners, admins and sales staff manage codes. Admins were left out of
+    // this list, so they got "Unauthorized" on every code action.
+    if (!profile || !["admin", "owner", "sales_staff"].includes(profile.role)) return null;
     return { userId: user.id, userRole: profile.role };
 }
 

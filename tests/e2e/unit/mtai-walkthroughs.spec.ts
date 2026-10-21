@@ -32,7 +32,9 @@ test("every ringed control is registered and lives on the step's page (topbar is
 
 test("tours are role-filtered, and the effect refuses tours a role can't run", () => {
     expect(walkthroughsFor("sales_staff").map(w => w.id)).not.toContain("delivery-fees");
-    expect(walkthroughsFor("admin").map(w => w.id)).not.toContain("discount-code");
+    // Admins can create codes since October 2026, so the tour is theirs too
+    expect(walkthroughsFor("admin").map(w => w.id)).toContain("discount-code");
+    expect(walkthroughsFor("admin").map(w => w.id)).toContain("delivery-fees");
     expect(walkthroughEffect("delivery-fees", "sales_staff")).toBeNull();
     expect(walkthroughEffect("nope", "admin")).toBeNull();
     expect(walkthroughEffect("pos-sale", "sales_staff")).toEqual({ kind: "walkthrough", id: "pos-sale", href: "/pos", label: "Start walkthrough" });
