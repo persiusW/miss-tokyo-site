@@ -84,3 +84,26 @@ test("settings, content and finance writes need owner or admin", () => {
     // The catalogue stays open to sales staff: their menu shows it.
     expect(sql).not.toMatch(/on public\.(categories|products|product_variants|riders|coupons)\b/);
 });
+
+test("the old /admin screens outside the dashboard send non-staff to sign in", () => {
+    const ADMIN = path.join(ROOT, "src", "app", "admin");
+    const gate = read(path.join(ROOT, "src", "components", "admin", "LegacyStaffGate.tsx"));
+    expect(gate).toContain("await requireStaff()");
+    expect(gate).toContain('redirect("/admin/login")');
+    const top = fs.readdirSync(ADMIN, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name);
+    expect(top).toContain("customers");
+    for (const dir of top) {
+        if (dir === "login") continue;
+        const layout = path.join(ADMIN, dir, "layout.tsx");
+        expect(fs.existsSync(layout), `/admin/${dir} has a layout`).toBe(true);
+        const src = read(layout);
+        expect(/<LegacyStaffGate\b/.test(src) || /requireStaff\(\[\.\.\.OWNER_ADMIN\]\)/.test(src), `/admin/${dir} is gated`).toBe(true);
+    }
+});
+
+test("invoice pay links read the invoice total from documents", () => {
+    const route = read(path.join(ROOT, "src", "app", "api", "invoice", "paystack-link", "route.ts"));
+    expect(route).not.toMatch(/from\("invoices"\)/);
+    expect(route).toContain('.from("documents")');
+    expect(route).toContain("const baseAmount = Number(invoiceData.amount);");
+});
