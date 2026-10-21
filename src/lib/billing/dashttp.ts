@@ -111,9 +111,27 @@ export const getDashttpBilling = (d?: DashttpDeps) => call("GET", "/billing", pa
 export const getManageLink = (d?: DashttpDeps) =>
     call("POST", "/billing/manage-link", (x: any) => ({ url: str(x?.url), expiresAt: strOrNull(x?.expiresAt) }), { body: {} }, d);
 
+/**
+ * A statement line in exactly the shape Dashttp validates (docs/client-api-v1.md):
+ * only the five documented fields, and a non-empty unit. A line whose quantity
+ * the owner doesn't see (quantity 0, no unit) goes as "1 period", so Dashttp's
+ * invoice reads the same as the owner's Billing page.
+ */
+export function dashttpLine(l: DashttpInvoiceLine): DashttpInvoiceLine {
+    const unit = String(l.unit ?? "").trim();
+    const hidden = !(Number(l.quantity) > 0) || !unit;
+    return {
+        service: String(l.service ?? "").trim() || "other",
+        description: String(l.description ?? "").trim(),
+        quantity: hidden ? 1 : Number(l.quantity),
+        unit: hidden ? "period" : unit.slice(0, 40),
+        amountGhs: l.amountGhs,
+    };
+}
+
 /** Send a frozen statement. Client-facing amounts only. */
 export const submitUsageInvoice = (s: { periodStart: string; periodEnd: string; lines: DashttpInvoiceLine[]; totalGhs: number }, key: string, d?: DashttpDeps) =>
-    call("POST", "/usage-invoices", parseInvoice, { body: { periodStart: s.periodStart, periodEnd: s.periodEnd, lines: s.lines, totalGhs: s.totalGhs, currency: "GHS" }, idempotencyKey: key }, d);
+    call("POST", "/usage-invoices", parseInvoice, { body: { periodStart: s.periodStart, periodEnd: s.periodEnd, lines: s.lines.map(dashttpLine), totalGhs: s.totalGhs, currency: "GHS" }, idempotencyKey: key }, d);
 
 export const listUsageInvoices = (status?: "open" | "paid", limit = 20, d?: DashttpDeps) =>
     call("GET", `/usage-invoices?limit=${limit}${status ? `&status=${status}` : ""}`, (x: any) => (Array.isArray(x) ? x : Array.isArray(x?.data) ? x.data : []).map(parseInvoice), {}, d);

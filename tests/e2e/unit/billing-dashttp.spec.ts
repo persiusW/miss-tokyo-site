@@ -1,7 +1,7 @@
 import "./stubSupabaseEnv";
 import { test, expect } from "@playwright/test";
 import crypto from "crypto";
-import { dashttpMode, getDashttpBilling, submitUsageInvoice, payUsageInvoice, getManageLink, safePaystackUrl, parseBilling } from "../../../src/lib/billing/dashttp";
+import { dashttpLine, dashttpMode, getDashttpBilling, submitUsageInvoice, payUsageInvoice, getManageLink, safePaystackUrl, parseBilling } from "../../../src/lib/billing/dashttp";
 import { resetMockDashttp } from "../../../src/lib/billing/dashttpMock";
 import { verifyDashttpSignature, parseEvent } from "../../../src/lib/billing/dashttpWebhook";
 
@@ -92,4 +92,19 @@ test("webhook signature: sha256 HMAC of the raw body, constant-time, nothing els
     expect(parseEvent(raw, null)).toMatchObject({ id: "evt_1", type: "invoice.paid" });
     expect(parseEvent(JSON.stringify({ type: "x", data: {} }), "evt_hdr")).toMatchObject({ id: "evt_hdr" });
     expect(parseEvent("not json", "x")).toBeNull();
+});
+
+test("statement lines match Dashttp's validation: five fields, a non-empty unit, total = sum of lines", async () => {
+    // Mirrors dashttp-website src/lib/client-api/usage.ts (zod): unit min 1, quantity ≥ 0, total equals the lines.
+    const hidden = dashttpLine({ service: "SMS", description: "Order messages", quantity: 0, unit: "", amountGhs: 12.5, ...{ unitPriceGhs: 0.05 } } as never);
+    expect(hidden).toEqual({ service: "SMS", description: "Order messages", quantity: 1, unit: "period", amountGhs: 12.5 });
+    const shown = dashttpLine({ service: "WhatsApp", description: "Replies", quantity: 80, unit: "messages", amountGhs: 40 });
+    expect(shown).toEqual({ service: "WhatsApp", description: "Replies", quantity: 80, unit: "messages", amountGhs: 40 });
+    let sent: any = null;
+    const fetchImpl = (async (_u: string, init: any) => { sent = JSON.parse(init.body); return new Response(JSON.stringify({ id: "i1", number: "INV-1", amountGhs: 52.5, status: "open", lines: [] }), { status: 201 }); }) as typeof fetch;
+    await submitUsageInvoice({ periodStart: "2026-10-08", periodEnd: "2026-10-28", lines: [{ service: "SMS", description: "x", quantity: 0, unit: "", amountGhs: 12.5 }, { service: "WhatsApp", description: "y", quantity: 80, unit: "messages", amountGhs: 40 }], totalGhs: 52.5 },
+        "misstokyo:2026-10-08:2026-10-28", { env: { DASHTTP_API_BASE: "https://www.dashttp.com", DASHTTP_CLIENT_TOKEN: "t" } as never, fetchImpl });
+    expect(sent.currency).toBe("GHS");
+    expect(sent.lines.every((l: any) => typeof l.unit === "string" && l.unit.length > 0 && Object.keys(l).sort().join() === "amountGhs,description,quantity,service,unit")).toBe(true);
+    expect(Math.round(sent.lines.reduce((s: number, l: any) => s + l.amountGhs, 0) * 100)).toBe(Math.round(sent.totalGhs * 100));
 });
