@@ -197,7 +197,7 @@ function DocPanel({ data, doc, onClose, onSaved }: { data: DocsData; doc?: Docum
             footer={<>
                 <Btn kind="ghost" onClick={onClose} disabled={busy}>{doc ? "Close" : "Cancel"}</Btn>
                 {editable && <Btn onClick={() => save("draft")} disabled={busy || !ready}>Save draft</Btn>}
-                {editable && <Btn kind="primary" onClick={() => save("pending")} disabled={busy || !ready}>{doc ? "Finish and keep" : `Make ${KIND[kind].toLowerCase()}`}</Btn>}
+                {editable && <Btn kind="primary" onClick={() => save("pending")} disabled={busy || !ready}>{`Make ${KIND[kind].toLowerCase()}`}</Btn>}
                 {doc && doc.status === "pending" && <Btn kind="primary" onClick={() => void status("paid")} disabled={busy}>Mark as paid</Btn>}
                 {doc && doc.status === "paid" && <BtnLink kind="primary" icon="download" href={viewUrl} external>Open receipt</BtnLink>}
             </>}>
