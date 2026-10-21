@@ -59,7 +59,7 @@ export const CUSTOMER_TOOL_DEFS: Anthropic.Tool[] = [
     },
     {
         name: "track_order",
-        description: "Look up an order by its 8-character order number plus the email or phone used on it. A signed-in customer may set my_orders to see their last 5 orders.",
+        description: "Look up an order by its 8-character order number plus the email or phone used on it. A signed-in customer, or a customer on WhatsApp (their number is the proof), may set my_orders to see their last 5 orders.",
         input_schema: {
             type: "object",
             properties: {
