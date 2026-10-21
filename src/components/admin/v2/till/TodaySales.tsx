@@ -16,6 +16,7 @@ import {
     SALES_PAGE_SIZE, SALES_WHEN, SALE_STATUSES, canCancel, paidByLabel, saleStatusLabel, salesHref, type SalesQuery, type SalesWhen, type SaleStatus,
 } from "@/lib/admin/v2/till";
 import type { SaleRow, SalesData, TodayKpis } from "@/lib/admin/v2/tillLoad";
+import { useReceipt } from "./useReceipt";
 import "../orders/orders.css";
 import "./till.css";
 
@@ -132,6 +133,7 @@ export function TodaySales({ role, query, kpis, data }: { role: string; query: S
 
 function SalePanel({ row, own, now, onClose, onChanged }: { row: SaleRow; own: boolean; now: number; onClose: () => void; onChanged: () => void }) {
     const [busy, setBusy] = useState(false);
+    const receipt = useReceipt();
     const st = saleStatusLabel(row, now);
     const goods = row.items.reduce((s, i) => s + i.price * i.quantity, 0);
     const left = row.status === "pending_payment" ? minutesLeft(row.expires_at, now) : null;
@@ -168,6 +170,7 @@ function SalePanel({ row, own, now, onClose, onChanged }: { row: SaleRow; own: b
             ) : undefined}
             footer={<>
                 {row.status === "pending_payment" && <Btn icon="copy" onClick={() => void copy()}>Copy pay link</Btn>}
+                {row.order_id && <Btn icon="print" onClick={() => void receipt.print(row.order_id)} disabled={receipt.busy}>{receipt.busy ? "Getting the receipt…" : "Print receipt"}</Btn>}
                 {row.order_id && <BtnLink href={`/orders/${row.order_id}`}>Open order</BtnLink>}
                 <Btn kind="ghost" onClick={onClose}>Close</Btn>
             </>}>
@@ -217,6 +220,7 @@ function SalePanel({ row, own, now, onClose, onChanged }: { row: SaleRow; own: b
                 {row.notes && <Field label="Staff notes"><p>{row.notes}</p></Field>}
                 {row.status === "paid" && row.paid_at && <p className="help">Paid {when(row.paid_at)}.</p>}
             </div>
+            {receipt.node}
         </Panel>
     );
 }

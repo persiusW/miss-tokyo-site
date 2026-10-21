@@ -58,3 +58,4 @@
 /* Miss Tokyo AI's launcher sits left of the sale card, never over its button. */
 @media (min-width:900px){.adm2 .mtai-launcher.on-pos{right:calc(380px + var(--s7) + var(--s4))}.adm2 .mtai-tip.on-pos{right:calc(380px + var(--s7) + var(--s4))}}
 @media (min-width:900px) and (max-width:1180px){.adm2 .mtai-launcher.on-pos,.adm2 .mtai-tip.on-pos{right:calc(330px + var(--s7) + var(--s4))}}
+.adm2 .tile-grid[aria-busy="true"]{opacity:.6;transition:opacity var(--dur) var(--ease)}
