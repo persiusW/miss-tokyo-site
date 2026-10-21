@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { parseChatbotsAfrica } from "../../../src/lib/whatsapp/parsers/chatbotsAfrica";
 import type { InboundMessage, ParsedInbound } from "../../../src/lib/whatsapp/pipeline";
-import { MAX_PAIRED_PHOTOS, PAIR_SETTLE_MS, PAIR_WINDOW_MS, photosBefore, textFollows, type PairingDeps } from "../../../src/lib/whatsapp/photoPairing";
+import { BURST_MS, carriedBefore, MAX_PAIRED_PHOTOS, PAIR_SETTLE_MS, PAIR_WINDOW_MS, photosBefore, textFollows, textFollowsSoon, type PairingDeps } from "../../../src/lib/whatsapp/photoPairing";
 
 // The 2026-10-20 chat: a screenshot with no caption, then "Do you have this ?" four seconds later.
 const PHONE = "233200000041";
@@ -105,4 +105,55 @@ test("real provider payloads: the parser's bare photo pairs with its text, and t
     };
     expect(await textFollows(p, PHOTO_AT, deps)).toBe(true);
     expect((await photosBefore(t, TEXT_AT, deps)).map(m => m.mediaId)).toEqual([p.mediaId]);
+});
+
+// ── Bursts of texts ──────────────────────────────────────────────────────────
+const t = (s: string, id: string) => text(s, { messageId: `wamid.${id}` });
+
+test("a quick burst is one question: the earlier texts stand down, the last carries them in order", async () => {
+    const T0 = PHOTO_AT;
+    const events = [
+        { at: T0, m: t("Hi", "1") },
+        { at: plus(T0, 1500), m: t("I want the brown dress", "2") },
+        { at: plus(T0, 3500), m: t("size M", "3") },
+    ];
+    const w = world(events, plus(T0, 60_000));
+    expect(await textFollowsSoon(events[0].m, events[0].at, w.deps)).toBe(true);
+    expect(await textFollowsSoon(events[1].m, events[1].at, w.deps)).toBe(true);
+    expect(await textFollowsSoon(events[2].m, events[2].at, w.deps)).toBe(false);
+    const c = await carriedBefore(events[2].m, events[2].at, w.deps);
+    expect(c.texts.map(m => m.text)).toEqual(["Hi", "I want the brown dress"]);
+    expect(c.photos).toEqual([]);
+});
+
+test("a pause longer than the burst window starts a new question; STOP never joins one", async () => {
+    const a = { at: PHOTO_AT, m: t("Hi", "1") };
+    const b = { at: plus(PHOTO_AT, BURST_MS + 1), m: t("Do you deliver to Kumasi?", "2") };
+    const w = world([a, b], plus(PHOTO_AT, 60_000));
+    expect(await textFollowsSoon(a.m, a.at, w.deps)).toBe(false);
+    expect((await carriedBefore(b.m, b.at, w.deps)).texts).toEqual([]);
+    const stop = { at: plus(PHOTO_AT, 1000), m: t("STOP", "s") };
+    const w2 = world([a, stop], plus(PHOTO_AT, 60_000));
+    expect(await textFollowsSoon(a.m, a.at, w2.deps)).toBe(false);
+});
+
+test("a photo then a burst: the photo rides with the whole burst, even past 12 s from the last text", async () => {
+    const p = { at: PHOTO_AT, m: photo() };
+    const a = { at: plus(PHOTO_AT, 11_000), m: t("Do you have this", "a") };
+    const b = { at: plus(PHOTO_AT, 13_000), m: t("in M?", "b") };
+    const w = world([p, a, b], plus(PHOTO_AT, 60_000));
+    expect(await textFollows(p.m, p.at, w.deps)).toBe(true);           // the photo stands down
+    expect(await textFollowsSoon(a.m, a.at, w.deps)).toBe(true);       // so does the first text
+    const c = await carriedBefore(b.m, b.at, w.deps);
+    expect(c.texts.map(m => m.text)).toEqual(["Do you have this"]);
+    expect(c.photos.map(m => m.mediaId)).toEqual(["2000000000000001"]);
+});
+
+test("one photo, two separate questions after it: only the first question's burst carries the photo", async () => {
+    const p = { at: PHOTO_AT, m: photo() };
+    const a = { at: plus(PHOTO_AT, 2000), m: t("Do you have this?", "a") };
+    const b = { at: plus(PHOTO_AT, 8000), m: t("Also, delivery to Tema?", "b") };
+    const w = world([p, a, b], plus(PHOTO_AT, 60_000));
+    expect((await carriedBefore(a.m, a.at, w.deps)).photos.map(m => m.mediaId)).toEqual(["2000000000000001"]);
+    expect((await carriedBefore(b.m, b.at, w.deps)).photos).toEqual([]);
 });

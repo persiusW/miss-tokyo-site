@@ -23,7 +23,7 @@ import { canAnswerWaiting } from "./inbox";
 import { archiveInboundMedia, type Download } from "./media";
 import { toModelPhoto } from "./photo";
 import type { MediaResult } from "@/lib/messaging/provider";
-import { photosBefore, textFollows, type PairingDeps } from "./photoPairing";
+import { carriedBefore, textFollows, textFollowsSoon, type PairingDeps } from "./photoPairing";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
 import { FALLBACK_TEXT, type Conversation, type InboundMessage, type InboundParser, type PipelineDeps } from "./pipeline";
 import { supabaseInboundStore } from "./pipelineStore";
@@ -139,7 +139,8 @@ export async function pipelineFor(
             return toModelPhoto(r.bytes);
         },
         textFollows: (m, at) => textFollows(m, at, pairing),
-        photosBefore: (m, at) => photosBefore(m, at, pairing),
+        carriedBefore: (m, at) => carriedBefore(m, at, pairing),
+        textFollowsSoon: (m, at) => textFollowsSoon(m, at, pairing),
         perDay: settings.shop.dailyMessagesPerVisitor,
         teamNumber,
         // The team has the chat and the customer wrote again: alert them, at most once an hour.

@@ -25,7 +25,7 @@ import { withNotice } from "./notices";
 import type { ModelPhoto } from "./photo";
 import type { HandoffReason } from "./handoff";
 import type { Conversation, InboundMessage } from "./pipeline";
-import { isBarePhoto, MAX_PAIRED_PHOTOS } from "./photoPairing";
+import { canCarryPhoto, isBarePhoto, MAX_PAIRED_PHOTOS } from "./photoPairing";
 import { handedOffLine, renderForWhatsApp, WA_LINES, type WhatsAppReply } from "./render";
 
 export type AssistantDeps = {
@@ -61,7 +61,9 @@ export type AssistantDeps = {
     /** Bare photo: waits out the pairing window; true when a text that arrived inside it will answer the photo. */
     textFollows?: (m: InboundMessage, receivedAt: string) => Promise<boolean>;
     /** Text: the bare photos it answers, oldest first. Throws when they can't be read, so the text is retried. */
-    photosBefore?: (m: InboundMessage, receivedAt: string) => Promise<InboundMessage[]>;
+    carriedBefore?: (m: InboundMessage, receivedAt: string) => Promise<{ texts: InboundMessage[]; photos: InboundMessage[] }>;
+    /** Text: waits out the burst window; true when the sender's next text came inside it (that one answers both). */
+    textFollowsSoon?: (m: InboundMessage, receivedAt: string) => Promise<boolean>;
     siteUrl: string;
 };
 
@@ -204,12 +206,15 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
             if (photos.length === 0) return notReadable(c, m);
         } else if (m.type !== "text") {
             return notReadable(c, m);
-        } else if (receivedAt && deps.photosBefore) {
-            const before = await deps.photosBefore(m, receivedAt);
-            if (before.length > 0) {
-                photos = await fetchAll(before.map(p => p.mediaId!));
-                if (photos.length === 0) return notReadable(c, before[before.length - 1]);
+        } else if (receivedAt && deps.carriedBefore) {
+            // A quick burst of texts is one question: the last of them answers. On an error, answer here.
+            if (canCarryPhoto(m) && await deps.textFollowsSoon?.(m, receivedAt).catch(() => false)) return;
+            const carried = await deps.carriedBefore(m, receivedAt);
+            if (carried.photos.length > 0) {
+                photos = await fetchAll(carried.photos.map(p => p.mediaId!));
+                if (photos.length === 0) return notReadable(c, carried.photos[carried.photos.length - 1]);
             }
+            if (carried.texts.length > 0) typed = [...carried.texts.map(t => t.text ?? ""), typed].filter(t => t.trim()).join("\n");
         }
         const photo = photos.length > 0;
         if (!m.from) return;
