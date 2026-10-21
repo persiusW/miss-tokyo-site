@@ -6,6 +6,8 @@ import { NewArrivalsSection } from "@/components/public/NewArrivalsSection";
 import { OptInSection } from "@/components/public/OptInSection";
 import { InstagramFeed } from "@/components/public/InstagramFeed";
 import type { SiteSettings, HeroSlide, FeaturedCategory, TrustBarItem } from "@/types/settings";
+import { HOME_LAYOUT_KEY, parseLayout, type HomeSectionId } from "@/lib/content/homeLayout";
+import { Fragment, type ReactNode } from "react";
 
 // 5-minute ISR: homepage content (hero, categories) changes rarely.
 // Under heavy load this means only ~1 DB query per 5 minutes instead of per-request.
@@ -16,6 +18,7 @@ export default async function HomePage() {
     { data: settingsData },
     { data: heroSlidesData },
     { data: featuredCatsData },
+    { data: layoutRow },
   ] = await Promise.all([
     supabaseAdmin
       .from("site_settings")
@@ -32,7 +35,14 @@ export default async function HomePage() {
       .select("*, category:categories(name, slug, image_url, product_count)")
       .eq("enabled", true)
       .order("position", { ascending: true }),
+    // Section order and visibility from Content › Home page.
+    supabaseAdmin
+      .from("site_copy")
+      .select("value")
+      .eq("copy_key", HOME_LAYOUT_KEY)
+      .maybeSingle(),
   ]);
+  const layout = parseLayout(layoutRow?.value);
 
   const settings = settingsData as SiteSettings | null;
   const heroSlides = (heroSlidesData || []) as HeroSlide[];
@@ -57,21 +67,13 @@ export default async function HomePage() {
   const couponEnabled = settings?.welcome_coupon_enabled ?? true;
   const couponCode = settings?.welcome_coupon_code ?? "FIRST10";
 
-  return (
-    <>
-      {/* 1. Hero Slider */}
-      <HeroSlider slides={heroSlides} />
-
-      {/* 2. Trust Bar (below hero) */}
-      <TrustBar enabled={trustBarEnabled} items={trustBarItems} />
-
-      {/* 3. Category Grid */}
-      <CategoryGrid categories={categoriesWithCounts} />
-
-      {/* 4. New Arrivals */}
-      <NewArrivalsSection />
-
-      {/* 5. Transparent Turtle Review Widget */}
+  const sections: Record<HomeSectionId, ReactNode> = {
+    hero: <HeroSlider slides={heroSlides} />,
+    trust: <TrustBar enabled={trustBarEnabled} items={trustBarItems} />,
+    categories: <CategoryGrid categories={categoriesWithCounts} />,
+    new_arrivals: <NewArrivalsSection />,
+    // Transparent Turtle review widget
+    reviews: (
       <div className="w-full px-4 md:px-8 py-8">
         <iframe
           src="https://www.transparentturtle.com/widget/misstokyo?type=full&theme=light"
@@ -83,8 +85,8 @@ export default async function HomePage() {
           style={{ border: "none", overflow: "hidden", width: "100%" }}
         />
       </div>
-
-      {/* 6. Email Opt-In */}
+    ),
+    newsletter: (
       <OptInSection
         enabled={optInEnabled}
         title={optInTitle}
@@ -92,13 +94,23 @@ export default async function HomePage() {
         couponEnabled={couponEnabled}
         couponCode={couponCode}
       />
-
-      {/* 7. Instagram Feed */}
+    ),
+    instagram: (
       <InstagramFeed
         instagramUrl={settings?.social_instagram ?? null}
         accessToken={settings?.instagram_access_token ?? null}
       />
+    ),
+  };
 
+  // Default order: hero, promise strip, categories, new arrivals, reviews,
+  // newsletter, Instagram. The promise strip and newsletter keep their own
+  // switches (passed in above); the rest are hidden through the layout.
+  return (
+    <>
+      {layout.order.filter(id => !layout.hidden.includes(id)).map(id => (
+        <Fragment key={id}>{sections[id]}</Fragment>
+      ))}
     </>
   );
 }
