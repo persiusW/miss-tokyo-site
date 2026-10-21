@@ -169,8 +169,9 @@
 .adm2 .btn-danger{background:var(--danger-bg);color:var(--danger-ink)}
 .adm2 .btn-danger:hover{background:var(--danger-line)}
 .adm2 .btn-danger-solid{background:var(--danger-solid);color:#fff}
-.adm2 .btn-danger-solid:hover{filter:brightness(.92)}
-.adm2 .btn-armed{background:var(--danger-solid);color:#fff}
+/* .btn:hover would otherwise grey these out under the pointer, and a tap leaves :hover on touch screens. */
+.adm2 .btn-danger-solid:hover{background:var(--danger-solid);filter:brightness(.92)}
+.adm2 .btn-armed,.adm2 .btn-armed:hover{background:var(--danger-solid);color:#fff}
 .adm2 .btn-sm{min-height:var(--ctl-sm);padding:0 var(--s3);font-size:var(--t-sm)}
 .adm2 .btn[disabled]{opacity:.5;cursor:not-allowed}
 .adm2 .btn-block{width:100%}
