@@ -64,6 +64,8 @@ function orderWhat(row: ActivityRow): string {
         case "NOTE_TO_CUSTOMER": return `sent the customer a note about ${o}${d.channel === "whatsapp" ? " on WhatsApp" : d.channel === "email" ? " by email" : ""}`;
         case "STAFF_NOTE": return `changed the staff notes on ${o}`;
     }
+    // A parcel packed from part of the order (admin v2) syncs status 'paid'.
+    if (s(d.new_fulfillment_status) === "partial") return `packed part of ${o}`;
     switch (st) {
         case "paid": return d.verified_against_paystack ? `checked ${o} with Paystack and marked it paid` : `marked ${o} as paid`;
         case "inbox":
