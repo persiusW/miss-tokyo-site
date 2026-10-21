@@ -6,6 +6,7 @@ import { notifyOrderOnWhatsApp } from "@/lib/whatsapp/notifyOrder";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendEmail } from "@/lib/email";
 import { apiError } from "@/lib/errors/apiError";
+import { stampReadyAt } from "@/lib/orders/readyAt";
 
 /**
  * POST /api/pickup-ready
@@ -41,6 +42,9 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Update status to ready_for_pickup ─────────────────────────────────
+    // Orders already ready keep their ready_at, so sending the notice again
+    // doesn't restart the "days waiting" count on Home.
+    await stampReadyAt(orderIds);
     const { error: updateError } = await supabaseAdmin
       .from("orders")
       .update({ status: "ready_for_pickup" })

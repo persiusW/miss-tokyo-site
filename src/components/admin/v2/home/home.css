@@ -1,0 +1,10 @@
+/* Admin v2 Home. Scoped to .adm2, tokens only. */
+.adm2 .need-row{align-items:flex-start;padding-top:14px;padding-bottom:14px}
+.adm2 .need-n{font-size:30px;min-width:40px;color:var(--ink)}
+.adm2 .need-n.warn{color:var(--warn-ink)}
+.adm2 .need-row .btn{flex:none}
+.adm2 .act-row{align-items:flex-start}
+@media (max-width:620px){
+.adm2 .need-row{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:var(--s3);row-gap:var(--s2)}
+.adm2 .need-row .btn{grid-column:2;justify-self:start}
+}

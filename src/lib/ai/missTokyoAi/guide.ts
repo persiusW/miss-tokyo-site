@@ -24,7 +24,7 @@ export const GUIDE: GuideEntry[] = [
         id: "overview",
         title: "Dashboard",
         route: "overview",
-        body: `KPI tiles (Total Revenue, Cash Taken, Unfulfilled, Fulfilled, Avg. Order Value) and cards for Catalog by Category, Conversion Funnel, Order Status Breakdown, Low Stock Alert ("View All →") and Recent Activity. The Low Stock Alert counts a product as low when its TOTAL is under 5, so one sold-out size does not show there — use stock_report for per-size stock.`,
+        body: `In the new admin this page is Home: "Open the till", alert banners (WhatsApp credit running low, a paid order that had been cancelled, new-order alerts on this device), a "Needs you today" card (orders waiting to pack, waiting for payment, ready for collection with days waiting, conversations that need a person, return requests, sizes low or sold out counted per size and colour at each product's warning level, default 2 or fewer, and products with no photo), "Sales so far" for Today / 7 days / 30 days (Sales, Orders, Average order with the change against the same stretch before, and Cash to count at close), then Latest orders and Team activity. In the old admin (Overview) it shows KPI tiles (Total Revenue, Cash Taken, Unfulfilled, Fulfilled, Avg. Order Value), Catalog by Category, Conversion Funnel, Order Status Breakdown, Low Stock Alert ("View All →", a product's TOTAL under 5) and Recent Activity.`,
     },
     {
         id: "analytics",
