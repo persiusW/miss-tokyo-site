@@ -11,6 +11,8 @@ export type AiSettings = {
     whatsappPhoneNumberId: string | null;
     /** Where a WhatsApp chat is forwarded when it goes to a person (233…). Null = the shop's WhatsApp number. */
     whatsappHandoffNumber: string | null;
+    /** Who gets AI spend and WhatsApp wallet alerts (whatsapp_wallet_alert_number); null = the handoff/team number. */
+    alertNumber: string | null;
     /** Order updates on WhatsApp (also needs whatsapp_enabled). */
     whatsappStatusNotifications: boolean;
     /** Approved Chatbots Africa template id for updates outside the 24h window; null = text inside the window only. Superseded by whatsappStatusTemplateIds. */
@@ -114,6 +116,7 @@ const OFF: AiSettings = {
     whatsappEnabled: false,
     whatsappPhoneNumberId: null,
     whatsappHandoffNumber: null,
+    alertNumber: null,
     whatsappStatusNotifications: false,
     whatsappStatusTemplateId: null,
     whatsappStatusTemplateIds: {},
@@ -156,6 +159,7 @@ export async function getAiSettings(): Promise<AiSettings> {
         whatsappPhoneNumberId: typeof map.get("whatsapp_phone_number_id") === "string" && /^\d{6,30}$/.test(map.get("whatsapp_phone_number_id") as string)
             ? map.get("whatsapp_phone_number_id") as string : null,
         whatsappHandoffNumber: normaliseWaNumber(map.get("whatsapp_handoff_number")),
+        alertNumber: normaliseWaNumber(map.get("whatsapp_wallet_alert_number")),
         whatsappStatusNotifications: bool("whatsapp_status_notifications"),
         whatsappStatusTemplateId: templateId(map.get("whatsapp_status_template_id")),
         whatsappStatusTemplateIds: (() => {
