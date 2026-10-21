@@ -49,7 +49,7 @@ test("every route is a real dashboard page", () => {
 });
 
 test("Settings tab ids match the tabs on the Settings page", () => {
-    const src = fs.readFileSync(path.join(DASH, "settings", "page.tsx"), "utf8");
+    const src = fs.readFileSync(path.join(DASH, "settings", "LegacySettingsPage.tsx"), "utf8");
     // The page's top-level tabs array only (the CMS sub-tabs are a different list).
     const block = src.slice(src.indexOf("const tabs: { key: TabKey"), src.indexOf("];", src.indexOf("const tabs: { key: TabKey")));
     const keys = [...block.matchAll(/\{ key: "([a-z-]+)",\s+label:/g)].map(m => m[1]);
