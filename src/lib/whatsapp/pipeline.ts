@@ -88,11 +88,16 @@ export interface InboundStore {
 export type PipelineDeps = {
     store: InboundStore;
     parse: InboundParser;
-    /** Answers one new message. Not called for duplicates or conversations a person holds. receivedAt: when we stored it. */
+    /**
+     * Answers one new message. Not called for duplicates, nor for a chat a person holds when
+     * quietWhileWithTeam is set. receivedAt: when we stored it.
+     */
     handle: (m: InboundMessage, c: Conversation, receivedAt: string) => Promise<void>;
     sendFallback: (to: string) => Promise<MessagingResult>;
     /** Our WhatsApp phone_number_id. A delivery for another number is only warned about, never refused. */
     expectedPhoneNumberId?: string | null;
+    /** The bot stays silent while a person has the chat (WHATSAPP_AGENT_DURING_HANDOFF=off). */
+    quietWhileWithTeam?: boolean;
     /** After a message is logged: keeps a copy of its file for the inbox. Best effort; a failure never fails the event. */
     afterLog?: (conversationId: string, m: InboundMessage) => Promise<void>;
     /** Runs after a give-up moved the chat to a person (forwards it to the team). Never throws. */
@@ -136,7 +141,7 @@ export async function processInboundEvent(id: string, deps: PipelineDeps): Promi
             conversation = await deps.store.touchConversation(phone, m.name, messageTime(m.at, ev.received_at), ev.provider, m.fromUserId ?? null);
             found.conversationId = conversation.id;
             if (m.messageId && await deps.store.seen(m.messageId)) continue;
-            if (!conversation.handedOffAt) await deps.handle(m, conversation, ev.received_at);
+            if (!conversation.handedOffAt || !deps.quietWhileWithTeam) await deps.handle(m, conversation, ev.received_at);
             await deps.store.logInbound(conversation.id, m, messageTime(m.at, ev.received_at));
             if (m.mediaId) await deps.afterLog?.(conversation.id, m).catch(e => console.error("[whatsapp] media not kept", { err: String(e) }));
         }
