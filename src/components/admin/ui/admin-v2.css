@@ -451,6 +451,15 @@
 @keyframes tab-in-2{from{opacity:0;transform:translateY(4px)}}
 .adm2 .panel-body.tab-in-1{animation:tab-in-1 var(--dur) var(--ease)}
 .adm2 .panel-body.tab-in-2{animation:tab-in-2 var(--dur) var(--ease)}
+/* Data. A KPI value is keyed by what it shows (Kpi), so a new period fades it
+   in again. Chart: the line draws in over 1s (stroke-dashoffset on a
+   pathLength=1 path, the spec's own ask), the area and the dashed previous
+   period fade in. Bars grow from the left over .7s. */
+.adm2 .kpi-value{animation:fade var(--dur-slow) var(--ease)}
+@keyframes draw{from{stroke-dashoffset:1}}
+.adm2 .chart .cur{stroke-dasharray:1;animation:draw 1s var(--ease) backwards}
+.adm2 .chart .area,.adm2 .chart .prev{animation:fade 1s var(--ease) backwards}
+.adm2 .bar-fill{transform-origin:left center;animation:grow-x .7s var(--ease) backwards}
 /* Route view transitions (motion.ts startRouteTransition): a short root
    cross-fade that never takes the clicks. */
 html:has(.adm2)::view-transition{pointer-events:none}

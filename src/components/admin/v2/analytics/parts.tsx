@@ -75,7 +75,7 @@ export function Bars({ items, label }: { items: Bar[]; label: string }) {
             {items.map(b => (
                 <li key={b.key} className="stack-sm">
                     <div className="hrow between"><span className="strong an-bar-l">{b.label}</span><span className="sm nowrap">{b.right}</span></div>
-                    <div className="bar-track" aria-hidden="true"><div className="bar-fill" style={{ width: `${Math.max(b.value > 0 ? 2 : 0, (b.value / top) * 100)}%` }} /></div>
+                    <div className="bar-track" aria-hidden="true"><div className="bar-fill" key={`${b.value}/${top}`} style={{ width: `${Math.max(b.value > 0 ? 2 : 0, (b.value / top) * 100)}%` }} /></div>
                 </li>
             ))}
         </ul>

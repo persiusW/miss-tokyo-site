@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type KeyboardEvent, type SelectHTMLAttributes } from "react";
 import Link from "next/link";
 import { Icon, type IconName } from "./Icon";
-import { startRouteTransition } from "./motion";
+import { nodeText, startRouteTransition } from "./motion";
 
 export type Tone = "warn" | "danger" | "ok" | "neutral" | "info";
 
@@ -267,12 +267,12 @@ export function SRow({ label, help, children, stacked, id, hl }: { label: ReactN
     );
 }
 
-/** A number is never shown without its context. */
+/** A number is never shown without its context. Keyed by what it shows, so a new value fades in. */
 export function Kpi({ label, value, ctx, delta }: { label: ReactNode; value: ReactNode; ctx: ReactNode; delta?: number | null }) {
     return (
         <div className="kpi">
             <div className="kpi-label">{label}</div>
-            <div className="kpi-value">{value}</div>
+            <div className="kpi-value" key={nodeText(value)}>{value}</div>
             <div className="kpi-ctx">
                 {delta != null && <span className={`delta ${delta >= 0 ? "up" : "down"}`}>{delta >= 0 ? "↑" : "↓"} {Math.abs(delta)}%</span>} {ctx}
             </div>
