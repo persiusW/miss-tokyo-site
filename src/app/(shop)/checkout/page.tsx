@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { evaluateAutoDiscounts, type AutoDiscountResult } from "@/lib/autoDiscount";
 import { GHANA_REGIONS, COUNTRIES } from "@/lib/geo";
-import { computeDiscountSplit } from "@/lib/discountSplit";
+import { needsRecheck, splitAppliedCode, type CouponTerms } from "@/lib/couponValue";
 import {
     DELIVERY_DEFAULTS,
     parseDeliverySettings,
@@ -39,6 +39,9 @@ type AppliedDiscount = {
      *  split can be recomputed when the customer changes region after applying. */
     raw_value?: number;
     label: string;
+    /** An item code's terms (category, sale price, buy X get Y), so it can be re-priced against the basket. */
+    terms?: CouponTerms | null;
+    line_categories?: Record<string, string[]> | null;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -365,6 +368,13 @@ export default function CheckoutPage() {
           }, 0)
         : 0;
 
+    // The basket as an item code sees it: each line at the price charged, and
+    // whether an automatic discount already covers it. The server prices the
+    // same lines from the database when the order is placed.
+    const codeLines = mounted
+        ? items.map(i => ({ productId: i.productId, unitPrice: getEffectivePrice(i), quantity: i.quantity, covered: coveredProductIds.has(i.productId) }))
+        : [];
+
     // ── Discount code logic ────────────────────────────────────────────────────
 
     const applyCode = async () => {
@@ -381,7 +391,7 @@ export default function CheckoutPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 // Validate against the uncovered portion of the cart only
-                body: JSON.stringify({ code: discountInput.trim(), subtotal: remainingSubtotal, deliveryFee, email: form.email, phone: form.phone }),
+                body: JSON.stringify({ code: discountInput.trim(), subtotal: remainingSubtotal, deliveryFee, email: form.email, phone: form.phone, items: codeLines }),
             });
             const data = await res.json();
             if (data.valid) {
@@ -417,7 +427,7 @@ export default function CheckoutPage() {
                 const res = await fetch("/api/checkout/validate-code", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ code: appliedDiscount.code, subtotal: remainingSubtotal, deliveryFee, email: form.email, phone: form.phone }),
+                    body: JSON.stringify({ code: appliedDiscount.code, subtotal: remainingSubtotal, deliveryFee, email: form.email, phone: form.phone, items: codeLines }),
                 });
                 const data = await res.json();
                 if (cancelled) return;
@@ -433,7 +443,19 @@ export default function CheckoutPage() {
             }
         })();
         return () => { cancelled = true; };
+        // codeLines is rebuilt each render; the recheck flag is what triggers this
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [discountNeedsRecheck, appliedDiscount, remainingSubtotal]);
+
+    // An item code was priced with the categories of the lines it was applied
+    // to. A product added since then has none on record here, so ask again
+    // rather than show a figure the server won't charge.
+    const cartProductKey = mounted ? [...new Set(items.map(i => i.productId))].sort().join(",") : "";
+    useEffect(() => {
+        if (appliedDiscount && needsRecheck(appliedDiscount, cartProductKey ? cartProductKey.split(",") : [])) {
+            setDiscountNeedsRecheck(true);
+        }
+    }, [appliedDiscount, cartProductKey]);
 
     // ── Fee calculations ───────────────────────────────────────────────────────
 
@@ -463,12 +485,7 @@ export default function CheckoutPage() {
     // than trusting the figure the code was validated at, because the customer
     // can change region afterwards and move the delivery fee under it.
     const discountSplit = appliedDiscount
-        ? computeDiscountSplit({
-            discountType: appliedDiscount.discount_type,
-            value: appliedDiscount.raw_value ?? appliedDiscount.discount_amount,
-            subtotal: afterAutoDiscount,
-            deliveryFee,
-        })
+        ? splitAppliedCode(appliedDiscount, { subtotal: afterAutoDiscount, deliveryFee, lines: codeLines })
         : { amount: 0, subtotalAmount: 0, deliveryAmount: 0 };
 
     const discountAmount = discountSplit.amount;
