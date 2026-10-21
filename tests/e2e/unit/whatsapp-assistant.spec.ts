@@ -41,6 +41,7 @@ function harness(o: {
     const runs: string[] = [];
     const runImages: unknown[] = [];
     const optOuts: boolean[] = [];
+    const loggedMedia: (string | null)[] = [];
     let human = false;
     const deps: AssistantDeps = {
         send: async (_to, text) => { sent.push(text); return o.sendOk === false ? { ok: false, code: "network" } : { ok: true, messageId: "wamid.OUT" }; },
@@ -49,7 +50,7 @@ function harness(o: {
         offered: async () => [],
         notice: async () => o.notice ?? null,
         handOff: async (_id, reason) => { handoffs.push(reason); if (human) return false; human = true; return true; },
-        logOutbound: async (_id, text) => { logged.push(text); },
+        logOutbound: async (_id, text, _wamid, type, mediaUrl) => { logged.push(text); if (type === "image") loggedMedia.push(mediaUrl ?? null); },
         chatFor: async () => ({ chat, customerId: null }),
         counts: async () => (o.counts === undefined ? { lastMinute: 0, today: 0 } : o.counts),
         setOptOut: async (_id, out) => { optOuts.push(out); },
@@ -61,7 +62,7 @@ function harness(o: {
         run: async a => { runs.push(a.text); runImages.push(a.images); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
         siteUrl: SITE,
     };
-    return { handle: createWhatsAppHandler(deps), sent, images, logged, handoffs, runs, runImages, optOuts };
+    return { handle: createWhatsAppHandler(deps), sent, images, logged, loggedMedia, handoffs, runs, runImages, optOuts };
 }
 
 test("a text gets the assistant's reply, sent and logged, with no handoff", async () => {
@@ -199,6 +200,8 @@ test("product photos follow the answer, at most two, through the JPEG route", as
     await h.handle(msg(), conv);
     expect(h.sent).toHaveLength(1);
     expect(h.images).toHaveLength(2);
+    // The inbox shows the photos we sent: each is logged with its link.
+    expect(h.loggedMedia).toEqual(h.images);
     expect(h.logged).toHaveLength(3);
 });
 

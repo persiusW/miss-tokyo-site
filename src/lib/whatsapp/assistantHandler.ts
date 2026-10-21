@@ -35,7 +35,8 @@ export type AssistantDeps = {
     offered: (conversationId: string, waMessageId: string) => Promise<string[]>;
     /** True only for the call that moved the chat to a person (it also forwards the chat to the team). */
     handOff: (conversationId: string, reason: HandoffReason) => Promise<boolean>;
-    logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
+    /** mediaUrl: the public link of a photo we sent, so the inbox shows it. */
+    logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string, mediaUrl?: string | null) => Promise<void>;
     chatFor: (c: Conversation, phone: string) => Promise<{ chat: ShopChat; customerId: string | null }>;
     /** Order updates off (STOP) or back on (START) for this conversation. */
     setOptOut: (conversationId: string, optedOut: boolean) => Promise<void>;
@@ -85,7 +86,7 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
     async function sendImages(c: Conversation, to: string, out: WhatsAppReply): Promise<void> {
         for (const img of out.images) {
             const r = await deps.sendImage(to, img.url, img.caption);
-            if (r.ok) await deps.logOutbound(c.id, img.caption, r.messageId, "image");
+            if (r.ok) await deps.logOutbound(c.id, img.caption, r.messageId, "image", img.url);
             else console.error("[whatsapp] product photo not sent", { code: r.code });
         }
     }
