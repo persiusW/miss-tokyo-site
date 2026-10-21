@@ -125,6 +125,12 @@ export function activityText(row: ActivityRow): ActivityText {
         const href = row.resource_id && row.action_type !== "DELETE" ? `/catalogue/${row.resource_id}` : undefined;
         return { what: `${verb === "added" ? "added the product" : verb ?? "updated"} ${name || "a product"}`, href };
     }
+    if (res === "customer") {
+        const href = row.resource_id && row.action_type !== "DELETE" && row.resource_id.includes("@") ? `/customers/${encodeURIComponent(row.resource_id)}` : undefined;
+        if (typeof d.wholesale === "boolean") return { what: d.wholesale ? `gave ${name || "a customer"} wholesale access` : `took wholesale access away from ${name || "a customer"}`, href };
+        if (row.action_type === "CREATE" && typeof d.imported === "number") return { what: `imported ${d.imported} customer${d.imported === 1 ? "" : "s"}` };
+        return { what: `${verb ?? "updated"} the customer ${name || "—"}`, href };
+    }
     if (res === "team") return { what: "changed the team" };
     return { what: `${verb ?? "updated"} ${name || "something"}` };
 }

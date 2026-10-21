@@ -4,12 +4,17 @@ import { createClient } from "@/lib/supabaseServer";
 import { sendEmail } from "@/lib/email";
 import { sendSMSLogged } from "@/lib/sms";
 import { apiError } from "@/lib/errors/apiError";
+import { logActivity } from "@/lib/utils/logActivity";
+
+// A team member's role is never changed from here: "revoke" writes role = null,
+// which would take an owner's or admin's access away.
+const STAFF_ROLES = ["owner", "admin", "sales_staff"];
 
 export async function POST(req: NextRequest) {
     // Auth check — only admin/owner can promote users
     const serverClient = await createClient();
     const { data: { user } } = await serverClient.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return apiError("AUTH-01", { status: 401, audience: "staff" });
 
     const { data: caller } = await supabaseAdmin
         .from("profiles")
@@ -18,12 +23,12 @@ export async function POST(req: NextRequest) {
         .single();
 
     if (!caller || !["admin", "owner"].includes(caller.role)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        return NextResponse.json({ error: "Only owners and admins can change wholesale access." }, { status: 403 });
     }
 
-    const { userId, action } = await req.json();
-    if (!userId || !action) {
-        return NextResponse.json({ error: "userId and action are required" }, { status: 400 });
+    const { userId, action } = await req.json().catch(() => ({}));
+    if (!userId || (action !== "promote" && action !== "revoke")) {
+        return NextResponse.json({ error: "Pick a customer and try again." }, { status: 400 });
     }
 
     const newRole = action === "promote" ? "wholesale" : null;
@@ -31,9 +36,16 @@ export async function POST(req: NextRequest) {
     // Fetch the target user's profile for notifications
     const { data: profile } = await supabaseAdmin
         .from("profiles")
-        .select("email, full_name, first_name, phone")
+        .select("email, full_name, first_name, phone, role")
         .eq("id", userId)
         .single();
+
+    if (!profile) {
+        return NextResponse.json({ error: "That account isn't there any more. Please refresh." }, { status: 404 });
+    }
+    if (profile.role && STAFF_ROLES.includes(profile.role)) {
+        return NextResponse.json({ error: "That's a team member's account. Team roles are changed in Staff." }, { status: 409 });
+    }
 
     const { error } = await supabaseAdmin
         .from("profiles")
@@ -41,6 +53,11 @@ export async function POST(req: NextRequest) {
         .eq("id", userId);
 
     if (error) return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
+
+    await logActivity({
+        userId: user.id, userRole: caller.role, actionType: "UPDATE", resource: "customer", resourceId: profile.email?.toLowerCase(),
+        details: { wholesale: action === "promote", name: profile.full_name || profile.email },
+    });
 
     // Send notifications if we have the user's email
     if (profile?.email) {

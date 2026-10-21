@@ -84,7 +84,7 @@ export const GUIDE: GuideEntry[] = [
         title: "Wholesalers",
         route: "wholesalers",
         roles: FULL,
-        body: `"Manage Wholesalers" → search an email → "Promote". "Revoke Access" per account. Wholesale prices only apply to a wholesaler who is signed in when they check out.`,
+        body: `New admin: wholesale customers are the "Wholesale" chip on Customers (the old Wholesalers page opens it). Open a customer and, under Wholesale, press "Give wholesale access" or "Remove wholesale access" and confirm; they're told by email (and by text when giving access, if their account has a phone number). Only owners and admins see the button. A customer needs a shop account first; team members' accounts can't be changed here. Old admin: "Manage Wholesalers" → search an email → "Promote"; "Revoke Access" per account. Wholesale prices only apply to a wholesaler who is signed in when they check out.`,
     },
     {
         id: "discounts",
@@ -130,9 +130,9 @@ export const GUIDE: GuideEntry[] = [
     },
     {
         id: "customers",
-        title: "Contact List and customer profiles",
+        title: "Customers (Contact List) and customer profiles",
         route: "contacts",
-        body: `Export, "Add Contact", search, source and date filters; click a row for the profile (total spent, contact details, last address, orders, forms, invoices). Only manually added contacts can be deleted.`,
+        body: `New admin: Customers lists everyone who ordered, wrote through the contact form, sent a custom request, signed up for an account or the newsletter, or was added by the team. Chips: All, Have ordered, VIP, Wholesale, Get marketing email, Never ordered; search by name, email or phone; "Came from", tag and "Added from/to" filters; sort by most recent, spent or last order. Orders and Spent count paid orders only. Tap a customer to open their panel: Overview (Spent, Average order, Last order, contact, wholesale, orders), "Tags and notes" (tags such as VIP become list filters; private notes only the team sees) and Activity (orders, WhatsApp, contact forms, custom requests, invoices). The panel's "Create order" opens the till and "WhatsApp" opens their chat in the Inbox. "Add customer" (name, phone, email, "They agreed to marketing email"), "Import" (a CSV with an Email column) and "Export" (the filtered list, or the ticked rows). "Delete customer" (tap twice) only appears for someone the team added who has never ordered. Old admin: Contact List with Export, "Add Contact", search, source and date filters; click a row for the profile (total spent, contact details, last address, orders, forms, invoices). Only manually added contacts can be deleted.`,
     },
     {
         id: "inbox",
