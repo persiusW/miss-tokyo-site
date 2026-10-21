@@ -25,8 +25,24 @@ export type AdminV2Ctx = {
 
 export const AdminV2Context = createContext<AdminV2Ctx | null>(null);
 
+// The layout and the page each read the store switch, so for a moment (a
+// switch flipped between the two reads) a new page can render inside the old
+// shell. That used to throw and show a crash screen; it now gets the most
+// limited context instead. Every page and action still checks the role on the
+// server, so nothing opens up.
+const OUTSIDE_SHELL: AdminV2Ctx = {
+    role: "sales_staff",
+    userName: "",
+    isFullAccess: false,
+    isAdmin: false,
+    showCustomRequests: false,
+    dirty: 0,
+    setDirty: () => {},
+    setDiscard: () => {},
+    go: href => { if (typeof window !== "undefined") window.location.assign(href); },
+    refreshCounts: () => {},
+};
+
 export function useAdminV2(): AdminV2Ctx {
-    const c = useContext(AdminV2Context);
-    if (!c) throw new Error("useAdminV2 outside the admin v2 shell");
-    return c;
+    return useContext(AdminV2Context) ?? OUTSIDE_SHELL;
 }
