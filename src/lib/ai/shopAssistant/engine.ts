@@ -1,6 +1,6 @@
 // The shop assistant's model loop. Pure: the model client, the tools and the
 // spend check are injected, so it is unit-tested with a fake client.
-import type Anthropic from "@anthropic-ai/sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import { costUsd } from "@/lib/ai/pricing";
 import { CUSTOMER_TOOL_NAMES, END_TURN_TOOL_NAMES, OPTIONAL_TOOL_NAMES } from "./toolDefs";
 import { LINES, safeReply } from "./lines";
@@ -9,6 +9,17 @@ const MAX_ITERATIONS = 8;
 const MAX_TOKENS = 8000;
 const BUDGET_MS = 70_000;
 const CALL_TIMEOUT_MS = 40_000;
+/** Waits before retrying a call Claude turned away (busy, rate-limited, a dropped connection). */
+export const RETRY_WAITS_MS = [1_500, 4_000];
+/** A retry only starts with at least this much of the turn's budget left. */
+const RETRY_MIN_LEFT_MS = 15_000;
+
+/** Worth another try: rate-limited (429), overloaded or a server error (5xx, 529), or the connection dropped. */
+export function retryable(e: unknown): boolean {
+    if (e instanceof Anthropic.RateLimitError || e instanceof Anthropic.InternalServerError) return true;
+    if (e instanceof Anthropic.APIConnectionError && !(e instanceof Anthropic.APIUserAbortError)) return true;
+    return e instanceof Anthropic.APIError && typeof e.status === "number" && (e.status === 429 || e.status >= 500);
+}
 
 type Msg = Anthropic.MessageParam;
 export type EngineDeps = {
@@ -17,6 +28,7 @@ export type EngineDeps = {
     runTool: (name: string, input: unknown) => Promise<{ content: string; isError: boolean; endTurn?: string }>;
     fits: (runningUsd: number) => boolean;
     now?: () => number;
+    sleep?: (ms: number) => Promise<void>;
 };
 export type EngineUsage = { input: number; output: number; cacheRead: number; cacheWrite: number; costUsd: number; toolCalls: { name: string; ok: boolean }[] };
 export type EngineResult =
@@ -49,25 +61,38 @@ export async function runShopTurn(
             const remaining = BUDGET_MS - (now() - started);
             if (remaining < 8_000) { fixed = LINES.slow; break; }
             if (!deps.fits(usage.costUsd)) { fixed = LINES.cantChat; break; }
-            const timeoutMs = Math.min(CALL_TIMEOUT_MS, remaining - 2_000);
-            const response = await deps.client.messages.create(
-                {
-                    model: args.model,
-                    max_tokens: MAX_TOKENS,
-                    system: [
-                        { type: "text", text: args.system, cache_control: { type: "ephemeral" } },
-                        ...(args.lessons ? [{ type: "text", text: args.lessons, cache_control: { type: "ephemeral" } }] : []),
-                        ...(args.facts ? [{ type: "text", text: args.facts }] : []),
-                    ],
-                    tools: args.tools,
-                    tool_choice: { type: "auto" },
-                    thinking: { type: "adaptive" },
-                    output_config: { effort: "medium" },
-                    cache_control: { type: "ephemeral" },
-                    messages,
-                } as any,
-                { timeout: timeoutMs, maxRetries: 0, signal: AbortSignal.timeout(timeoutMs + 1_000) },
-            ) as Anthropic.Message;
+            // At a sales rush Claude can turn calls away for a moment: retry those, briefly, inside the budget.
+            const call = () => {
+                const left = BUDGET_MS - (now() - started);
+                const timeoutMs = Math.min(CALL_TIMEOUT_MS, left - 2_000);
+                return deps.client.messages.create(
+                    {
+                        model: args.model,
+                        max_tokens: MAX_TOKENS,
+                        system: [
+                            { type: "text", text: args.system, cache_control: { type: "ephemeral" } },
+                            ...(args.lessons ? [{ type: "text", text: args.lessons, cache_control: { type: "ephemeral" } }] : []),
+                            ...(args.facts ? [{ type: "text", text: args.facts }] : []),
+                        ],
+                        tools: args.tools,
+                        tool_choice: { type: "auto" },
+                        thinking: { type: "adaptive" },
+                        output_config: { effort: "medium" },
+                        cache_control: { type: "ephemeral" },
+                        messages,
+                    } as any,
+                    { timeout: timeoutMs, maxRetries: 0, signal: AbortSignal.timeout(timeoutMs + 1_000) },
+                ) as Promise<Anthropic.Message>;
+            };
+            let response: Anthropic.Message;
+            for (let attempt = 0; ; attempt++) {
+                try { response = await call(); break; } catch (e) {
+                    const wait = RETRY_WAITS_MS[attempt];
+                    if (wait === undefined || !retryable(e) || BUDGET_MS - (now() - started) - wait < RETRY_MIN_LEFT_MS) throw e;
+                    console.warn("[shop-assistant] Claude busy; retrying", { attempt: attempt + 1, status: (e as { status?: number }).status ?? null });
+                    await (deps.sleep ?? (ms => new Promise(r => setTimeout(r, ms))))(wait);
+                }
+            }
 
             usage.input += response.usage.input_tokens;
             usage.output += response.usage.output_tokens;
