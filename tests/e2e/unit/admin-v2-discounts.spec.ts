@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { PAID_LEGACY_STATUSES } from "../../../src/lib/admin/v2/customers";
 import fs from "fs";
 import path from "path";
 import {
@@ -188,5 +189,32 @@ test.describe("the panel", () => {
         const c = makeCode(() => (i++ % 10) / 10);
         expect(c).toMatch(/^MT[A-Z2-9]{6}$/);
         expect(makeCode()).not.toMatch(/[01OI]/);
+    });
+});
+
+test.describe("results per discount (gap 16)", () => {
+    const sql = fs.readFileSync(path.join(ROOT, "supabase/migrations/20261022072000_discount_results.sql"), "utf8");
+    const summary = fs.readFileSync(path.join(ROOT, "supabase/migrations/20261022042000_fn_sales_summary.sql"), "utf8");
+    const legacy = (s: string) => /status in \(([^)]+)\)/.exec(s)?.[1].replace(/\s+/g, "");
+    test("paid orders only, with exactly fn_sales_summary's paid rule", () => {
+        expect(sql).toContain("x.payment_status = 'paid'");
+        expect(legacy(sql)).toBe(legacy(summary));
+        expect(legacy(sql)).toBe(PAID_LEGACY_STATUSES.map(s => `'${s}'`).join(","));
+    });
+    test("the same sums as Analytics' discount performance: total_amount and discount_amount per code", () => {
+        expect(sql).toContain("sum(o.total_amount) filter (where o.paid)");
+        expect(sql).toContain("sum(o.discount_amount) filter (where o.paid)");
+        const reports = fs.readFileSync(path.join(ROOT, "src/app/(dashboard)/sales/analytics/page.tsx"), "utf8");
+        expect(reports).toContain("discMap[code].savings += Number(o.discount_amount ?? 0)");
+        expect(reports).toContain("discMap[code].revenue += Number(o.total_amount ?? 0)");
+    });
+    test("an order with two automatic discounts isn't split by guesswork", () => {
+        expect(sql).toContain("filter (where t.paid and t.n_titles = 1)");
+        expect(sql).toContain("count(*) filter (where t.paid and t.n_titles > 1)");
+    });
+    test("service role only, and never cut off at 1000 rows", () => {
+        expect(sql).toContain("revoke execute on function public.fn_discount_results() from public, anon, authenticated");
+        const load = fs.readFileSync(path.join(ROOT, "src/lib/admin/v2/discountsLoad.ts"), "utf8");
+        expect(load).toMatch(/all<[^>]+>\(\s*\(\) => db\.rpc\("fn_discount_results"\)/);
     });
 });
