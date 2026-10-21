@@ -55,9 +55,14 @@
 .adm2{margin:0;min-height:100vh}
 .adm2 .kpi-value,.adm2 .ph h1,.adm2 .panel-h h2,.adm2 .modal-h h2,.adm2 .brand-name{font-variant-numeric:lining-nums tabular-nums}
 .adm2{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:var(--t-md);line-height:var(--lh);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
-.adm2 a{color:var(--accent);text-decoration:none}
-.adm2 a:hover{color:var(--accent-hover);text-decoration:underline}
-.adm2 button{font:inherit;color:inherit}
+/* Element resets live in Tailwind's base layer with no class weight, so old
+   pages rendered inside the shell keep their own button and link colours
+   (.ac-btn-primary, Tailwind's text-white): unlayered CSS would beat them all. */
+@layer base{
+:where(.adm2) a{color:var(--accent);text-decoration:none}
+:where(.adm2) a:hover{color:var(--accent-hover);text-decoration:underline}
+:where(.adm2) button{font:inherit;color:inherit}
+}
 .adm2 :focus-visible{outline:none;box-shadow:var(--focus)}
 .adm2 h1,.adm2 h2,.adm2 h3,.adm2 p{margin:0}
 .adm2 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
