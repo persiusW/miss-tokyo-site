@@ -92,6 +92,7 @@ export const PAGE_ROUTES: readonly string[] = [
     "/settings/ai",
     "/settings/assets",
     "/settings/emails",
+    "/settings/[section]",
     "/shipping",
     "/shop",
     "/size-guide",
