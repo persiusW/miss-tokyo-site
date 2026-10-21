@@ -22,7 +22,10 @@ const DATA_CACHE   = "mt-data-v4";
 const PRIVATE_PREFIXES = [
     "/overview", "/sales", "/catalog", "/customers", "/finance",
     "/seo", "/settings", "/cms", "/communications", "/team", "/admin",
-    "/pos",
+    "/pos", "/agent", "/ai", "/test-orders",
+    // Admin v2 (keep in step with V2_PREFIXES in src/lib/admin/v2/routeMap.ts)
+    "/home", "/inbox", "/orders", "/till", "/catalogue", "/discounts", "/content",
+    "/analytics", "/staff", "/billing", "/ui-kit",
 ];
 
 // ─── App Shell URLs to precache on install ────────────────────────────────────

@@ -4,7 +4,9 @@ import { looksRaw } from "@/lib/errors/looksRaw";
 export type ToastType = "success" | "error" | "info";
 /** The sale a payment error is about, for "Ask Miss Tokyo AI". */
 export type AskTarget = { code: string; posSessionId?: string; orderId?: string; saleKey?: string };
-export type Toast = { id: string; message: string; type: ToastType; code?: string; ask?: AskTarget };
+/** An optional button on a success or info toast, e.g. "Undo". */
+export type ToastAction = { label: string; onClick: () => void };
+export type Toast = { id: string; message: string; type: ToastType; code?: string; ask?: AskTarget; action?: ToastAction };
 
 // Registered by the dashboard's Miss Tokyo AI panel while help on payment
 // errors is switched on; null everywhere else (so customers never see it).
@@ -40,12 +42,12 @@ export function dismiss(id: string) {
     notify();
 }
 
-function add(message: string, type: ToastType, code?: string, ask?: AskTarget) {
+function add(message: string, type: ToastType, code?: string, ask?: AskTarget, action?: ToastAction) {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const keepAsk = ask && code && isErrorCode(code) && (ERRORS[code] as { aiHelp?: boolean }).aiHelp ? { ...ask, code } : undefined;
-    toasts = [...toasts, { id, message, type, code, ask: keepAsk }];
+    toasts = [...toasts, { id, message, type, code, ask: keepAsk, action }];
     notify();
-    setTimeout(() => dismiss(id), keepAsk ? 12000 : type === "error" ? 6000 : 3500);
+    setTimeout(() => dismiss(id), keepAsk ? 12000 : type === "error" ? 6000 : action ? 6000 : 4000);
 }
 
 /** Backstop: technical text never reaches the screen. The original goes to the console. */
@@ -64,9 +66,9 @@ export function responseMessage(data: unknown, audience: Audience, fallback: Err
 }
 
 export const toast = {
-    success: (message: string) => add(message, "success"),
+    success: (message: string, opts?: { action?: ToastAction }) => add(message, "success", undefined, undefined, opts?.action),
     error: (message: string) => add(calmMessage(message), "error"),
-    info: (message: string) => add(message, "info"),
+    info: (message: string, opts?: { action?: ToastAction }) => add(message, "info", undefined, undefined, opts?.action),
     /** A known error by code. Staff see the code. */
     code: (code: ErrorCode, opts: { audience: Audience; ask?: Omit<AskTarget, "code"> }) =>
         add(opts.audience === "staff" ? staffLine(code) : errorText(code, "customer"), "error", code, opts.audience === "staff" && opts.ask ? { code, ...opts.ask } : undefined),
