@@ -46,3 +46,18 @@ export async function autoResume(now = new Date(), limit = 50): Promise<number> 
     }
     return resumed;
 }
+
+/** Turn lock (turnLock.ts): taken when empty or expired. */
+export async function claimTurnLock(conversationId: string, until: Date, now: Date): Promise<boolean> {
+    const { data, error } = await db.from("whatsapp_conversations").update({ turn_lock_until: until.toISOString() })
+        .eq("id", conversationId).or(`turn_lock_until.is.null,turn_lock_until.lt.${now.toISOString()}`).select("id");
+    if (error) throw new Error(`claim turn lock: ${error.code ?? ""} ${error.message ?? ""}`);
+    return (data ?? []).length > 0;
+}
+
+/** Frees the turn lock only if it is still the one this turn took. */
+export async function releaseTurnLock(conversationId: string, until: Date): Promise<void> {
+    const { error } = await db.from("whatsapp_conversations").update({ turn_lock_until: null })
+        .eq("id", conversationId).eq("turn_lock_until", until.toISOString());
+    if (error) console.error("[whatsapp] could not free the turn lock", { code: error.code });
+}

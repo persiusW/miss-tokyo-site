@@ -16,7 +16,8 @@ import { providerMessage } from "./choices";
 import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnNote, setOptOut, waitingInbound } from "./conversationStore";
 import { forwardToTeam, localNumber, whyText, type HandoffReason } from "./handoff";
 import { logConversationEvent } from "./events";
-import { claimReferral, claimTeamAlert } from "./teamWatch";
+import { claimReferral, claimTeamAlert, claimTurnLock, releaseTurnLock } from "./teamWatch";
+import { withTurnLock } from "./turnLock";
 import { factsFor } from "./customerFacts";
 import { sendAdminPushNotifications } from "@/lib/orderSettlement";
 import { canAnswerWaiting } from "./inbox";
@@ -150,6 +151,7 @@ export async function pipelineFor(
             await forward(c.id, "wrote_again");
         },
         referToTeam: id => claimReferral(id),
+        turnLock: (id, fn) => withTurnLock(id, fn, { claim: claimTurnLock, release: releaseTurnLock }),
         run: async a => runShopAssistant({
             channel: "whatsapp", identity: { customerId: a.customerId, phone: a.phone }, chat: a.chat, text: a.text,
             settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, images: a.images, withTeam: a.withTeam,

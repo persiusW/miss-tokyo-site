@@ -54,6 +54,8 @@ export type AssistantDeps = {
     teamNumber?: string | null;
     /** The customer wrote while the team has the chat: alert the team again if the last alert is an hour old. Never throws. */
     withTeam?: (c: Conversation) => Promise<void>;
+    /** Runs one assistant turn holding the chat's turn lock, so two messages never answer at once. */
+    turnLock?: (conversationId: string, fn: () => Promise<void>) => Promise<void>;
     /** True when "our team has your message" may be sent now (at most every 6 hours); records it. */
     referToTeam?: (conversationId: string) => Promise<boolean>;
     /** A customer's photo, ready for the model; null when it can't be fetched or isn't an image. */
@@ -140,6 +142,11 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
 
     /** One turn of the assistant on what the customer said, and the reply sent. */
     async function answer(c: Conversation, from: string, text: string, photos: ModelPhoto[], replyTo: string | null): Promise<void> {
+        const turn = () => answerNow(c, from, text, photos, replyTo);
+        return deps.turnLock ? deps.turnLock(c.id, turn) : turn();
+    }
+
+    async function answerNow(c: Conversation, from: string, text: string, photos: ModelPhoto[], replyTo: string | null): Promise<void> {
         // The quote comes from our records, never from the customer, so the model may trust it.
         const quote = replyTo ? await deps.quoted(c.id, replyTo).catch(() => null) : null;
         // Otherwise, an order update or reminder they may be answering, also from our records.
