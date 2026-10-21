@@ -80,8 +80,10 @@ export const PERMS: PermRow[] = [
     { area: "Content", owner: "yes", admin: "yes", sales: "menu" },
     { area: "Settings", owner: "yes", admin: "yes", sales: "menu" },
     { area: "Staff and billing", owner: "yes", admin: "yes", sales: "no" },
+    { area: "Set the monthly cap and pay invoices in Billing", owner: "yes", admin: "yes", sales: "no" },
     { area: "AI settings", owner: "yes", admin: "yes", sales: "no" },
     { area: "AI cost markup and the admin inbox", owner: "no", admin: "yes", sales: "no" },
+    { area: "Admin tools: payouts, processing fee, billing prices and switches", owner: "no", admin: "yes", sales: "no" },
 ];
 
 // ── Activity log in sentences ────────────────────────────────────────────
@@ -109,12 +111,14 @@ const RESOURCE_WORDS: Record<string, string> = {
     auto_discount: "automatic discount", order: "order", rider: "rider", settings: "settings",
     store_settings: "store settings", business_settings: "business details", team: "staff", staff: "staff",
     invite: "invite", cash_sale: "cash sale", session: "session", customer: "customer", contact: "contact",
+    admin_tools: "admin tools", billing: "billing",
 };
 
 const AREA_WORDS: Record<string, string> = {
     product: "Products", category: "Categories", order: "Orders", customer: "Customers", contact: "Customers",
     discount: "Discounts", auto_discount: "Discounts", gift_card: "Gift cards", settings: "Settings",
     store_settings: "Settings", business_settings: "Settings", rider: "Riders", team: "Staff", staff: "Staff", invite: "Staff",
+    admin_tools: "Admin tools", billing: "Billing",
 };
 
 function str(v: unknown): string | null {
