@@ -57,7 +57,11 @@ test.describe("one merged list", () => {
     test("each row says what it is, what it covers and how much it was used", () => {
         expect(rows[0]).toMatchObject({ kind: "code", name: "HARMATTAN20", value: "20% off", applies: "Everything", used: 0, limit: null });
         expect(rows[2]).toMatchObject({ kind: "auto", value: "GH₵ 100 off", applies: "Slides", used: 5 });
-        expect(fromCoupon(coupon({ category_id: "c2" }), names, null, NOW).applies).toBe("Everything (marked Dresses)");
+        // A code with a category comes off that category only (lib/couponValue), so the list says so
+        expect(fromCoupon(coupon({ category_id: "c2" }), names, null, NOW).applies).toBe("Dresses");
+        expect(fromCoupon(coupon({ category_id: null, target_category_id: "c1" }), names, null, NOW).applies).toBe("Slides");
+        expect(fromCoupon(coupon({ category_id: "c2" }), names, null, NOW).target).toEqual({ categories: ["c2"] });
+        expect(fromCoupon(coupon({ discount_type: "free_shipping", category_id: "c2" }), names, null, NOW).target).toEqual({ delivery: true });
         expect(fromCoupon(coupon({ discount_type: "free_shipping" }), names, null, NOW).applies).toBe("Delivery");
         expect(fromCoupon(coupon({ discount_type: "buy_x_get_y", buy_quantity: 2, get_quantity: 1 }), names, null, NOW).value).toBe("Buy 2, get 1 free");
     });
@@ -155,8 +159,11 @@ test.describe("overlap warning (gap 15)", () => {
         expect(engine).toContain("When every item in the cart is covered, coupons are blocked entirely");
         const checkout = fs.readFileSync(path.join(ROOT, "src/lib/checkout/createCheckoutOrder.ts"), "utf8");
         expect(checkout).toContain("couponBlocked = cartArr.every(i => autoResult.coveredProductIds.has(i.productId))");
-        // Codes ignore coupons.category_id at checkout, which is why a code's target is everything
-        expect(fs.readFileSync(path.join(ROOT, "src/lib/discountValidation.ts"), "utf8")).not.toContain("category_id");
+        // Codes are priced by the shared rule, which reads the code's category
+        const validation = fs.readFileSync(path.join(ROOT, "src/lib/discountValidation.ts"), "utf8");
+        expect(validation).toContain("computeCouponSplit({ terms: coupon, subtotal: orderAmount, deliveryFee, lines })");
+        expect(validation).toContain("category_id, target_category_id, buy_quantity, get_quantity");
+        expect(checkout).toContain("covered: autoResult.coveredProductIds.has(l.productId)");
     });
 });
 
@@ -165,6 +172,24 @@ test.describe("the panel", () => {
         const f = { ...emptyForm("code", NOW), code: "HARM20", value: "20", condition: "min" as const, minTotal: "500", limit: "100", oncePerCustomer: true, hasEnd: true, end: "2026-10-31T23:59" };
         expect(summarySentence(f, names, NOW)).toMatch(/^20% off everything, on orders over GH₵ 500\. Up to 100 uses, once per customer\. Ends 31 Oct 2026\.$/);
         expect(summarySentence({ ...f, codeType: "free_shipping" }, names, NOW)).toMatch(/^Free delivery on the order, on orders over GH₵ 500\./);
+    });
+    test("item codes say what checkout takes off", () => {
+        const base = { ...emptyForm("code", NOW), code: "X", start: "", hasEnd: false };
+        expect(summarySentence({ ...base, codeType: "percentage", value: "20", applies: "SPECIFIC_CATEGORIES", categoryIds: ["c2"] }, names, NOW))
+            .toBe("20% off Dresses. Items that already have an automatic discount don't count. No limit on uses. No end date.");
+        expect(summarySentence({ ...base, codeType: "buy_x_get_y", buyQty: "2", getQty: "1" }, names, NOW))
+            .toBe("Buy 2, get 1 free on everything: for every 3 in the cart, the cheapest 1 is free. Items that already have an automatic discount don't count. No limit on uses. No end date.");
+        expect(summarySentence({ ...base, codeType: "sale_price", value: "80", applies: "SPECIFIC_CATEGORIES", categoryIds: ["c1"] }, names, NOW))
+            .toMatch(/^A sale price of GH₵ 80(\.00)? on Slides: anything priced above it sells for it\. Items that already/);
+        // A whole-cart code reads as before
+        expect(summarySentence({ ...base, codeType: "fixed", value: "50" }, names, NOW)).toMatch(/^GH₵ 50(\.00)? off everything\. No limit on uses\. No end date\.$/);
+    });
+    test("a category code only overlaps automatic discounts on the same items", () => {
+        const dressCode = fromCoupon(coupon({ category_id: "c2" }), names, null, NOW);
+        const slidesAuto = fromAuto(auto(), names, null, NOW);
+        expect(findOverlaps([dressCode, slidesAuto], names, productCategories, NOW)).toHaveLength(0);
+        const slidesCode = fromCoupon(coupon({ id: "k3", code: "SLIDES10", category_id: "c1" }), names, null, NOW);
+        expect(findOverlaps([slidesCode, slidesAuto], names, productCategories, NOW)).toHaveLength(1);
     });
     test("a new automatic discount: quantity and scope are spelled out", () => {
         const f = { ...emptyForm("auto", NOW), title: "2 slides", autoType: "FIXED" as const, value: "100", applies: "SPECIFIC_CATEGORIES" as const, categoryIds: ["c1"], condition: "qty" as const, minQty: "2", qtyScope: "PER_PRODUCT" as const };
@@ -183,11 +208,11 @@ test.describe("the panel", () => {
         const f = { ...emptyForm("code", NOW), code: "harm 20", value: "20", applies: "SPECIFIC_CATEGORIES" as const, categoryIds: ["c2"], condition: "min" as const, minTotal: "500", limit: "", start: "", hasEnd: false };
         expect(couponPayload(f)).toEqual({
             code: "HARM20", discount_type: "percentage", discount_value: 20, free_shipping: false, buy_quantity: null, get_quantity: null,
-            category_id: "c2", min_order_value: 500, usage_limit: null, single_use_per_customer: false, starts_at: null, expires_at: null,
+            category_id: "c2", target_category_id: "c2", min_order_value: 500, usage_limit: null, single_use_per_customer: false, starts_at: null, expires_at: null,
         });
         // discount_value is NOT NULL: the old page sent null for free shipping, so it could never be created
         const fs1 = couponPayload({ ...f, codeType: "free_shipping" });
-        expect(fs1).toMatchObject({ discount_value: 0, free_shipping: true, category_id: null });
+        expect(fs1).toMatchObject({ discount_value: 0, free_shipping: true, category_id: null, target_category_id: null });
         expect(couponPayload({ ...f, codeType: "buy_x_get_y", buyQty: "3", getQty: "1" })).toMatchObject({ discount_value: 0, buy_quantity: 3, get_quantity: 1 });
     });
     test("an automatic discount round-trips through the form unchanged", () => {
