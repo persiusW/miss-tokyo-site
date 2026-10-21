@@ -13,13 +13,34 @@ import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { sendSMS } from "@/lib/sms";
 import { createWhatsAppHandler } from "./assistantHandler";
 import { providerMessage } from "./choices";
-import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnNote, setOptOut } from "./conversationStore";
+import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnNote, setOptOut, waitingInbound } from "./conversationStore";
 import { forwardToTeam, type HandoffReason } from "./handoff";
+import { canAnswerWaiting } from "./inbox";
 import { toModelPhoto } from "./photo";
 import { photosBefore, textFollows, type PairingDeps } from "./photoPairing";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
-import { FALLBACK_TEXT, type InboundParser, type PipelineDeps } from "./pipeline";
+import { FALLBACK_TEXT, type Conversation, type InboundMessage, type InboundParser, type PipelineDeps } from "./pipeline";
 import { supabaseInboundStore } from "./pipelineStore";
+
+type WaitingAnswerer = (waiting: InboundMessage[], c: Conversation) => Promise<void>;
+
+/**
+ * Staff handed a chat back and asked the assistant to reply to what came in meanwhile.
+ * wasWithPerson false: the chat was the assistant's, so only messages it missed (not ones it is
+ * answering now) count. "off": processing is off; "nothing": no message is waiting.
+ */
+export async function answerWaitingMessages(
+    conversationId: string, provider: string, settings: AiSettings, wasWithPerson: boolean,
+): Promise<"answered" | "nothing" | "off"> {
+    const pipeline = await pipelineFor(provider, settings);
+    if (!pipeline) return "off";
+    const now = Date.now();
+    const { messages, newestAt } = await waitingInbound(conversationId, now);
+    const due = newestAt ? canAnswerWaiting(wasWithPerson ? "person" : "assistant", [{ at: newestAt }], now) : false;
+    if (messages.length === 0 || !due) return "nothing";
+    await pipeline.answerWaiting(messages, { id: conversationId, handedOffAt: null });
+    return "answered";
+}
 
 /** Parser per provider. */
 export const INBOUND_PARSERS: Partial<Record<string, InboundParser>> = {
@@ -39,7 +60,7 @@ export function siteBaseUrl(): string {
 }
 
 /** The pipeline for a provider, or null while events are stored only. */
-export async function pipelineFor(provider: string, settings: AiSettings): Promise<PipelineDeps | null> {
+export async function pipelineFor(provider: string, settings: AiSettings): Promise<(PipelineDeps & { answerWaiting: WaitingAnswerer }) | null> {
     const parse = INBOUND_PARSERS[provider];
     if (!parse || !settings.whatsappEnabled) return null;
     const sender = createChatbotsAfrica();
@@ -109,6 +130,7 @@ export async function pipelineFor(provider: string, settings: AiSettings): Promi
         store: supabaseInboundStore,
         parse,
         handle,
+        answerWaiting: handle.answerWaiting,
         sendFallback: to => sender.sendText(to, FALLBACK_TEXT, { event: "whatsapp_handoff_fallback" }),
         afterHandOff: id => forward(id, "processing_failed"),
         expectedPhoneNumberId: settings.whatsappPhoneNumberId,

@@ -124,6 +124,32 @@ test("a text whose photos can't be fetched goes to a person, like a photo would"
     expect(h.sent).toEqual([WA_LINES.textOnly]);
 });
 
+test("on hand-back, the waiting messages are answered in one turn: texts in order, with the photo", async () => {
+    const h = harness({ photo: true });
+    await h.handle.answerWaiting([
+        msg({ type: "image", text: "Is this available?", mediaId: "2000000000000001", messageId: "wamid.W1" }),
+        msg({ type: "audio", text: null, messageId: "wamid.W2" }),
+        msg({ text: "??", messageId: "wamid.W3" }),
+    ], conv);
+    expect(h.runs).toEqual(["Is this available?\n??"]);
+    expect(h.runImages).toEqual([[{ data: "BASE64", mediaType: "image/jpeg" }]]);
+    expect(h.sent).toEqual(["Yes, size M is in stock."]);
+    expect(h.handoffs).toEqual([]);
+
+    const bare = harness({ photo: true });
+    await bare.handle.answerWaiting([msg({ type: "image", text: null, mediaId: "2000000000000001" })], conv);
+    expect(bare.runs).toEqual(["(The customer sent this photo.)"]);
+
+    const lost = harness({ photo: false });
+    await lost.handle.answerWaiting([msg({ type: "image", text: "Is this available?", mediaId: "2000000000000001" })], conv);
+    expect([lost.runs, lost.sent]).toEqual([[], [WA_LINES.textOnly]]);
+
+    const none = harness();
+    await none.handle.answerWaiting([], conv);
+    await none.handle.answerWaiting([msg({ type: "audio", text: null })], conv);
+    expect([none.runs, none.sent]).toEqual([[], []]);
+});
+
 test("a photo that can't be fetched, a voice note or a file: a person, told once", async () => {
     const h = harness({ photo: false });
     await h.handle(msg({ type: "image", text: null, mediaId: "2000000000000001" }), conv);

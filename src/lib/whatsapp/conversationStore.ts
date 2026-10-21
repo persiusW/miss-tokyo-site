@@ -9,6 +9,8 @@ import { optionsFrom } from "./choices";
 import { unseenNotice } from "./notices";
 import { returnSummary } from "./returns";
 import type { HistoryLine } from "./handoff";
+import { waitingMessages } from "./inbox";
+import type { InboundMessage } from "./pipeline";
 
 // The new whatsapp_conversations columns are not in the generated types yet.
 const db = supabaseAdmin as any;
@@ -35,6 +37,27 @@ export async function chatForConversation(c: WaConversation): Promise<ShopChat> 
     const { error } = await db.from("whatsapp_conversations").update({ shop_chat_id: chat.id }).eq("id", c.id);
     if (error) throw error;
     return chat;
+}
+
+/** The customer's messages after our last one (see waitingMessages), as they came in; newestAt from the log. */
+export async function waitingInbound(conversationId: string, now: number): Promise<{ messages: InboundMessage[]; newestAt: string | null }> {
+    const { data, error } = await db.from("message_log").select("direction, wa_message_id, created_at")
+        .eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(30);
+    if (error) throw error;
+    const rows = ((data ?? []) as { direction: "inbound" | "outbound"; wa_message_id: string | null; created_at: string }[])
+        .reverse().map(r => ({ direction: r.direction, at: r.created_at, id: r.wa_message_id }));
+    const out: InboundMessage[] = [];
+    const waiting = waitingMessages(rows, now);
+    for (const w of waiting) {
+        if (!w.id) continue;
+        // The full message (photo id, tap, quote) is kept with the stored event.
+        const { data: ev, error: evError } = await db.from("inbound_events").select("parsed")
+            .contains("parsed", { messages: [{ messageId: w.id }] }).limit(1);
+        if (evError) throw evError;
+        const m = ((ev ?? [])[0]?.parsed?.messages ?? []).find((x: InboundMessage) => x.messageId === w.id);
+        if (m) out.push(m);
+    }
+    return { messages: out, newestAt: waiting[waiting.length - 1]?.at ?? null };
 }
 
 /** Logs a message we sent, so the inbox shows both sides. Never throws. */

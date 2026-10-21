@@ -48,6 +48,29 @@ export function shapeConversation(c: ConversationRow, last: MessageRow | null, n
     };
 }
 
+/** In assistant mode, a message this old with no reply was missed, not still being answered. */
+export const MISSED_AFTER_MS = 2 * 60_000;
+/** At most this many waiting messages are answered in one turn, the latest. */
+export const MAX_WAITING = 6;
+
+/**
+ * The customer's messages after our last one, oldest first, while WhatsApp still lets us reply.
+ * Staff reply from their own WhatsApp, so a person may have answered these; staff choose.
+ */
+export function waitingMessages<T extends { direction: "inbound" | "outbound"; at: string }>(messages: T[], now: number): T[] {
+    let i = messages.length;
+    while (i > 0 && messages[i - 1].direction === "inbound") i--;
+    const waiting = messages.slice(i);
+    if (waiting.length === 0 || !windowOpen(waiting[waiting.length - 1].at, now)) return [];
+    return waiting.slice(-MAX_WAITING);
+}
+
+/** Whether staff are offered "reply to the waiting messages": always with a person, else only once they were missed. */
+export function canAnswerWaiting(mode: InboxMode, waiting: { at: string }[], now: number): boolean {
+    if (waiting.length === 0) return false;
+    return mode === "person" || now - Date.parse(waiting[waiting.length - 1].at) >= MISSED_AFTER_MS;
+}
+
 /** Back to the assistant: the person is done. Keeps the rest of state. */
 export function handBackState(state: Record<string, unknown> | null, now: Date): Record<string, unknown> {
     return { ...(state ?? {}), mode: "assistant", reason: null, since: now.toISOString() };
