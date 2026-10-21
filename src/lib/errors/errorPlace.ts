@@ -24,6 +24,8 @@ export const PAGE_ROUTES: readonly string[] = [
     "/admin/products/new",
     "/admin/settings",
     "/agent",
+    "/analytics",
+    "/analytics/reports/[key]",
     "/ai/inbox",
     "/auth/confirm",
     "/auth/two-step",
