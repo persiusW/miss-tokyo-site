@@ -90,6 +90,21 @@ test("Orders: old pages go forward to the list, its tabs and the panel, and come
     expect(v2Redirect("/orders/abandoned", "range=30d", FLAGS_OFF)).toBe("/customers/abandoned?range=30d");
 });
 
+test("Till: /pos and its history go forward on the Till's own switch, and come back", () => {
+    const on = { ...FLAGS_OFF, admin_v2: true, admin_v2_till: true };
+    expect(v2Redirect("/pos", "", on)).toBe("/till");
+    expect(v2Redirect("/pos", "customer=ama%40x.com", on)).toBe("/till?customer=ama%40x.com");
+    expect(v2Redirect("/pos/history", "", on)).toBe("/till/today");
+    // The real switches: the Till waits for its own.
+    expect(v2Redirect("/pos", "", { ...FLAGS_OFF, admin_v2: true })).toBeNull();
+    expect(v2Redirect("/till", "", { ...FLAGS_OFF, admin_v2: true })).toBe("/pos");
+    expect(v2Redirect("/till", "", on)).toBeNull();
+    expect(v2Redirect("/till/today", "", on)).toBeNull();
+    // Off: links to the new Till (Customers' and Home's) land on the old one.
+    expect(v2Redirect("/till", "customer=ama%40x.com", FLAGS_OFF)).toBe("/pos?customer=ama%40x.com");
+    expect(v2Redirect("/till/today", "", FLAGS_OFF)).toBe("/pos/history");
+});
+
 test("Inbox: a chat link keeps working when the Inbox switch is off", () => {
     expect(v2Redirect("/inbox", "c=whatsapp:0a1b2c3d-1111-2222-3333-444455556666", FLAGS_OFF)).toBe("/customers/whatsapp?c=0a1b2c3d-1111-2222-3333-444455556666");
     expect(v2Redirect("/inbox", "c=form:9", FLAGS_OFF)).toBe("/customers/forms");
@@ -139,8 +154,8 @@ test("no redirect ever loops", () => {
         "/catalog/categories", "/catalogue/categories", "/admin/categories", "/catalog/gift-cards", "/catalogue/gift-cards", "/admin/products/new",
         "/sales/pre-orders", "/customers/abandoned", "/finance", "/finance/links", "/finance/invoices", "/finance/invoices/d1",
         "/orders/invoices", "/orders/invoices/d1", "/orders/0a1b2c3d-1111-2222-3333-444455556666", "/sales/orders/0a1b2c3d-1111-2222-3333-444455556666",
-        "/inbox", "/customers/whatsapp"];
-    for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_products: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_orders: true }]) {
+        "/inbox", "/customers/whatsapp", "/pos/history", "/till/today"];
+    for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_products: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_orders: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_till: true }]) {
         for (const p of paths) {
             const once = v2Redirect(p, "", flags, ALL);
             if (!once) continue;
@@ -149,8 +164,9 @@ test("no redirect ever loops", () => {
         }
     }
     const withQuery: [string, string][] = [["/orders", "preorder=1"], ["/orders", "view=ready&pay=cash"], ["/orders/invoices", "type=link"],
-        ["/inbox", "c=whatsapp:abc"], ["/inbox", "c=form:1"], ["/sales/orders", "tab=pickups"], ["/finance/links", ""]];
-    for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }]) {
+        ["/inbox", "c=whatsapp:abc"], ["/inbox", "c=form:1"], ["/sales/orders", "tab=pickups"], ["/finance/links", ""],
+        ["/till", "customer=ama%40x.com"], ["/pos", "customer=ama%40x.com"]];
+    for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }, { ...FLAGS_OFF, admin_v2: true, admin_v2_till: true }]) {
         for (const [p, qs] of withQuery) {
             const once = v2Redirect(p, qs, flags, ALL);
             if (!once) continue;

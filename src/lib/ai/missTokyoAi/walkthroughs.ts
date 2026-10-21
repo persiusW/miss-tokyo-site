@@ -17,11 +17,11 @@ export const WALKTHROUGHS = [
         title: "Ring up a sale at the till",
         roles: ALL,
         steps: [
-            { route: "pos", anchor: "pos.search", text: "Search for the product by name or SKU. Pick its size, colour or brand on the card, then press Add." },
-            { route: "pos", anchor: "pos.phone", text: "Attach the customer (Existing or New). A phone number is needed to send a pay link." },
-            { route: "pos", anchor: "pos.code", text: "Optional: enter a gift card or discount code. Then choose Store Pickup or Delivery." },
-            { route: "pos", anchor: "pos.send-link", text: "To take payment by link, press Send Link. The customer gets it by SMS and email, and the stock is held while they pay." },
-            { route: "pos", anchor: "pos.cash", text: "For cash, press Cash Received, then press it again within 4 seconds to confirm." },
+            { route: "pos", anchor: "pos.search", text: "Search for the product by name or SKU. Tap it, pick its size, colour or brand, then press Add to sale (old admin: pick on the card, then Add)." },
+            { route: "pos", anchor: "pos.phone", text: "Choose the customer (Find a customer or New customer; Existing or New in the old admin) and add their phone. A pay link needs the phone." },
+            { route: "pos", anchor: "pos.code", text: "Optional: enter a gift card or discount code. Choose how they get it: Taking it now, Deliver in Accra or Outside Accra (Store Pickup or Delivery in the old admin)." },
+            { route: "pos", anchor: "pos.send-link", text: "To take payment by link, choose Send a pay link, then press Send pay link (Send Link in the old admin). The customer gets it by SMS and email, and the stock is held while they pay." },
+            { route: "pos", anchor: "pos.cash", text: "For cash, choose Cash, press Take GH₵ X cash, type what you were handed to see the change, then press Record. (Old admin: press Cash Received, then again within 4 seconds.)" },
         ],
     },
     {
@@ -68,7 +68,7 @@ export const WALKTHROUGHS = [
         steps: [
             { route: "orders", orderPage: true, anchor: "order.cancel", text: "Open the order and press Cancel order. The new admin asks first (cancel and refund, or cancel without a refund, and whether to tell the customer); the old admin's Cancel works at once. Either way the stock the order took goes back." },
             { route: "orders", orderPage: true, anchor: "order.refund", text: "Refund (owners and admins) refunds everything, chosen items or an amount, and can put items back in stock. While refunds through Paystack are off, refund in the Paystack dashboard first, then press Record. The old admin's Refund only marks the order and returns stock." },
-            { route: "pos_history", anchor: "poshistory.cancel", text: "For an unpaid till link, open the session in POS History and press Cancel Session. A paid till sale is cancelled or refunded from its order instead." },
+            { route: "pos_history", anchor: "poshistory.cancel", text: "For an unpaid till link, open the sale in Today's sales and tap Cancel sale twice (POS History › Cancel Session in the old admin). A paid till sale is cancelled or refunded from its order instead." },
         ],
     },
     {

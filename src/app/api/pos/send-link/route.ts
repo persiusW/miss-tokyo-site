@@ -222,9 +222,12 @@ export async function POST(req: NextRequest) {
     // Platform fee settings — read up front alongside the session
     const storeFeeSettings = storeFeeRes.data;
 
-    // Fee is charged on the post-discount subtotal, matching storefront checkout
+    // Fee is charged on the post-discount subtotal, matching storefront checkout.
+    // Cash carries no processing fee (owner decision 2026-10-21): the till always
+    // asked for the goods price, but the fee was still added here and recorded
+    // on the order, so every cash order read 2.5% more than the drawer took.
     const feePct = Number(storeFeeSettings?.platform_fee_percentage) || 0;
-    const platformFeeAmount = feePct > 0
+    const platformFeeAmount = feePct > 0 && mode !== 'cash'
         ? parseFloat((discountedSubtotal * feePct / 100).toFixed(2))
         : 0;
     const platformFeeLabel = storeFeeSettings?.platform_fee_label || (feePct > 0 ? `${feePct}%` : undefined);

@@ -118,6 +118,7 @@ export const PAGE_ROUTES: readonly string[] = [
     "/team",
     "/terms",
     "/test-orders",
+    "/till", "/till/today",
     "/ui-kit",
     "/track",
     "/whitelabel",

@@ -77,14 +77,15 @@ export function Chip({ pressed, onClick, children, count, href }: { pressed?: bo
     return <button type="button" className="chip" aria-pressed={!!pressed} onClick={onClick}>{inner}</button>;
 }
 
-export type RadioOpt<V extends string> = { v: V; title: ReactNode; desc?: ReactNode; disabled?: boolean; right?: ReactNode };
+/** `assist` puts a Miss Tokyo AI anchor (data-assist) on that one card. */
+export type RadioOpt<V extends string> = { v: V; title: ReactNode; desc?: ReactNode; disabled?: boolean; right?: ReactNode; assist?: string };
 export function RadioCards<V extends string>({ value, onChange, options, label, cols }: { value: V | null; onChange: (v: V) => void; options: RadioOpt<V>[]; label: string; cols?: number }) {
     const i = Math.max(0, options.findIndex(o => o.v === value));
     return (
         <div className="rcards" role="radiogroup" aria-label={label} style={cols ? { gridTemplateColumns: `repeat(${cols},minmax(0,1fr))` } : undefined}
             onKeyDown={e => arrowNav(e, options.length, i, n => { if (!options[n].disabled) onChange(options[n].v); })}>
             {options.map(o => (
-                <button type="button" key={o.v} role="radio" aria-checked={value === o.v} aria-disabled={o.disabled || undefined}
+                <button type="button" key={o.v} role="radio" aria-checked={value === o.v} aria-disabled={o.disabled || undefined} data-assist={o.assist}
                     tabIndex={value === o.v || (value == null && o === options[0]) ? 0 : -1}
                     className="rcard" onClick={() => !o.disabled && onChange(o.v)}>
                     <span className="dot" />
