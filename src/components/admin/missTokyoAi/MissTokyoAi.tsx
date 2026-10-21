@@ -44,7 +44,8 @@ export function MissTokyoAi() {
     const launcherRef = useRef<HTMLButtonElement>(null);
     const [openCount, setOpenCount] = useState(0);
     const onAgentPage = pathname === "/agent";
-    const onPos = pathname === "/pos";
+    // The till keeps its sale card on the right; the launcher moves out of its way.
+    const onPos = pathname === "/pos" || pathname === "/till";
 
     useEffect(() => { hydrate(); }, [hydrate]);
 

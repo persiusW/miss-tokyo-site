@@ -231,6 +231,8 @@ export function OrderPanel({ orderId, role, initial, onClose, onChanged }: {
                 { l: "Print receipt", icon: "print" as const, onClick: () => setPrinting(true) },
                 { l: "Copy delivery details", icon: "copy" as const, onClick: () => void copyDetails() },
                 ...(o.customer_email ? [{ l: "Open customer", icon: "user" as const, onClick: () => window.location.assign(`/customers/${encodeURIComponent(String(o.customer_email).toLowerCase())}`) }] : []),
+                // The till opens with this customer already chosen (by email, else phone).
+                ...(o.customer_email || o.customer_phone ? [{ l: "New sale for this customer", icon: "till" as const, onClick: () => window.location.assign(`/till?customer=${encodeURIComponent(String(o.customer_email || o.customer_phone))}`) }] : []),
             ]} />
         </span>
     );
