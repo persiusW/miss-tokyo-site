@@ -10,9 +10,10 @@
 // the list or one chat, with a back button.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { canAnswerWaiting, waitingMessages, type InboxConversation } from "@/lib/whatsapp/inbox";
+import { canAnswerWaiting, mediaKind, waitingMessages, type InboxConversation } from "@/lib/whatsapp/inbox";
 
-type Message = { id: string; direction: "inbound" | "outbound"; text: string | null; type: string | null; at: string };
+/** media: what can be shown of the message's file (see mediaState); the file itself loads through the media route. */
+type Message = { id: string; direction: "inbound" | "outbound"; text: string | null; type: string | null; at: string; media?: "ready" | "fetch" | "missing" | null };
 /** loadedAt: when it was fetched, the "now" for what is waiting (render stays pure). */
 type Thread = { conversation: InboxConversation; messages: Message[]; loadedAt: number };
 
@@ -299,7 +300,8 @@ export default function WhatsAppInboxClient() {
                                         color: r.m.direction === "outbound" ? "var(--ac-bg, #fff)" : "var(--ac-ink)",
                                         border: r.m.direction === "outbound" ? "none" : "1px solid var(--ac-line)",
                                     }}>
-                                        {r.m.text?.trim() ? r.m.text : <em>[{r.m.type ?? "message"}]</em>}
+                                        {r.m.media && thread && <MediaView conversationId={thread.conversation.id} m={r.m} />}
+                                        {r.m.text?.trim() ? r.m.text : r.m.media ? null : <em>[{r.m.type ?? "message"}]</em>}
                                     </div>
                                     <div style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2, textAlign: r.m.direction === "outbound" ? "right" : "left" }}>
                                         {r.m.direction === "outbound" ? "Assistant · " : ""}{clock(r.m.at)}
@@ -312,4 +314,30 @@ export default function WhatsAppInboxClient() {
             </div>
         </div>
     );
+}
+
+const LABEL = { photo: "Photo", audio: "Voice note", video: "Video", file: "File" } as const;
+
+/** A message's photo, voice note, video or file, loaded through the staff-only media route. */
+function MediaView({ conversationId, m }: { conversationId: string; m: Message }) {
+    const [failed, setFailed] = useState(false);
+    const kind = mediaKind(m.type) ?? "file";
+    const src = `/api/whatsapp/inbox/${conversationId}/media/${m.id}`;
+    const gap = m.text?.trim() ? { marginBottom: 6 } : {};
+    if (m.media === "missing" || failed) {
+        return <div style={{ ...gap, fontStyle: "italic", opacity: 0.75 }} data-wa-media-missing>[{LABEL[kind]} not available]</div>;
+    }
+    if (kind === "photo") {
+        return (
+            <a href={src} target="_blank" rel="noopener" style={{ display: "block", ...gap }} data-wa-media="photo">
+                {/* A signed, short-lived link behind our own route: next/image can't optimise it. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`${LABEL[kind]} in the chat`} loading="lazy" onError={() => setFailed(true)}
+                    style={{ display: "block", maxWidth: "100%", width: 240, maxHeight: 320, objectFit: "cover", borderRadius: 8 }} />
+            </a>
+        );
+    }
+    if (kind === "audio") return <audio controls preload="none" src={src} onError={() => setFailed(true)} style={{ display: "block", maxWidth: "100%", ...gap }} data-wa-media="audio" />;
+    if (kind === "video") return <video controls preload="metadata" src={src} onError={() => setFailed(true)} style={{ display: "block", maxWidth: "100%", width: 260, borderRadius: 8, ...gap }} data-wa-media="video" />;
+    return <a href={src} target="_blank" rel="noopener" style={{ display: "block", color: "inherit", textDecoration: "underline", ...gap }} data-wa-media="file">Open file</a>;
 }

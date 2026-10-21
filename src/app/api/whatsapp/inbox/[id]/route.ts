@@ -8,7 +8,7 @@ import { answerWaitingMessages } from "@/lib/whatsapp/processing";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireStaff } from "@/lib/ai/requireStaff";
 import { logCause } from "@/lib/errors/apiError";
-import { handBackState, shapeConversation, type ConversationRow, type MessageRow } from "@/lib/whatsapp/inbox";
+import { handBackState, mediaState, shapeConversation, type ConversationRow, type MessageRow } from "@/lib/whatsapp/inbox";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     try {
         const [conv, msgs] = await Promise.all([
             db.from("whatsapp_conversations").select(FIELDS).eq("id", id).maybeSingle(),
-            db.from("message_log").select("id, conversation_id, direction, content, message_type, created_at")
+            db.from("message_log").select("id, conversation_id, direction, content, message_type, media_url, created_at")
                 .eq("conversation_id", id).order("created_at", { ascending: false }).limit(300),
         ]);
         if (conv.error || msgs.error) throw conv.error ?? msgs.error;
@@ -38,7 +38,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         const messages = ((msgs.data ?? []) as MessageRow[]).reverse();
         return NextResponse.json({
             conversation: shapeConversation(conv.data as ConversationRow, messages[messages.length - 1] ?? null, Date.now()),
-            messages: messages.map(m => ({ id: m.id, direction: m.direction, text: m.content, type: m.message_type, at: m.created_at })),
+            messages: messages.map(m => ({ id: m.id, direction: m.direction, text: m.content, type: m.message_type, at: m.created_at, media: mediaState(m) })),
         });
     } catch (e) {
         logCause("GEN-00", e, { route: "whatsapp/inbox/[id]" });
