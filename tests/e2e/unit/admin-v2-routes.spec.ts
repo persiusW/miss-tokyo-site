@@ -13,12 +13,35 @@ test("old URLs go forward only while their area is on and built", () => {
     expect(v2Redirect("/sales/orders/abc-123", "", FLAGS_ALL, ALL)).toBe("/orders/abc-123");
     expect(v2Redirect("/sales/pre-orders", "", FLAGS_ALL, ALL)).toBe("/orders?preorder=1");
     expect(v2Redirect("/catalog/products/p1/edit", "", FLAGS_ALL, ALL)).toBe("/catalogue/p1");
-    expect(v2Redirect("/sales/riders/r9", "", FLAGS_ALL, ALL)).toBe("/analytics/reports/riders?rider=r9");
+    expect(v2Redirect("/sales/riders/r9", "", FLAGS_ALL, ALL)).toBe("/analytics?report=riders&rider=r9");
     expect(v2Redirect("/sales/wholesalers", "", FLAGS_ALL, ALL)).toBe("/customers?segment=wholesale");
     expect(v2Redirect("/settings/ai", "", FLAGS_ALL, ALL)).toBe("/settings/assistants");
     expect(v2Redirect("/sales/orders", "tab=packed&page=2", FLAGS_ALL, ALL)).toBe("/orders?tab=packed&page=2");
     expect(v2Redirect("/catalog/discounts", "", FLAGS_ALL, ALL)).toBe("/discounts");
     expect(v2Redirect("/catalog/auto-discounts", "", FLAGS_ALL, ALL)).toBe("/discounts?type=auto");
+});
+
+test("Payments and Riders open as reports on Analytics, and come back while it's off", () => {
+    expect(v2Redirect("/sales/analytics", "", FLAGS_ALL, ALL)).toBe("/analytics");
+    expect(v2Redirect("/admin/analytics", "", FLAGS_ALL, ALL)).toBe("/analytics");
+    expect(v2Redirect("/sales/payments", "", FLAGS_ALL, ALL)).toBe("/analytics?report=payments");
+    expect(v2Redirect("/sales/riders", "", FLAGS_ALL, ALL)).toBe("/analytics?report=riders");
+    expect(v2Redirect("/sales/riders/0a1b2c3d-1111-2222-3333-444455556666", "", FLAGS_ALL, ALL))
+        .toBe("/analytics?report=riders&rider=0a1b2c3d-1111-2222-3333-444455556666");
+    // Analytics is built, so the real switch moves these too.
+    const v2Only = { ...FLAGS_OFF, admin_v2: true };
+    expect(v2Redirect("/sales/payments", "", v2Only)).toBe("/analytics?report=payments");
+    expect(v2Redirect("/sales/analytics", "", FLAGS_OFF)).toBeNull();
+    // Switched off: the new URLs go back to the old pages.
+    expect(v2Redirect("/analytics", "report=payments&range=30d", FLAGS_OFF, ALL)).toBe("/sales/payments?range=30d");
+    expect(v2Redirect("/analytics", "report=riders&rider=r9", FLAGS_OFF, ALL)).toBe("/sales/riders/r9");
+    expect(v2Redirect("/analytics", "report=riders", FLAGS_OFF, ALL)).toBe("/sales/riders");
+    expect(v2Redirect("/analytics", "report=timing", FLAGS_OFF, ALL)).toBe("/sales/analytics?report=timing");
+    expect(v2Redirect("/analytics", "report=riders&rider=..%2F..", FLAGS_OFF, ALL)).toBe("/sales/riders?rider=..%2F..");
+    expect(v2Redirect("/analytics/reports/payments", "", FLAGS_OFF, ALL)).toBe("/sales/payments");
+    expect(v2Redirect("/analytics/reports/riders", "", FLAGS_OFF, ALL)).toBe("/sales/riders");
+    expect(v2Redirect("/analytics/reports/timing", "", FLAGS_OFF, ALL)).toBe("/sales/analytics");
+    expect(v2Redirect("/analytics", "range=30d", FLAGS_ALL, ALL)).toBeNull();
 });
 
 test("high-risk areas wait for their own switch", () => {
@@ -51,7 +74,9 @@ test("shared paths are never redirected", () => {
 });
 
 test("no redirect ever loops", () => {
-    const paths = ["/overview", "/home", "/sales/orders", "/orders", "/orders/abandoned", "/pos", "/till", "/catalogue", "/catalog/products", "/team", "/staff", "/cms", "/content", "/catalog/discounts", "/catalog/auto-discounts", "/discounts", "/discounts/abc"];
+    const paths = ["/overview", "/home", "/sales/orders", "/orders", "/orders/abandoned", "/pos", "/till", "/catalogue", "/catalog/products", "/team", "/staff", "/cms", "/content",
+        "/catalog/discounts", "/catalog/auto-discounts", "/discounts", "/discounts/abc",
+        "/sales/analytics", "/analytics", "/sales/payments", "/sales/riders", "/sales/riders/r9", "/analytics/reports/payments"];
     for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }]) {
         for (const p of paths) {
             const once = v2Redirect(p, "", flags, ALL);

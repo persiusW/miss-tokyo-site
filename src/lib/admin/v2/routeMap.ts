@@ -24,7 +24,7 @@ export const FLAGS_ALL: V2Flags = { admin_v2: true, admin_v2_products: true, adm
 
 /** Areas whose new pages exist. An area joins this list in the PR that builds it,
  *  so a switch can never send anyone to a page that isn't there yet. */
-export const V2_READY_AREAS: readonly V2Area[] = ["settings", "home", "inbox", "content", "customers", "discounts"];
+export const V2_READY_AREAS: readonly V2Area[] = ["settings", "home", "inbox", "content", "customers", "discounts", "analytics"];
 
 export function areaOn(area: V2Area, flags: V2Flags, ready: readonly V2Area[] = V2_READY_AREAS): boolean {
     if (!flags.admin_v2 || !ready.includes(area)) return false;
@@ -44,6 +44,10 @@ type Rule = {
     query?: Record<string, string>;
     /** Forward only: the new page has no single old equivalent to go back to. */
     oneWay?: boolean;
+    /** Also used on the way back, but only when the request carries this rule's
+     *  query (":id" values are read from it). For pages the new admin folds into
+     *  one URL, such as Analytics reports. */
+    backByQuery?: boolean;
 };
 
 // Order matters: the first matching rule wins, so specific paths come first.
@@ -90,8 +94,13 @@ const RULES: Rule[] = [
 
     { area: "analytics", legacy: "/sales/analytics", v2: "/analytics" },
     { area: "analytics", legacy: "/admin/analytics", v2: "/analytics", oneWay: true },
+    // Payments and Riders are reports on the Analytics page now: the panel
+    // opens from ?report= (and ?rider= for one rider's orders). Going back
+    // while the area is off, /analytics/reports/<key> returns to the old page.
+    { area: "analytics", legacy: "/sales/payments", v2: "/analytics", query: { report: "payments" }, oneWay: true, backByQuery: true },
+    { area: "analytics", legacy: "/sales/riders/:id", v2: "/analytics", query: { report: "riders", rider: ":id" }, oneWay: true, backByQuery: true },
+    { area: "analytics", legacy: "/sales/riders", v2: "/analytics", query: { report: "riders" }, oneWay: true, backByQuery: true },
     { area: "analytics", legacy: "/sales/payments", v2: "/analytics/reports/payments" },
-    { area: "analytics", legacy: "/sales/riders/:id", v2: "/analytics/reports/riders", query: { rider: ":id" }, oneWay: true },
     { area: "analytics", legacy: "/sales/riders", v2: "/analytics/reports/riders" },
 
     { area: "staff", legacy: "/team", v2: "/staff" },
@@ -166,6 +175,26 @@ export function v2Redirect(
     for (const r of RULES) {
         const params = match(r.legacy, path);
         if (params && areaOn(r.area, flags, ready)) return withQuery(fill(r.v2, params), search, r.query, params);
+    }
+
+    // New URL with a report-style query while its area is off → that old page.
+    // Rules naming more of the query go first (one rider before all riders).
+    const byQuery = RULES.filter(r => r.backByQuery && r.query).sort((a, b) => Object.keys(b.query!).length - Object.keys(a.query!).length);
+    for (const r of byQuery) {
+        if (!match(r.v2, path) || areaOn(r.area, flags, ready)) continue;
+        const q = new URLSearchParams(search);
+        const params: Record<string, string> = {};
+        const hit = Object.entries(r.query!).every(([k, v]) => {
+            const got = q.get(k);
+            if (got == null) return false;
+            if (v.startsWith(":")) { params[v.slice(1)] = got; return /^[A-Za-z0-9_-]{1,80}$/.test(got); }
+            return got === v;
+        });
+        if (!hit) continue;
+        for (const k of Object.keys(r.query!)) q.delete(k);
+        const rest = q.toString();
+        const legacy = fill(r.legacy, params);
+        return rest ? `${legacy}?${rest}` : legacy;
     }
 
     // New URL while its area is off → old URL. Fixed paths before patterns, so
