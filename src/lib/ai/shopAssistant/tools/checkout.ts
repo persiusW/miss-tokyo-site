@@ -6,11 +6,14 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { canOpenAnother, quoteHolds, stampQuote, quoteKey, sameTotal } from "../guards";
 import { BUTTON_LABELS, LINES } from "../lines";
 import { err, ok, pushTalk, str, type ShopToolContext, type ToolOutcome } from "./context";
+import type { CartLine } from "../cartRules";
+import { clearCart, loadCart } from "../cartStore";
+import { holdLive } from "../holds";
 
 const PAY_CODES = new Set(["gateway", "refused", "payments_unconfigured"]);
 
-function toInput(input: any, ctx: ShopToolContext): CreateCheckoutOrderInput {
-    const items = Array.isArray(input?.items) ? input.items : [];
+function toInput(input: any, ctx: ShopToolContext, cart: CartLine[] | null = null): CreateCheckoutOrderInput {
+    const items = cart ?? (Array.isArray(input?.items) ? input.items : []);
     return {
         items: items.map((i: any) => ({
             product_id: str(i?.product_id, 40),
@@ -46,30 +49,46 @@ const keyOf = (oi: CreateCheckoutOrderInput) => quoteKey({
     items: oi.items, delivery_method: oi.delivery.method, delivery_zone: oi.delivery.zone ?? null, discount_code: oi.discount_code ?? null,
 });
 
+/** from_cart: the basket's lines (WhatsApp); null when the order lists its own items. */
+async function basketFor(input: any, ctx: ShopToolContext): Promise<CartLine[] | null | "empty"> {
+    if (input?.from_cart !== true) return null;
+    const lines = await loadCart(ctx.chat.visitorKey);
+    return lines.length ? lines : "empty";
+}
+const EMPTY_BASKET = "The basket is empty. Add the pieces with update_cart first, or list them in items.";
+
 export async function priceOrder(input: any, ctx: ShopToolContext): Promise<ToolOutcome> {
     ctx.notes.topic = "placing an order";
     if (tooMany(input)) return err(TOO_MANY);
-    const oi = toInput(input, ctx);
+    const cart = await basketFor(input, ctx);
+    if (cart === "empty") return err(EMPTY_BASKET);
+    const oi = toInput(input, ctx, cart);
     const r = await quoteCheckoutOrder(oi);
     if (!r.success) return err(checkoutCustomerLine(r.code, r.error));
     ctx.chat.lastQuote = stampQuote(ctx.chat.lastQuote, keyOf(oi), r.totals.total, Date.now(), ctx.chat.turns);
     return ok({ totals_ghs: r.totals, out_of_stock: r.outOfStock, next: "Tell the customer the total and ask them to confirm with a clear yes." });
 }
 
-/** Open orders still waiting for payment; paid, cancelled and expired ones drop out. */
+/**
+ * Open orders still waiting for payment with their stock still held; paid, cancelled and expired ones
+ * drop out, and so does one whose hold ran out (its link can't safely be paid, and it mustn't block a new order).
+ */
 async function stillOpen(ids: string[]): Promise<string[]> {
     if (ids.length === 0) return [];
     const { data, error } = await supabaseAdmin.from("orders").select("id").in("id", ids).eq("status", "pending").eq("payment_status", "pending");
     if (error) throw error;
-    const open = new Set((data ?? []).map(r => r.id as string));
-    return ids.filter(id => open.has(id));
+    const pending = ids.filter(id => (data ?? []).some(r => r.id === id));
+    const held = await Promise.all(pending.map(id => holdLive(id)));
+    return pending.filter((_, i) => held[i]);
 }
 
 export async function placeOrder(input: any, ctx: ShopToolContext): Promise<ToolOutcome> {
     ctx.notes.topic = "placing an order";
     if (input?.customer_said_yes !== true) return err("Tell the customer the total from price_order and wait for a clear yes.");
     if (tooMany(input)) return err(TOO_MANY);
-    const oi = toInput(input, ctx);
+    const cart = await basketFor(input, ctx);
+    if (cart === "empty") return err(EMPTY_BASKET);
+    const oi = toInput(input, ctx, cart);
     const key = keyOf(oi);
     if (!quoteHolds(ctx.chat.lastQuote, key, Date.now(), ctx.chat.turns)) {
         return err("The customer must agree to a total you gave them in an earlier message. If they just said yes to the total you quoted before, call place_order without calling price_order again; if the order changed, quote the new total and wait for their reply.");
@@ -87,7 +106,9 @@ export async function placeOrder(input: any, ctx: ShopToolContext): Promise<Tool
     }
 
     // Re-price right before creating: the customer said yes to a number, and
-    // that number must still be the price.
+    // that number must still be the price. The final stock check is the order
+    // itself: createCheckoutOrder reserves every line in one locked database
+    // step, and refuses ("just sold out") when one is no longer there.
     const again = await quoteCheckoutOrder(oi);
     if (!again.success) return err(checkoutCustomerLine(again.code, again.error));
     if (!sameTotal(again.totals.total, ctx.chat.lastQuote!.total)) {
@@ -107,6 +128,8 @@ export async function placeOrder(input: any, ctx: ShopToolContext): Promise<Tool
     if (!ctx.chat.verifiedOrders.includes(r.orderId)) ctx.chat.verifiedOrders = [...ctx.chat.verifiedOrders, r.orderId].slice(-20);
     ctx.chat.payLinks = { ...ctx.chat.payLinks, [r.orderId]: r.authorizationUrl };
     ctx.chat.lastQuote = null;
+    // The basket became this order.
+    if (cart) await clearCart(ctx.chat.visitorKey).catch(e => console.error("[shop-assistant] basket not emptied", e instanceof Error ? e.message : e));
     const ref = r.orderId.slice(0, 8).toUpperCase();
     ctx.notes.orderRef = ref;
     ctx.buttons.push({ kind: "pay_now", label: BUTTON_LABELS.pay, href: r.authorizationUrl });

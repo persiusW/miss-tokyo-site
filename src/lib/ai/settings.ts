@@ -200,7 +200,7 @@ export async function getAiSettings(): Promise<AiSettings> {
         },
         shop: {
             enabled: bool("shop_assistant_enabled"),
-            dailyMessagesPerVisitor: Math.max(0, num("shop_assistant_daily_messages_per_visitor", 20)),
+            dailyMessagesPerVisitor: Math.max(0, num("shop_assistant_daily_messages_per_visitor", 30)),
             capSharePct: Math.min(100, Math.max(0, num("shop_assistant_cap_share_pct", 40))),
             whatsappNumber: normaliseWaNumber(map.get("shop_whatsapp_number")),
         },

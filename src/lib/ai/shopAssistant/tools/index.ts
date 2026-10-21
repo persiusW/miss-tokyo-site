@@ -9,6 +9,7 @@ import { placeOrder, priceOrder } from "./checkout";
 import { offerChoices } from "./choices";
 import { notifyWhenBack } from "./restock";
 import { startReturn } from "./returns";
+import { updateCart } from "./cart";
 
 export type { ShopToolContext, ToolOutcome } from "./context";
 
@@ -21,6 +22,7 @@ const RUN: Record<(typeof CUSTOMER_TOOL_NAMES)[number] | (typeof OPTIONAL_TOOL_N
     offer_choices: offerChoices,
     notify_when_back: notifyWhenBack,
     start_return: startReturn,
+    update_cart: updateCart,
 };
 
 export async function runCustomerTool(name: string, input: unknown, ctx: ShopToolContext): Promise<ToolOutcome> {

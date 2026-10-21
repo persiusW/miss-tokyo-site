@@ -28,8 +28,9 @@ const orderSchema = {
         delivery_zone: { type: "string", enum: ["accra", "outside"], description: "accra = anywhere in Greater Accra; outside = elsewhere in Ghana." },
         region: { type: "string" },
         discount_code: { type: "string" },
+        from_cart: { type: "boolean", description: "WhatsApp: true to use the pieces in the customer's basket (update_cart) instead of items." },
     },
-    required: ["customer_name", "customer_phone", "items", "delivery_method"],
+    required: ["customer_name", "customer_phone", "delivery_method"],
 };
 
 export const CUSTOMER_TOOL_DEFS: Anthropic.Tool[] = [
@@ -137,8 +138,26 @@ export const START_RETURN_TOOL: Anthropic.Tool = {
     },
 };
 
+/** WhatsApp only: the customer's basket across messages, checked against stock as pieces go in. */
+export const UPDATE_CART_TOOL: Anthropic.Tool = {
+    name: "update_cart",
+    description: "The customer's basket on WhatsApp, kept across messages until they check out. add: a piece they want, in the exact size/colour/brand (it is checked against stock first). set_quantity / remove: change a piece already in it. show: read it back with its items total. clear: empty it. Price and place the basket with price_order / place_order with from_cart true.",
+    input_schema: {
+        type: "object",
+        properties: {
+            action: { type: "string", enum: ["add", "set_quantity", "remove", "show", "clear"] },
+            product_id: { type: "string", description: "product_id from find_products" },
+            size: { type: "string" },
+            colour: { type: "string" },
+            brand: { type: "string" },
+            quantity: { type: "integer", minimum: 0, maximum: 20 },
+        },
+        required: ["action"],
+    },
+};
+
 /** Tools that end the turn: they send the message themselves, so the model says nothing after them. */
 export const END_TURN_TOOL_NAMES = ["offer_choices"] as const;
 /** Tools a turn gets only when its channel and settings allow. */
-export const OPTIONAL_TOOL_NAMES = ["offer_choices", "notify_when_back", "start_return"] as const;
+export const OPTIONAL_TOOL_NAMES = ["offer_choices", "notify_when_back", "start_return", "update_cart"] as const;
 

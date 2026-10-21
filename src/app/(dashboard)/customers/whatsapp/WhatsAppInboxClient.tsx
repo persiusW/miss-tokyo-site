@@ -460,9 +460,15 @@ function CustomerSummary({ c }: { c: CustomerPanel }) {
         : `${c.orders} order${c.orders === 1 ? "" : "s"} · ${ghs(c.spent)} spent${c.paidOrders !== c.orders ? ` (${c.paidOrders} paid)` : ""}`;
     return (
         <details style={{ marginTop: 10, fontSize: 12, color: "var(--ac-ink-3)" }} data-wa-customer>
-            <summary style={{ cursor: c.orders ? "pointer" : "default" }}>
-                Customer{c.name ? `: ${c.name}` : ""} · {line}
+            <summary style={{ cursor: c.orders || c.basket?.length ? "pointer" : "default" }}>
+                Customer{c.name ? `: ${c.name}` : ""} · {line}{c.basket?.length ? ` · ${c.basket.length} in basket` : ""}
             </summary>
+            {c.basket?.length > 0 && (
+                <div style={{ marginTop: 6 }} data-wa-basket>
+                    <div style={{ color: "var(--ac-ink-2, var(--ac-ink))" }}>In the assistant's basket:</div>
+                    {c.basket.map((b, i) => <div key={i}>{b}</div>)}
+                </div>
+            )}
             {c.orders > 0 && (
                 <div style={{ marginTop: 6, display: "grid", gap: 4 }}>
                     {c.email && <div>Email: {c.email}</div>}

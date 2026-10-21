@@ -12,7 +12,7 @@ import { BUTTON_LABELS, LINES, safeReply } from "../../../src/lib/ai/shopAssista
 import { looksRaw } from "../../../src/lib/errors/looksRaw";
 import { stockWord, publicProduct, publicOrder, paymentState, waSummary, talkButton, dedupeButtons, cartLineFor, repayButton, sizeMatches } from "../../../src/lib/ai/shopAssistant/format";
 import { stampQuote, settleQuote, quoteKey, quoteHolds, sameTotal, canOpenAnother, trackLocked, QUOTE_TTL_MS } from "../../../src/lib/ai/shopAssistant/guards";
-import { visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor, mergeChatState, chatIsStale, STALE_CHAT_MS } from "../../../src/lib/ai/shopAssistant/limits";
+import { visitorLimit, visitorOver, cleanCustomerText, trimTranscript, IpGate, sameOrigin, identityFor, mergeChatState, chatIsStale, STALE_CHAT_MS } from "../../../src/lib/ai/shopAssistant/limits";
 
 test("WhatsApp numbers normalise to 233 + 9 digits, or null", () => {
     expect(normaliseWaNumber("055 389 8704")).toBe("233553898704");
@@ -182,6 +182,10 @@ test("open orders cap at 2, tracking locks at 5 wrong tries", () => {
 
 test("visitor limits: 6 a minute, the daily setting", () => {
     expect(visitorOver({ lastMinute: 5, today: 19, perDay: 20 })).toBe(false);
+    expect(visitorLimit({ lastMinute: 0, today: 30, perDay: 30 })).toBe("day");
+    expect(visitorLimit({ lastMinute: 6, today: 1, perDay: 30 })).toBe("minute");                 // website: 6 a minute
+    expect(visitorLimit({ lastMinute: 6, today: 1, perDay: 30, perMinute: 15 })).toBe(null);      // WhatsApp: 15 a minute
+    expect(visitorLimit({ lastMinute: 15, today: 1, perDay: 30, perMinute: 15 })).toBe("minute");
     expect(visitorOver({ lastMinute: 6, today: 1, perDay: 20 })).toBe(true);
     expect(visitorOver({ lastMinute: 0, today: 20, perDay: 20 })).toBe(true);
     expect(visitorOver({ lastMinute: 0, today: 0, perDay: 0 })).toBe(true);

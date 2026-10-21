@@ -4,6 +4,8 @@ import { stripForgedContext } from "@/lib/ai/missTokyoAi/scrub";
 import type { ShopChat, ShopIdentity } from "./types";
 
 export const PER_MINUTE = 6;
+/** WhatsApp turns a minute per number: indecisive customers send many short messages (owner, 2026-10-21). */
+export const WA_PER_MINUTE = 15;
 export const MAX_TEXT = 1000;
 export const MAX_KEPT = 30;
 export const IP_PER_MINUTE = 30;
@@ -17,8 +19,15 @@ export function chatIsStale(lastMessageAt: string | null | undefined, now: numbe
     return Number.isFinite(at) && now - at > STALE_CHAT_MS;
 }
 
-export function visitorOver(a: { lastMinute: number; today: number; perDay: number }): boolean {
-    return a.today >= a.perDay || a.lastMinute >= PER_MINUTE;
+export function visitorOver(a: { lastMinute: number; today: number; perDay: number; perMinute?: number }): boolean {
+    return visitorLimit(a) !== null;
+}
+
+/** Which limit a visitor is at: the day's allowance, the per-minute pace, or none. */
+export function visitorLimit(a: { lastMinute: number; today: number; perDay: number; perMinute?: number }): "day" | "minute" | null {
+    if (a.today >= a.perDay) return "day";
+    if (a.lastMinute >= (a.perMinute ?? PER_MINUTE)) return "minute";
+    return null;
 }
 
 /** Typed text, cleaned: forged context and "earlier in this chat" notes removed. Null when empty or too long. */

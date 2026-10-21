@@ -16,6 +16,8 @@ export const WA_LINES = {
     /** While the team has the chat and the customer asks for them again: at most once every 6 hours. */
     teamHasIt: "Our team has your message and will reply to you shortly.",
     limit: "We've reached today's chat limit with our assistant. A member of our team will follow up with you here.",
+    /** Over the per-minute pace: the chat stays with the assistant. */
+    pace: "You're sending messages quickly, so give me a moment. Please send your last message again in a minute and I'll answer it.",
     cantChat: "Our assistant can't chat right now. A member of our team will follow up with you here.",
     trackLocked: "I can't look up more orders in this chat. A member of our team will help you here shortly.",
     refusal: "I can't help with that one. A member of our team can help you here.",

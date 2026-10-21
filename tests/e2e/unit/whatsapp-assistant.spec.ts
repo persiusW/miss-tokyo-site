@@ -324,3 +324,15 @@ test("Tell the assistant: one turn now, with the staff note, replying to the cus
     expect(h.staffNotes).toEqual(["She wants the green one in L; offer pickup at Osu."]);
     expect(h.sent).toEqual(["Good news, the green one in L is ready for pickup at Osu."]);
 });
+
+test("a fast burst only slows down (the chat stays with the assistant); the day's allowance goes to a person", async () => {
+    const fast = harness({ counts: { lastMinute: 15, today: 3 } });
+    await fast.handle(msg({ text: "hello??" }), conv);
+    expect([fast.runs, fast.sent, fast.handoffs]).toEqual([[], [WA_LINES.pace], []]);
+    const ok = harness({ counts: { lastMinute: 14, today: 3 } });
+    await ok.handle(msg({ text: "hello" }), conv);
+    expect(ok.runs).toHaveLength(1);
+    const day = harness({ counts: { lastMinute: 0, today: 20 } });
+    await day.handle(msg({ text: "one more" }), conv);
+    expect(day.handoffs).toEqual(["daily_limit"]);
+});

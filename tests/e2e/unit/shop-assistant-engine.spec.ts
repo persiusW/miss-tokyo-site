@@ -141,3 +141,37 @@ test("raw model text becomes the calm line and counts as fixed, so the WhatsApp 
     expect(r.reply).toBe(LINES.generic);
     expect(r.fixed).toBe(true);
 });
+
+// ── Retries when Claude is briefly busy (sales rush) ─────────────────────────
+import Anthropic from "@anthropic-ai/sdk";
+import { retryable, RETRY_WAITS_MS } from "../../../src/lib/ai/shopAssistant/engine";
+
+const busy = (status: number) => Anthropic.APIError.generate(status, undefined, "busy", new Headers());
+
+function flaky(failures: unknown[], then: any) {
+    let n = 0;
+    return { messages: { create: async () => { if (n < failures.length) throw failures[n++]; n++; return then; } } } as any;
+}
+
+test("a call Claude turns away (429, 529, 5xx, dropped connection) is retried twice, then the reply goes through", async () => {
+    expect([429, 500, 503, 529].map(s => retryable(busy(s)))).toEqual([true, true, true, true]);
+    expect([400, 401, 404, 422].map(s => retryable(busy(s)))).toEqual([false, false, false, false]);
+    expect(retryable(new Anthropic.APIConnectionError({ message: "reset" }))).toBe(true);
+    expect(retryable(new Error("boom"))).toBe(false);
+
+    const slept: number[] = [];
+    const r = await runShopTurn({ system: "s", tools: [], model: "m", messages: [{ role: "user", content: "Hi" }] },
+        { client: flaky([busy(529), busy(429)], say("Hello!")), runTool: async () => ({ content: "", isError: false }), fits: () => true, sleep: async ms => { slept.push(ms); } });
+    expect(r.ok && r.reply).toBe("Hello!");
+    expect(slept).toEqual(RETRY_WAITS_MS);
+});
+
+test("no retry for a bad request, and after two retries the turn fails (the chat then goes to a person)", async () => {
+    const slept: number[] = [];
+    const deps = (client: any) => ({ client, runTool: async () => ({ content: "", isError: false }), fits: () => true, sleep: async (ms: number) => { slept.push(ms); } });
+    const bad = await runShopTurn({ system: "s", tools: [], model: "m", messages: [{ role: "user", content: "Hi" }] }, deps(flaky([busy(400)], say("x"))));
+    expect([bad.ok, slept]).toEqual([false, []]);
+    const down = await runShopTurn({ system: "s", tools: [], model: "m", messages: [{ role: "user", content: "Hi" }] }, deps(flaky([busy(529), busy(529), busy(529)], say("x"))));
+    expect(down.ok).toBe(false);
+    expect(slept).toEqual(RETRY_WAITS_MS);
+});

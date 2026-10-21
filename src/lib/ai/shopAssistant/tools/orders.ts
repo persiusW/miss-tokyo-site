@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { cleanTrackQuery } from "@/lib/orders/trackQuery";
 import { findOrderByRef } from "@/lib/orders/findOrderByRef";
 import { last9 } from "@/lib/phoneTail";
+import { HOLD_OVER_NOTE, holdLive } from "../holds";
 import { publicOrder, repayButton, type OrderRow } from "../format";
 import { trackLocked } from "../guards";
 import { LINES } from "../lines";
@@ -22,11 +23,21 @@ function remember(ctx: ShopToolContext, id: string) {
     ctx.notes.orderRef = id.slice(0, 8).toUpperCase();
 }
 
-/** An order this chat placed and that still waits for payment brings its Pay now button back. */
-function offerPay(ctx: ShopToolContext, row: OrderRow) {
+/**
+ * An order this chat placed and that still waits for payment brings its Pay now button back,
+ * but only while its stock is still held: the final stock check at the moment of paying.
+ * Returns the order number when the hold is over (the link is withheld).
+ */
+async function offerPay(ctx: ShopToolContext, row: OrderRow): Promise<string | null> {
     const b = repayButton(ctx.chat, row);
-    if (b) ctx.buttons.push(b);
+    if (!b) return null;
+    if (await holdLive(row.id)) { ctx.buttons.push(b); return null; }
+    return row.id.slice(0, 8).toUpperCase();
 }
+const lapsed = (refs: (string | null)[]) => {
+    const r = refs.filter(Boolean);
+    return r.length ? { hold_over_for: r, pay_link_note: HOLD_OVER_NOTE } : {};
+};
 
 export async function trackOrder(input: any, ctx: ShopToolContext): Promise<ToolOutcome> {
     ctx.notes.topic = "my order";
@@ -38,8 +49,9 @@ export async function trackOrder(input: any, ctx: ShopToolContext): Promise<Tool
         const { data, error } = await (ctx.identity.customerId ? base.eq("customer_id", ctx.identity.customerId) : base.ilike("customer_phone", `%${tail}`))
             .order("created_at", { ascending: false }).limit(5);
         if (error) throw error;
-        for (const r of data ?? []) { remember(ctx, r.id); offerPay(ctx, r as OrderRow); }
-        return ok({ orders: (data ?? []).map(r => publicOrder(r as OrderRow)) });
+        const over: (string | null)[] = [];
+        for (const r of data ?? []) { remember(ctx, r.id); over.push(await offerPay(ctx, r as OrderRow)); }
+        return ok({ orders: (data ?? []).map(r => publicOrder(r as OrderRow)), ...lapsed(over) });
     }
 
     const q = cleanTrackQuery({ ref: input?.order_ref, email: input?.email, phone: input?.phone });
@@ -48,7 +60,7 @@ export async function trackOrder(input: any, ctx: ShopToolContext): Promise<Tool
     const known = ctx.chat.verifiedOrders.find(id => id.slice(0, 8).toUpperCase() === q.ref);
     if (known) {
         const row = await rowById(known);
-        if (row) { remember(ctx, row.id); offerPay(ctx, row); return ok({ order: publicOrder(row) }); }
+        if (row) { remember(ctx, row.id); const over = await offerPay(ctx, row); return ok({ order: publicOrder(row), ...lapsed([over]) }); }
     }
 
     if (trackLocked(ctx.chat.wrongTries)) { pushTalk(ctx); return ok({ reply_with: LINES.trackLocked }); }
@@ -65,6 +77,6 @@ export async function trackOrder(input: any, ctx: ShopToolContext): Promise<Tool
     const row = await rowById(hit.id);
     if (!row) return ok({ reply_with: LINES.wrongDetails });
     remember(ctx, row.id);
-    offerPay(ctx, row);
-    return ok({ order: publicOrder(row) });
+    const over = await offerPay(ctx, row);
+    return ok({ order: publicOrder(row), ...lapsed([over]) });
 }
