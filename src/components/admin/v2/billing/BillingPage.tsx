@@ -71,7 +71,7 @@ export function BillingPage() {
                 </Card>
             </div>
 
-            <Card title="Payment history">
+            <Card title="Payment history" className="bil-history">
                 <div className="tbl-wrap">
                     <table className="tbl">
                         <thead>
@@ -84,7 +84,7 @@ export function BillingPage() {
                                     <td>{h.desc}<div className="xs muted"><Badge tone="ok">Paid</Badge></div></td>
                                     <td className="hide-sm">{h.no}</td>
                                     <td className="r strong nowrap">{ghs(h.amount)}</td>
-                                    <td className="r"><Btn sm kind="ghost" icon="download" aria-label={`Receipt ${h.no}`} onClick={notConnected}>Receipt</Btn></td>
+                                    <td className="r"><Btn sm kind="ghost" icon="download" aria-label={`Receipt ${h.no}`} onClick={notConnected}><span className="hide-sm">Receipt</span></Btn></td>
                                 </tr>
                             ))}
                         </tbody>

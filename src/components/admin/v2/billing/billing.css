@@ -3,3 +3,6 @@
 .adm2 .bil-plan-rows{border-top:1px solid var(--line)}
 .adm2 .bil-warn{color:var(--warn-ink)}
 .adm2 .bil-bar{width:120px}
+/* The kit's .tbl-wrap scrolls but isn't positioned, so the screen-reader-only
+   header escapes it and widens the page on phones. */
+.adm2 .bil-history .tbl-wrap{position:relative}
