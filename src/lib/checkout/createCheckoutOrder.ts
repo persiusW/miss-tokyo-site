@@ -14,6 +14,7 @@ import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee
 import { errorBody } from "@/lib/errors/catalogue";
 import { channelFor, cleanSaleKey, saleKeyFor, withSaleKey } from "@/lib/payments/attemptRules";
 import { recordError, recordStart } from "@/lib/payments/attempts";
+import { payoutFor, postWithPayout } from "@/lib/billing/payoutInit";
 
 /** The JSON body /api/paystack/initialize has always accepted. */
 export type CheckoutPayload = {
@@ -512,20 +513,10 @@ async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, 
         const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://misstokyo.shop";
         const siteUrl = rawSiteUrl.replace(/\/+$/, "");
 
-        // --- SPLIT GROUP (SPL_xxx) — only applied when amount is above Paystack's
-        // minimum subaccount payout (~GHS 5). Below that, the 2.5% allocation
-        // rounds to less than 1 pesewa and Paystack returns "No active channel".
-        const paystackSplitCode = process.env.PAYSTACK_SPLIT_CODE;
-        const splitPayload = (paystackSplitCode && amountWithDelivery >= 5) ? { split_code: paystackSplitCode } : {};
-
-        // --- SUBACCOUNT (ACCT_xxx) — commented out while testing split groups ---
-        // const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
-        // const subPct = Number(process.env.PAYSTACK_SUBACCOUNT_PERCENTAGE) || 2.5;
-        // const subaccountPayload = paystackSubaccount ? {
-        //     subaccount: paystackSubaccount,
-        //     bearer: "subaccount",
-        //     transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
-        // } : {};
+        // Which Paystack split rides along (the amount is never changed):
+        // switch off = the env split group (SPL_xxx) from GH₵ 5 up, as always;
+        // on = the admin's exact share by subaccount (lib/billing/payoutInit).
+        const payout = await payoutFor({ source: "checkout", amountGhs: amountWithDelivery, feeGhs: platformFeeAmount, baseGhs: amountInGHS });
 
         // A retry after an abandoned attempt must not be blocked by that
         // attempt's own hold. Released before reserving, never after — the new
@@ -669,20 +660,20 @@ async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, 
 
         let response: Response;
         try {
-        response = await fetch("https://api.paystack.co/transaction/initialize", {
+        response = await postWithPayout(body => fetch("https://api.paystack.co/transaction/initialize", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${paystackSecret}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({
+            body: JSON.stringify(body),
+        }), {
                 email,
                 amount: amountInPesewas,
                 currency: "GHS",
                 callback_url: `${siteUrl}/checkout/success`,
                 // Which channels, and why only these: see paymentChannels.ts.
                 channels: [...CHECKOUT_CHANNELS],
-                ...splitPayload,
                 metadata: {
                     ...clientMetadata,
                     productId,
@@ -705,8 +696,7 @@ async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, 
                         auto_discount_ids: appliedAutoDiscountIds,
                     } : {}),
                 },
-            }),
-        });
+        }, payout);
         } catch (e) {
             console.error("[Paystack init] unreachable:", e);
             await recordError({ saleKey, channel: attemptChannel, code: "PAY-01", message: String(e), orderId });

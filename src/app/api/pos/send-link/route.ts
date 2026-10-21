@@ -17,6 +17,7 @@ import { apiError } from "@/lib/errors/apiError";
 import { cleanSaleKey } from '@/lib/payments/attemptRules';
 import { recordError, recordStart } from '@/lib/payments/attempts';
 import { errorBody } from "@/lib/errors/catalogue";
+import { payoutFor, postWithPayout } from "@/lib/billing/payoutInit";
 
 
 export async function POST(req: NextRequest) {
@@ -359,9 +360,10 @@ export async function POST(req: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://misstokyo.shop';
 
-    // Apply split group when configured and amount is above Paystack's minimum (GHS 5)
-    const paystackSplitCode = process.env.PAYSTACK_SPLIT_CODE;
-    const splitPayload = (paystackSplitCode && amountWithFee >= 5) ? { split_code: paystackSplitCode } : {};
+    // Which Paystack split rides along (the amount is never changed): switch
+    // off = the env split group from GH₵ 5 up, as always; on = the admin's
+    // exact share by subaccount (lib/billing/payoutInit).
+    const payout = await payoutFor({ source: 'pos', amountGhs: amountWithFee, feeGhs: platformFeeAmount, baseGhs: discountedSubtotal });
 
     const paystackBody = {
         // Paystack rejects an initialize call with no email, so a walk-in who
@@ -374,7 +376,6 @@ export async function POST(req: NextRequest) {
         // Nigeria-only and leave the GHS payment page blank beside the channel
         // list. Mobile money first makes it the default.
         channels: ['mobile_money', 'card', 'bank_transfer'],
-        ...splitPayload,
         metadata: {
             pos_session_id: sessionId,
             source: 'pos',
@@ -392,12 +393,12 @@ export async function POST(req: NextRequest) {
     let paystackData: any = null;
     let gatewayReachable = true;
     try {
-        const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
+        const paystackRes = await postWithPayout(body => fetch('https://api.paystack.co/transaction/initialize', {
             method: 'POST',
             headers: { Authorization: `Bearer ${secretKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(paystackBody),
+            body: JSON.stringify(body),
             signal: AbortSignal.timeout(15_000),
-        });
+        }), paystackBody, payout);
         // 5xx, rate-limited or a firewall page: Paystack isn't really answering.
         if (paystackRes.status >= 500 || paystackRes.status === 429 || paystackRes.status === 403) gatewayReachable = false;
         paystackData = await paystackRes.json().catch(() => null);
