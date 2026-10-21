@@ -21,6 +21,7 @@ export type ConversationRow = {
 export type MessageRow = {
     id: string; conversation_id: string; direction: "inbound" | "outbound"; content: string | null; message_type: string | null; created_at: string;
     media_url?: string | null;
+    sent_by_staff?: string | null; sent_by_name?: string | null;
 };
 
 export type InboxConversation = {
@@ -84,7 +85,7 @@ export function waitingFor(since: string | null, now: number): string | null {
 
 // ── What happened in a chat (whatsapp_conversation_events) ─────────────────────
 
-export type EventKind = "handed_off" | "handed_back" | "dealt_with" | "answered_waiting" | "auto_resumed" | "re_alerted";
+export type EventKind = "handed_off" | "handed_back" | "dealt_with" | "answered_waiting" | "auto_resumed" | "re_alerted" | "staff_replied" | "told_assistant";
 export type EventRow = { id: string; kind: EventKind; reason: string | null; staff_name: string | null; created_at: string };
 
 /** One line for the marker in the chat. */
@@ -97,6 +98,8 @@ export function eventLabel(e: Pick<EventRow, "kind" | "reason" | "staff_name">):
         case "answered_waiting": return `Assistant asked to reply to waiting messages${by}`;
         case "auto_resumed": return "Back with the assistant after 24 hours";
         case "re_alerted": return "Team alerted again: the customer wrote again";
+        case "staff_replied": return `${e.staff_name ?? "Your team"} replied here; the assistant stays quiet until the chat is handed back`;
+        case "told_assistant": return `${e.staff_name ?? "Your team"} told the assistant what to say`;
         default: return "Chat updated";
     }
 }
@@ -109,6 +112,7 @@ const REASON_LABEL: Record<string, string> = {
     daily_limit: "Reached today's chat limit",
     assistant_failed: "Assistant had a problem",
     return_request: "Return or exchange",
+    staff_replying: "Your team is replying",
 };
 
 export function previewText(m: Pick<MessageRow, "content" | "message_type">): string {

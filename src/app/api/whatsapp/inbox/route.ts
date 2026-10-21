@@ -9,6 +9,27 @@ import { requireStaff } from "@/lib/ai/requireStaff";
 import { logCause } from "@/lib/errors/apiError";
 import { cleanSearch } from "@/lib/ai/missTokyoAi/tools/shared";
 import { inTab, shapeConversation, sortInbox, tabCounts, TABS, type ConversationRow, type InboxTab, type MessageRow } from "@/lib/whatsapp/inbox";
+import { composerOn, teachOn } from "@/lib/whatsapp/flags";
+
+const STATS_DAYS = 7;
+
+/** The tiles over the inbox: the last 7 days, and who is waiting now. */
+async function inboxStats(convs: ConversationRow[], waiting: number, now: number) {
+    const since = new Date(now - STATS_DAYS * 86_400_000).toISOString();
+    const chats = convs.filter(c => c.last_inbound_at && c.last_inbound_at >= since).length;
+    const [orders, handed] = await Promise.all([
+        db.from("orders").select("total_amount").eq("source", "whatsapp").eq("payment_status", "paid").gte("created_at", since).limit(2000),
+        db.from("whatsapp_conversation_events").select("conversation_id").eq("kind", "handed_off").gte("created_at", since).limit(2000),
+    ]);
+    if (orders.error || handed.error) throw orders.error ?? handed.error;
+    const paid = (orders.data ?? []) as { total_amount: number | string }[];
+    return {
+        days: STATS_DAYS, chats, waiting,
+        assistantOrders: paid.length,
+        assistantSalesGhs: Math.round(paid.reduce((n, o) => n + (Number(o.total_amount) || 0), 0) * 100) / 100,
+        handedOver: new Set(((handed.data ?? []) as { conversation_id: string }[]).map(h => h.conversation_id)).size,
+    };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -62,8 +83,11 @@ export async function GET(req: NextRequest) {
             for (const m of (msgs ?? []) as MessageRow[]) if (!last.has(m.conversation_id)) last.set(m.conversation_id, m);
         }
         const rows = new Map(((convs ?? []) as ConversationRow[]).map(c => [c.id, c]));
+        const stats = await inboxStats(((convs ?? []) as ConversationRow[]), counts.needs, now)
+            .catch(e => { logCause("GEN-00", e, { route: "whatsapp/inbox stats" }); return null; });
         return NextResponse.json({
-            tab, counts,
+            tab, counts, stats,
+            can: { teach: teachOn() && (auth.role === "admin" || auth.role === "owner"), reply: composerOn() },
             conversations: shown.map(c => shapeConversation(rows.get(c.id)!, last.get(c.id) ?? null, now)),
         });
     } catch (e) {

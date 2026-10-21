@@ -62,7 +62,8 @@ export type InboundEvent = {
     received_at: string; attempts: number; last_attempt_at: string | null;
     processed_at: string | null; gave_up_at: string | null;
 };
-export type Conversation = { id: string; handedOffAt: string | null };
+/** quiet: staff are replying in this chat themselves (Reply myself), so the assistant says nothing. */
+export type Conversation = { id: string; handedOffAt: string | null; quiet?: boolean };
 type Found = { waPhone: string | null; conversationId: string | null };
 
 export interface InboundStore {

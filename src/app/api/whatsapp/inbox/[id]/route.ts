@@ -14,6 +14,7 @@ import { eventLabel, handBackState, mediaState, shapeConversation, type Conversa
 import { conversationEvents, logConversationEvent, staffName } from "@/lib/whatsapp/events";
 import { customerPanel } from "@/lib/whatsapp/customerPanel";
 import { mediaEnabled } from "@/lib/whatsapp/media";
+import { composerOn, teachOn } from "@/lib/whatsapp/flags";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -35,7 +36,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     try {
         const [conv, msgs, events] = await Promise.all([
             db.from("whatsapp_conversations").select(FIELDS).eq("id", id).maybeSingle(),
-            db.from("message_log").select("id, conversation_id, direction, content, message_type, media_url, created_at")
+            db.from("message_log").select("id, conversation_id, direction, content, message_type, media_url, sent_by_name, sent_by_staff, created_at")
                 .eq("conversation_id", id).order("created_at", { ascending: false }).limit(300),
             conversationEvents(id).catch(() => [] as EventRow[]),
         ]);
@@ -47,7 +48,13 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         const customer = await customerPanel(conv.data.wa_phone_number).catch(e => { logCause("GEN-00", e, { route: "whatsapp/inbox/[id] customer" }); return null; });
         return NextResponse.json({
             conversation: shapeConversation(conv.data as ConversationRow, messages[messages.length - 1] ?? null, Date.now()),
-            messages: messages.map(m => ({ id: m.id, direction: m.direction, text: m.content, type: m.message_type, at: m.created_at, media: showMedia ? mediaState(m) : null })),
+            messages: messages.map(m => ({
+                id: m.id, direction: m.direction, text: m.content, type: m.message_type, at: m.created_at, media: showMedia ? mediaState(m) : null,
+                byStaff: m.sent_by_staff ? (m.sent_by_name ?? "Your team") : null,
+                // The assistant's own words can be corrected; staff messages, order updates and photos can't.
+                correctable: m.direction === "outbound" && !m.sent_by_staff && ["text", "interactive"].includes(m.message_type ?? "text") && !!m.content?.trim(),
+            })),
+            can: { teach: teachOn() && (auth.role === "admin" || auth.role === "owner"), reply: composerOn() },
             events: events.map(e => ({ id: e.id, label: eventLabel(e), kind: e.kind, at: e.created_at })),
             customer,
         });

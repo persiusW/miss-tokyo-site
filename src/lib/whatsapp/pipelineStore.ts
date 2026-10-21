@@ -40,7 +40,7 @@ export const supabaseInboundStore: InboundStore & {
     },
 
     async touchConversation(phone, name, at, provider, userId) {
-        const pick = "id, handed_off_at, last_inbound_at, wa_contact_name, wa_user_id";
+        const pick = "id, handed_off_at, last_inbound_at, wa_contact_name, wa_user_id, state";
         const read = () => db.from("whatsapp_conversations").select(pick).eq("wa_phone_number", phone).maybeSingle();
         let { data: row, error } = await read();
         if (error) fail("read conversation", error);
@@ -61,7 +61,8 @@ export const supabaseInboundStore: InboundStore & {
             const { error: upError } = await db.from("whatsapp_conversations").update(patch).eq("id", row.id);
             if (upError) fail("touch conversation", upError);
         }
-        return { id: row.id, handedOffAt: row.handed_off_at ?? null } satisfies Conversation;
+        const quiet = !!row.handed_off_at && row.state?.reason === "staff_replying";
+        return { id: row.id, handedOffAt: row.handed_off_at ?? null, quiet } satisfies Conversation;
     },
 
     async seen(waMessageId) {

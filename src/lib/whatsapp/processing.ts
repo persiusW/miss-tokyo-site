@@ -19,6 +19,7 @@ import { logConversationEvent } from "./events";
 import { claimReferral, claimTeamAlert, claimTurnLock, releaseTurnLock } from "./teamWatch";
 import { withTurnLock } from "./turnLock";
 import { factsFor } from "./customerFacts";
+import { staffNoteFact } from "@/lib/ai/shopAssistant/facts";
 import { sendAdminPushNotifications } from "@/lib/orderSettlement";
 import { canAnswerWaiting } from "./inbox";
 import { archiveInboundMedia, type Download } from "./media";
@@ -30,6 +31,17 @@ import { FALLBACK_TEXT, type Conversation, type InboundMessage, type InboundPars
 import { supabaseInboundStore } from "./pipelineStore";
 
 type WaitingAnswerer = (waiting: InboundMessage[], c: Conversation) => Promise<void>;
+type NoteAnswerer = (c: Conversation, from: string, note: string) => Promise<void>;
+
+/** Tell the assistant: one turn now with staff's note for this chat. "off" when processing is off. */
+export async function tellAssistant(conversationId: string, provider: string, note: string, settings: AiSettings): Promise<"answered" | "off" | "missing"> {
+    const pipeline = await pipelineFor(provider, settings);
+    if (!pipeline) return "off";
+    const conv = await loadWaConversation(conversationId);
+    if (!conv) return "missing";
+    await pipeline.answerWithNote({ id: conversationId, handedOffAt: null }, conv.phone, note);
+    return "answered";
+}
 
 /**
  * Staff handed a chat back and asked the assistant to reply to what came in meanwhile.
@@ -69,7 +81,7 @@ export function siteBaseUrl(): string {
 /** The pipeline for a provider, or null while events are stored only. */
 export async function pipelineFor(
     provider: string, settings: AiSettings,
-): Promise<(PipelineDeps & { answerWaiting: WaitingAnswerer; fetchMedia: Download }) | null> {
+): Promise<(PipelineDeps & { answerWaiting: WaitingAnswerer; answerWithNote: NoteAnswerer; fetchMedia: Download }) | null> {
     const parse = INBOUND_PARSERS[provider];
     if (!parse || !settings.whatsappEnabled) return null;
     const sender = createChatbotsAfrica();
@@ -155,7 +167,7 @@ export async function pipelineFor(
         run: async a => runShopAssistant({
             channel: "whatsapp", identity: { customerId: a.customerId, phone: a.phone }, chat: a.chat, text: a.text,
             settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, images: a.images, withTeam: a.withTeam,
-            facts: await factsFor(a.conversationId, a.phone),
+            facts: [await factsFor(a.conversationId, a.phone), a.staffNote ? staffNoteFact(a.staffNote) : null].filter(Boolean).join("\n") || null,
         }),
         siteUrl: site,
     });
@@ -167,6 +179,7 @@ export async function pipelineFor(
         // WHATSAPP_AGENT_DURING_HANDOFF=off: the bot stays silent while a person has the chat.
         quietWhileWithTeam: (process.env.WHATSAPP_AGENT_DURING_HANDOFF ?? "").trim().toLowerCase() === "off",
         answerWaiting: handle.answerWaiting,
+        answerWithNote: handle.answerWithNote,
         // The copy is the last use of the file in this event; its bytes are let go after it.
         afterLog: async (conversationId, m) => {
             try { await archiveInboundMedia(conversationId, m, download); } finally { if (m.mediaId) fetched.delete(m.mediaId); }

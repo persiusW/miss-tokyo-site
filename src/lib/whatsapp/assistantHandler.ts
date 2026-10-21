@@ -48,8 +48,14 @@ export type AssistantDeps = {
     quoted: (conversationId: string, waMessageId: string) => Promise<string | null>;
     counts: (chat: ShopChat) => Promise<{ lastMinute: number; today: number } | null>;
     perDay: number;
-    /** withTeam: a person has the chat; the assistant answers what it can and leaves the rest to them. */
-    run: (a: { chat: ShopChat; text: string; phone: string; customerId: string | null; conversationId: string; images: ModelPhoto[]; withTeam?: boolean }) => Promise<ShopRunResult>;
+    /**
+     * withTeam: a person has the chat; the assistant answers what it can and leaves the rest to them.
+     * staffNote: what staff told the assistant for this chat (Tell the assistant).
+     */
+    run: (a: {
+        chat: ShopChat; text: string; phone: string; customerId: string | null; conversationId: string; images: ModelPhoto[];
+        withTeam?: boolean; staffNote?: string | null;
+    }) => Promise<ShopRunResult>;
     /** The number staff reply from, named in the handover line. */
     teamNumber?: string | null;
     /** The customer wrote while the team has the chat: alert the team again if the last alert is an hour old. Never throws. */
@@ -82,6 +88,9 @@ export function stripOurMarkers(text: string): string {
         out = next;
     }
 }
+
+/** The turn's message when staff told the assistant something (the note itself is in the facts). */
+export const TELL_TEXT = "(Our team has given you a note about this chat. Reply to the customer now, following it.)";
 
 export function createWhatsAppHandler(deps: AssistantDeps) {
     async function reply(c: Conversation, to: string, text: string): Promise<boolean> {
@@ -141,12 +150,12 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
     }
 
     /** One turn of the assistant on what the customer said, and the reply sent. */
-    async function answer(c: Conversation, from: string, text: string, photos: ModelPhoto[], replyTo: string | null): Promise<void> {
-        const turn = () => answerNow(c, from, text, photos, replyTo);
+    async function answer(c: Conversation, from: string, text: string, photos: ModelPhoto[], replyTo: string | null, staffNote: string | null = null): Promise<void> {
+        const turn = () => answerNow(c, from, text, photos, replyTo, staffNote);
         return deps.turnLock ? deps.turnLock(c.id, turn) : turn();
     }
 
-    async function answerNow(c: Conversation, from: string, text: string, photos: ModelPhoto[], replyTo: string | null): Promise<void> {
+    async function answerNow(c: Conversation, from: string, text: string, photos: ModelPhoto[], replyTo: string | null, staffNote: string | null): Promise<void> {
         // The quote comes from our records, never from the customer, so the model may trust it.
         const quote = replyTo ? await deps.quoted(c.id, replyTo).catch(() => null) : null;
         // Otherwise, an order update or reminder they may be answering, also from our records.
@@ -158,7 +167,7 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         if (!counts) return toPerson(c, from, "assistant_failed", WA_LINES.cantChat);
         if (visitorOver({ ...counts, perDay: deps.perDay })) return toPerson(c, from, "daily_limit", WA_LINES.limit);
 
-        const result = await deps.run({ chat, text: said, phone: from, customerId, conversationId: c.id, images: photos, withTeam: !!c.handedOffAt });
+        const result = await deps.run({ chat, text: said, phone: from, customerId, conversationId: c.id, images: photos, withTeam: !!c.handedOffAt, staffNote });
         const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
         if (result.failed) return toPerson(c, from, "assistant_failed", out.text);
         if (out.wantsPerson) return toPerson(c, from, result.handoff ?? "customer_asked", out.text);
@@ -193,6 +202,8 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         // The team has the chat and the customer wrote: they hear about it (rationed to once an hour),
         // alongside the reply rather than before it.
         const alerting = c.handedOffAt ? deps.withTeam?.(c).catch(() => undefined) : undefined;
+        // Staff are replying in this chat themselves: the assistant stays out of it.
+        if (c.quiet) { await alerting; return; }
         try { await respond(m, c, receivedAt); } finally { await alerting; }
     };
 
@@ -242,5 +253,10 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         // A tap's context is the question it answers, already in the chat; it is not a quote.
         await answer(c, m.from, caption || photoLine(photos.length), photos, m.tap ? null : m.replyTo ?? null);
     };
-    return Object.assign(handle, { answerWaiting });
+    /** Tell the assistant: staff gave it a note for this chat; it answers the customer now with it. */
+    async function answerWithNote(c: Conversation, from: string, note: string): Promise<void> {
+        await answer(c, from, TELL_TEXT, [], null, note);
+    }
+
+    return Object.assign(handle, { answerWaiting, answerWithNote });
 }
