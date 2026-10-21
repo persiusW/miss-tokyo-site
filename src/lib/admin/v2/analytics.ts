@@ -42,11 +42,11 @@ export const DEFAULT_QUERY: AnalyticsQuery = { range: "7d", from: null, to: null
 export const REPORTS: { k: ReportKey; t: string; d: string }[] = [
     { k: "product", t: "Sales by product", d: "Units and money per product, best sellers first." },
     { k: "variant", t: "Sales by size and colour", d: "Which sizes and colours sell, to plan the next cut." },
-    { k: "channel", t: "Sales by channel", d: "Online shop, till, WhatsApp and pay links." },
+    { k: "channel", t: "Sales by channel", d: "Online shop, POS, WhatsApp and pay links." },
     { k: "discounts", t: "Discounts", d: "Orders, sales and money given away per discount." },
     { k: "payments", t: "Payments received", d: "Every payment by method: Paystack (card or Mobile money), cash and gift card." },
     { k: "riders", t: "Riders", d: "Deliveries per rider, and each rider's orders." },
-    { k: "cash", t: "Cash taken at the till", d: "What should be in the drawer at close, by day." },
+    { k: "cash", t: "Cash taken at the POS", d: "What should be in the drawer at close, by day." },
     { k: "writeoffs", t: "Stock written off", d: "Items taken off stock by hand: damaged, lost or corrected." },
     { k: "customers", t: "Customers", d: "Unique and repeat buyers, new customers, sign-ups and top customers." },
     { k: "timing", t: "When people buy", d: "Orders by day, by hour and by day of the week." },
@@ -277,7 +277,7 @@ export function fillSeries(points: unknown, buckets: number, key: "sales" | "ord
 // ── Labels ─────────────────────────────────────────────────────────────────
 
 export const CHANNEL_LABEL: Record<string, string> = {
-    storefront: "Online shop", pos: "Till", pay_link: "Pay link", whatsapp: "WhatsApp", web_chat: "Shop assistant",
+    storefront: "Online shop", pos: "POS", pay_link: "Pay link", whatsapp: "WhatsApp", web_chat: "Shop assistant",
 };
 export const channelName = (c: string) => CHANNEL_LABEL[c] ?? "Other";
 
@@ -402,7 +402,7 @@ export function discountOrdersTable(rows: unknown): Table {
 
 export function cashTable(rows: unknown): Table {
     const r = arr(rows).map(x => [str(x.d), num(x.till_sales), num(x.cash_orders), num(x.cash)] as Cell[]);
-    return { cols: [D("Day"), I("Till sales"), I("Paid in cash"), M("Cash")], rows: r, foot: ["Total", sum(r, 1), sum(r, 2), sum(r, 3)] };
+    return { cols: [D("Day"), I("POS sales"), I("Paid in cash"), M("Cash")], rows: r, foot: ["Total", sum(r, 1), sum(r, 2), sum(r, 3)] };
 }
 
 export function writeoffTable(rows: unknown): Table {

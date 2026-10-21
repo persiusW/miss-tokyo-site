@@ -89,7 +89,7 @@ export function ProductPanel({ id, preload, onClose, onSaved, onGone }: {
         if (!id || !form) return;
         const r = await setProductStatus([id], "archived");
         if (!r.ok) { toast.error(r.error); return; }
-        toast.success(`${form.name} archived. It's hidden from the shop and the till.`, {
+        toast.success(`${form.name} archived. It's hidden from the shop and the POS.`, {
             action: { label: "Undo", onClick: () => { void restoreProductStatus(r.before).then(x => { if (x.ok) { toast.success("Archive undone"); onSaved(id); } else toast.error(x.error); }); } },
         });
         onSaved(id);
@@ -320,7 +320,7 @@ function PricingTab({ f, up, errors, data }: TabProps & { data: PanelData }) {
             </div>
             <div className="card cat-inset">
                 <div className="rows">
-                    <SRow label="On sale" help={f.isSale ? "Shows the Sale ribbon and takes the discount off the price at checkout and the till." : "Takes a percentage off the price everywhere it's sold."}>
+                    <SRow label="On sale" help={f.isSale ? "Shows the Sale ribbon and takes the discount off the price at checkout and the POS." : "Takes a percentage off the price everywhere it's sold."}>
                         <Switch label="On sale" checked={f.isSale} onChange={v => up({ isSale: v, discount: v ? f.discount || "10" : "" })} />
                     </SRow>
                     {f.isSale && (
@@ -370,7 +370,7 @@ function VisibilityTab({ f, up, errors }: TabProps) {
     return (
         <>
             <RadioCards<ProductStatus> label="Status" value={f.status} onChange={v => up({ status: v })} options={[
-                { v: "active", title: "Active", desc: "In the shop, at the till and known to the assistants." },
+                { v: "active", title: "Active", desc: "In the shop, at the POS and known to the assistants." },
                 { v: "draft", title: "Draft", desc: "Hidden everywhere while you work on it." },
                 { v: "archived", title: "Archived", desc: "Hidden everywhere and filed under Archived. Past orders and reports still show it." },
             ]} />

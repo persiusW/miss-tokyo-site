@@ -165,7 +165,7 @@ export function inboxText(b: InboxBreakdown): string {
 /** Where an order came from, in the team's words. */
 export function channelLabel(source: string | null | undefined, paymentMethod: string | null | undefined): string {
     const s = (source || "").toLowerCase();
-    if (s === "pos") return (paymentMethod || "").toLowerCase() === "paystack" ? "Pay link" : "Till";
+    if (s === "pos") return (paymentMethod || "").toLowerCase() === "paystack" ? "Pay link" : "POS";
     if (s === "whatsapp") return "WhatsApp";
     if (s === "web_chat") return "Shop assistant";
     return "Online";

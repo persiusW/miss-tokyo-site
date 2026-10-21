@@ -13,7 +13,7 @@ export type ChatUser = { firstName: string | null; role: string };
 const SAMPLES: { text: string; kind: "live" | "how"; icon: string }[] = [
     { text: "Which products are running out of stock?", kind: "live", icon: "▦" },
     { text: "What sold best this week?", kind: "live", icon: "★" },
-    { text: "How do I send a pay link from the till?", kind: "how", icon: "▭" },
+    { text: "How do I send a pay link from the POS?", kind: "how", icon: "▭" },
     { text: "How much did we take today?", kind: "live", icon: "₵" },
     { text: "How do I refund an order?", kind: "how", icon: "?" },
 ];

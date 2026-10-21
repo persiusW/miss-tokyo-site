@@ -15,7 +15,7 @@ type V2AnchorDef = AnchorDef & { route: V2RouteKey };
 
 export const ANCHORS = {
     "topbar.search": { route: "overview", label: "Search orders, products… (top bar, any page)" },
-    "pos.search": { route: "pos", label: "Product search on the till (Search by name or SKU…)" },
+    "pos.search": { route: "pos", label: "Product search on the POS (Search by name or SKU…)" },
     "pos.phone": { route: "pos", label: "Customer phone (Phone *, needed for a pay link)" },
     "pos.code": { route: "pos", label: "Gift card or discount code (Enter code)" },
     "pos.send-link": { route: "pos", label: "Send Link button" },
@@ -53,7 +53,7 @@ export type AnchorId = keyof typeof ANCHORS;
 /** The same controls in the new admin, with its labels and pages. */
 export const V2_ANCHORS = {
     "topbar.search": { route: "home", label: "Search orders, products, customers (top bar, any page, or ⌘K)" },
-    "pos.search": { route: "till", label: "Product search on the till (Search by name or SKU)" },
+    "pos.search": { route: "till", label: "Product search on the POS (Search by name or SKU)" },
     "pos.phone": { route: "till", label: "Customer phone (a pay link needs it)" },
     "pos.code": { route: "till", label: "Discount or gift card code" },
     "pos.send-link": { route: "till", label: "Send a pay link (under Payment)" },

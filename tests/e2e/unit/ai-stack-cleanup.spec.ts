@@ -39,7 +39,7 @@ test("seed gate: refusals", async () => {
 
 test("seed gate: accepted", async () => {
     const r = await checkSeed({ seed: { code: "PAY-04", posSessionId: S }, transcriptLength: 1, role: "sales_staff", userId: "me" }, deps());
-    expect(r).toMatchObject({ ok: true, key: `PAY-04:${S}:att-1`, label: "till sale #3BBB1012" });
+    expect(r).toMatchObject({ ok: true, key: `PAY-04:${S}:att-1`, label: "POS sale #3BBB1012" });
 });
 
 test("the till stops polling when there is nothing more to learn", () => {

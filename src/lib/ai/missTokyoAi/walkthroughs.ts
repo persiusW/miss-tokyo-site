@@ -25,7 +25,7 @@ const ALL: StaffRole[] = ["admin", "owner", "sales_staff"];
 export const WALKTHROUGHS = [
     {
         id: "pos-sale",
-        title: "Ring up a sale at the till",
+        title: "Ring up a sale at the POS",
         roles: ALL,
         area: "till",
         steps: [
@@ -115,8 +115,8 @@ export const WALKTHROUGHS = [
             { route: "orders", orderPage: true, anchor: "order.refund", text: "Refund marks the order refunded and returns its stock, but sends no money: refund the customer in the Paystack dashboard first." },
             {
                 route: "pos_history", anchor: "poshistory.cancel",
-                text: "For an unpaid till link, open the session in POS History and press Cancel Session. A paid till sale is cancelled or refunded from its order instead.",
-                alt: { route: "till_today", anchor: "poshistory.cancel", text: "For an unpaid till pay link, open the sale in Today's sales and tap Cancel sale twice. A paid till sale is cancelled or refunded from its order instead." },
+                text: "For an unpaid POS link, open the session in POS History and press Cancel Session. A paid POS sale is cancelled or refunded from its order instead.",
+                alt: { route: "till_today", anchor: "poshistory.cancel", text: "For an unpaid POS pay link, open the sale in Today's sales and tap Cancel sale twice. A paid POS sale is cancelled or refunded from its order instead." },
             },
         ],
         v2: [
@@ -124,8 +124,8 @@ export const WALKTHROUGHS = [
             { route: "orders", orderPage: true, anchor: "order.refund", text: "Refund (owners and admins): Everything, Choose items or An amount, whether to put the items back in stock, a reason and whether to email the customer. It shows what will happen before you confirm." },
             {
                 route: "till_today", anchor: "poshistory.cancel",
-                text: "For an unpaid till pay link, open the sale in Today's sales and tap Cancel sale twice. A paid till sale is cancelled or refunded from its order instead.",
-                alt: { route: "pos_history", anchor: "poshistory.cancel", text: "For an unpaid till link, open the session in POS History and press Cancel Session. A paid till sale is cancelled or refunded from its order instead." },
+                text: "For an unpaid POS pay link, open the sale in Today's sales and tap Cancel sale twice. A paid POS sale is cancelled or refunded from its order instead.",
+                alt: { route: "pos_history", anchor: "poshistory.cancel", text: "For an unpaid POS link, open the session in POS History and press Cancel Session. A paid POS sale is cancelled or refunded from its order instead." },
             },
         ],
     },

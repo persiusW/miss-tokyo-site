@@ -99,7 +99,7 @@ export function activityText(row: ActivityRow): ActivityText {
     if (res === "cash_sale") {
         const ref = orderRef(row);
         const href = row.resource_id && row.resource_id !== s(d.sessionId) ? `/orders/${row.resource_id}` : undefined;
-        return { what: `took a cash sale${money(d.total) ? ` of ${money(d.total)}` : ""} at the till${ref ? ` (order ${ref})` : ""}`, href };
+        return { what: `took a cash sale${money(d.total) ? ` of ${money(d.total)}` : ""} at the POS${ref ? ` (order ${ref})` : ""}`, href };
     }
 
     switch (row.action_type) {

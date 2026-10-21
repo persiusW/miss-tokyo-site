@@ -140,9 +140,9 @@ export const SECTIONS: Section[] = [
         sum: (v, c) => `Paystack ${c.paystackConnected ? "connected" : "not set up"} · pay links hold stock ${str(v["store.pos_hold_minutes"]) || "15"} min`,
         rows: [
             { k: "_ps", label: "Paystack", help: "Card and Mobile money for the shop, invoices and pay links.", type: "status", status: c => (c.paystackConnected ? { text: "Connected", tone: "ok" } : { text: "Not set up", tone: "warn" }) },
-            { k: "_cash", label: "Cash at the till", help: "Cash is always a payment option at the till. It's counted at close.", type: "status", status: () => ({ text: "Always on", tone: "neutral" }) },
-            { k: "store.pos_hold_minutes", label: "Pay links hold the stock for", help: "Nobody else can buy the items until the link is paid or expires. The same time is shown in the customer's email and SMS.", type: "select", opts: [["15", "15 minutes"], ["30", "30 minutes"], ["45", "45 minutes"]], assist: "settings.pos-hold", words: "pos till hold link" },
-            { k: "store.pos_live_payment_status", label: "Show live payment status at the till", help: "After sending a link, the till checks Paystack every few seconds and shows Waiting, Paid or Declined.", type: "switch", words: "pos till" },
+            { k: "_cash", label: "Cash at the POS", help: "Cash is always a payment option at the POS. It's counted at close.", type: "status", status: () => ({ text: "Always on", tone: "neutral" }) },
+            { k: "store.pos_hold_minutes", label: "Pay links hold the stock for", help: "Nobody else can buy the items until the link is paid or expires. The same time is shown in the customer's email and SMS.", type: "select", opts: [["15", "15 minutes"], ["30", "30 minutes"], ["45", "45 minutes"]], assist: "settings.pos-hold", words: "pos POS hold link" },
+            { k: "store.pos_live_payment_status", label: "Show live payment status at the POS", help: "After sending a link, the POS checks Paystack every few seconds and shows Waiting, Paid or Declined.", type: "switch", words: "pos till" },
         ],
     },
     {
@@ -242,7 +242,7 @@ export const SECTIONS: Section[] = [
         g: "Online store", k: "status", t: "Shop open or closed",
         sum: v => (v["store.maintenance_mode"] === true ? "Closed for maintenance" : "Open"),
         rows: [
-            { k: "store.maintenance_mode", label: "Shop status", type: "radio", opts: [["open", "Open", "Customers can browse and buy."], ["closed", "Closed for maintenance", "Customers see a “Coming soon” page instead of the shop. The admin and the till keep working, and pay links still work."]], words: "maintenance coming soon" },
+            { k: "store.maintenance_mode", label: "Shop status", type: "radio", opts: [["open", "Open", "Customers can browse and buy."], ["closed", "Closed for maintenance", "Customers see a “Coming soon” page instead of the shop. The admin and the POS keep working, and pay links still work."]], words: "maintenance coming soon" },
         ],
     },
     {
@@ -319,10 +319,10 @@ export const SECTIONS: Section[] = [
         g: "Admin", k: "rollout", t: "New admin rollout",
         sum: v => (v["store.admin_v2"] === true ? `New admin on · ${["store.admin_v2_products", "store.admin_v2_orders", "store.admin_v2_till"].filter(k => v[k] === true).length} of 3 extra areas` : "Everyone uses the old admin"),
         rows: [
-            { k: "store.admin_v2", label: "New admin for everyone", help: "Everyone who signs in gets the new menu and the new pages that are ready. Products, Orders and the Till stay on their old pages until their own switch below is on.", type: "switch", words: "v2 redesign" },
+            { k: "store.admin_v2", label: "New admin for everyone", help: "Everyone who signs in gets the new menu and the new pages that are ready. Products, Orders and the POS stay on their old pages until their own switch below is on.", type: "switch", words: "v2 redesign" },
             { k: "store.admin_v2_products", label: "New Products pages", help: "Everyone edits products, photos and stock in the new product panel.", type: "switch", needs: "store.admin_v2", words: "v2" },
             { k: "store.admin_v2_orders", label: "New Orders pages", help: "Everyone packs, sends, refunds and cancels orders in the new order panel. Run the old and new pages side by side first.", type: "switch", needs: "store.admin_v2", words: "v2" },
-            { k: "store.admin_v2_till", label: "New Till", help: "Everyone at the counter uses the new till. Try it on the tablet before turning it on.", type: "switch", needs: "store.admin_v2", words: "v2 pos" },
+            { k: "store.admin_v2_till", label: "New POS", help: "Everyone at the counter uses the new POS. Try it on the tablet before turning it on.", type: "switch", needs: "store.admin_v2", words: "v2 pos" },
         ],
     },
     {

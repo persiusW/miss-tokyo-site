@@ -140,7 +140,7 @@ type Part = { f: DiscountForm; up: (p: Partial<DiscountForm>) => void; err: Form
 function NameField({ f, up, err, locked }: Part & { locked: boolean }) {
     if (f.kind === "auto") {
         return (
-            <Field label="Title" htmlFor="disc-title" error={err.title} help="Customers see this in their cart and at the till. Results are counted by title, so a new title starts its count again.">
+            <Field label="Title" htmlFor="disc-title" error={err.title} help="Customers see this in their cart and at the POS. Results are counted by title, so a new title starts its count again.">
                 <input id="disc-title" data-autofocus className="input" value={f.title} maxLength={120} placeholder="Slides: 2 for GH₵ 600" onChange={e => up({ title: e.target.value })} />
             </Field>
         );
@@ -420,7 +420,7 @@ function ResultsTab({ kind, disc }: { kind: Kind; disc: Discount }) {
                                 <Link key={o.id} href={`/sales/orders/${o.id}`} className="row click disc-order">
                                     <div className="row-main">
                                         <div className="row-title">#{o.ref} · {o.customer}</div>
-                                        <div className="row-sub">{when(o.at)}{o.source === "pos" ? " · At the till" : ""}</div>
+                                        <div className="row-sub">{when(o.at)}{o.source === "pos" ? " · At the POS" : ""}</div>
                                     </div>
                                     <div className="r">
                                         <div className="strong num">{ghs0(o.total)}</div>

@@ -237,7 +237,7 @@ export function OrdersPage({ role, query, data, initialId, initialDetail }: {
                             action={<Btn onClick={clearAll}>Clear filters</Btn>} />
                     ) : (
                         <Empty icon="orders" title={viewDef.empty}
-                            body={query.view === "all" ? "Orders from the shop, the till, WhatsApp and pay links appear here as they come in." : "Orders move here on their own as they're paid, packed and sent. You don't need to do anything."} />
+                            body={query.view === "all" ? "Orders from the shop, the POS, WhatsApp and pay links appear here as they come in." : "Orders move here on their own as they're paid, packed and sent. You don't need to do anything."} />
                     )
                 ) : (
                     <div className="tbl-wrap" aria-busy={pending} style={pending ? { opacity: 0.6 } : undefined}>

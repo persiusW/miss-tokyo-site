@@ -171,7 +171,7 @@ test("inbox sentence lists what's waiting", () => {
 
 test("channels and item counts", () => {
     expect(channelLabel("storefront", "paystack")).toBe("Online");
-    expect(channelLabel("pos", "cash")).toBe("Till");
+    expect(channelLabel("pos", "cash")).toBe("POS");
     expect(channelLabel("pos", "paystack")).toBe("Pay link");
     expect(channelLabel("whatsapp", "paystack")).toBe("WhatsApp");
     expect(channelLabel("web_chat", null)).toBe("Shop assistant");
@@ -254,7 +254,7 @@ test("activity rows read as sentences, never codes", () => {
     expect(o("NOTE_TO_CUSTOMER", { order_number: "8677abf7", channel: "whatsapp" }).what).toBe("sent the customer a note about order #8677ABF7 on WhatsApp");
     expect(o("CREATE", { order_number: "8677abf7", total: 450, via: "miss_tokyo_ai" }).what).toBe("created order #8677ABF7 for GH₵ 450.00 with Miss Tokyo AI");
     expect(activityText({ action_type: "CREATE", resource: "cash_sale", resource_id: "abc", details: { total: 594.5, orderRef: "8677ABF7", sessionId: "s1" } }).what)
-        .toBe("took a cash sale of GH₵ 594.50 at the till (order #8677ABF7)");
+        .toBe("took a cash sale of GH₵ 594.50 at the POS (order #8677ABF7)");
     expect(activityText({ action_type: "UPDATE", resource: "product", resource_id: "p1", details: { resource_name: "Amazon pants" } })).toEqual({ what: "updated Amazon pants", href: "/catalogue/p1" });
     expect(activityText({ action_type: "CREATE", resource: "product", resource_id: "p1", details: { name: "Leather jacket " } }).what).toBe("added the product Leather jacket");
     expect(activityText({ action_type: "UPDATE", resource: "settings", resource_id: "seo", details: { section: "seo", changed: ["meta.keywords"] } }).what).toBe("changed Settings › Search engines");

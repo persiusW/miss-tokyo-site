@@ -248,7 +248,7 @@ export async function deleteProduct(id: string): Promise<{ ok: true } | Fail> {
         const { error } = await db.from("products").delete().eq("id", id);
         if (error) {
             // A checkout or till sale holding it (reservation rows) blocks the delete.
-            if (error.code === "23503") return { ok: false, error: "A checkout or till sale is holding this product right now. Archive it instead, or try again in a few minutes." };
+            if (error.code === "23503") return { ok: false, error: "A checkout or POS sale is holding this product right now. Archive it instead, or try again in a few minutes." };
             throw error;
         }
         refresh();

@@ -83,7 +83,7 @@ export function HomePage({ title, sub }: { title: string; sub: string }) {
 
     return (
         <>
-            <PageHeader title={title} sub={sub} actions={<BtnLink kind="primary" icon="till" href="/till">Open the till</BtnLink>} />
+            <PageHeader title={title} sub={sub} actions={<BtnLink kind="primary" icon="till" href="/till">Open the POS</BtnLink>} />
 
             {(wallet || (restored && restored.count > 0)) && (
                 <div className="stack-sm">
@@ -149,7 +149,7 @@ export function HomePage({ title, sub }: { title: string; sub: string }) {
                                         <Kpi label="Sales" value={ghs0(c.sales)} delta={d.sales} ctx={kpiCtx(k, d.sales, p ? p.sales : null)} />
                                         <Kpi label="Orders" value={c.orders.toLocaleString("en-GB")} delta={d.orders} ctx={kpiCtx(k, d.orders, p ? p.orders : null)} />
                                         <Kpi label="Average order" value={ghs0(c.aov)} delta={d.aov} ctx={kpiCtx(k, d.aov, p ? p.aov : null)} />
-                                        <Kpi label="Cash to count at close" value={ghs0(c.cash)} ctx={`from ${plural(c.cash_orders, "till sale")}`} />
+                                        <Kpi label="Cash to count at close" value={ghs0(c.cash)} ctx={`from ${plural(c.cash_orders, "POS sale")}`} />
                                     </>
                                 );
                             })()}
@@ -161,7 +161,7 @@ export function HomePage({ title, sub }: { title: string; sub: string }) {
                     {needs.state === "loading" ? <SkeletonRows n={6} cols={3} />
                         : needs.state === "error" ? <ErrorState what="the latest orders" body="Nothing was changed. Try again in a moment." onRetry={() => void loadNeeds()} />
                         : needs.data.latest.length === 0
-                            ? <Empty icon="orders" title="No orders yet" body="Orders from the shop, the till, WhatsApp and pay links show up here as they come in." />
+                            ? <Empty icon="orders" title="No orders yet" body="Orders from the shop, the POS, WhatsApp and pay links show up here as they come in." />
                             : (
                                 <div className="rows">
                                     {needs.data.latest.map(o => (
@@ -181,7 +181,7 @@ export function HomePage({ title, sub }: { title: string; sub: string }) {
                     {needs.state === "loading" ? <SkeletonRows n={5} cols={2} />
                         : needs.state === "error" ? <ErrorState what="team activity" body="Nothing was changed. Try again in a moment." onRetry={() => void loadNeeds()} />
                         : needs.data.activity.length === 0
-                            ? <Empty icon="staff" title="No team activity yet" body="Packing, till sales and changes to products and settings show up here as the team works." />
+                            ? <Empty icon="staff" title="No team activity yet" body="Packing, POS sales and changes to products and settings show up here as the team works." />
                             : (
                                 <div className="rows">
                                     {needs.data.activity.map(a => {

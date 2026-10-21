@@ -24,9 +24,9 @@ export function placeNames(v: AdminView) {
         /** Where manual stock write-offs are reported. */
         writeOffs: isOn(v, "analytics") ? "Analytics › Reports › Stock written off" : "the stock history",
         /** The till, by name. */
-        till: till ? "the Till" : "Point of Sale",
+        till: till ? "the POS" : "Point of Sale",
         /** The till's list of today's sales. */
-        tillHistory: till ? "Till › Today's sales" : "POS History",
+        tillHistory: till ? "POS › Today's sales" : "POS History",
         /** The customer list. */
         customers: isOn(v, "customers") ? "Customers" : "the Contact List",
         /** WhatsApp chats. */

@@ -183,7 +183,7 @@ function Body({ k, data, q, page, setPage, openRider, openDiscount }: {
         case "channel": {
             const t = channelTable(data.rows);
             return t.rows.length ? <>
-                <p className="help">Pay links are payment links sent from the till. &quot;Orders placed, any status&quot; counts every checkout started in these dates, paid or not, as the old report did.</p>
+                <p className="help">Pay links are payment links sent from the POS. &quot;Orders placed, any status&quot; counts every checkout started in these dates, paid or not, as the old report did.</p>
                 <ReportTable t={t} label="Sales by channel" />
             </> : noSales();
         }
@@ -201,9 +201,9 @@ function Body({ k, data, q, page, setPage, openRider, openDiscount }: {
         case "cash": {
             const t = cashTable(data.rows);
             return t.rows.length ? <>
-                <p className="help">Cash is every paid order taken in cash: what should be in the drawer at close. Till sales counts every paid sale made at the till, however it was paid.</p>
-                <ReportTable t={t} label="Cash taken at the till" />
-            </> : empty("No till sales in these dates", "Each day the till takes a sale shows here, with the cash to count at close.", "cash");
+                <p className="help">Cash is every paid order taken in cash: what should be in the drawer at close. POS sales counts every paid sale made at the POS, however it was paid.</p>
+                <ReportTable t={t} label="Cash taken at the POS" />
+            </> : empty("No POS sales in these dates", "Each day the POS takes a sale shows here, with the cash to count at close.", "cash");
         }
         case "writeoffs": {
             const t = writeoffTable(data.rows);
@@ -223,7 +223,7 @@ function Body({ k, data, q, page, setPage, openRider, openDiscount }: {
             const t = regionTable(data.rows);
             const unknown = n(data.unknown);
             return <>
-                {unknown > 0 && <p className="help">{plural(unknown, "paid order")} had no region or city (most till sales), so {unknown === 1 ? "it isn't" : "they aren't"} counted here.</p>}
+                {unknown > 0 && <p className="help">{plural(unknown, "paid order")} had no region or city (most POS sales), so {unknown === 1 ? "it isn't" : "they aren't"} counted here.</p>}
                 {t.rows.length ? <>
                     <Bars label="Paid orders per region" items={t.rows.slice(0, 8).map(r => ({ key: String(r[0]), label: String(r[0]), value: n(r[1]), right: <><span className="strong num">{plural(n(r[1]), "order")}</span> <span className="muted">· {ghs0(n(r[2]))}</span></> }))} />
                     <ReportTable t={t} label="Where orders go" />
@@ -302,7 +302,7 @@ function Customers({ data }: { data: Data }) {
             <Kpi label="Newsletter sign-ups" value={n(data.newsletter).toLocaleString("en-GB")} ctx="in these dates" />
             <Kpi label="Bespoke inquiries" value={n(data.inquiries).toLocaleString("en-GB")} ctx="custom requests sent" />
         </div>
-        {noEmail > 0 && <p className="help">{plural(noEmail, "paid order")} had no email (till walk-ins), so {noEmail === 1 ? "it isn't" : "they aren't"} counted as customers.</p>}
+        {noEmail > 0 && <p className="help">{plural(noEmail, "paid order")} had no email (POS walk-ins), so {noEmail === 1 ? "it isn't" : "they aren't"} counted as customers.</p>}
         <h3 className="section-t">New customers by day</h3>
         {newDays.length
             ? <Bars label="New customers by day" items={newDays.map(x => ({ key: s(x.d), label: dateCell(s(x.d)), value: n(x.n), right: <span className="strong num">{n(x.n)}</span> }))} />

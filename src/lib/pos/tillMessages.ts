@@ -10,7 +10,7 @@ export type Delivery = {
 } | null | undefined;
 
 export const TILL_GENERIC = "Something happened. Please try again shortly.";
-export const TILL_SERVER_UNREACHABLE = "The till couldn't reach the server. Please try again.";
+export const TILL_SERVER_UNREACHABLE = "The POS couldn't reach the server. Please try again.";
 
 /** The panel heading for a link sale. Not for cash or gift-card completions. */
 export function deliveryHeadline(d: Delivery): { text: string; tone: "ok" | "warn" } {

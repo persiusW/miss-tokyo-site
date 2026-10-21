@@ -296,7 +296,7 @@ export function NewSale({ settings, categories, initialProducts, initialCustomer
             if (t.type === "success") toast.success(t.message); else toast.error(t.message);
             return "ok";
         } catch (e) {
-            console.error("[till] send failed", e);
+            console.error("[POS] send failed", e);
             const t = started ? unclearText(mode) : TILL_GENERIC;
             toast.error(t);
             if (started && mode === "cash") { setUnclear(t); return "unclear"; }
@@ -717,7 +717,7 @@ export function NewSale({ settings, categories, initialProducts, initialCustomer
                                     ]} />
                                 )}
                                 {primary}
-                                {cart.length > 0 && !hasCustomer && <p className="help">Every till sale needs a customer with a phone or email, so they get their order number.</p>}
+                                {cart.length > 0 && !hasCustomer && <p className="help">Every POS sale needs a customer with a phone or email, so they get their order number.</p>}
                             </div>
                         </>
                     )}

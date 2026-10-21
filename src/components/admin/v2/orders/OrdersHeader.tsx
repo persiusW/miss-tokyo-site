@@ -11,7 +11,7 @@ export function OrdersHeader({ tab, role, abandoned, actions }: { tab: OrdersTab
     const full = role === "owner" || role === "admin";
     return (
         <>
-            <PageHeader title="Orders" sub="Every order from the shop, the till, WhatsApp and pay links, in one list."
+            <PageHeader title="Orders" sub="Every order from the shop, the POS, WhatsApp and pay links, in one list."
                 actions={<>{actions}<BtnLink kind="primary" icon="plus" href="/till">Create order</BtnLink></>} />
             <Tabs label="Orders sections" value={tab} tabs={[
                 { v: "orders", l: "Orders", href: "/orders" },

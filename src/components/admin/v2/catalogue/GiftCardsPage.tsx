@@ -143,7 +143,7 @@ export function GiftCardsPage({ query, data }: { query: GiftQuery; data: { rows:
             <ConfirmPanel open={!!cancelling} level={viewing ? 2 : 1} onClose={() => setCancelling(null)} busy={busy}
                 title={cancelling ? `Cancel ${cancelling.code}` : "Cancel gift card"} sub={cancelling ? `For ${cancelling.recipient_name || cancelling.recipient_email || "the recipient"}` : undefined}
                 consequenceTitle={cancelling ? `${ghs(cancelling.remaining_value)} can no longer be spent` : ""}
-                consequence={cancelling ? `The code stops working at checkout and the till straight away. ${firstName(cancelling.recipient_name) || "The recipient"} isn't told. No money is refunded to the buyer; do that from the original order if you need to. This can't be undone.` : ""}
+                consequence={cancelling ? `The code stops working at checkout and the POS straight away. ${firstName(cancelling.recipient_name) || "The recipient"} isn't told. No money is refunded to the buyer; do that from the original order if you need to. This can't be undone.` : ""}
                 cancelLabel="Keep gift card" confirmLabel="Cancel gift card" onConfirm={cancel} />
         </>
     );
@@ -176,7 +176,7 @@ function GiftPanel({ g, onClose, onResend, onCancel }: { g: GiftCardRow; onClose
                 <div className="card-h"><h2>Spent</h2></div>
                 {failed ? <ErrorState what="the redemptions" body={failed} />
                     : !d ? <SkeletonRows n={2} cols={3} />
-                    : d.redemptions.length === 0 ? <Empty icon="gift" title="Not used yet" body="Each time the code is used at checkout or the till, the amount appears here." />
+                    : d.redemptions.length === 0 ? <Empty icon="gift" title="Not used yet" body="Each time the code is used at checkout or the POS, the amount appears here." />
                     : <div className="rows">{d.redemptions.map(r => (
                         <div className="row" key={r.id}>
                             <div className="row-main"><div className="row-title">{ghs(r.amount_used)} spent</div><div className="row-sub">{when(r.redeemed_at)} · {ghs(r.balance_before)} → {ghs(r.balance_after)}</div></div>
@@ -227,7 +227,7 @@ function IssuePanel({ onClose, onIssued }: { onClose: () => void; onIssued: () =
             </div>
             <Field label="From" htmlFor="gc-from"><input id="gc-from" className="input" value={from} onChange={e => setFrom(e.target.value)} /></Field>
             <Field label="Message" htmlFor="gc-msg" help="Optional. Printed on the gift card email."><textarea id="gc-msg" className="textarea" rows={3} value={msg} onChange={e => setMsg(e.target.value)} /></Field>
-            {ok && <Banner tone="neutral" title={`${ghs(value)} to ${to.trim() || email.trim()}`}>{"The code works at checkout and at the till until it's spent or cancelled."}</Banner>}
+            {ok && <Banner tone="neutral" title={`${ghs(value)} to ${to.trim() || email.trim()}`}>{"The code works at checkout and at the POS until it's spent or cancelled."}</Banner>}
         </Panel>
     );
 }

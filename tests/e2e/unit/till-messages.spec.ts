@@ -35,7 +35,7 @@ test("completion banner names the real method and never claims a receipt it can'
 
 test("calm constants", () => {
     expect(TILL_GENERIC).toBe("Something happened. Please try again shortly.");
-    expect(TILL_SERVER_UNREACHABLE).toBe("The till couldn't reach the server. Please try again.");
+    expect(TILL_SERVER_UNREACHABLE).toBe("The POS couldn't reach the server. Please try again.");
 });
 
 test("readJson refuses HTML, empty and broken bodies instead of throwing", async () => {

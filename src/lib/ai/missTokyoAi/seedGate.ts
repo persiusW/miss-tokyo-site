@@ -23,7 +23,7 @@ export async function checkSeed(
         const s = await deps.session(seed.posSessionId);
         if (!s) return { ok: false, status: 404, error: "That sale wasn't found." };
         if (a.role === "sales_staff" && s.created_by !== a.userId) return { ok: false, status: 403, error: "That sale belongs to someone else." };
-        label = `till sale #${s.ref ?? s.id.slice(0, 8).toUpperCase()}`;
+        label = `POS sale #${s.ref ?? s.id.slice(0, 8).toUpperCase()}`;
     } else if (seed.orderId) {
         const o = await deps.order(seed.orderId);
         if (!o) return { ok: false, status: 404, error: "That order wasn't found." };

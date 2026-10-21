@@ -12,7 +12,7 @@ const DESCRIPTION = `Admin only. Run ONE read-only SQL SELECT (Postgres) over th
 
 Views:
 - paid_orders: sales only (payment_status = 'paid'). Same columns as orders. Use this for revenue.
-- orders: every order. id, ref, created_at, day, channel ('pos' | 'online'), status, payment_status, fulfillment_status, payment_method, total_amount, delivery_fee, delivery_method, delivery_zone, discount_code, discount_amount, auto_discount_amount, has_preorder, customer_name, staff_name (who rang it up at the till; null online).
+- orders: every order. id, ref, created_at, day, channel ('pos' | 'online'), status, payment_status, fulfillment_status, payment_method, total_amount, delivery_fee, delivery_method, delivery_zone, discount_code, discount_amount, auto_discount_amount, has_preorder, customer_name, staff_name (who rang it up at the POS; null online).
 - sales_lines: one row per item sold on a paid order. order_id, ref, created_at, day, channel, payment_method, staff_name, product_id, product_name, category, size, colour, brand, quantity, unit_price, line_total, is_preorder.
 - products: id, name, sku, price, is_sale, sale_discount_pct, active, track_inventory, track_variant_inventory, inventory_count, preorder_enabled, category, created_at.
 - stock: one row per variant (size/colour/brand) of tracked products, or one row for products tracked without variants. product_id, product_name, sku, category, active, size, colour, brand, on_hand.

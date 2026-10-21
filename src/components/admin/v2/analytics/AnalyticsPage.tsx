@@ -184,7 +184,7 @@ function SalesChart({ ov, q }: { ov: Overview | null; q: AnalyticsQuery }) {
         <Card title={title} action={legend}>
             {any
                 ? <div className="card-body an-chart"><LineChart cur={cur} prev={prev} labels={labels} label={title} /></div>
-                : <Empty icon="analytics" title="No paid orders in these dates" body="Sales appear here as soon as an order is paid, online or at the till." />}
+                : <Empty icon="analytics" title="No paid orders in these dates" body="Sales appear here as soon as an order is paid, online or at the POS." />}
         </Card>
     );
 }
@@ -214,7 +214,7 @@ function Channels({ ov, onReport }: { ov: Overview | null; onReport: () => void 
     return (
         <Card title="Sales by channel" action={<Btn sm kind="ghost" onClick={onReport}>Full report</Btn>}>
             {!ov ? <SkeletonRows n={4} cols={2} /> : rows.length === 0 ? (
-                <Empty icon="store" title="No paid orders in these dates" body="Each channel (online shop, till, pay links, WhatsApp) shows here once it has a paid order." />
+                <Empty icon="store" title="No paid orders in these dates" body="Each channel (online shop, POS, pay links, WhatsApp) shows here once it has a paid order." />
             ) : (
                 <div className="card-body">
                     <Bars label="Sales by channel" items={rows.map(c => ({

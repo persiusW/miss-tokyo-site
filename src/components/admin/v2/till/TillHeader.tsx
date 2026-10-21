@@ -11,14 +11,14 @@ export function TillHeader({ tab, role }: { tab: "sale" | "today"; role: string 
     const reprint = async () => {
         const r = await tillLastReceipt();
         if (!r.ok) { toast.error(r.error); return; }
-        if (!r.orderId) { toast.info("You haven't completed a till sale yet, so there's no receipt to reprint."); return; }
+        if (!r.orderId) { toast.info("You haven't completed a POS sale yet, so there's no receipt to reprint."); return; }
         await receipt.print(r.orderId);
     };
     return (
         <>
-            <PageHeader title="Till" sub="Sell in the atelier or over the phone. Take cash or send a pay link."
+            <PageHeader title="POS" sub="Sell in the atelier or over the phone. Take cash or send a pay link."
                 actions={<Btn kind="ghost" icon="print" onClick={() => void reprint()} disabled={receipt.busy}>{receipt.busy ? "Getting the receipt…" : "Reprint last receipt"}</Btn>} />
-            <Tabs label="Till sections" value={tab} tabs={[
+            <Tabs label="POS sections" value={tab} tabs={[
                 { v: "sale", l: "New sale", href: "/till" },
                 { v: "today", l: role === "sales_staff" ? "My sales today" : "Today's sales", href: "/till/today" },
             ]} />

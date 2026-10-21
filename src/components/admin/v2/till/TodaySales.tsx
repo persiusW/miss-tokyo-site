@@ -54,7 +54,7 @@ export function TodaySales({ role, query, kpis, data }: { role: string; query: S
                 <div className="grid-3">
                     <Kpi label="Cash to count at close" value={ghs0(kpis.cash)}
                         ctx={kpis.cashSales ? `from ${plural(kpis.cashSales, "cash sale")} today${own ? " that you took" : ""}` : "No cash sales yet today"} />
-                    <Kpi label="Till sales today" value={ghs0(kpis.tillSales)}
+                    <Kpi label="POS sales today" value={ghs0(kpis.tillSales)}
                         ctx={`${plural(kpis.tillCount, "sale")} paid${kpis.waiting ? `, ${kpis.waiting} still waiting` : ""}`} />
                     <Kpi label="Pay links waiting" value={String(kpis.waiting)}
                         ctx={kpis.waiting ? `the next hold ends in ${plural(nextIn ?? 0, "minute")}` : "Nothing waiting for payment"} />
@@ -87,7 +87,7 @@ export function TodaySales({ role, query, kpis, data }: { role: string; query: S
                 {!data ? (
                     <ErrorState what="the sales" onRetry={() => router.refresh()} />
                 ) : data.rows.length === 0 ? (
-                    <Empty icon="till" title={filtered ? "No sales match" : "No till sales yet today"}
+                    <Empty icon="till" title={filtered ? "No sales match" : "No POS sales yet today"}
                         body={filtered ? "Try another date or status, or clear the filters." : "Each sale from New sale shows here as it's made: paid, waiting for payment, expired or cancelled."}
                         action={filtered ? <BtnLink href="/till/today">Clear filters</BtnLink> : <BtnLink kind="primary" href="/till">New sale</BtnLink>} />
                 ) : (
@@ -149,7 +149,7 @@ function SalePanel({ row, own, now, onClose, onChanged }: { row: SaleRow; own: b
             toast.success(`Sale ${row.ref} cancelled. The items are back on sale.`);
             onChanged();
         } catch {
-            toast.error("The till couldn't reach the server. Please try again.");
+            toast.error("The POS couldn't reach the server. Please try again.");
         } finally {
             setBusy(false);
         }

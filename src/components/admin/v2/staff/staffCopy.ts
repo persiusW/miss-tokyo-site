@@ -10,7 +10,7 @@ export const ROLE_LABEL: Record<StaffRoleKey, string> = { owner: "Owner", admin:
 export const ROLE_DESC: Record<StaffRoleKey, string> = {
     owner: "Everything, including staff, billing and settings. Can refund orders.",
     admin: "Everything an owner can do, plus AI settings and the admin inbox. For your developer.",
-    sales_staff: "Orders, the till, products, customers, discounts, inbox and analytics. No settings, staff, billing or content.",
+    sales_staff: "Orders, the POS, products, customers, discounts, inbox and analytics. No settings, staff, billing or content.",
 };
 
 /** Roles an invite may grant (lib/teamInvites INVITABLE_ROLES: owner is never handed out by invite). */
@@ -65,10 +65,10 @@ export type PermCell = "yes" | "no" | "menu";
 export type PermRow = { area: string; owner: PermCell; admin: PermCell; sales: PermCell };
 
 export const PERMS: PermRow[] = [
-    { area: "Home, orders, till and inbox", owner: "yes", admin: "yes", sales: "yes" },
+    { area: "Home, orders, POS and inbox", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Change an order's status, including cancelled, refunded and paid", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Mark an order paid (after a Paystack check, or by hand)", owner: "yes", admin: "yes", sales: "yes" },
-    { area: "Change or cancel another person's till sale", owner: "yes", admin: "yes", sales: "no" },
+    { area: "Change or cancel another person's POS sale", owner: "yes", admin: "yes", sales: "no" },
     { area: "Products, inventory, categories, gift cards and customers", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Discount codes", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Automatic discounts", owner: "yes", admin: "yes", sales: "yes" },
@@ -198,7 +198,7 @@ export function describeActivity(row: Pick<ActivityRow, "action_type" | "resourc
     }
     if (res === "cash_sale" && row.action_type === "CREATE") {
         const total = d.total != null && Number.isFinite(Number(d.total)) ? ` of ${ghs(Number(d.total))}` : "";
-        return { sentence: `Took a cash payment${total} for ${orderRef({ order_number: d.orderRef }, null)}`, area: "Till" };
+        return { sentence: `Took a cash payment${total} for ${orderRef({ order_number: d.orderRef }, null)}`, area: "POS" };
     }
     if (res === "gift_card" && row.action_type === "CREATE") {
         const value = d.value != null && Number.isFinite(Number(d.value)) ? ` worth ${ghs(Number(d.value))}` : "";
@@ -226,7 +226,7 @@ export const ACTION_FILTERS: ActionFilter[] = [
     { v: "delivered", l: "Delivered", group: "Orders", action: ["DELIVERED_ORDER"] },
     { v: "rider", l: "Rider assigned", group: "Orders", action: ["ASSIGNED_RIDER"] },
     { v: "status", l: "Status changed", group: "Orders", action: ["UPDATE_STATUS"] },
-    { v: "cash", l: "Cash payments at the till", group: "Orders", action: ["CREATE"], resource: ["cash_sale"] },
+    { v: "cash", l: "Cash payments at the POS", group: "Orders", action: ["CREATE"], resource: ["cash_sale"] },
     { v: "code-created", l: "Discount code created", group: "Discounts", action: ["CREATE_DISCOUNT"] },
     { v: "code-toggled", l: "Discount code switched on or off", group: "Discounts", action: ["TOGGLE_DISCOUNT"] },
     { v: "code-deleted", l: "Discount code deleted", group: "Discounts", action: ["DELETE_DISCOUNT"] },

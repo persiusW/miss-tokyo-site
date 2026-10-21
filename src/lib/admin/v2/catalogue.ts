@@ -497,7 +497,7 @@ export type HistoryRow = {
 /** Every ledger reason in plain words. */
 export const REASON_TEXT: Record<string, string> = {
     sale: "Sold",
-    pos_sale: "Sold at the till",
+    pos_sale: "Sold at the POS",
     sale_unresolved_variant: "Sold (size not matched)",
     reversal: "Returned to stock",
     position_sync: "Taken again for an order",

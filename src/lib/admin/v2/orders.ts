@@ -40,12 +40,12 @@ export type ChannelFilter = "all" | "storefront" | "pos" | "whatsapp" | "web_cha
 export const CHANNELS: readonly { v: ChannelFilter; l: string }[] = [
     { v: "all", l: "All channels" },
     { v: "storefront", l: "Online shop" },
-    { v: "pos", l: "Till" },
+    { v: "pos", l: "POS" },
     { v: "whatsapp", l: "WhatsApp" },
     { v: "web_chat", l: "Shop assistant" },
 ];
 const CHANNEL_LABEL: Record<string, string> = {
-    storefront: "Online shop", web: "Online shop", pos: "Till", whatsapp: "WhatsApp", web_chat: "Shop assistant",
+    storefront: "Online shop", web: "Online shop", pos: "POS", whatsapp: "WhatsApp", web_chat: "Shop assistant",
     pay_link: "Pay link", invoice: "Invoice", dashboard: "Admin",
 };
 export const channelLabel = (source: string | null | undefined) => CHANNEL_LABEL[(source ?? "storefront").toLowerCase()] ?? "Online shop";
@@ -224,7 +224,7 @@ const REFUND_HOW: Record<string, string> = {
 /** Every event for one order, newest first, in plain language. */
 export function buildTimeline(s: TimelineSources): TimelineItem[] {
     const out: TimelineItem[] = [];
-    out.push({ at: s.order.created_at, text: `Order placed on ${channelLabel(s.order.source).replace("Online shop", "the online shop").replace("Till", "the till").replace("Shop assistant", "the shop assistant")}`, tone: "" });
+    out.push({ at: s.order.created_at, text: `Order placed on ${channelLabel(s.order.source).replace("Online shop", "the online shop").replace("POS", "the POS").replace("Shop assistant", "the shop assistant")}`, tone: "" });
     if (s.order.paid_at) out.push({ at: s.order.paid_at, text: `Payment of ${gh(s.order.total_amount)} confirmed`, tone: "ok" });
     if (s.order.ready_at) out.push({ at: s.order.ready_at, text: "Ready for collection", tone: "" });
     for (const a of s.activity) out.push({ at: a.at, text: a.who ? `${a.who} ${a.what}` : a.what.charAt(0).toUpperCase() + a.what.slice(1), tone: "" });

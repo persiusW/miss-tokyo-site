@@ -151,7 +151,7 @@ export function DiscountsPage({ query, data, missing }: { query: ListQuery; data
                     options={[
                         {
                             v: "code", title: "Discount code",
-                            desc: "Customers type a code like HARMATTAN20 at checkout, or you enter it at the till. Nothing comes off until someone uses the code.",
+                            desc: "Customers type a code like HARMATTAN20 at checkout, or you enter it at the POS. Nothing comes off until someone uses the code.",
                         },
                         { v: "auto", title: "Automatic discount", desc: "Applies by itself when the cart qualifies, for example 2 slides for GH₵ 600. No code needed, and every customer whose cart qualifies gets it." },
                     ]} />

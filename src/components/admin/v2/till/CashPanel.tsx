@@ -19,7 +19,7 @@ export function CashPanel({ open, onClose, total, units, customer, receiptBy, re
             tone="warn" confirmLabel={`Record ${ghs(total)} cash`} cancelLabel="Back" busy={busy}
             confirmDisabled={change != null && change < 0} onConfirm={onConfirm}
             consequenceTitle="This records the sale now"
-            consequence={`${ghs(total)} in cash for ${plural(units, "item")}. The order is made, the stock comes off and ${receiptBy}. It can't be undone from the till: a mistake is refunded from the order.`}>
+            consequence={`${ghs(total)} in cash for ${plural(units, "item")}. The order is made, the stock comes off and ${receiptBy}. It can't be undone from the POS: a mistake is refunded from the order.`}>
             <Field label="Cash received" htmlFor="till-cash" help="Optional. Type what you were handed to see the change.">
                 <Money id="till-cash" value={received} onChange={setReceived} />
             </Field>

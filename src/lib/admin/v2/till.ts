@@ -208,7 +208,7 @@ export const changeDue = (received: number, total: number) => round2(received - 
 export function unclearText(mode: SendMode): string {
     return mode === "cash"
         ? "We couldn't confirm the cash sale. Check Today's sales before trying again, so it isn't recorded twice."
-        : "The till couldn't reach the server. Please try again.";
+        : "The POS couldn't reach the server. Please try again.";
 }
 
 // ── The product grid ────────────────────────────────────────────────────────

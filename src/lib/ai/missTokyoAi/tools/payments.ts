@@ -27,7 +27,7 @@ export const paymentTools: ToolDef[] = [
                 type: "object",
                 properties: {
                     order_ref: { type: "string", description: "8-character order reference or order id." },
-                    pos_session_id: { type: "string", description: "Till session id." },
+                    pos_session_id: { type: "string", description: "POS session id." },
                     sale_key: { type: "string", description: "Sale key." },
                 },
             },
@@ -44,10 +44,10 @@ export const paymentTools: ToolDef[] = [
             const orderRef = str(input?.order_ref, 60);
             const key = str(input?.sale_key, 60);
             if (sessionId) {
-                if (!UUID_RE.test(sessionId)) return err("That till session id isn't valid.");
+                if (!UUID_RE.test(sessionId)) return err("That POS session id isn't valid.");
                 const { data: s } = await supabaseAdmin.from("pos_sessions").select("id, status, created_by").eq("id", sessionId).maybeSingle();
-                if (!s) return err("That till sale wasn't found.");
-                if (ctx.role === "sales_staff" && s.created_by !== ctx.userId) return err("That till sale belongs to someone else. Ask them, or an admin or owner.");
+                if (!s) return err("That POS sale wasn't found.");
+                if (ctx.role === "sales_staff" && s.created_by !== ctx.userId) return err("That POS sale belongs to someone else. Ask them, or an admin or owner.");
                 owed = owedFrom(s.status);
                 linkExpired = s.status === "expired";
                 channel = "pos";
@@ -69,7 +69,7 @@ export const paymentTools: ToolDef[] = [
                 owed = !attempts.some(a => a.status === "paid");
                 if (attempts[0]?.channel === "pos") channel = "pos";
             } else {
-                return err("Give the order reference or the till sale.");
+                return err("Give the order reference or the POS sale.");
             }
 
             saleKey = attempts[0]?.sale_key ?? (key || null);

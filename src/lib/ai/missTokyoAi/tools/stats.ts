@@ -238,7 +238,7 @@ export const statsTools: ToolDef[] = [
                     to: { type: "string", description: "YYYY-MM-DD inclusive, only for range=custom." },
                     channel: { type: "string", enum: ["online", "pos"] },
                     payment_method: { type: "string", enum: ["cash", "paystack", "gift_card"] },
-                    staff: { type: "string", description: "Part of a staff member's name (till sales only)." },
+                    staff: { type: "string", description: "Part of a staff member's name (POS sales only)." },
                     category: { type: "string", description: "Part of a category name." },
                     product: { type: "string", description: "Part of a product name." },
                     compare_previous: { type: "boolean" },
@@ -306,7 +306,7 @@ export const statsTools: ToolDef[] = [
                     now.lineLevel
                         ? "Product/size/category figures use each order line's stored price × quantity, before order-level discounts, service fee and delivery."
                         : "Revenue is order totals (items after discounts, plus service fee and delivery) for paid orders.",
-                    ...(group === "staff" ? ["Staff are recorded on till (POS) sales only; online orders have no staff member."] : []),
+                    ...(group === "staff" ? ["Staff are recorded on POS sales only; online orders have no staff member."] : []),
                 ],
             });
         },

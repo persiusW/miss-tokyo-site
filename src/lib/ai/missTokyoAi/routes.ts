@@ -89,7 +89,7 @@ export const V2_ROUTES = {
     pre_orders: { path: "/orders?preorder=1", title: "Orders › Pre-orders only", roles: ALL, area: "orders" },
     abandoned: { path: "/orders/abandoned", title: "Abandoned checkouts", roles: ALL, area: "orders" },
     invoices: { path: "/orders/invoices", title: "Invoices and pay links", roles: FULL, area: "orders" },
-    till: { path: "/till", title: "Till", roles: ALL, area: "till" },
+    till: { path: "/till", title: "POS", roles: ALL, area: "till" },
     till_today: { path: "/till/today", title: "Today's sales", roles: ALL, area: "till" },
     catalogue: { path: "/catalogue", title: "Products", roles: ALL, area: "products" },
     product_new: { path: "/catalogue/new", title: "Add product", roles: ALL, area: "products" },

@@ -107,7 +107,7 @@ export function ProductsPage({ query, data, preload, missing }: { query: ListQue
                     : rows.length === 0 ? (
                         query.q ? <Empty icon="search" title="No products match" body={`Nothing has “${query.q}” in its name or SKU${query.view !== "all" ? ` in ${viewLabel}` : ""}.`} action={<Btn onClick={() => { setTerm(""); go({ q: "", view: "all" }); }}>Clear search</Btn>} />
                         : narrowed ? <Empty icon="check" title={`No products ${query.view === "all" ? "here" : `in ${viewLabel}`}`} body="Nothing needs attention in this view." action={<Btn onClick={() => go({ view: "all" })}>Show all products</Btn>} />
-                        : <Empty icon="products" title="Add your first product" body="Products you add here appear in the shop, at the till and in the WhatsApp assistant's answers." action={<Btn kind="primary" icon="plus" onClick={openNew}>Add product</Btn>} />
+                        : <Empty icon="products" title="Add your first product" body="Products you add here appear in the shop, at the POS and in the WhatsApp assistant's answers." action={<Btn kind="primary" icon="plus" onClick={openNew}>Add product</Btn>} />
                     ) : (
                         <div className="tbl-wrap">
                             <table className="tbl cat-tbl">
@@ -147,7 +147,7 @@ export function ProductsPage({ query, data, preload, missing }: { query: ListQue
             {modal === "preorder" && <PreorderModal ids={sel} onClose={() => setModal(null)} onSaved={() => { setModal(null); setSel([]); refresh(); }} />}
             <ConfirmPanel open={modal === "untrack"} onClose={() => setModal(null)} tone="warn" title={`Stop tracking stock for ${plural(sel.length, "product")}`}
                 consequenceTitle="They will never sell out"
-                consequence="The stock numbers are replaced with “not tracked”, so the shop and the till always sell them. To count stock again, open each product and switch Track stock back on, then enter the stock."
+                consequence="The stock numbers are replaced with “not tracked”, so the shop and the POS always sell them. To count stock again, open each product and switch Track stock back on, then enter the stock."
                 confirmLabel="Stop tracking stock"
                 onConfirm={async () => {
                     const r = await stopTracking(sel);

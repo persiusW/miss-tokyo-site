@@ -18,7 +18,7 @@ export const NAV_MAIN: NavDef[] = [
     { k: "home", label: "Home", href: "/home", icon: "home", legacy: ["/overview"] },
     { k: "inbox", label: "Inbox", href: "/inbox", icon: "inbox", legacy: ["/customers/whatsapp", "/customers/forms", "/customers/requests", "/ai/inbox"] },
     { k: "orders", label: "Orders", href: "/orders", icon: "orders", legacy: ["/sales/orders", "/sales/pre-orders", "/customers/abandoned", "/finance"] },
-    { k: "till", label: "Till", href: "/till", icon: "till", legacy: ["/pos"] },
+    { k: "till", label: "POS", href: "/till", icon: "till", legacy: ["/pos"] },
     { k: "products", label: "Products", href: "/catalogue", icon: "products", legacy: ["/catalog/products", "/catalog/categories", "/catalog/gift-cards"] },
     { k: "customers", label: "Customers", href: "/customers", icon: "customers", legacy: ["/sales/wholesalers"] },
     { k: "discounts", label: "Discounts", href: "/discounts", icon: "discounts", legacy: ["/catalog/discounts", "/catalog/auto-discounts"] },

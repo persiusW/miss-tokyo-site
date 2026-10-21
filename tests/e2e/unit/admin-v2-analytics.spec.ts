@@ -127,7 +127,7 @@ test("report tables keep the old columns, with totals", () => {
     expect(p.rows).toEqual([["Satin Slip Dress", 3, 900], ["Unknown", 1, 50.5]]);
     expect(p.foot).toEqual(["Total", 4, 950.5]);
     const c = channelTable([{ channel: "pos", orders: 3, sales: 300, placed: 4 }, { channel: "pay_link", orders: 1, sales: 100, placed: 1 }, { channel: "storefront", orders: 0, sales: 0, placed: 2 }]);
-    expect(c.rows.map(r => r[0])).toEqual(["Till", "Pay link", "Online shop"]);
+    expect(c.rows.map(r => r[0])).toEqual(["POS", "Pay link", "Online shop"]);
     expect(c.rows.map(r => r[2])).toEqual([75, 25, 0]);
     const d = discountTable([{ label: "MISST100", type: "code", uses: 2, given: 200, sales: 500 }, { label: "2 for 150", type: "auto", uses: 1, given: 10, sales: 140 }]);
     expect(d.rows.map(r => r[1])).toEqual(["Code", "Automatic"]);

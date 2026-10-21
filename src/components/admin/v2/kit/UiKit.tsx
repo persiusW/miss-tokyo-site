@@ -37,7 +37,7 @@ export function UiKit() {
                 <Kpi label="Sales" value="GH₵ 3,860" delta={24} ctx="vs same time yesterday" />
                 <Kpi label="Orders" value="6" delta={-3} ctx="vs same time yesterday" />
                 <Kpi label="Average order" value="GH₵ 643" ctx="paid orders only" />
-                <Kpi label="Cash to count at close" value="GH₵ 630" ctx="from 1 till sale" />
+                <Kpi label="Cash to count at close" value="GH₵ 630" ctx="from 1 POS sale" />
             </div>
             <Card title="Buttons" pad>
                 <div className="hrow wrap">
@@ -122,7 +122,7 @@ export function UiKit() {
                 <p className="ink2">You have 2 unsaved changes in Settings.</p>
             </Modal>
             <ConfirmPanel open={confirm} onClose={() => setConfirm(false)} title="Cancel MT-GC-7Q2K" sub="For Adwoa Sika"
-                consequenceTitle="GH₵ 500.00 can no longer be spent" consequence="The code stops working at checkout and the till straight away. No money is refunded to the buyer."
+                consequenceTitle="GH₵ 500.00 can no longer be spent" consequence="The code stops working at checkout and the POS straight away. No money is refunded to the buyer."
                 confirmLabel="Cancel gift card" cancelLabel="Keep gift card" onConfirm={() => { setConfirm(false); toast.success("Gift card cancelled"); }} />
         </>
     );
