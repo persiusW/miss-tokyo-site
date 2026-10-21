@@ -2,9 +2,10 @@
 // search-engine text is saved under (site_metadata.page_path).
 import { POLICY_META, type PolicyKey } from "@/lib/content/pageDocs";
 
-export type PageId = "about" | "size-guide" | PolicyKey | "faq" | "gift-cards";
+export type PageId = "shop" | "about" | "size-guide" | PolicyKey | "faq" | "gift-cards";
 
 export const CONTENT_PAGES: { id: PageId; name: string; path: string; seoTitle: string }[] = [
+    { id: "shop", name: "Shop page", path: "/shop", seoTitle: "Shop — Miss Tokyo" },
     { id: "about", name: "About", path: "/about", seoTitle: "About — Miss Tokyo" },
     { id: "size-guide", name: "Size guide", path: "/size-guide", seoTitle: "Size Guide — Miss Tokyo" },
     { id: "shipping", name: POLICY_META.shipping.name, path: POLICY_META.shipping.path, seoTitle: "Shipping Policy — Miss Tokyo" },

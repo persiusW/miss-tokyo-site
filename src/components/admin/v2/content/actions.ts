@@ -13,6 +13,7 @@ import { HOME_LAYOUT_KEY, OWN_SWITCH, cleanLayout, parseLayout, type HomeSection
 import { FAQ_COPY_KEY, POLICY_META, SIZE_GUIDE_PAGE_KEY, SIZE_MODAL_KEY, cleanFaqs, cleanPolicy, cleanSizeGuidePage, type PolicyKey } from "@/lib/content/pageDocs";
 import { SITE_ASSETS, isConfigCopyKey } from "@/lib/content/wording";
 import { NAV_TAG } from "@/lib/content/shopNav";
+import { PAGE_SEO_TAG } from "@/lib/content/load";
 import {
     NAV_KEYS, PDP_KEYS, cleanAbout, cleanCarouselTabs, cleanFeatured, cleanGiftCards, cleanImage, cleanLink, cleanModalRows,
     cleanReview, cleanSeo, cleanSlide, cleanTrustItems, isUuid, type NavKey, type PdpKey, type SeoIn,
@@ -301,8 +302,15 @@ export async function reorderReviews(ids: string[]): Promise<Done> { return reor
 async function finishPage(path: string, seo: unknown): Promise<Done> {
     const r = await putSeo(path, seo);
     if (r.error) return fail("GEN-00", r.error, { path });
+    updateTag(PAGE_SEO_TAG);
     revalidatePath(path);
     return OK();
+}
+
+/** The shop page has no text to edit here, only its search-engine text. */
+export async function publishShopPage(seo: unknown): Promise<Done> {
+    const denied = await gate(); if (denied) return denied;
+    return finishPage("/shop", seo);
 }
 
 export async function publishAbout(input: unknown, seo: unknown): Promise<Done> {

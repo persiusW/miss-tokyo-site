@@ -1,9 +1,14 @@
 // Server-side reads of the editable shop pages, for the storefront and for
 // Ask Miss Tokyo. A failed read shows the original text, never an empty page.
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { FAQ_COPY_KEY, POLICY_META, SIZE_GUIDE_PAGE_KEY, parseFaqs, parsePolicy, parseSizeGuidePage, type PolicyKey } from "./pageDocs";
 import type { ShopContent } from "./shopInfoText";
+import { withSeoRow } from "./seo";
+
+/** Cache tag: Content's saves expire it so the shop updates at once. */
+export const PAGE_SEO_TAG = "page-seo";
 
 async function copyValues(keys: string[]): Promise<Record<string, string>> {
     try {
@@ -38,22 +43,26 @@ export async function loadShopContent(): Promise<ShopContent> {
     };
 }
 
+// One cached read per page path (a minute at most, and expired on save), so
+// a page rendered per request, like /shop, doesn't query on every visit.
+const seoRow = unstable_cache(
+    async (path: string) => {
+        const { data, error } = await supabaseAdmin.from("site_metadata")
+            .select("title, description, keywords, og_image_url").eq("page_path", path).maybeSingle();
+        if (error) throw error;
+        return data as { title: string | null; description: string | null; keywords: string | null; og_image_url: string | null } | null;
+    },
+    ["page-seo"],
+    { revalidate: 60, tags: [PAGE_SEO_TAG] },
+);
+
 /**
  * A page's search-engine title and description: the row saved in
  * Content › Pages › Search engines for this path, else the page's own.
  */
 export async function pageSeo(path: string, fallback: Metadata): Promise<Metadata> {
     try {
-        const { data } = await supabaseAdmin.from("site_metadata")
-            .select("title, description, keywords, og_image_url").eq("page_path", path).maybeSingle();
-        if (!data) return fallback;
-        return {
-            ...fallback,
-            title: data.title?.trim() || fallback.title,
-            description: data.description?.trim() || fallback.description,
-            ...(data.keywords?.trim() ? { keywords: data.keywords } : {}),
-            ...(data.og_image_url ? { openGraph: { ...(fallback.openGraph ?? {}), images: [data.og_image_url] } } : {}),
-        };
+        return withSeoRow(await seoRow(path), fallback);
     } catch {
         return fallback;
     }

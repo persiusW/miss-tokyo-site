@@ -5,6 +5,7 @@ import { getProducts, getCategories, getPopulatedCategoryFilter, deriveColors, d
 import { ShopPageClient } from "@/components/ui/miss-tokyo/ShopPageClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { liveAutoDiscounts } from "@/lib/autoDiscount";
+import { pageSeo } from "@/lib/content/load";
 
 const getAutoDiscountRules = unstable_cache(
     async () => {
@@ -81,12 +82,13 @@ export async function generateMetadata({
         }
     }
 
-    return {
+    // Search-engine text can be changed in the admin (Content › Pages › Shop page).
+    return pageSeo("/shop", {
         title: "Shop — Miss Tokyo",
         description:
             "Browse 240+ styles — dresses, tops, sets, activewear and more. New drops weekly. Free delivery in Accra on orders over GH₵150.",
         alternates: { canonical: `${BASE}/shop` },
-    };
+    });
 }
 
 export default async function ShopPage({

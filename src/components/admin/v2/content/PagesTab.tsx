@@ -16,6 +16,7 @@ import { PolicyPanel } from "./pages/PolicyPanel";
 import { FaqPanel } from "./pages/FaqPanel";
 import { SizeGuidePanel } from "./pages/SizeGuidePanel";
 import { GiftCardsPanel } from "./pages/GiftCardsPanel";
+import { ShopPagePanel } from "./pages/ShopPagePanel";
 
 const PDP: Record<PdpKey, { l: string; help: string }> = {
     pdp_show_trust_strip: { l: "Promise icons", help: "Free delivery, easy returns and secure payment icons under the buttons." },
@@ -42,6 +43,7 @@ export function PagesTab({ data }: { data: PagesData }) {
         if (id === "faq") return data.faq.saved ? { sub: `Edited ${when(data.faq.updatedAt)}` } : { sub: "Original questions" };
         if (id === "size-guide") return data.sizeGuide.updatedAt ? { sub: `Edited ${when(data.sizeGuide.updatedAt)}` } : { sub: "Original sizes" };
         if (id === "gift-cards") return { sub: data.giftCards.gc_enabled ? "Selling gift cards online" : "Shows “Coming soon”" };
+        if (id === "shop") return { sub: "Search engine text" };
         return { sub: "Story, numbers, values, team" };
     };
 
@@ -79,6 +81,7 @@ export function PagesTab({ data }: { data: PagesData }) {
                 </div>
             </Card>
 
+            {open === "shop" && <ShopPagePanel seo={data.seo["/shop"]} onClose={close} onSaved={saved} />}
             {open === "about" && <AboutPanel value={data.about} seo={data.seo["/about"]} onClose={close} onSaved={saved} />}
             {open && (POLICY_IDS as string[]).includes(open) && (
                 <PolicyPanel k={open as PolicyKey} doc={data.policies[open as PolicyKey].doc} seo={data.seo[CONTENT_PAGES.find(p => p.id === open)!.path]} onClose={close} onSaved={saved} />
