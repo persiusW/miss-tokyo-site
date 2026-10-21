@@ -36,6 +36,48 @@ export function prefersReducedMotion(): boolean {
     try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
 }
 
+// ── Exit on a detached copy ────────────────────────────────────────────────
+
+/**
+ * Called when an overlay goes away (its `open` turned false, or the caller
+ * stopped rendering it). React has already removed the nodes; this puts the
+ * same nodes back for one exit animation, inert and hidden from assistive
+ * tech, and removes them when it ends. Scroll positions are restored so the
+ * copy doesn't jump to the top while it slides out.
+ */
+export function playExit(nodes: HTMLElement[], parent: Node | null, ms: number, scrolls?: Map<Element, number>) {
+    if (!parent || !nodes.length || prefersReducedMotion()) return;
+    queueMicrotask(() => {
+        // Still attached: StrictMode or Fast Refresh re-ran the effect without unmounting.
+        if (nodes.some(n => n.isConnected) || !(parent as Element).isConnected) return;
+        for (const n of nodes) {
+            n.classList.add("closing");
+            n.setAttribute("aria-hidden", "true");
+            n.setAttribute("inert", "");
+            parent.appendChild(n);
+        }
+        scrolls?.forEach((top, el) => { if (el.isConnected) el.scrollTop = top; });
+        let done = false;
+        const finish = () => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            for (const n of nodes) { n.removeEventListener("animationend", onEnd); n.remove(); }
+        };
+        const onEnd = (e: AnimationEvent) => { if (e.animationName.endsWith("-out")) finish(); };
+        const timer = setTimeout(finish, ms + 80);
+        for (const n of nodes) n.addEventListener("animationend", onEnd);
+    });
+}
+
+/** Remembers scroll offsets inside `nodes` so playExit can put them back. Returns the map and a stop function. */
+export function trackScroll(nodes: HTMLElement[]): [Map<Element, number>, () => void] {
+    const m = new Map<Element, number>();
+    const h = (e: Event) => { const t = e.target; if (t instanceof Element) m.set(t, t.scrollTop); };
+    for (const n of nodes) n.addEventListener("scroll", h, { capture: true, passive: true });
+    return [m, () => { for (const n of nodes) n.removeEventListener("scroll", h, { capture: true }); }];
+}
+
 // ── Route view transitions ─────────────────────────────────────────────────
 
 let commits = 0;

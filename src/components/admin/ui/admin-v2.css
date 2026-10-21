@@ -419,6 +419,22 @@
 .adm2 .page>:nth-child(4){animation-delay:calc(var(--stagger)*3)}
 .adm2 .page>:nth-child(5){animation-delay:calc(var(--stagger)*4)}
 .adm2 .page>:nth-child(n+6){animation-delay:calc(var(--stagger)*5)}
+/* Panels and modals. Open: panel 40px from the right over --dur (a sheet from
+   below under 620px), modal from .97 in 150ms, scrim fades. Close: useExit
+   puts the removed nodes back with .closing for one exit, then drops them. */
+.adm2 .modal,.adm2 .palette{animation-duration:150ms}
+@keyframes panel-out{to{transform:translateX(40px);opacity:0}}
+@keyframes sheet-out{to{transform:translateY(40px);opacity:0}}
+@keyframes pop-out{to{transform:scale(.97);opacity:0}}
+@keyframes fade-out{to{opacity:0}}
+.adm2 .closing{pointer-events:none}
+/* Re-inserted nodes would replay every entrance inside them. */
+.adm2 .closing *{animation:none!important}
+.adm2 .scrim.closing{animation:fade-out 170ms var(--ease-in) forwards}
+.adm2 .panel.closing{animation:panel-out 170ms var(--ease-in) forwards}
+.adm2 .modal-wrap.closing>.scrim{animation:fade-out 150ms var(--ease-in) forwards!important}
+.adm2 .modal-wrap.closing>.modal,.adm2 .modal-wrap.closing>.palette{animation:pop-out 150ms var(--ease-in) forwards!important}
+@media (max-width:620px){.adm2 .panel.closing,.adm2 .panel.wide.closing{animation:sheet-out 170ms var(--ease-in) forwards}}
 /* Route view transitions (motion.ts startRouteTransition): a short root
    cross-fade that never takes the clicks. */
 html:has(.adm2)::view-transition{pointer-events:none}

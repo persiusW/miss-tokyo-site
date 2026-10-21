@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import fs from "fs";
 import path from "path";
-import { STAGGER_CAP, STAGGER_MS, nodeText, staggerDelayMs } from "../../../src/components/admin/ui/motion";
+import { EXIT_MS, STAGGER_CAP, STAGGER_MS, nodeText, staggerDelayMs } from "../../../src/components/admin/ui/motion";
 import { pageKey } from "../../../src/components/admin/shell/nav";
 
 const ROOT = path.resolve(__dirname, "../../..");
@@ -54,6 +54,12 @@ test("the CSS page stagger matches staggerDelayMs", () => {
         expect(CSS, `child ${i + 1}`).toContain(`.adm2 .page>:nth-child(${i + 1}){animation-delay:${want}}`);
     }
     expect(CSS).toContain(`.adm2 .page>:nth-child(n+${STAGGER_CAP}){animation-delay:calc(var(--stagger)*${STAGGER_CAP - 1})}`);
+});
+
+test("exit lengths match the keyframes in admin-v2.css", () => {
+    expect(EXIT_MS).toEqual({ panel: 170, modal: 150 });
+    expect(CSS).toMatch(/\.adm2 \.panel\.closing\{animation:panel-out 170ms var\(--ease-in\)/);
+    expect(CSS).toMatch(/\.adm2 \.modal-wrap\.closing>\.modal[^{]*\{animation:pop-out 150ms var\(--ease-in\)/);
 });
 
 test("nodeText keys a KPI value by what it shows", () => {

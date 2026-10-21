@@ -5,7 +5,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/admin/ui/Icon";
-import { useLayer, portalHost } from "@/components/admin/ui/overlays";
+import { useExit, useLayer, portalHost } from "@/components/admin/ui/overlays";
+import { EXIT_MS } from "@/components/admin/ui/motion";
 import { FUL, fulKey, ghs } from "@/components/admin/ui";
 import { paletteSearch, type PaletteHit } from "@/lib/admin/paletteSearch";
 import type { NavDef } from "./nav";
@@ -32,6 +33,7 @@ export function CommandPaletteV2({ open, onClose, go, pages }: { open: boolean; 
     const ref = useRef<HTMLDivElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
     const runId = useRef(0);
+    const wrapRef = useRef<HTMLDivElement>(null);
     useLayer(open, onClose, ref);
 
     useEffect(() => { if (open) { setQ(""); setDebounced(""); setHits([]); setA(0); } }, [open]);
@@ -59,11 +61,12 @@ export function CommandPaletteV2({ open, onClose, go, pages }: { open: boolean; 
     }, [a]);
 
     const host = open ? portalHost() : null;
+    useExit(open && !!host, EXIT_MS.modal, wrapRef);
     if (!open || !host) return null;
     const run = (r: Row) => { onClose(); go(r.href); };
 
     return createPortal(
-        <div className="modal-wrap" style={{ placeItems: "start center" }}>
+        <div className="modal-wrap" style={{ placeItems: "start center" }} ref={wrapRef}>
             <div className="scrim" onClick={onClose} />
             <div className="palette" role="dialog" aria-modal="true" aria-label="Search" ref={ref}>
                 <div className="palette-in">

@@ -3,13 +3,20 @@
 // Panels, modals and menus. Esc closes the top-most layer only, focus is
 // trapped inside it and returns to the opener on close.
 //
+// Closing never waits: onClose runs at once (so saves, toasts and focus
+// return are never held back) and useExit plays the slide-out on the nodes
+// React just removed. That covers every way an overlay goes away: Esc, the
+// scrim, the close button, a footer Cancel, a save that closes it, the
+// caller unmounting it, or a route change.
+//
 // Overlays portal into the .adm2 root, never <body>: the tokens are declared
 // there, and the top bar's backdrop-filter would otherwise trap position:fixed
 // (see memory: fixed-position traps in the admin shell).
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { Icon, type IconName } from "./Icon";
 import { Banner, Btn, IconBtn, Tabs, type TabDef } from "./primitives";
+import { EXIT_MS, playExit, trackScroll } from "./motion";
 
 const layerStack: object[] = [];
 
@@ -56,6 +63,21 @@ export function useLayer(open: boolean, onClose: () => void, ref: RefObject<HTML
     }, [open, ref]);
 }
 
+/**
+ * Plays the exit animation once this overlay goes away: `active` turning
+ * false, or the component unmounting. `a` and `b` are its top-level nodes
+ * (scrim first, so the panel stays on top). Skipped under reduced motion.
+ */
+export function useExit(active: boolean, ms: number, a: RefObject<HTMLElement | null>, b?: RefObject<HTMLElement | null>) {
+    useLayoutEffect(() => {
+        if (!active) return;
+        const nodes = [a.current, b?.current].filter((n): n is HTMLElement => !!n);
+        const parent = nodes[0]?.parentNode ?? null;
+        const [scrolls, stop] = trackScroll(nodes);
+        return () => { stop(); playExit(nodes, parent, ms, scrolls); };
+    }, [active, ms, a, b]);
+}
+
 function useMounted() {
     const [m, setM] = useState(false);
     useEffect(() => setM(true), []);
@@ -82,14 +104,16 @@ type PanelProps<T extends string> = {
 /** Right-hand drawer for every create and edit flow. Under 620px it's a full-height sheet. */
 export function Panel<T extends string>({ open, onClose, title, sub, head, tabs, tab, onTab, children, footer, footerLeft, wide, level, label }: PanelProps<T>) {
     const ref = useRef<HTMLElement>(null);
+    const scrimRef = useRef<HTMLDivElement>(null);
     useLayer(open, onClose, ref);
     const mounted = useMounted();
     const host = mounted ? portalHost() : null;
+    useExit(open && !!host, EXIT_MS.panel, scrimRef, ref);
     if (!open || !host) return null;
     const lv = level === 2 ? " stack-2" : "";
     return createPortal(
         <>
-            <div className={"scrim" + lv} onClick={onClose} />
+            <div className={"scrim" + lv} onClick={onClose} ref={scrimRef} />
             <aside className={`panel${wide ? " wide" : ""}${lv}`} role="dialog" aria-modal="true"
                 aria-label={label ?? (typeof title === "string" ? title : "Panel")} ref={ref}>
                 <div className="panel-h">
@@ -108,12 +132,14 @@ export function Panel<T extends string>({ open, onClose, title, sub, head, tabs,
 /** Centred dialog, only for short single-purpose steps. */
 export function Modal({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
     const ref = useRef<HTMLDivElement>(null);
+    const wrapRef = useRef<HTMLDivElement>(null);
     useLayer(open, onClose, ref);
     const mounted = useMounted();
     const host = mounted ? portalHost() : null;
+    useExit(open && !!host, EXIT_MS.modal, wrapRef);
     if (!open || !host) return null;
     return createPortal(
-        <div className="modal-wrap">
+        <div className="modal-wrap" ref={wrapRef}>
             <div className="scrim" onClick={onClose} />
             <div className={`modal${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
                 <div className="modal-h"><h2>{title}</h2></div>
