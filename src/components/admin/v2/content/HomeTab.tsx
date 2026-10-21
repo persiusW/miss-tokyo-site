@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Btn, Card, Empty, Icon, Switch, Thumb, plural, toast } from "@/components/admin/ui";
-import { HOME_SECTIONS, NEW_ARRIVALS_SHOWN, OWN_SWITCH, type HomeSectionId } from "@/lib/content/homeLayout";
+import { HOME_SECTIONS, OWN_SWITCH, type HomeSectionId } from "@/lib/content/homeLayout";
 import type { HomeData, Slide } from "./data";
 import { reorderSlides, saveHomeOrder, setHomeSectionShown } from "./actions";
 import { MoveButtons, quickSwitch, run, swap } from "./shared";
@@ -14,9 +14,10 @@ import { TrustPanel } from "./home/TrustPanel";
 import { FeaturedPanel } from "./home/FeaturedPanel";
 import { NewArrivalsPanel } from "./home/NewArrivalsPanel";
 import { NewsletterPanel } from "./home/NewsletterPanel";
+import { ReviewsSourcePanel } from "./home/ReviewsSourcePanel";
 
-type PanelKey = "trust" | "categories" | "new_arrivals" | "newsletter";
-const EDITABLE: Partial<Record<HomeSectionId, PanelKey>> = { trust: "trust", categories: "categories", new_arrivals: "new_arrivals", newsletter: "newsletter" };
+type PanelKey = "trust" | "categories" | "new_arrivals" | "reviews" | "newsletter";
+const EDITABLE: Partial<Record<HomeSectionId, PanelKey>> = { trust: "trust", categories: "categories", new_arrivals: "new_arrivals", reviews: "reviews", newsletter: "newsletter" };
 
 export function HomeTab({ data }: { data: HomeData }) {
     const router = useRouter();
@@ -88,10 +89,18 @@ export function HomeTab({ data }: { data: HomeData }) {
                     .map(f => f.custom_label || data.categories.find(c => c.id === f.category_id)?.name).filter(Boolean);
                 return names.length ? names.join(", ") : "No categories picked";
             }
-            case "new_arrivals":
-                return `The ${NEW_ARRIVALS_SHOWN} newest products`;
+            case "new_arrivals": {
+                const na = data.newArrivals;
+                const cat = na.categoryId ? data.categories.find(c => c.id === na.categoryId)?.name ?? "one category" : null;
+                const what = na.tabs.length > 1
+                    ? `${na.tabs.length} tabs: ${na.tabs.map(t => t.label || "Untitled").join(", ")}`
+                    : `The ${na.limit} ${na.tabs[0]?.mode === "sort_order" ? "first products in shop order" : "newest products"}`;
+                return `“${na.title}” · ${what}${cat ? ` from ${cat}` : ""}`;
+            }
             case "reviews":
-                return "Review widget from Transparent Turtle";
+                return data.reviews.source === "own"
+                    ? `Your reviews · ${plural(data.reviews.shown, "review")} showing`
+                    : "Review widget from Transparent Turtle";
             case "newsletter":
                 return `${data.newsletter.title ? `“${data.newsletter.title}” · ` : ""}${plural(data.newsletter.subscribers, "subscriber")}`;
             case "instagram":
@@ -160,6 +169,7 @@ export function HomeTab({ data }: { data: HomeData }) {
             {panel === "trust" && <TrustPanel items={data.trustItems} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
             {panel === "categories" && <FeaturedPanel slots={data.featured} categories={data.categories} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
             {panel === "new_arrivals" && <NewArrivalsPanel value={data.newArrivals} categories={data.categories} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
+            {panel === "reviews" && <ReviewsSourcePanel source={data.reviews.source} shown={data.reviews.shown} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
             {panel === "newsletter" && <NewsletterPanel value={data.newsletter} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
         </>
     );

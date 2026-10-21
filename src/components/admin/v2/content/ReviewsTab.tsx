@@ -3,6 +3,8 @@
 // Content › Reviews: the customer reviews kept for the home page.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import type { ReviewsSource } from "@/lib/content/homeSections";
 import { Banner, Btn, Card, Empty, Field, Panel, Seg, SRow, Switch, TwoTap, toast } from "@/components/admin/ui";
 import type { Review } from "./data";
 import { deleteReview, reorderReviews, saveReview, setReviewShown } from "./actions";
@@ -14,7 +16,7 @@ function Stars({ n }: { n: number }) {
     return <span className="ct-stars" aria-label={`${n} out of 5 stars`}>{"★".repeat(n)}<span className="off">{"★".repeat(5 - n)}</span></span>;
 }
 
-export function ReviewsTab({ reviews }: { reviews: Review[] }) {
+export function ReviewsTab({ reviews, source }: { reviews: Review[]; source: ReviewsSource }) {
     const router = useRouter();
     const [list, setList] = useState(reviews);
     const [open, setOpen] = useState<Review | "new" | null>(null);
@@ -37,9 +39,15 @@ export function ReviewsTab({ reviews }: { reviews: Review[] }) {
 
     return (
         <>
-            <Banner tone="info" title="These reviews aren't on the shop yet">
-                The home page shows the review widget from Transparent Turtle. The reviews here are kept for when the shop shows its own.
-            </Banner>
+            {source === "own" ? (
+                <Banner tone="info" title="These reviews show on the home page">
+                    The ones switched on show in this order, three to a row. To show the Transparent Turtle widget instead, change it in <Link href="/content" className="link-btn">Home page › Customer reviews</Link>.
+                </Banner>
+            ) : (
+                <Banner tone="info" title="The home page shows the Transparent Turtle widget">
+                    These reviews are kept ready. To show them instead of the widget, choose “Your reviews” in <Link href="/content" className="link-btn">Home page › Customer reviews</Link>.
+                </Banner>
+            )}
             <Card title="Customer reviews" action={<Btn sm icon="plus" onClick={() => setOpen("new")}>Add review</Btn>}>
                 {list.length === 0 ? (
                     <Empty icon="star" title="No reviews yet" body="Add a review from a customer with their name, a star rating and what they said."

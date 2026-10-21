@@ -26,9 +26,6 @@ export const OWN_SWITCH: Partial<Record<HomeSectionId, "trust_bar_enabled" | "op
     newsletter: "optin_section_enabled",
 };
 
-/** How many products the home page's New Arrivals carousel shows (newest first). */
-export const NEW_ARRIVALS_SHOWN = 16;
-
 export type HomeLayout = { order: HomeSectionId[]; hidden: HomeSectionId[] };
 
 const IDS = HOME_SECTIONS.map(s => s.id);

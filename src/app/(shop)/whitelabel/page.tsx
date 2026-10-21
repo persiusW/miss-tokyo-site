@@ -1,7 +1,9 @@
 import Image from "next/image";
+import Link from "next/link";
 import { CustomOrderForm } from "@/components/ui/miss-tokyo/CustomOrderForm";
 import { Suspense } from "react";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { loadSiteImages } from "@/lib/content/load";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,8 @@ export default async function WhiteLabelPage({ searchParams }: { searchParams: P
             imageUrl = data.image_urls[0];
         }
     }
+    // Without a product, the photo from Content › Images › Custom order photo (if on).
+    const photo = imageUrl ? null : (await loadSiteImages(["custom_banner"] as const)).custom_banner;
 
     return (
         <div className="pt-24 pb-32 px-6 md:px-12 max-w-7xl mx-auto flex flex-col md:flex-row gap-16 md:gap-24">
@@ -23,6 +27,11 @@ export default async function WhiteLabelPage({ searchParams }: { searchParams: P
             <div className="w-full md:w-5/12 hidden md:block relative h-[80vh] bg-neutral-100 flex items-center justify-center">
                 {imageUrl ? (
                     <Image src={imageUrl} alt="Reference Product" fill className="object-cover" />
+                ) : photo ? (
+                    <>
+                        <Image src={photo.url} alt={photo.alt || "White Labelling"} fill className="object-cover" />
+                        {photo.link && <Link href={photo.link} className="absolute inset-0" aria-label={photo.alt || "White Labelling"} />}
+                    </>
                 ) : (
                     <span className="text-neutral-400 text-sm tracking-widest uppercase">White Labelling</span>
                 )}

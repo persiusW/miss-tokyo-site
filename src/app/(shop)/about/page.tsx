@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { pageSeo } from "@/lib/content/load";
+import { loadSiteImages, pageSeo } from "@/lib/content/load";
 import { AboutSections } from "./AboutSections";
 import type { AboutTimelineEntry, AboutValue, AboutTeamMember } from "@/types/settings";
 
@@ -16,11 +16,14 @@ export function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
-    const { data: s } = await supabaseAdmin
-        .from("site_settings")
-        .select("*")
-        .eq("id", "singleton")
-        .single();
+    const [{ data: s }, img] = await Promise.all([
+        supabaseAdmin
+            .from("site_settings")
+            .select("*")
+            .eq("id", "singleton")
+            .single(),
+        loadSiteImages(["about_hero", "about_founder", "about_photo_3"] as const),
+    ]);
 
     const d = {
         eyebrow:        s?.about_eyebrow        ?? "Our story",
@@ -48,6 +51,7 @@ export default async function AboutPage() {
         ctaBody:        s?.about_cta_body       ?? "",
         ctaBtnLabel:    s?.about_cta_btn_label  ?? "Shop Now",
         ctaBtnUrl:      s?.about_cta_btn_url    ?? "/shop",
+        photos:         [img.about_hero, img.about_founder, img.about_photo_3],
     };
 
     return <AboutSections {...d} />;

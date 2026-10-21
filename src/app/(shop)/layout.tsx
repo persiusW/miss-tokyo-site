@@ -8,6 +8,8 @@ import { PWAInstallBanner } from "@/components/ui/miss-tokyo/PWAInstallBanner";
 import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { AskMissTokyo } from "@/components/shop/askMissTokyo/AskMissTokyo";
+import { DEFAULT_NAV, NAV_TAG, shopNavFrom } from "@/lib/content/shopNav";
+import { NAV_KEYS } from "@/lib/content/adminInput";
 
 export const revalidate = 60;
 
@@ -50,12 +52,32 @@ const getShopAssistantEnabled = unstable_cache(
     { revalidate: 60 }
 );
 
+// The menu's links (Content › Menu) and which optional pages are on
+// (Settings › Shop pages), read on the server so the first paint is right and
+// cached like maintenance mode. Saving either expires NAV_TAG.
+const getShopNav = unstable_cache(
+    async () => {
+        try {
+            const [site, store] = await Promise.all([
+                supabaseAdmin.from("site_settings").select(NAV_KEYS.join(", ")).eq("id", "singleton").maybeSingle(),
+                supabaseAdmin.from("store_settings").select("enable_gallery, enable_gift_cards").eq("id", "default").maybeSingle(),
+            ]);
+            if (site.error || store.error) return DEFAULT_NAV;
+            return shopNavFrom(site.data as unknown as Record<string, boolean | null> | null, store.data);
+        } catch {
+            return DEFAULT_NAV;
+        }
+    },
+    ["shop-nav"],
+    { revalidate: 60, tags: [NAV_TAG] }
+);
+
 export default async function ShopLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const isMaintenanceMode = await getMaintenanceMode();
+    const [isMaintenanceMode, nav] = await Promise.all([getMaintenanceMode(), getShopNav()]);
     const askEnabled = (process.env.NODE_ENV !== "production" && process.env.SHOP_ASSISTANT_FORCE_ENABLED === "1")
         || ((await getShopAssistantEnabled()) && !!process.env.ANTHROPIC_API_KEY);
 
@@ -81,7 +103,7 @@ export default async function ShopLayout({
               * Removing server-side auth.getUser() from the layout prevents cookies()
               * from being called, which restores ISR for every page under (shop).
               */}
-            <NavBar initialUser={null} />
+            <NavBar initialUser={null} nav={nav} />
             <main className="flex-1 flex flex-col pt-20 pb-safe-tab bg-[#f5f0e8]">
                 {children}
             </main>
@@ -90,7 +112,7 @@ export default async function ShopLayout({
             <ErrorNet />
             <CartDrawer />
             <AskMissTokyo enabled={askEnabled} />
-            <MobileTabBar />
+            <MobileTabBar nav={nav} />
             <PWAInstallBanner />
         </div>
     );

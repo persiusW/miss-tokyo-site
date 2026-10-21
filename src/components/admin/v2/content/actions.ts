@@ -4,14 +4,17 @@
 // run on the service role, so each one re-checks that the caller is an owner
 // or admin first (the old CMS tabs wrote straight from the browser). Each
 // refreshes the shop pages it changes.
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireStaff } from "@/lib/ai/requireStaff";
 import { logCause } from "@/lib/errors/apiError";
 import { errorBody, type ErrorCode } from "@/lib/errors/catalogue";
 import { HOME_LAYOUT_KEY, OWN_SWITCH, cleanLayout, parseLayout, type HomeSectionId, type HomeLayout } from "@/lib/content/homeLayout";
 import { FAQ_COPY_KEY, POLICY_META, SIZE_GUIDE_PAGE_KEY, SIZE_MODAL_KEY, cleanFaqs, cleanPolicy, cleanSizeGuidePage, type PolicyKey } from "@/lib/content/pageDocs";
-import { SITE_ASSETS, isConfigCopyKey } from "@/lib/content/wording";
+import { SITE_ASSETS, WORDING, isConfigCopyKey } from "@/lib/content/wording";
+import { REVIEWS_SOURCE_KEY, type ReviewsSource } from "@/lib/content/homeSections";
+import { NAV_TAG } from "@/lib/content/shopNav";
+import { PAGE_SEO_TAG, SITE_IMAGES_TAG } from "@/lib/content/load";
 import {
     NAV_KEYS, PDP_KEYS, cleanAbout, cleanCarouselTabs, cleanFeatured, cleanGiftCards, cleanImage, cleanLink, cleanModalRows,
     cleanReview, cleanSeo, cleanSlide, cleanTrustItems, isUuid, type NavKey, type PdpKey, type SeoIn,
@@ -241,6 +244,8 @@ export async function setNavShown(key: NavKey, on: boolean): Promise<Done> {
     if (!(NAV_KEYS as readonly string[]).includes(key)) return nope("That menu link wasn't found.");
     const { error } = await updateSiteSettings({ [key]: !!on });
     if (error) return fail("GEN-00", error, { key });
+    // The menu is on every shop page, read through one cached value.
+    updateTag(NAV_TAG);
     return OK();
 }
 
@@ -293,13 +298,30 @@ export async function deleteReview(id: string): Promise<Done> {
 
 export async function reorderReviews(ids: string[]): Promise<Done> { return reorder("homepage_reviews", ids); }
 
+/** Which reviews the home page shows: the Transparent Turtle widget or the team's own. */
+export async function setReviewsSource(source: ReviewsSource): Promise<Done> {
+    const denied = await gate(); if (denied) return denied;
+    if (source !== "widget" && source !== "own") return nope("Choose which reviews to show.");
+    const { error } = await putCopy(REVIEWS_SOURCE_KEY, source, "Home page reviews", "homepage");
+    if (error) return fail("GEN-00", error);
+    refreshHome();
+    return OK();
+}
+
 // ── Pages ────────────────────────────────────────────────────────────────────
 
 async function finishPage(path: string, seo: unknown): Promise<Done> {
     const r = await putSeo(path, seo);
     if (r.error) return fail("GEN-00", r.error, { path });
+    updateTag(PAGE_SEO_TAG);
     revalidatePath(path);
     return OK();
+}
+
+/** The shop page has no text to edit here, only its search-engine text. */
+export async function publishShopPage(seo: unknown): Promise<Done> {
+    const denied = await gate(); if (denied) return denied;
+    return finishPage("/shop", seo);
 }
 
 export async function publishAbout(input: unknown, seo: unknown): Promise<Done> {
@@ -360,26 +382,32 @@ export async function saveWording(key: string, value: string, meta: { label: str
     const text = typeof value === "string" ? value.slice(0, 5000) : "";
     const { error } = await putCopy(key, text, String(meta?.label ?? key).slice(0, 120), String(meta?.group ?? "general").slice(0, 40));
     if (error) return fail("GEN-00", error, { key });
-    revalidatePath("/craft");
-    revalidatePath("/");
+    // The page that shows this wording (old wording has none; refresh both pages that read wording).
+    const path = WORDING.find(w => w.key === key)?.path;
+    if (path) revalidatePath(path);
+    else { revalidatePath("/craft"); revalidatePath("/"); }
     return OK();
 }
 
-export async function saveSiteImage(key: string, input: { image_url: unknown; alt_text: unknown; link_url: unknown }): Promise<Done> {
+export async function saveSiteImage(key: string, input: { image_url: unknown; alt_text: unknown; link_url: unknown; is_active?: unknown }): Promise<Done> {
     const denied = await gate(); if (denied) return denied;
     const def = SITE_ASSETS.find(a => a.key === key);
     if (!def) return nope("That image slot wasn't found.");
     const row = {
         image_url: cleanImage(input?.image_url) || null,
         alt_text: typeof input?.alt_text === "string" ? input.alt_text.trim().slice(0, 300) || null : null,
-        link_url: cleanLink(input?.link_url) || null,
+        // Backgrounds can't be tapped; a link saved on one is left as it was.
+        ...(def.linkable ? { link_url: cleanLink(input?.link_url) || null } : {}),
+        // "Show on the shop": on unless switched off.
+        is_active: input?.is_active !== false,
         updated_at: now(),
     };
     const { data: existing } = await supabaseAdmin.from("site_assets").select("section_key").eq("section_key", key).maybeSingle();
     const { error } = existing
         ? await supabaseAdmin.from("site_assets").update(row).eq("section_key", key)
-        : await supabaseAdmin.from("site_assets").insert({ section_key: key, label: def.label, is_active: true, ...row });
+        : await supabaseAdmin.from("site_assets").insert({ section_key: key, label: def.label, ...row });
     if (error) return fail("GEN-00", error, { key });
-    revalidatePath("/craft");
+    updateTag(SITE_IMAGES_TAG);
+    if (def.path) revalidatePath(def.path);
     return OK();
 }

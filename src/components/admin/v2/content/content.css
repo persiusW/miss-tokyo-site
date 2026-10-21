@@ -25,6 +25,7 @@
 .adm2 .ct-avatar{width:36px;height:36px;border-radius:var(--rp);display:grid;place-items:center;color:#fff;font-size:var(--t-xs);font-weight:700;flex-shrink:0}
 .adm2 .ct-range{width:100%;accent-color:var(--accent);min-height:var(--tap)}
 .adm2 .ct-group-h{padding:var(--s3) var(--s5);font-size:var(--t-xs);font-weight:700;color:var(--ink-3);background:var(--card-2)}
+.adm2 .ct-group-note{padding:var(--s2) var(--s5) 0;margin:0}
 .adm2 .ct-quote{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .adm2 .ct-upl{background:var(--card-2);border-radius:var(--r2);padding:var(--s4)}
 .adm2 .ct-chips{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}

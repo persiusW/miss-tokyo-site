@@ -5,8 +5,10 @@ import { CategoryGrid } from "@/components/public/CategoryGrid";
 import { NewArrivalsSection } from "@/components/public/NewArrivalsSection";
 import { OptInSection } from "@/components/public/OptInSection";
 import { InstagramFeed } from "@/components/public/InstagramFeed";
-import type { SiteSettings, HeroSlide, FeaturedCategory, TrustBarItem } from "@/types/settings";
+import { ReviewGrid } from "@/components/public/ReviewGrid";
+import type { SiteSettings, HeroSlide, FeaturedCategory, TrustBarItem, HomepageReview } from "@/types/settings";
 import { HOME_LAYOUT_KEY, parseLayout, type HomeSectionId } from "@/lib/content/homeLayout";
+import { CAROUSEL_KEY, NEW_ARRIVALS_WORDING, REVIEWS_SOURCE_KEY, newArrivalsConfig, parseReviewsSource } from "@/lib/content/homeSections";
 import { Fragment, type ReactNode } from "react";
 
 // 5-minute ISR: homepage content (hero, categories) changes rarely.
@@ -18,7 +20,8 @@ export default async function HomePage() {
     { data: settingsData },
     { data: heroSlidesData },
     { data: featuredCatsData },
-    { data: layoutRow },
+    { data: copyRows },
+    { data: reviewsData },
   ] = await Promise.all([
     supabaseAdmin
       .from("site_settings")
@@ -35,14 +38,23 @@ export default async function HomePage() {
       .select("*, category:categories(name, slug, image_url, product_count)")
       .eq("enabled", true)
       .order("position", { ascending: true }),
-    // Section order and visibility from Content › Home page.
+    // Section order and visibility, the New Arrivals tabs and wording, and
+    // which reviews show, from Content › Home page.
     supabaseAdmin
       .from("site_copy")
-      .select("value")
-      .eq("copy_key", HOME_LAYOUT_KEY)
-      .maybeSingle(),
+      .select("copy_key, value")
+      .in("copy_key", [HOME_LAYOUT_KEY, CAROUSEL_KEY, REVIEWS_SOURCE_KEY, ...NEW_ARRIVALS_WORDING]),
+    // The team's own reviews (Content › Reviews), shown when chosen instead of the widget.
+    supabaseAdmin
+      .from("homepage_reviews")
+      .select("*")
+      .eq("enabled", true)
+      .order("position", { ascending: true }),
   ]);
-  const layout = parseLayout(layoutRow?.value);
+  const copy: Record<string, string> = Object.fromEntries(
+    ((copyRows ?? []) as { copy_key: string; value: string }[]).map(r => [r.copy_key, r.value]),
+  );
+  const layout = parseLayout(copy[HOME_LAYOUT_KEY]);
 
   const settings = settingsData as SiteSettings | null;
   const heroSlides = (heroSlidesData || []) as HeroSlide[];
@@ -71,9 +83,11 @@ export default async function HomePage() {
     hero: <HeroSlider slides={heroSlides} />,
     trust: <TrustBar enabled={trustBarEnabled} items={trustBarItems} />,
     categories: <CategoryGrid categories={categoriesWithCounts} />,
-    new_arrivals: <NewArrivalsSection />,
-    // Transparent Turtle review widget
-    reviews: (
+    new_arrivals: <NewArrivalsSection config={newArrivalsConfig(settings, copy)} />,
+    reviews: parseReviewsSource(copy[REVIEWS_SOURCE_KEY]) === "own" ? (
+      <ReviewGrid reviews={(reviewsData ?? []) as HomepageReview[]} />
+    ) : (
+      // Transparent Turtle review widget
       <div className="w-full px-4 md:px-8 py-8">
         <iframe
           src="https://www.transparentturtle.com/widget/misstokyo?type=full&theme=light"
