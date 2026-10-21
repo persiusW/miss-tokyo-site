@@ -76,10 +76,10 @@ export const WALKTHROUGHS = [
         title: "Add a new product",
         roles: ALL,
         steps: [
-            { route: "products", anchor: "products.new", text: "Press New Product." },
-            { route: "product_new", text: "Fill in the name, category and price." },
-            { route: "product_new", text: "Switch on Sizes, Colors or Brands and tick what you stock. Missing an option? An admin or owner adds it in Site Settings → Store first." },
-            { route: "product_new", text: "Turn on per-variant stock and enter the stock for each combination, add the photos (the first is the main image), then save." },
+            { route: "products", anchor: "products.new", text: "Press Add product (New Product in the old admin)." },
+            { route: "product_new", text: "Fill in the name and category (Details), then the price (Pricing)." },
+            { route: "product_new", text: "Under Sizes and stock, tap the sizes, colours or brands you stock (old admin: switch on Sizes, Colors or Brands and tick them). Missing an option? An admin or owner adds it in Settings → Store first." },
+            { route: "product_new", text: "Switch on \"Separate stock for each size and colour\" (Track Inventory by Variant in the old admin) and enter each one's stock, add the photos on Details (the first is the main image), choose Active or Draft under Visibility, then press Add product." },
         ],
     },
     {
@@ -87,8 +87,8 @@ export const WALKTHROUGHS = [
         title: "Restock from the low-stock list",
         roles: ALL,
         steps: [
-            { route: "products", anchor: "products.low-stock", text: "Press Low Stock to see what is running out." },
-            { route: "low_stock", text: "Press Edit on the product, enter the new on-hand count (per size and colour where it has them) and save. Only the difference is applied." },
+            { route: "products", anchor: "products.low-stock", text: "Tap the Low stock chip to see what is running out (the Low Stock button in the old admin). Products › Inventory › Running low lists each size." },
+            { route: "low_stock", text: "In Products › Inventory, press Adjust on the size, choose \"New stock arrived\" and enter how many came in (old admin: Edit the product, enter the new count and save; only the difference is applied)." },
         ],
     },
     {
@@ -105,8 +105,8 @@ export const WALKTHROUGHS = [
         title: "Issue a gift card",
         roles: ALL,
         steps: [
-            { route: "gift_cards", anchor: "giftcards.issue", text: "Press Issue Gift Card." },
-            { route: "gift_cards", text: "Enter the amount and the recipient's email, then issue it. The code is emailed to them." },
+            { route: "gift_cards", anchor: "giftcards.issue", text: "Press Issue gift card (Issue Gift Card in the old admin)." },
+            { route: "gift_cards", text: "Pick the amount, enter the recipient's email, then press Send gift card (Issue & Send Email in the old admin). The code is emailed to them." },
         ],
     },
     {
