@@ -48,30 +48,30 @@ export const GUIDE: GuideEntry[] = [
         id: "orders",
         title: "Orders",
         route: "orders",
-        body: `Tabs: Inbox (paid only), Packed, Pickups, Shipped, Fulfilled, Cancelled, Refunds, All. Search by 8-character ref, name, email or phone — use the All tab, because Inbox shows paid orders only and "processing" orders appear only under All. Payment filter (Cash, Card/mobile money, Gift card) and From/To dates. Tick rows for bulk Mark Packed / Mark Shipped / Mark Fulfilled (on Packed: Mark Ready for Pickup, Assign Rider & Ship). Row "…" menu: Copy Order ID, Print Invoice (only opens the order), Mark Ready for Pickup / Assign Rider & Ship, Mark Fulfilled, View Details. Orders made only of pre-orders live under Pre-Orders.`,
+        body: `New admin (Orders): chips All, Waiting to pack (same count as Home and the side menu), Packed, Out for delivery, Ready for collection, Delivered or collected, Waiting for payment, Cancelled and refunded. "Search by order number, name or phone", a payment method and a channel filter (Online shop, Till, WhatsApp, Shop assistant), "Pre-orders only", and Placed from / to dates; 25 a page. Tick orders for "Mark as packed" (unpaid or partly packed orders are skipped and the message says how many), "Assign rider and send" (packed delivery orders), "Tell customers it's ready" (packed pickup orders), "Mark as delivered", "Print packing slips" and "Export". Tap an order to open its panel. Tabs above the list: Orders, Abandoned checkouts, Invoices and pay links (owners and admins). "Create order" opens the till. Old admin: tabs Inbox (paid only), Packed, Pickups, Shipped, Fulfilled, Cancelled, Refunds, All. Search by 8-character ref, name, email or phone — use the All tab, because Inbox shows paid orders only and "processing" orders appear only under All. Payment filter (Cash, Card/mobile money, Gift card) and From/To dates. Tick rows for bulk Mark Packed / Mark Shipped / Mark Fulfilled (on Packed: Mark Ready for Pickup, Assign Rider & Ship). Row "…" menu: Copy Order ID, Print Invoice (only opens the order), Mark Ready for Pickup / Assign Rider & Ship, Mark Fulfilled, View Details. Orders made only of pre-orders live under Pre-Orders.`,
     },
     {
         id: "order-detail",
         title: "An order's page",
         route: "orders",
-        body: `Header buttons appear by state: "Send Pickup Ready Notification" (packed pickup), "Assign Rider & Ship" (packed delivery), "Mark Collected", "Mark Fulfilled", "Refund", "Cancel", "Copy Details", "Resend Confirmation", "Print Receipt". The Payment card shows Order Total, Paystack Fee and Amount Paid, plus "Verify with Paystack". Verify only asks Paystack and changes nothing; on a mismatch "Mark this order paid" appears, which only admin or owner can apply (it marks paid, takes stock and emails the customer). Cancel fires immediately with no confirmation, returns exactly the stock the order took and emails the customer. Refund marks the order refunded and returns stock but sends NO money — refund in the Paystack dashboard. To ship: the order must be packed first, then Assign Rider & Ship → pick rider → choose notifications → Confirm & Ship. Pickup: packed → Send Pickup Ready Notification → Mark Collected when they collect.`,
+        body: `New admin: the order opens as a panel over the list (Details and Timeline tabs). It shows the badges, banners (unpaid for a day or more, pre-order items, items still to send, a refund Paystack couldn't finish), progress steps, items, the Payment card (items, discounts, delivery, processing fee, total, refunded, paid by, Paystack fee and "You receive" when Paystack sent them) with "Check with Paystack", the customer (WhatsApp and Email buttons, address or pickup instructions, rider), "Staff notes" (saved when you click away) and "Send a note to the customer" (WhatsApp only works if they messaged the shop in the last 24 hours, or email). One main button by state: Check with Paystack, Mark as packed (choose how many of each item; leaving some out makes it "Partly sent"), Send remaining items, Tell customer it's ready, Assign rider and send (pick a rider, "Text the rider", "Tell the customer"), Mark as delivered, Mark as collected. "…" has Resend confirmation, Print receipt, Copy delivery details, Open customer. Bottom left: Refund (owners and admins: Everything, Choose items or An amount, "Put the items back in stock", reason, "Email the customer") and Cancel order (paid orders: "Cancel and refund" or "Cancel without a refund"; "Tell the customer"); both show what will happen before you confirm. Card and Mobile money refunds go through Paystack only when "refunds through Paystack" is switched on; while it's off (the default) refund in the Paystack dashboard first and press Record. Cash and gift card refunds are recorded only. Old admin page: header buttons appear by state: "Send Pickup Ready Notification" (packed pickup), "Assign Rider & Ship" (packed delivery), "Mark Collected", "Mark Fulfilled", "Refund", "Cancel", "Copy Details", "Resend Confirmation", "Print Receipt". The Payment card shows Order Total, Paystack Fee and Amount Paid, plus "Verify with Paystack". Verify only asks Paystack and changes nothing; on a mismatch "Mark this order paid" appears, which only admin or owner can apply (it marks paid, takes stock and emails the customer). Cancel fires immediately with no confirmation, returns exactly the stock the order took and emails the customer. Refund marks the order refunded and returns stock but sends NO money — refund in the Paystack dashboard. To ship: the order must be packed first, then Assign Rider & Ship → pick rider → choose notifications → Confirm & Ship. Pickup: packed → Send Pickup Ready Notification → Mark Collected when they collect.`,
     },
     {
         id: "cancelled-but-paid",
         title: "Order shows cancelled but the customer paid",
-        body: `Unpaid online orders are cancelled automatically 20 minutes after checkout (checked every 30 minutes). A late payment reverses those automatic cancellations, and a nightly job at 23:30 repairs the rest; staff cancellations are final. To fix one now: open the order → "Verify with Paystack" → "Mark this order paid" (admin or owner).`,
+        body: `Unpaid online orders are cancelled automatically 20 minutes after checkout (checked every 30 minutes). A late payment reverses those automatic cancellations, and a nightly job at 23:30 repairs the rest; staff cancellations are final. To fix one now: open the order → "Check with Paystack" ("Verify with Paystack" in the old admin) → "Mark this order paid" (admin or owner).`,
     },
     {
         id: "pre-orders",
         title: "Pre-Orders",
         route: "pre_orders",
-        body: `Orders containing pre-order items, with Total Value, Awaiting Stock, Fulfilled and Cancelled. Same tabs as Orders, no payment or date filters. Regular items in mixed orders are fulfilled from Orders.`,
+        body: `New admin: Orders › "Pre-orders only" (old Pre-Orders links land there) shows Pre-orders waiting for stock, sent and cancelled, and the orders; an order's panel says which items are on pre-order. Old admin: orders containing pre-order items, with Total Value, Awaiting Stock, Fulfilled and Cancelled. Same tabs as Orders, no payment or date filters. Regular items in mixed orders are fulfilled from Orders.`,
     },
     {
         id: "abandoned",
         title: "Abandoned Carts",
         route: "abandoned",
-        body: `Pending orders that never reached Paystack, filtered Today / 7 Days / 30 Days / All Time. "Send Reminder" emails the customer (disabled when there is no email).`,
+        body: `New admin: Orders › Abandoned checkouts: checkouts that never became a payment (including those the unpaid-order sweep cancelled), with Checkouts not finished, Value left in carts and Recovered after a reminder (paid within 7 days), for Today / 7 days / 30 days / All time. "Send reminder" / "Send again" emails the customer (owners and admins); "Paid later" means they bought since. The shop also emails one reminder on its own a day after a checkout that never reached payment. Old admin (Abandoned Carts): pending orders that never reached Paystack, filtered Today / 7 Days / 30 Days / All Time. "Send Reminder" emails the customer (disabled when there is no email).`,
     },
     {
         id: "riders",
@@ -158,7 +158,7 @@ export const GUIDE: GuideEntry[] = [
         title: "Invoices and Pay Links",
         route: "invoices",
         roles: FULL,
-        body: `Invoices: "New Document" (invoice or quotation, line items) and a manual status dropdown. On an invoice's own page, "Paystack Link" creates a working payment link. The invoice list's "Pay Link" and the Pay Links page currently cannot produce a link — use the invoice page's "Paystack Link" instead.`,
+        body: `New admin: Orders › Invoices and pay links lists invoices, quotes and pay links (chips All, Invoices, Quotes, Pay links). "New" → Invoice, Quote or Pay link → customer name and email, lines (description, quantity, amount), tax, note → "Save draft" or "Make …". Open one to "Make a Paystack pay link", "Email to …", "Copy link to view it", "Open printable copy", "Mark as paid", or "Cancel it" (tap twice). Old admin: "New Document" (invoice or quotation, line items) and a manual status dropdown; on an invoice's own page, "Paystack Link" creates a payment link. The old Pay Links page can't produce a link; use an invoice or pay link from the new admin, or the invoice page's "Paystack Link".`,
     },
     {
         id: "settings",
@@ -193,7 +193,7 @@ export const GUIDE: GuideEntry[] = [
 
 /** Things the dashboard cannot do. Stops the assistant inventing workarounds. */
 export const CANNOT_DO: string[] = [
-    "Refund money to a customer from the dashboard. Refund marks the order and returns stock; the money is refunded in the Paystack dashboard.",
+    "Send a card or Mobile money refund through Paystack while refunds through Paystack are switched off (the default): refund in the Paystack dashboard, then record it on the order. In the old admin, Refund only marks the order and returns stock.",
     "Edit items, quantities, prices, address or customer details on an existing order.",
     "Change or cancel a POS sale after it is paid (cancel or refund its order instead).",
     "Delete an order.",
