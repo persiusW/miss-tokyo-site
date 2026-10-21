@@ -1,0 +1,5 @@
+/* Billing extras. Scoped to .adm2, tokens only. */
+.adm2 .bil-includes{margin:0;padding-left:18px;line-height:1.9}
+.adm2 .bil-plan-rows{border-top:1px solid var(--line)}
+.adm2 .bil-warn{color:var(--warn-ink)}
+.adm2 .bil-bar{width:120px}
