@@ -147,7 +147,7 @@ export function autoValueText(a: Pick<AutoRow, "discount_type" | "discount_value
 
 /** "Dresses", "Dresses and Tops", "Dresses, Tops and 3 more". */
 export function listNames(names: string[], max = 2): string {
-    const n = names.filter(Boolean);
+    const n = names.map(x => x.trim()).filter(Boolean);
     if (n.length === 0) return "";
     if (n.length <= max) return n.length === 2 ? `${n[0]} and ${n[1]}` : n[0];
     if (max === 2 && n.length === 3) return `${n[0]}, ${n[1]} and ${n[2]}`;
@@ -603,4 +603,97 @@ export const discountHref = (id: string, search = "") => `/discounts/${encodeURI
 export function idFromPath(pathname: string): string | null {
     const m = /^\/discounts\/([^/?#]+)/.exec(pathname);
     return m ? decodeURIComponent(m[1]) : null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const str = (v: unknown, max: number) => (typeof v === "string" ? v : v == null ? "" : String(v)).slice(0, max);
+const pick = <T extends string>(v: unknown, opts: readonly T[], dflt: T): T => (opts.includes(v as T) ? (v as T) : dflt);
+
+/**
+ * A form that came from the browser, made safe to validate and save on the
+ * server: known enums only, ids that look like ids, bounded strings. The
+ * browser sends start and end as ISO strings (it knows the staff's time zone).
+ */
+export function cleanForm(input: unknown, kind: Kind): DiscountForm {
+    const f = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+    const ids = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && UUID.test(x)))].slice(0, 500) : []);
+    return {
+        kind,
+        code: normaliseCode(str(f.code, 40)),
+        title: str(f.title, 120).replace(/\s+/g, " ").trim(),
+        codeType: pick(f.codeType, Object.keys(CODE_TYPE_LABEL) as CodeType[], "percentage"),
+        autoType: pick(f.autoType, ["PERCENTAGE", "FIXED"] as const, "PERCENTAGE"),
+        value: str(f.value, 12).trim(),
+        buyQty: str(f.buyQty, 6).trim(),
+        getQty: str(f.getQty, 6).trim(),
+        applies: pick(f.applies, ["ALL_PRODUCTS", "SPECIFIC_CATEGORIES", "SPECIFIC_PRODUCTS"] as const, "ALL_PRODUCTS"),
+        categoryIds: ids(f.categoryIds),
+        productIds: ids(f.productIds),
+        condition: pick(f.condition, ["none", "min", "qty"] as const, "none"),
+        minTotal: str(f.minTotal, 12).trim(),
+        minQty: str(f.minQty, 6).trim(),
+        qtyScope: pick(f.qtyScope, ["ACROSS_TARGET", "PER_PRODUCT"] as const, "ACROSS_TARGET"),
+        start: str(f.start, 40),
+        hasEnd: f.hasEnd === true,
+        end: str(f.end, 40),
+        limit: str(f.limit, 9).trim(),
+        oncePerCustomer: f.oncePerCustomer === true,
+        isActive: f.isActive !== false,
+    };
+}
+
+/** What the browser sends to save: the form with start and end turned into ISO strings here, in the staff's own time zone. */
+export function formForServer(f: DiscountForm): DiscountForm {
+    return { ...f, start: fromLocalInput(f.start) ?? "", end: f.hasEnd ? fromLocalInput(f.end) ?? "" : "" };
+}
+
+export type OverlapBanner = { key: string; title: string; body: string; reviewId: string };
+
+const CODE_AUTO_RULE = "On items an automatic discount covers, the checkout takes the automatic discount and a code comes off the rest of the cart only. If every item in the cart has an automatic discount, the code can't be used.";
+const plural = (n: number, w: string) => `${n} ${n === 1 ? w : `${w}s`}`;
+
+/**
+ * Overlaps as banners. Two automatic discounts on the same items get a banner
+ * each: that is a real choice the checkout makes between them. Codes reach
+ * every item, so every live code meets every live automatic discount; listing
+ * each pair would bury the page, so those become one banner that says the rule
+ * once and names who it affects. `focus` narrows it to one discount's panel.
+ */
+export function overlapBanners(list: Overlap[], focus?: string): OverlapBanner[] {
+    const mine = focus ? list.filter(o => o.a.id === focus || o.b.id === focus) : list;
+    const autoPairs = mine.filter(o => o.a.kind === "auto" && o.b.kind === "auto");
+    const mixed = mine.filter(o => o.a.kind !== o.b.kind);
+    const out: OverlapBanner[] = autoPairs.map(o => {
+        const other = focus ? (o.a.id === focus ? o.b : o.a) : null;
+        return {
+            key: `${o.a.id}-${o.b.id}`,
+            title: other ? `Overlaps with “${other.name}” on ${o.what}` : o.title,
+            body: o.body,
+            reviewId: other ? other.id : o.a.id,
+        };
+    });
+    if (mixed.length === 1) {
+        const o = mixed[0];
+        const other = focus ? (o.a.id === focus ? o.b : o.a) : null;
+        out.push({ key: `${o.a.id}-${o.b.id}`, title: other ? `Overlaps with ${quoted(other)} on ${o.what}` : o.title, body: o.body, reviewId: other ? other.id : o.b.id });
+    } else if (mixed.length > 1) {
+        const codes = [...new Map(mixed.map(o => [o.a.id, o.a])).values()];
+        const autos = [...new Map(mixed.map(o => [o.b.id, o.b])).values()];
+        const autoNames = listNames(autos.map(quoted));
+        const codeNames = listNames(codes.map(quoted));
+        const focused = focus ? (codes.find(c => c.id === focus) ?? autos.find(a => a.id === focus)) : null;
+        if (focused?.kind === "code") {
+            out.push({ key: "codes", title: `Overlaps with ${plural(autos.length, "automatic discount")}`, body: `${autoNames} can apply to the same items while this code is live. ${CODE_AUTO_RULE}`, reviewId: autos[0].id });
+        } else if (focused?.kind === "auto") {
+            out.push({ key: "codes", title: `Overlaps with ${plural(codes.length, "code")}`, body: `${codeNames} can be used while this is on. ${CODE_AUTO_RULE}`, reviewId: codes[0].id });
+        } else {
+            out.push({
+                key: "codes",
+                title: `${plural(codes.length, "code")} and ${plural(autos.length, "automatic discount")} are live together`,
+                body: `${codeNames} can be used while ${autoNames} ${autos.length === 1 ? "is" : "are"} on. ${CODE_AUTO_RULE}`,
+                reviewId: autos[0].id,
+            });
+        }
+    }
+    return out;
 }

@@ -3,11 +3,13 @@ import { PAID_LEGACY_STATUSES } from "../../../src/lib/admin/v2/customers";
 import fs from "fs";
 import path from "path";
 import {
-    DEFAULT_QUERY, autoPayload, autoStatus, chipCounts, couponPayload, couponStatus, datesText, emptyForm, filterList, findOverlaps,
+    DEFAULT_QUERY, autoPayload, cleanForm, formForServer, autoStatus, chipCounts, couponPayload, couponStatus, datesText, emptyForm, filterList, findOverlaps, overlapBanners,
     formFromAuto, formFromCoupon, fromAuto, fromCoupon, idFromPath, discountHref, listNames, listSearch, makeCode, parseListQuery,
     sharedTarget, sortList, summarySentence, validateForm,
     type AutoRow, type CouponRow, type Names,
 } from "../../../src/lib/admin/v2/discounts";
+import { FLAGS_ALL, FLAGS_OFF, V2_READY_AREAS, v2Redirect } from "../../../src/lib/admin/v2/routeMap";
+import { activityText } from "../../../src/lib/admin/activityText";
 
 // Admin v2 Discounts: status, the merged list's URL state, the overlap warning,
 // the summary sentence and what the panel saves. Pure: no database.
@@ -123,6 +125,29 @@ test.describe("overlap warning (gap 15)", () => {
         const apart = [fromCoupon(coupon({ starts_at: "2026-11-05T00:00:00Z" }), names, null, NOW), fromAuto(auto(), names, null, NOW)];
         expect(findOverlaps(apart, names, productCategories, NOW)).toEqual([]);
     });
+    test("every code meets every automatic discount, so those pairs become one banner", () => {
+        const rows = [
+            fromCoupon(coupon(), names, null, NOW), fromCoupon(coupon({ id: "k2", code: "B20" }), names, null, NOW),
+            fromAuto(auto(), names, null, NOW), fromAuto(auto({ id: "a2", title: "Tote 10%", applies_to: "SPECIFIC_PRODUCTS", target_category_ids: [], target_product_ids: ["p3"] }), names, null, NOW),
+        ];
+        const list = findOverlaps(rows, names, productCategories, NOW);
+        expect(list).toHaveLength(4);
+        const all = overlapBanners(list);
+        expect(all).toHaveLength(1);
+        expect(all[0].title).toBe("2 codes and 2 automatic discounts are live together");
+        expect(all[0].body).toContain("HARMATTAN20 and B20 can be used while “Slides: 2 for 600” and “Tote 10%” are on.");
+        expect(all[0].body).toContain("a code comes off the rest of the cart only");
+        const forCode = overlapBanners(list, "k1");
+        expect(forCode.map(b => b.title)).toEqual(["Overlaps with 2 automatic discounts"]);
+        const forAuto = overlapBanners(list, "a1");
+        expect(forAuto.map(b => b.title)).toEqual(["Overlaps with 2 codes"]);
+    });
+    test("two automatic discounts keep a banner each, named from the panel's side", () => {
+        const rows = [fromAuto(auto(), names, null, NOW), fromAuto(auto({ id: "a2", title: "Leather Slides 10%", applies_to: "SPECIFIC_PRODUCTS", target_category_ids: [], target_product_ids: ["p1"] }), names, null, NOW)];
+        const list = findOverlaps(rows, names, productCategories, NOW);
+        expect(overlapBanners(list)[0].title).toBe("Two discounts can apply to Leather Slides");
+        expect(overlapBanners(list, "a1")[0]).toMatchObject({ title: "Overlaps with “Leather Slides 10%” on Leather Slides", reviewId: "a2" });
+    });
     test("the wording matches the checkout code it describes", () => {
         const engine = fs.readFileSync(path.join(ROOT, "src/lib/autoDiscount.ts"), "utf8");
         expect(engine).toContain("If the same item qualifies for two rules, the higher-discount rule wins");
@@ -216,5 +241,38 @@ test.describe("results per discount (gap 16)", () => {
         expect(sql).toContain("revoke execute on function public.fn_discount_results() from public, anon, authenticated");
         const load = fs.readFileSync(path.join(ROOT, "src/lib/admin/v2/discountsLoad.ts"), "utf8");
         expect(load).toMatch(/all<[^>]+>\(\s*\(\) => db\.rpc\("fn_discount_results"\)/);
+    });
+});
+
+test.describe("what the server accepts", () => {
+    test("a hostile or sloppy form is cut down to known values", () => {
+        const f = cleanForm({
+            code: " harm 20 ", title: "  Two   slides ", codeType: "drop table", autoType: "FIXED", applies: "SPECIFIC_PRODUCTS",
+            productIds: ["c90ace37-332e-4947-8601-a841661ad450", "not-an-id", 7, "c90ace37-332e-4947-8601-a841661ad450"],
+            condition: "qty", hasEnd: "yes", oncePerCustomer: 1, isActive: false, value: "1".repeat(50),
+        }, "auto");
+        expect(f).toMatchObject({ kind: "auto", code: "HARM20", title: "Two slides", codeType: "percentage", autoType: "FIXED", hasEnd: false, oncePerCustomer: false, isActive: false });
+        expect(f.productIds).toEqual(["c90ace37-332e-4947-8601-a841661ad450"]);
+        expect(f.value.length).toBe(12);
+        expect(cleanForm(null, "code")).toMatchObject({ kind: "code", applies: "ALL_PRODUCTS", condition: "none", isActive: true });
+    });
+    test("the browser sends ISO dates, which validate and save as they are", () => {
+        const f = formForServer({ ...emptyForm("auto", NOW), title: "x", value: "10", start: "2026-10-21T09:00", hasEnd: true, end: "2026-10-31T23:59" });
+        expect(f.start).toBe(new Date("2026-10-21T09:00").toISOString());
+        expect(validateForm(f)).toEqual({});
+        expect(autoPayload(f, NOW).ends_at).toBe(new Date("2026-10-31T23:59").toISOString());
+    });
+});
+test.describe("routes and logging", () => {
+    test("Discounts is ready, and both old pages land on it", () => {
+        expect(V2_READY_AREAS).toContain("discounts");
+        expect(v2Redirect("/catalog/discounts", "", FLAGS_ALL)).toBe("/discounts");
+        expect(v2Redirect("/catalog/auto-discounts", "", FLAGS_ALL)).toBe("/discounts?type=auto");
+        expect(v2Redirect("/discounts", "", FLAGS_OFF)).toBe("/catalog/discounts");
+        expect(v2Redirect("/discounts/abc", "", FLAGS_OFF)).toBe("/catalog/discounts");
+    });
+    test("every discount action reads plainly in the team activity", () => {
+        expect(activityText({ action_type: "UPDATE_DISCOUNT", resource: "discount", details: { code: "HARM20" } }).what).toBe("changed the discount code HARM20");
+        expect(activityText({ action_type: "TOGGLE_DISCOUNT", resource: "discount", details: { code: "HARM20", is_active: false } }).what).toBe("turned the discount code HARM20 off");
     });
 });
