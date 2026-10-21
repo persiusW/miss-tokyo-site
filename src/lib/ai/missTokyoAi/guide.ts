@@ -88,15 +88,15 @@ export const GUIDE: GuideEntry[] = [
     },
     {
         id: "discounts",
-        title: "Discounts (coupon codes)",
+        title: "Discounts (codes)",
         route: "discounts",
-        body: `"New Discount" → type (Fixed Discount, Percentage Off, Free Shipping, Sale Price, Buy X Get Y) → "Coupon Code" (or "Gen") → value → optional category, Min Order, Usage Limit, Expiry Date → "Create Discount". Click a code's Active badge to pause it. Today only owners and sales staff can create or change codes; the admin role gets "Unauthorized".`,
+        body: `New admin: Discounts lists codes and automatic discounts together (chips All / Active / Scheduled / Ended, and Codes / Automatic). "Create discount" → "Discount code" → Code (or "Make one up") → Percentage, Fixed amount, Buy X get Y, Free delivery or Sale price and the value → optional Category label, Minimum order total, Starts, "Has an end date", "Limit total uses", "One use per customer" (checked by email and phone when they pay) → "Create discount". Open a code to change it (a code that has been used keeps its name), "Switch off" / "Switch on", Delete (tap twice), or the Results tab (paid orders, sales, given away). Buy X get Y and Sale price codes are accepted but take nothing off by themselves, and checkout takes a code off every item without an automatic discount whatever its category. A yellow banner warns when two discounts can apply to the same items. Old admin: "New Discount" → type (Fixed Discount, Percentage Off, Free Shipping, Sale Price, Buy X Get Y) → "Coupon Code" (or "Gen") → value → optional category, Min Order, Usage Limit, Expiry Date → "Create Discount"; click a code's Active badge to pause it. In both, only owners and sales staff can create or change codes; the admin role can look but gets "Unauthorized" (old) or a read-only panel (new).`,
     },
     {
         id: "auto-discounts",
-        title: "Auto Discounts",
+        title: "Automatic discounts",
         route: "auto_discounts",
-        body: `Checkout rules that need no code. "New Rule": title (customers see it), percentage or fixed, applies to all / specific categories / specific products, minimum quantity, minimum order amount, start and end dates, Active.`,
+        body: `Checkout offers that need no code. New admin: Discounts → "Create discount" → "Automatic discount" → Title (customers see it) → Percentage or Fixed amount → Applies to Everything, Categories or Products → Conditions: No conditions, Minimum order total, or Minimum number of items (counted across all qualifying items or each product on its own, with an optional order total too) → Starts and "Has an end date" → "Create discount". Open one to change it, switch it off or on, delete it, or see its Results. Old admin (Auto Discounts): "New Rule" with the same fields and an Active switch. When two automatic discounts reach the same item, the one that saves more on that cart takes it; a code only comes off items no automatic discount covers.`,
     },
     {
         id: "gift-cards",
