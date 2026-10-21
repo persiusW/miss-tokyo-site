@@ -26,6 +26,7 @@ export const PAGE_ROUTES: readonly string[] = [
     "/agent",
     "/ai/inbox",
     "/auth/confirm",
+    "/auth/two-step",
     "/catalog/auto-discounts",
     "/catalog/categories",
     "/catalog/discounts",

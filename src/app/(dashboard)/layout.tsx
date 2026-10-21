@@ -68,6 +68,14 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         redirect("/admin/login");
     }
 
+    // Two-step sign-in (Settings › Your account): someone who turned it on must
+    // enter their code before the admin opens. Read from the session cookie, so
+    // there's no extra round trip, and only checked while the session is aal1.
+    if (claims?.aal === "aal1") {
+        const { data: aal } = await serverClient.auth.mfa.getAuthenticatorAssuranceLevel().catch(() => ({ data: null }));
+        if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") redirect("/auth/two-step");
+    }
+
     let userRole: string | null = null;
     {
         const { data: profile } = await supabaseAdmin
