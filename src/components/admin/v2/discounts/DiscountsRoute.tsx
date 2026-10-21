@@ -11,7 +11,8 @@ import { DiscountsPage } from "./DiscountsPage";
 type SP = Record<string, string | string[] | undefined>;
 
 export async function DiscountsV2({ searchParams, openId }: { searchParams: SP; openId: string | null }) {
-    const auth = await requireV2Page("discounts", openId ? `/discounts/${encodeURIComponent(openId)}` : "/discounts");
+    // Signs out and redirects anyone who isn't staff; every staff role can change discounts
+    await requireV2Page("discounts", openId ? `/discounts/${encodeURIComponent(openId)}` : "/discounts");
     let data: DiscountData | null = null;
     try {
         data = await loadDiscountData();
@@ -23,7 +24,7 @@ export async function DiscountsV2({ searchParams, openId }: { searchParams: SP; 
     if (openId && data) missing = !(await kindOf(openId).catch(() => null));
     return (
         <Suspense>
-            <DiscountsPage role={auth.role} query={parseListQuery(searchParams)} data={data} missing={missing} />
+            <DiscountsPage query={parseListQuery(searchParams)} data={data} missing={missing} />
         </Suspense>
     );
 }

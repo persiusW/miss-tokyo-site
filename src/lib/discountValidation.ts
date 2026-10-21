@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { computeDiscountSplit } from "@/lib/discountSplit";
+import { computeCouponSplit, couponCategoryId, couponLabel, isItemCoupon, type CodeLine } from "@/lib/couponValue";
 import { couponTimingBlock, customerKeys, hasCustomerKeys, type CustomerKeys } from "@/lib/couponRules";
 import { POS_FALLBACK_EMAIL } from "@/lib/posContact";
 
@@ -76,12 +77,19 @@ export const buyerKeys = (who: { email?: string | null; phone?: string | null } 
  * an order of `orderAmount` GHS. Returns null when the code is missing, unknown,
  * inactive, not started, ended, over its usage limit, below its minimum order
  * value, or (for a once-per-customer code) already used by this customer.
+ *
+ * `lines` is the basket, priced as the caller charges it, with the products an
+ * automatic discount covers marked. Whole-cart codes (every code before item
+ * codes existed) ignore it and are worth exactly what they always were; an
+ * item code (a category, sale price or buy X get Y) is priced from it, and is
+ * refused (null) when nothing in the basket lets it take anything off.
  */
 export async function validateDiscountCode(
     code: string | undefined | null,
     orderAmount: number,
     deliveryFee: number = 0,
     customer?: { email?: string | null; phone?: string | null } | null,
+    lines?: readonly CodeLine[] | null,
 ): Promise<ValidatedDiscount | null> {
     if (!code || typeof code !== "string") return null;
     const normalized = code.trim().toUpperCase();
@@ -90,7 +98,7 @@ export async function validateDiscountCode(
     const [{ data: coupon }, { data: card }] = await Promise.all([
         supabaseAdmin
             .from("coupons")
-            .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at, single_use_per_customer")
+            .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at, single_use_per_customer, category_id, target_category_id, buy_quantity, get_quantity")
             .ilike("code", normalized)
             .maybeSingle(),
         supabaseAdmin
@@ -109,18 +117,15 @@ export async function validateDiscountCode(
         if (coupon.min_order_value && orderAmount < Number(coupon.min_order_value)) return null;
         if (coupon.single_use_per_customer && await couponUsedByCustomer(coupon.code, buyerKeys(customer))) return null;
 
-        const split = computeDiscountSplit({
-            discountType: coupon.discount_type,
-            value: Number(coupon.discount_value),
-            subtotal: orderAmount,
-            deliveryFee,
-        });
-        const label =
-            coupon.discount_type === "percentage"    ? `${Number(coupon.discount_value)}% Off`
-          : coupon.discount_type === "fixed"         ? `GH₵ ${Number(coupon.discount_value).toFixed(2)} Off`
-          : coupon.discount_type === "free_shipping" ? "Free Shipping"
-          : coupon.discount_type === "bogo"          ? "Buy One, Get One Free (applied at dispatch)"
-          : "Discount Applied";
+        const split = computeCouponSplit({ terms: coupon, subtotal: orderAmount, deliveryFee, lines });
+        // An item code with nothing in the basket to take off isn't applied:
+        // it would otherwise hold one of the code's uses for a sale it gave nothing to.
+        if (isItemCoupon(coupon) && split.amount <= 0) return null;
+        const catId = couponCategoryId(coupon);
+        const catName = catId
+            ? (await supabaseAdmin.from("categories").select("name").eq("id", catId).maybeSingle()).data?.name ?? null
+            : null;
+        const label = couponLabel(coupon, catName);
 
         return { type: "coupon", code: coupon.code, discount_type: coupon.discount_type, ...split, label, codeId: coupon.id };
     }

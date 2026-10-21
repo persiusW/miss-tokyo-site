@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabaseServer';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendSMS } from '@/lib/sms';
 import { validateDiscountCode, holdDiscount, releaseDiscountHolds } from '@/lib/discountValidation';
+import { productCategoryIds, type CodeLine } from '@/lib/couponValue';
 import { variantKey } from '@/lib/utils/normAttr';
 import { settlePosSession, getPosHoldMinutes } from '@/lib/posSettlement';
 import { parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/delivery';
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
     const [{ data: dbProducts }, { data: allVariants }] = await Promise.all([
         supabaseAdmin
             .from('products')
-            .select('id, price_ghs, is_sale, discount_value, track_variant_inventory')
+            .select('id, price_ghs, is_sale, discount_value, track_variant_inventory, category_ids')
             .in('id', productIds),
         supabaseAdmin
             .from('product_variants')
@@ -191,9 +192,19 @@ export async function POST(req: NextRequest) {
     // Re-validate the staff-entered coupon / gift card against the DB. The till
     // only ever sends a code; its worth is computed here against the
     // server-calculated subtotal, exactly as /api/paystack/initialize does.
+    // The basket at the prices just verified, for a code that prices by item
+    // (category, sale price, buy X get Y). The till applies no automatic
+    // discounts, so nothing is covered.
+    const productById = new Map((dbProducts ?? []).map((p: any) => [p.id, p]));
+    const codeLines: CodeLine[] = items.map((i: any) => ({
+        productId: i.productId,
+        unitPrice: priceMap[i.productId] ?? 0,
+        quantity: i.quantity ?? 1,
+        categoryIds: productCategoryIds(productById.get(i.productId)),
+    }));
     const validatedDiscount = await validateDiscountCode(session.discount_code, totalGHS, deliveryFee, {
         email: session.customer_email, phone: session.customer_phone,
-    });
+    }, codeLines);
 
     if (session.discount_code && !validatedDiscount) {
         return NextResponse.json({

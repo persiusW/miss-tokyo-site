@@ -1,4 +1,5 @@
 // src/types/pos.ts
+import type { CouponTerms } from "@/lib/couponValue";
 
 export type PosStatus = 'draft' | 'pending_payment' | 'paid' | 'expired' | 'cancelled';
 
@@ -17,6 +18,9 @@ export interface PosAppliedDiscount {
      *  till can re-split the code when the delivery zone changes under it. */
     raw_value?: number;
     label: string;
+    /** An item code's terms (category, sale price, buy X get Y), so the till re-prices it per line. */
+    terms?: CouponTerms | null;
+    line_categories?: Record<string, string[]> | null;
 }
 
 export interface PosItem {

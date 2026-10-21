@@ -17,10 +17,8 @@ import type { DiscountData } from "@/lib/admin/v2/discountsLoad";
 import { DiscountPanel } from "./DiscountPanel";
 import "./discounts.css";
 
-type Role = "admin" | "owner" | "sales_staff";
-export const CODE_EDITORS: Role[] = ["owner", "sales_staff"];
 
-export function DiscountsPage({ role, query, data, missing }: { role: Role; query: ListQuery; data: DiscountData | null; missing: boolean }) {
+export function DiscountsPage({ query, data, missing }: { query: ListQuery; data: DiscountData | null; missing: boolean }) {
     const router = useRouter();
     const pathname = usePathname();
     const [q, setQ] = useState<ListQuery>(query);
@@ -29,7 +27,6 @@ export function DiscountsPage({ role, query, data, missing }: { role: Role; quer
     const [newKind, setNewKind] = useState<Kind | null>(null);
     const [allOverlaps, setAllOverlaps] = useState(false);
     const openedHere = useRef(false);
-    const canCode = CODE_EDITORS.includes(role);
 
     // The URL follows the filters without asking the server for the page again
     const search = listSearch(q);
@@ -153,10 +150,8 @@ export function DiscountsPage({ role, query, data, missing }: { role: Role; quer
                     onChange={v => { setPicking(false); setNewKind(v); }}
                     options={[
                         {
-                            v: "code", title: "Discount code", disabled: !canCode,
-                            desc: canCode
-                                ? "Customers type a code like HARMATTAN20 at checkout, or you enter it at the till. Nothing comes off until someone uses the code."
-                                : "Only owners and sales staff can create codes. Ask the owner if you need one.",
+                            v: "code", title: "Discount code",
+                            desc: "Customers type a code like HARMATTAN20 at checkout, or you enter it at the till. Nothing comes off until someone uses the code.",
                         },
                         { v: "auto", title: "Automatic discount", desc: "Applies by itself when the cart qualifies, for example 2 slides for GH₵ 600. No code needed, and every customer whose cart qualifies gets it." },
                     ]} />
@@ -170,7 +165,6 @@ export function DiscountsPage({ role, query, data, missing }: { role: Role; quer
                     row={newKind ? null : openRow}
                     data={data}
                     overlaps={newKind || !open ? [] : overlapBanners(overlaps, open.id)}
-                    canEdit={(newKind ?? open!.kind) === "auto" || canCode}
                     onClose={close}
                     onChanged={changed}
                     onCreated={() => { setNewKind(null); changed(); }}

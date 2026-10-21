@@ -94,7 +94,7 @@ export const WALKTHROUGHS = [
     {
         id: "discount-code",
         title: "Create a discount code",
-        roles: ["owner", "sales_staff"],
+        roles: ALL,
         steps: [
             { route: "discounts", anchor: "discounts.new", text: "Press Create discount (New Discount in the old admin)." },
             { route: "discounts", text: "Pick Discount code, then enter the code and value, add any limits and dates, and create it." },

@@ -99,6 +99,17 @@ export default function DiscountsPage() {
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.code) return;
+        // Free shipping and Buy X Get Y have no value field, but the column is
+        // NOT NULL: they used to send null and every one of them failed to save.
+        const hasValue = form.discount_type !== "free_shipping" && form.discount_type !== "buy_x_get_y";
+        if (hasValue && !(Number(form.discount_value) > 0)) {
+            toast.error(form.discount_type === "percentage" ? "Enter the discount %." : "Enter the discount value in GH₵.");
+            return;
+        }
+        if (form.discount_type === "buy_x_get_y" && !(Number(form.buy_quantity) >= 1 && Number(form.get_quantity) >= 1)) {
+            toast.error("Enter how many they buy and how many they get free.");
+            return;
+        }
         setSaving(true);
 
         const payload: any = {
@@ -106,7 +117,7 @@ export default function DiscountsPage() {
             discount_type:   form.discount_type,
             is_active:       true,
             used_count:      0,
-            discount_value:  form.discount_value  ? Number(form.discount_value)  : null,
+            discount_value:  hasValue ? Number(form.discount_value) : 0,
             min_order_value: form.min_order_value ? Number(form.min_order_value) : null,
             usage_limit:     form.usage_limit     ? Number(form.usage_limit)     : null,
             expires_at:      form.expires_at      || null,

@@ -2,9 +2,11 @@
 // status, the overlap warning, the panel's summary sentence and the form ↔
 // row mapping. Pure: no database, safe for client and server.
 //
-// Nothing here decides what a discount is worth. That is computeDiscountSplit
-// (codes) and evaluateAutoDiscounts (automatic), both unchanged; this module
+// Nothing here decides what a discount is worth. That is computeCouponSplit
+// (codes, lib/couponValue) and evaluateAutoDiscounts (automatic); this module
 // only reads the rows to decide what to show and what to save.
+
+import { couponCategoryId } from "@/lib/couponValue";
 
 export type Kind = "code" | "auto";
 export type Status = "active" | "scheduled" | "ended" | "off";
@@ -31,6 +33,8 @@ export type CouponRow = {
     get_quantity: number | null;
     free_shipping: boolean | null;
     category_id: string | null;
+    /** Older column for the same category; read when category_id is empty, saved equal to it. */
+    target_category_id?: string | null;
     single_use_per_customer: boolean | null;
     created_at: string | null;
 };
@@ -127,9 +131,6 @@ export const CODE_TYPE_LABEL: Record<CodeType, string> = {
     buy_x_get_y: "Buy X get Y",
 };
 
-/** Code types the checkout takes nothing off for by itself (computeDiscountSplit returns zero). */
-export const MANUAL_CODE_TYPES: readonly CodeType[] = ["sale_price", "buy_x_get_y"];
-
 export function codeValueText(c: Pick<CouponRow, "discount_type" | "discount_value" | "buy_quantity" | "get_quantity">): string {
     switch (c.discount_type) {
         case "percentage": return `${num(c.discount_value)}% off`;
@@ -154,20 +155,25 @@ export function listNames(names: string[], max = 2): string {
     return `${n.slice(0, max).join(", ")} and ${n.length - max} more`;
 }
 
+type CouponCats = Pick<CouponRow, "discount_type" | "category_id" | "target_category_id">;
+const codeCategory = (c: CouponCats) => couponCategoryId({ ...c, discount_value: 0 });
+
 /**
- * What a code really reaches at checkout. coupons.category_id is saved and
- * shown, but neither validate-code nor validateDiscountCode reads it: a code
- * comes off every item no automatic discount covers. So a code's target is
- * everything (or the delivery fee), whatever category it is marked with.
+ * What a code reaches at checkout (lib/couponValue): free delivery reaches the
+ * fee; a code with a category reaches that category's items; any other code
+ * the whole cart. Either way only items no automatic discount covers.
  */
-export function couponTarget(c: Pick<CouponRow, "discount_type">): Target {
-    return c.discount_type === "free_shipping" ? { delivery: true } : { all: true };
+export function couponTarget(c: CouponCats): Target {
+    if (c.discount_type === "free_shipping") return { delivery: true };
+    const cat = codeCategory(c);
+    return cat ? { categories: [cat] } : { all: true };
 }
 
-/** The list's Applies to for a code, with the category it's marked with. */
-export function couponAppliesText(c: Pick<CouponRow, "discount_type" | "category_id">, names: Names): string {
+/** The list's Applies to for a code. */
+export function couponAppliesText(c: CouponCats, names: Names): string {
     if (c.discount_type === "free_shipping") return "Delivery";
-    return c.category_id ? `Everything (marked ${names.categories[c.category_id] ?? "a category that was removed"})` : "Everything";
+    const cat = codeCategory(c);
+    return cat ? names.categories[cat] ?? "A category that was removed" : "Everything";
 }
 
 export function autoTarget(a: Pick<AutoRow, "applies_to" | "target_category_ids" | "target_product_ids">): Target {
@@ -436,8 +442,8 @@ export function formFromCoupon(c: CouponRow): DiscountForm {
         codeType: (Object.keys(CODE_TYPE_LABEL).includes(c.discount_type) ? c.discount_type : "fixed") as CodeType,
         value: c.discount_type === "free_shipping" || c.discount_type === "buy_x_get_y" ? "" : s(c.discount_value),
         buyQty: s(c.buy_quantity ?? 2), getQty: s(c.get_quantity ?? 1),
-        applies: c.category_id ? "SPECIFIC_CATEGORIES" : "ALL_PRODUCTS",
-        categoryIds: c.category_id ? [c.category_id] : [],
+        applies: codeCategory(c) ? "SPECIFIC_CATEGORIES" : "ALL_PRODUCTS",
+        categoryIds: codeCategory(c) ? [codeCategory(c)!] : [],
         condition: min > 0 ? "min" : "none", minTotal: min > 0 ? s(min) : "",
         start: toLocalInput(c.starts_at ?? c.created_at), hasEnd: !!c.expires_at, end: toLocalInput(c.expires_at),
         limit: c.usage_limit != null ? s(c.usage_limit) : "", oncePerCustomer: !!c.single_use_per_customer, isActive: !!c.is_active,
@@ -513,9 +519,10 @@ export function validateForm(f: DiscountForm, codeChanged = true): FormErrors {
 
 const orNull = (v: string) => (v.trim() ? Number(v) : null);
 
-/** The coupons row to save. Value for types the checkout doesn't price is 0 (the column is NOT NULL). */
+/** The coupons row to save. Value for types without one is 0 (the column is NOT NULL). Both category columns are saved equal. */
 export function couponPayload(f: DiscountForm) {
     const priced = f.codeType === "percentage" || f.codeType === "fixed" || f.codeType === "sale_price";
+    const category = f.codeType !== "free_shipping" && f.applies === "SPECIFIC_CATEGORIES" ? f.categoryIds[0] ?? null : null;
     return {
         code: normaliseCode(f.code),
         discount_type: f.codeType,
@@ -523,7 +530,8 @@ export function couponPayload(f: DiscountForm) {
         free_shipping: f.codeType === "free_shipping",
         buy_quantity: f.codeType === "buy_x_get_y" ? Number(f.buyQty) : null,
         get_quantity: f.codeType === "buy_x_get_y" ? Number(f.getQty) : null,
-        category_id: f.codeType !== "free_shipping" && f.applies === "SPECIFIC_CATEGORIES" ? f.categoryIds[0] ?? null : null,
+        category_id: category,
+        target_category_id: category,
         min_order_value: f.condition === "min" ? Number(f.minTotal) : null,
         usage_limit: orNull(f.limit),
         single_use_per_customer: f.oncePerCustomer,
@@ -552,8 +560,8 @@ export function autoPayload(f: DiscountForm, now: Date = new Date()) {
 // ── The summary sentence ─────────────────────────────────────────────────────
 
 function formTarget(f: DiscountForm, names: Names): string {
-    // Codes come off the whole cart whatever category they're marked with (couponTarget)
-    if (f.kind === "code") return f.codeType === "free_shipping" ? "" : "everything";
+    if (f.kind === "code" && f.codeType === "free_shipping") return "";
+    if (f.kind === "code" && f.applies !== "SPECIFIC_CATEGORIES") return "everything";
     if (f.applies === "SPECIFIC_CATEGORIES") return listNames(f.categoryIds.map(id => names.categories[id] ?? "a category")) || "the categories you pick";
     if (f.applies === "SPECIFIC_PRODUCTS") return listNames(f.productIds.map(id => names.products[id] ?? "a product")) || "the products you pick";
     return "everything";
@@ -570,8 +578,14 @@ export function summarySentence(f: DiscountForm, names: Names, now: Date = new D
             case "percentage": lead = `${v ? `${v}% off` : "A percentage off"} ${target}`; break;
             case "fixed": lead = `${v ? `${money(v)} off` : "An amount off"} ${target}`; break;
             case "free_shipping": lead = "Free delivery on the order"; break;
-            case "sale_price": lead = `${v ? `A sale price of ${money(v)}` : "A sale price"} on ${target}`; break;
-            default: lead = `Buy ${f.buyQty || "?"}, get ${f.getQty || "?"} free on ${target}`;
+            // lib/couponValue: every unit above the price comes down to it
+            case "sale_price": lead = `${v ? `A sale price of ${money(v)}` : "A sale price"} on ${target}: anything priced above it sells for it`; break;
+            // lib/couponValue: floor(items / (X+Y)) × Y free, the cheapest ones
+            default: {
+                const x = Number(f.buyQty), y = Number(f.getQty);
+                const each = x >= 1 && y >= 1 ? `: for every ${x + y} in the cart, the cheapest ${y} ${y === 1 ? "is" : "are"} free` : "";
+                lead = `Buy ${f.buyQty || "?"}, get ${f.getQty || "?"} free on ${target}${each}`;
+            }
         }
     } else {
         const v = f.value.trim();
@@ -585,6 +599,10 @@ export function summarySentence(f: DiscountForm, names: Names, now: Date = new D
         if (f.minTotal.trim()) cond += ` and the order is over ${money(f.minTotal)}`;
     }
     parts.push(`${lead}${cond}.`);
+    // Codes that price by item (lib/couponValue) never touch an item an automatic discount already covers
+    if (f.kind === "code" && (f.codeType === "sale_price" || f.codeType === "buy_x_get_y" || (f.codeType !== "free_shipping" && f.applies === "SPECIFIC_CATEGORIES"))) {
+        parts.push("Items that already have an automatic discount don't count.");
+    }
     if (f.kind === "code") {
         const limit = f.limit.trim() ? `Up to ${f.limit.trim()} ${Number(f.limit) === 1 ? "use" : "uses"}` : "No limit on uses";
         parts.push(`${limit}${f.oncePerCustomer ? ", once per customer" : ""}.`);

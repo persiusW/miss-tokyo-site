@@ -4,16 +4,18 @@ import { unstable_cache } from "next/cache";
 import { getProducts, getCategories, getPopulatedCategoryFilter, deriveColors, deriveSizes } from "@/lib/products";
 import { ShopPageClient } from "@/components/ui/miss-tokyo/ShopPageClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { liveAutoDiscounts } from "@/lib/autoDiscount";
 
 const getAutoDiscountRules = unstable_cache(
     async () => {
         const { data } = await supabaseAdmin
             .from("automatic_discounts")
-            .select("id, title, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope, min_order_amount")
+            .select("id, title, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope, min_order_amount, is_active, starts_at, ends_at")
             .eq("is_active", true);
         return data ?? [];
     },
-    ["active-auto-discounts"],
+    // v2: the cached rows now carry is_active/starts_at/ends_at, which the old entries lack
+    ["active-auto-discounts-v2"],
     { revalidate: 300, tags: ["auto-discounts"] }
 );
 
@@ -100,7 +102,8 @@ export default async function ShopPage({
 
     const [{ paginationSetting, mobileCols }, autoDiscountRules] = await Promise.all([
         getShopSettings().catch(() => ({ paginationSetting: "load_more" as const, mobileCols: 2 as const })),
-        getAutoDiscountRules().catch(() => []),
+        // Dates checked per request against the cached rows, the same rule checkout charges by
+        getAutoDiscountRules().then(rules => liveAutoDiscounts(rules)).catch(() => []),
     ]);
 
     const [{ products, total, minPrice, maxPrice }, allCategories] = await Promise.all([

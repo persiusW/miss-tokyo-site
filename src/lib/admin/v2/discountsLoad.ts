@@ -10,7 +10,7 @@ const db = supabaseAdmin as any;
 const PAGE = 1000;
 
 export const COUPON_COLUMNS =
-    "id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at, buy_quantity, get_quantity, free_shipping, category_id, single_use_per_customer, created_at";
+    "id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at, buy_quantity, get_quantity, free_shipping, category_id, target_category_id, single_use_per_customer, created_at";
 export const AUTO_COLUMNS =
     "id, title, is_active, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope, min_order_amount, starts_at, ends_at, created_at";
 
@@ -86,7 +86,7 @@ export async function loadDiscountData(): Promise<DiscountData> {
         // The pickers offer active categories plus any a discount already uses
         categories: categories
             .filter(c => c.is_active !== false
-                || coupons.some(k => k.category_id === c.id)
+                || coupons.some(k => k.category_id === c.id || k.target_category_id === c.id)
                 || autos.some(a => (a.target_category_ids ?? []).includes(c.id)))
             .map(c => ({ id: c.id, name: c.name })),
     };

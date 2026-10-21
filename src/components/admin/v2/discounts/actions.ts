@@ -3,8 +3,8 @@
 // Discounts server actions (admin v2). Server actions are public endpoints
 // that run on the service role, so each one checks the caller's role itself,
 // with the same role lists as the old pages' actions:
-//   codes      owner and sales staff (catalog/discounts/actions.ts; the admin
-//              role has never been able to change codes)
+//   codes      admin, owner and sales staff (catalog/discounts/actions.ts;
+//              admins were added in October 2026 at the owner's request)
 //   automatic  admin, owner and sales staff (catalog/auto-discounts/actions.ts)
 // Every change is logged with the old pages' action types (plus
 // UPDATE_DISCOUNT, since codes can now be edited). The browser then calls
@@ -25,12 +25,8 @@ type Fail = { ok: false; error: string; fields?: FormErrors };
 
 const db = supabaseAdmin as any;
 const STAFF: Role[] = ["admin", "owner", "sales_staff"];
-const ROLES: Record<Kind, Role[]> = { code: ["owner", "sales_staff"], auto: ["admin", "owner", "sales_staff"] };
+const ROLES: Record<Kind, Role[]> = { code: ["admin", "owner", "sales_staff"], auto: ["admin", "owner", "sales_staff"] };
 const SIGNED_OUT: Fail = { ok: false, error: "Please sign in again to change discounts." };
-const NOT_YOURS: Record<Kind, Fail> = {
-    code: { ok: false, error: "Only owners and sales staff can change discount codes. Ask the owner if this needs changing." },
-    auto: SIGNED_OUT,
-};
 const FAILED = "We couldn't save that just now. Nothing was changed. Please try again.";
 const GONE = "That discount isn't there any more. Please refresh.";
 
@@ -47,7 +43,7 @@ async function caller(): Promise<Me | null> {
 async function allowed(kind: Kind): Promise<Me | Fail> {
     const me = await caller();
     if (!me) return SIGNED_OUT;
-    if (!ROLES[kind].includes(me.role)) return NOT_YOURS[kind];
+    if (!ROLES[kind].includes(me.role)) return SIGNED_OUT;
     return me;
 }
 const isFail = (x: Me | Fail): x is Fail => "ok" in x;

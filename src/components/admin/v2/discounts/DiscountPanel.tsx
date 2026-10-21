@@ -11,7 +11,7 @@ import {
     Switch, TwoTap, ghs0, plural, toast, when,
 } from "@/components/admin/ui";
 import {
-    CODE_TYPE_LABEL, MANUAL_CODE_TYPES, defaultEnd, emptyForm, formForServer, formFromAuto, formFromCoupon, makeCode, normaliseCode,
+    CODE_TYPE_LABEL, defaultEnd, emptyForm, formForServer, formFromAuto, formFromCoupon, makeCode, normaliseCode,
     summarySentence, validateForm,
     type AppliesTo, type AutoRow, type AutoType, type CodeType, type Condition, type CouponRow, type Discount, type DiscountForm,
     type FormErrors, type Kind, type OverlapBanner, type QtyScope,
@@ -21,13 +21,12 @@ import { deleteDiscount, findProducts, getRecentOrders, saveAuto, saveCode, setD
 
 type Tab = "setup" | "results";
 
-export function DiscountPanel({ kind, disc, row, data, overlaps, canEdit, onClose, onChanged, onCreated, onDeleted }: {
+export function DiscountPanel({ kind, disc, row, data, overlaps, onClose, onChanged, onCreated, onDeleted }: {
     kind: Kind;
     disc: Discount | null;
     row: CouponRow | AutoRow | null;
     data: DiscountData;
     overlaps: OverlapBanner[];
-    canEdit: boolean;
     onClose: () => void;
     onChanged: () => void;
     onCreated: () => void;
@@ -92,20 +91,22 @@ export function DiscountPanel({ kind, disc, row, data, overlaps, canEdit, onClos
         ? "Starts as soon as you save, unless you pick a later date."
         : `${disc!.statusLabel} · used ${plural(disc!.used, "time")}`;
 
-    const footerLeft = canEdit ? (isNew ? (
+    // Owners, admins and sales staff can all change codes and automatic
+    // discounts (the server actions check again), so there is no read-only view.
+    const footerLeft = isNew ? (
         <span className="hrow-sm"><Switch label="Turn on when saved" checked={f.isActive} onChange={v => up({ isActive: v })} /><span className="sm">Turn on when saved</span></span>
     ) : (
         <>
             <Btn kind="ghost" onClick={toggle} disabled={busy || saving}>{f.isActive ? "Switch off" : "Switch on"}</Btn>
             <TwoTap label="Delete" onConfirm={remove} disabled={busy || saving} />
         </>
-    )) : null;
-    const footer = canEdit ? (
+    );
+    const footer = (
         <>
             <Btn kind="ghost" onClick={onClose}>Cancel</Btn>
             <Btn kind="primary" onClick={save} disabled={saving || busy}>{saving ? "Saving…" : isNew ? "Create discount" : "Save discount"}</Btn>
         </>
-    ) : <Btn onClick={onClose}>Close</Btn>;
+    );
 
     return (
         <Panel open wide onClose={onClose} title={title} sub={sub}
@@ -113,15 +114,12 @@ export function DiscountPanel({ kind, disc, row, data, overlaps, canEdit, onClos
             footerLeft={footerLeft} footer={footer}>
             {tab === "setup" || isNew ? (
                 <>
-                    {!canEdit && (
-                        <Banner tone="info" title="You can look, but not change codes">Only owners and sales staff can create or change discount codes. Automatic discounts are open to admins too.</Banner>
-                    )}
                     <div className="inset" aria-live="polite">
                         <div className="section-t">Summary</div>
                         <div className="ink2">{summary}</div>
                     </div>
                     {overlaps.map(o => <Banner key={o.key} tone="warn" title={o.title}>{o.body}</Banner>)}
-                    <fieldset className="disc-fields stack" disabled={!canEdit}>
+                    <fieldset className="disc-fields stack">
                         <legend className="sr">Discount details</legend>
                         <NameField f={f} up={up} err={err} locked={codeLocked} />
                         <ValueFields f={f} up={up} err={err} />
@@ -177,30 +175,28 @@ function ValueFields({ f, up, err }: Part) {
             </>
         );
     }
-    const manual = MANUAL_CODE_TYPES.includes(f.codeType);
+    const inCategory = f.applies === "SPECIFIC_CATEGORIES";
     return (
         <>
             <Field label="Discount">
                 <Seg<CodeType> label="Discount kind" value={f.codeType} onChange={v => up({ codeType: v })}
                     options={(["percentage", "fixed", "buy_x_get_y", "free_shipping", "sale_price"] as CodeType[]).map(v => ({ v, l: CODE_TYPE_LABEL[v] }))} />
             </Field>
-            {manual && (
-                <Banner tone="warn" title="Checkout won't take this off by itself">
-                    The code is accepted and written on the order, but nothing comes off the total. Settle it with the customer by hand, for example with a custom price at the till.
-                </Banner>
-            )}
             {f.codeType === "percentage" && (
-                <Field label="Percentage off" htmlFor="disc-value" error={err.value} help="Comes off the products, never the delivery fee.">
+                <Field label="Percentage off" htmlFor="disc-value" error={err.value}
+                    help={inCategory ? "Comes off the category's items only, never the delivery fee." : "Comes off the products, never the delivery fee."}>
                     <Percent id="disc-value" value={f.value} onChange={v => up({ value: v })} width={180} />
                 </Field>
             )}
             {f.codeType === "fixed" && (
-                <Field label="Amount off" htmlFor="disc-value" error={err.value} help="Comes off the products first; anything left over comes off delivery.">
+                <Field label="Amount off" htmlFor="disc-value" error={err.value}
+                    help={inCategory ? "Comes off the category's items only, never more than they cost and never the delivery fee." : "Comes off the products first; anything left over comes off delivery."}>
                     <div className="disc-narrow"><Money id="disc-value" value={f.value} onChange={v => up({ value: v })} /></div>
                 </Field>
             )}
             {f.codeType === "sale_price" && (
-                <Field label="Sale price" htmlFor="disc-value" error={err.value}>
+                <Field label="Sale price" htmlFor="disc-value" error={err.value}
+                    help="Each item the code covers sells for this price. Items already at or under it stay as they are. Never the delivery fee.">
                     <div className="disc-narrow"><Money id="disc-value" value={f.value} onChange={v => up({ value: v })} /></div>
                 </Field>
             )}
@@ -213,6 +209,7 @@ function ValueFields({ f, up, err }: Part) {
                     <Field label="Gets free" htmlFor="disc-by" error={err.getQty}>
                         <input id="disc-by" className="input" inputMode="numeric" value={f.getQty} onChange={e => up({ getQty: e.target.value.replace(/\D/g, "") })} />
                     </Field>
+                    <p className="help disc-span">For every {Number(f.buyQty) + Number(f.getQty) || "?"} items the code covers in a cart, the cheapest {f.getQty || "?"} {Number(f.getQty) === 1 ? "is" : "are"} free. Never the delivery fee.</p>
                 </div>
             )}
         </>
@@ -225,14 +222,25 @@ function AppliesFields({ f, up, err, data, productNames, setProductNames }: Part
     const catOpts = data.categories.map(c => ({ v: c.id, l: c.name }));
     if (f.kind === "code") {
         if (f.codeType === "free_shipping") return null;
-        // The old page's optional category. Checkout doesn't read it (lib/discountValidation),
-        // so it is offered as what it really is: a label for the team.
+        // A code holds one category (coupons.category_id). Checkout takes it off
+        // that category's items only (lib/couponValue).
+        const inCategory = f.applies === "SPECIFIC_CATEGORIES";
         return (
-            <Field label="Category label" htmlFor="disc-cat"
-                help="Optional, for your records. Checkout takes a code off every item that has no automatic discount, whatever its category.">
-                <Select id="disc-cat" value={f.categoryIds[0] ?? ""}
-                    onChange={v => up({ categoryIds: v ? [v] : [], applies: v ? "SPECIFIC_CATEGORIES" : "ALL_PRODUCTS" })}
-                    options={[{ v: "", l: "No category" }, ...catOpts]} />
+            <Field label="Applies to" error={err.targets}>
+                <div className="stack-sm">
+                    <Seg<AppliesTo> label="Applies to" value={inCategory ? "SPECIFIC_CATEGORIES" : "ALL_PRODUCTS"}
+                        onChange={v => up(v === "SPECIFIC_CATEGORIES" ? { applies: v } : { applies: "ALL_PRODUCTS", categoryIds: [] })}
+                        options={[{ v: "ALL_PRODUCTS", l: "Everything" }, { v: "SPECIFIC_CATEGORIES", l: "One category" }]} />
+                    {inCategory && (
+                        catOpts.length === 0
+                            ? <p className="help">There are no categories yet. Add them under Products › Categories.</p>
+                            : <Select id="disc-cat" value={f.categoryIds[0] ?? ""} onChange={v => up({ categoryIds: v ? [v] : [] })}
+                                options={[{ v: "", l: "Pick a category" }, ...catOpts]} />
+                    )}
+                    <p className="help">{inCategory
+                        ? "The code comes off items in this category only. Items that already have an automatic discount keep that instead."
+                        : "The code comes off every item that has no automatic discount."}</p>
+                </div>
             </Field>
         );
     }
