@@ -12,8 +12,9 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await serverClient.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
-    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Invoices are an owner + admin area (the sidebar hides them from sales staff).
+    if (!caller || !["admin", "owner"].includes(caller.role)) {
+        return apiError("GEN-00", { status: 403, audience: "staff" });
     }
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
