@@ -30,7 +30,7 @@ export const GUIDE: GuideEntry[] = [
         id: "analytics",
         title: "Analytics",
         route: "analytics",
-        body: `Date range presets (Today, Yesterday, Past 7/30 Days, Year to Date, Custom) and tabs Highlights, Traffic, Reports, Insights. Reports has "Export CSV" for Sales by Item, by Variant, by Channel and Discount / Promo Performance. Traffic shows peak ordering hours and days. Insights shows repeat buyers.`,
+        body: `New admin (Analytics): pick Today, 7 days, 30 days, 90 days or Custom (From and To dates), and "Compare with" the previous period or the same period last year. Paid orders only. KPIs: Sales, Orders, Average order and Returning customers (the share of paid orders with an email whose customer had paid before), each with its change. Then "Sales by day", Top products, Sales by channel and Reports; each report opens with its own "Export CSV": Sales by product, Sales by size and colour, Sales by channel, Discounts (tap one for its orders), Payments received (by method; Paystack can't tell card from Mobile money, so they're counted together; "These dates" or "All time"), Riders, Cash taken at the till, Stock written off (stock taken off by hand; no reason is recorded yet), Customers (unique and repeat buyers, new customers, newsletter sign-ups, bespoke inquiries, top customers), When people buy (by day, hour and day of the week) and Where orders go. "Export CSV" at the top downloads the overview. The old Payments and Rider reports links open these reports. Old admin: date presets (Today, Yesterday, Past 7/30 Days, Year to Date, Custom) and tabs Highlights, Traffic, Reports, Insights; Reports has "Export CSV" for Sales by Item, by Variant, by Channel and Discount / Promo Performance; Traffic shows peak ordering hours and days; Insights shows repeat buyers. Payments was its own page (Total Collected, This Month, every Paystack reference).`,
     },
     {
         id: "pos",
@@ -77,7 +77,7 @@ export const GUIDE: GuideEntry[] = [
         id: "riders",
         title: "Riders",
         route: "riders",
-        body: `Read-only delivery stats per rider and each rider's orders. Riders are added or edited in Site Settings → Riders ("Add Rider"), which only admin and owner have in their sidebar.`,
+        body: `Read-only delivery stats per rider (orders, on the way, delivered, cancelled, order value) and each rider's orders. New admin: Analytics › Reports › Riders, for the page's dates or "All time"; tap a rider to see their orders. Old admin: Rider Reports page, "View →" per rider. Riders are added or edited in Settings › Shipping and delivery › Manage riders (old admin: Site Settings → Riders, "Add Rider"), which only admin and owner can open.`,
     },
     {
         id: "wholesalers",
