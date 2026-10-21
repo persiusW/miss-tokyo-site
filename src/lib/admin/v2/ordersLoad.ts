@@ -207,7 +207,7 @@ export async function loadOrderTimeline(id: string): Promise<TimelineItem[]> {
     const units = (items: unknown) => (Array.isArray(items) ? items : []).reduce((s: number, i: any) => s + (Number(i?.quantity) || 0), 0);
     return buildTimeline({
         order: o.data,
-        activity: (act.data ?? []).filter((a: any) => !COVERED.has(a.action_type)).map((a: any) => ({ at: a.created_at, who: who.get(a.user_id) ?? null, what: activityText(a).what })),
+        activity: (act.data ?? []).filter((a: any) => !COVERED.has(a.action_type) && a.details?.new_fulfillment_status !== "partial").map((a: any) => ({ at: a.created_at, who: who.get(a.user_id) ?? null, what: activityText(a).what })),
         notifications: notes.data ?? [],
         attempts: [...(att.data ?? []), ...(sale.data ?? [])],
         refunds: (refunds.data ?? []).map((r: any) => ({ ...r, who: who.get(r.actor) ?? null, units: units(r.items) })),
@@ -312,11 +312,13 @@ export type DocumentRow = {
 };
 export type LegacyLinkRow = { id: string; email: string; amount: number; description: string | null; paystack_url: string | null; status: string; created_at: string };
 
-export async function loadDocuments(): Promise<{ docs: DocumentRow[]; links: LegacyLinkRow[]; taxRate: number }> {
-    const [d, l, b] = await Promise.all([
+export async function loadDocuments(): Promise<{ docs: DocumentRow[]; links: LegacyLinkRow[]; taxRate: number; feePct: number; feeLabel: string }> {
+    const [d, l, b, f] = await Promise.all([
         db.from("documents").select("id, type, amount, status, customer_name, customer_email, line_items, tax_rate, notes, created_at").order("created_at", { ascending: false }).limit(500),
         db.from("pay_links").select("id, email, amount, description, paystack_url, status, created_at").order("created_at", { ascending: false }).limit(200),
         db.from("business_settings").select("tax_rate").eq("id", "default").maybeSingle(),
+        // The fee the Paystack link adds (api/invoice/paystack-link reads the same row).
+        db.from("store_settings").select("platform_fee_percentage, platform_fee_label").eq("id", "default").maybeSingle(),
     ]);
     if (d.error) throw d.error;
     if (l.error) throw l.error;
@@ -324,5 +326,13 @@ export async function loadDocuments(): Promise<{ docs: DocumentRow[]; links: Leg
         docs: (d.data ?? []).map((x: any) => ({ ...x, amount: Number(x.amount ?? 0), tax_rate: Number(x.tax_rate ?? 0), line_items: Array.isArray(x.line_items) ? x.line_items : [] })),
         links: (l.data ?? []).map((x: any) => ({ ...x, amount: Number(x.amount ?? 0) })),
         taxRate: Number(b.data?.tax_rate ?? 0),
+        feePct: Number(f.data?.platform_fee_percentage ?? 0),
+        feeLabel: f.data?.platform_fee_label || "Service Charge",
     };
+}
+
+/** The Abandoned checkouts tab's figure: checkouts not finished in the last 7 days. */
+export async function loadAbandonedCount(): Promise<number | null> {
+    const { count, error } = await abandonedBase(db.from("orders").select("id", { count: "exact", head: true }), rangeStart("7d"));
+    return error ? null : count ?? 0;
 }
