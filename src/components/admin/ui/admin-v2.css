@@ -439,3 +439,8 @@
 .adm2 .top .admin-icon-btn{width:var(--tap);height:var(--tap);border:0;border-radius:var(--r2);background:transparent;color:var(--ink-2);display:inline-grid;place-items:center;position:relative}
 .adm2 .top .admin-icon-btn:hover{background:var(--card-3);color:var(--ink)}
 .adm2 .top .admin-icon-btn svg{width:20px;height:20px}
+
+/* The floating Miss Tokyo AI button lifts above the unsaved bar and any
+   sticky panel footer so Save is never covered. */
+.adm2:has(.unsaved) .mtai-launcher{bottom:calc(var(--s4) + 76px)}
+@media (max-width:620px){.adm2 .unsaved{padding:var(--s2) var(--s2) var(--s2) var(--s4)}.adm2 .unsaved .strong{flex-basis:100%}}
