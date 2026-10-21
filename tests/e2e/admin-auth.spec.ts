@@ -124,7 +124,8 @@ async function loginAsAdmin(page: import("@playwright/test").Page) {
         );
     }
 
-    await expect(page).toHaveURL(/\/overview/, { timeout: 20_000 });
+    // Home with the new admin on, Overview with the old one.
+    await expect(page).toHaveURL(/\/(home|overview)/, { timeout: 20_000 });
 }
 
 test.describe("Admin login and logout cycle", () => {

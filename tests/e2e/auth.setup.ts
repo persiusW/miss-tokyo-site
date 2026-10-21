@@ -46,9 +46,9 @@ setup("authenticate as admin and save session", async ({ page }) => {
     // Submit.
     await page.locator('button[type="submit"]').click();
 
-    // Wait until we land on the overview page.
-    await page.waitForURL("**/overview", { timeout: 20_000 });
-    await expect(page).toHaveURL(/\/overview/);
+    // Wait until we land in the admin: Home with the new admin on, Overview with the old one.
+    await page.waitForURL(/\/(home|overview)(\?|$)/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/(home|overview)/);
 
     // Persist auth state.
     await page.context().storageState({ path: AUTH_FILE });
