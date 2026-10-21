@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { handBackState, previewText, shapeConversation, windowOpen, type ConversationRow } from "../../../src/lib/whatsapp/inbox";
+import { canAnswerWaiting, handBackState, MAX_WAITING, MISSED_AFTER_MS, previewText, shapeConversation, waitingMessages, windowOpen, type ConversationRow } from "../../../src/lib/whatsapp/inbox";
 
 const NOW = Date.parse("2026-10-14T18:00:00Z");
 const row = (over: Partial<ConversationRow> = {}): ConversationRow => ({
@@ -26,4 +26,33 @@ test("previews are one line, capped, and name media", () => {
 test("handing back keeps the rest of the state", () => {
     expect(handBackState({ mode: "human", reason: "daily_limit", note: "keep" }, new Date(NOW)))
         .toEqual({ mode: "assistant", reason: null, since: "2026-10-14T18:00:00.000Z", note: "keep" });
+});
+
+// The 2026-10-20 chat: our handoff note, then a photo and "??" while a person had it.
+const AT_2320 = Date.parse("2026-10-20T23:20:00Z");
+const line = (direction: "inbound" | "outbound", at: string, id: string) => ({ direction, at, id });
+const handedOff = [
+    line("inbound", "2026-10-20T22:39:49Z", "do-you-have-this"),
+    line("outbound", "2026-10-20T22:39:56Z", "handover-note"),
+    line("inbound", "2026-10-20T23:05:16Z", "photo"),
+    line("inbound", "2026-10-20T23:06:06Z", "??"),
+];
+
+test("waiting: the customer's messages after our last one, while WhatsApp still lets us reply", () => {
+    expect(waitingMessages(handedOff, AT_2320).map(m => m.id)).toEqual(["photo", "??"]);
+    expect(waitingMessages([...handedOff, line("outbound", "2026-10-20T23:07:00Z", "reply")], AT_2320)).toEqual([]);
+    expect(waitingMessages([], AT_2320)).toEqual([]);
+    expect(waitingMessages(handedOff, AT_2320 + 25 * 3600_000)).toEqual([]);   // window closed
+    const many = Array.from({ length: 9 }, (_, i) => line("inbound", new Date(AT_2320 - (9 - i) * 1000).toISOString(), `m${i}`));
+    expect(waitingMessages(many, AT_2320).map(m => m.id)).toEqual(many.slice(-MAX_WAITING).map(m => m.id));
+});
+
+test("staff are offered a reply: always while a person has the chat, else only once the assistant missed it", () => {
+    const waiting = waitingMessages(handedOff, AT_2320);
+    expect(canAnswerWaiting("person", waiting, AT_2320)).toBe(true);
+    expect(canAnswerWaiting("assistant", waiting, AT_2320)).toBe(true);   // 14 minutes unanswered
+    const fresh = [{ at: new Date(AT_2320 - MISSED_AFTER_MS + 5000).toISOString() }];
+    expect(canAnswerWaiting("assistant", fresh, AT_2320)).toBe(false);   // it may be answering now
+    expect(canAnswerWaiting("person", fresh, AT_2320)).toBe(true);
+    expect(canAnswerWaiting("person", [], AT_2320)).toBe(false);
 });

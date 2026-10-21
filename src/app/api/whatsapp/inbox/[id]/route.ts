@@ -1,13 +1,17 @@
 // One WhatsApp chat: every message in and out (GET), and handing it back to
-// the assistant once a person is done (POST { action: "hand_back" }).
-// Order staff only.
-import { NextRequest, NextResponse } from "next/server";
+// the assistant once a person is done (POST { action: "hand_back" }). With
+// answer: true the assistant also replies to the messages that came in with
+// no reply from us, after the response. Order staff only.
+import { after, NextRequest, NextResponse } from "next/server";
+import { getAiSettings } from "@/lib/ai/settings";
+import { answerWaitingMessages } from "@/lib/whatsapp/processing";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireStaff } from "@/lib/ai/requireStaff";
 import { logCause } from "@/lib/errors/apiError";
 import { handBackState, shapeConversation, type ConversationRow, type MessageRow } from "@/lib/whatsapp/inbox";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const DENIED = { 401: { error: "Please sign in again." }, 403: { error: "Only order staff can see WhatsApp chats." } };
 const NOT_FOUND = { error: "That chat isn't there any more. Please refresh." };
@@ -50,13 +54,25 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const body = await req.json().catch(() => null);
     if (body?.action !== "hand_back") return NextResponse.json({ error: "Please refresh and try again." }, { status: 400 });
     try {
-        const { data: row, error } = await db.from("whatsapp_conversations").select("state").eq("id", id).maybeSingle();
+        const { data: row, error } = await db.from("whatsapp_conversations").select("state, provider, handed_off_at").eq("id", id).maybeSingle();
         if (error) throw error;
         if (!row) return NextResponse.json(NOT_FOUND, { status: 404 });
         const { error: upError } = await db.from("whatsapp_conversations")
             .update({ handed_off_at: null, assigned_staff_id: null, state: handBackState(row.state, new Date()) }).eq("id", id);
         if (upError) throw upError;
-        return NextResponse.json({ ok: true });
+        const answer = body?.answer === true;
+        if (answer) {
+            const wasWithPerson = !!row.handed_off_at;
+            after(async () => {
+                try {
+                    const r = await answerWaitingMessages(id, row.provider ?? "chatbots_africa", await getAiSettings(), wasWithPerson);
+                    if (r !== "answered") console.info("[whatsapp-inbox] nothing answered on hand-back", { result: r });
+                } catch (e) {
+                    logCause("GEN-00", e, { route: "whatsapp/inbox/[id] answer waiting" });
+                }
+            });
+        }
+        return NextResponse.json({ ok: true, answering: answer });
     } catch (e) {
         logCause("GEN-00", e, { route: "whatsapp/inbox/[id] POST" });
         return NextResponse.json({ error: "We couldn't hand this chat back. Please try again." }, { status: 500 });

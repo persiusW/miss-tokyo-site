@@ -21,7 +21,7 @@ import { withNotice } from "./notices";
 import type { ModelPhoto } from "./photo";
 import type { HandoffReason } from "./handoff";
 import type { Conversation, InboundMessage } from "./pipeline";
-import { isBarePhoto } from "./photoPairing";
+import { isBarePhoto, MAX_PAIRED_PHOTOS } from "./photoPairing";
 import { renderForWhatsApp, WA_LINES, type WhatsAppReply } from "./render";
 
 export type AssistantDeps = {
@@ -116,8 +116,51 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         return got.filter((p): p is ModelPhoto => !!p);
     }
 
+    /** One turn of the assistant on what the customer said, and the reply sent. */
+    async function answer(c: Conversation, from: string, text: string, photos: ModelPhoto[], replyTo: string | null): Promise<void> {
+        // The quote comes from our records, never from the customer, so the model may trust it.
+        const quote = replyTo ? await deps.quoted(c.id, replyTo).catch(() => null) : null;
+        // Otherwise, an order update or reminder they may be answering, also from our records.
+        const notice = quote ? null : await deps.notice(c.id).catch(() => null);
+        const said = quote ? `[Replying to: "${quote}"]\n${text}` : notice ? withNotice(notice, text) : text;
+
+        const { chat, customerId } = await deps.chatFor(c, from);
+        const counts = await deps.counts(chat);
+        if (!counts) return toPerson(c, from, "assistant_failed", WA_LINES.cantChat);
+        if (visitorOver({ ...counts, perDay: deps.perDay })) return toPerson(c, from, "daily_limit", WA_LINES.limit);
+
+        const result = await deps.run({ chat, text: said, phone: from, customerId, conversationId: c.id, images: photos });
+        const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
+        if (result.failed) return toPerson(c, from, "assistant_failed", out.text);
+        if (out.wantsPerson) return toPerson(c, from, result.handoff ?? "customer_asked", out.text);
+        if (result.choices) return ask(c, from, out, result.choices);
+        if (!(await reply(c, from, out.text))) { await deps.handOff(c.id, "assistant_failed"); return; }
+        await sendImages(c, from, out);
+    }
+
+    const photoLine = (n: number) => (n > 1 ? "(The customer sent these photos.)" : "(The customer sent this photo.)");
+
+    /**
+     * Messages that came in while a person had the chat and got no reply from us, answered in one
+     * turn when staff hand the chat back. Their texts in order, their latest photos.
+     */
+    async function answerWaiting(waiting: InboundMessage[], c: Conversation): Promise<void> {
+        const from = waiting.find(m => m.from)?.from;
+        if (!from || waiting.length === 0) return;
+        const shots = waiting.filter(m => m.type === "image" && m.mediaId).slice(-MAX_PAIRED_PHOTOS);
+        const photos = await fetchAll(shots.map(m => m.mediaId!));
+        if (shots.length > 0 && photos.length === 0) return notReadable(c, shots[shots.length - 1]);
+        const lines = waiting
+            .map(m => (m.type === "interactive" && m.tap ? m.tap.title : m.type === "text" || m.type === "image" ? m.text ?? "" : ""))
+            .map(t => cleanCustomerText(stripOurMarkers(t)) ?? "")
+            .filter(Boolean);
+        const text = lines.join("\n") || (photos.length > 0 ? photoLine(photos.length) : "");
+        if (!text) return;
+        await answer(c, from, text, photos, null);
+    }
+
     /** receivedAt: when we stored the message; without it photos are not paired. */
-    return async (m: InboundMessage, c: Conversation, receivedAt?: string): Promise<void> => {
+    const handle = async (m: InboundMessage, c: Conversation, receivedAt?: string): Promise<void> => {
         // Photos are read (a screenshot's SKU, or the style and colour); voice notes, files and the rest go to a person.
         let photos: ModelPhoto[] = [];
         let tapped: string | null = null;   // "[tapped: …]": an option we offered, so ours
@@ -157,26 +200,8 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
             await reply(c, m.from, WA_LINES.started);
             return;
         }
-        const text = caption || (photos.length > 1 ? "(The customer sent these photos.)" : "(The customer sent this photo.)");
-
-        // The quote comes from our records, never from the customer, so the model may trust it.
         // A tap's context is the question it answers, already in the chat; it is not a quote.
-        const quote = m.replyTo && !m.tap ? await deps.quoted(c.id, m.replyTo).catch(() => null) : null;
-        // Otherwise, an order update or reminder they may be answering, also from our records.
-        const notice = quote ? null : await deps.notice(c.id).catch(() => null);
-        const said = quote ? `[Replying to: "${quote}"]\n${text}` : notice ? withNotice(notice, text) : text;
-
-        const { chat, customerId } = await deps.chatFor(c, m.from);
-        const counts = await deps.counts(chat);
-        if (!counts) return toPerson(c, m.from, "assistant_failed", WA_LINES.cantChat);
-        if (visitorOver({ ...counts, perDay: deps.perDay })) return toPerson(c, m.from, "daily_limit", WA_LINES.limit);
-
-        const result = await deps.run({ chat, text: said, phone: m.from, customerId, conversationId: c.id, images: photos });
-        const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
-        if (result.failed) return toPerson(c, m.from, "assistant_failed", out.text);
-        if (out.wantsPerson) return toPerson(c, m.from, result.handoff ?? "customer_asked", out.text);
-        if (result.choices) return ask(c, m.from, out, result.choices);
-        if (!(await reply(c, m.from, out.text))) { await deps.handOff(c.id, "assistant_failed"); return; }
-        await sendImages(c, m.from, out);
+        await answer(c, m.from, caption || photoLine(photos.length), photos, m.tap ? null : m.replyTo ?? null);
     };
+    return Object.assign(handle, { answerWaiting });
 }
