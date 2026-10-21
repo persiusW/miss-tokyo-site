@@ -24,7 +24,7 @@ export const FLAGS_ALL: V2Flags = { admin_v2: true, admin_v2_products: true, adm
 
 /** Areas whose new pages exist. An area joins this list in the PR that builds it,
  *  so a switch can never send anyone to a page that isn't there yet. */
-export const V2_READY_AREAS: readonly V2Area[] = ["settings", "home", "inbox", "content", "customers", "discounts", "analytics", "staff", "billing", "products"];
+export const V2_READY_AREAS: readonly V2Area[] = ["settings", "home", "inbox", "content", "customers", "discounts", "analytics", "staff", "billing", "products", "orders"];
 
 export function areaOn(area: V2Area, flags: V2Flags, ready: readonly V2Area[] = V2_READY_AREAS): boolean {
     if (!flags.admin_v2 || !ready.includes(area)) return false;
@@ -48,7 +48,39 @@ type Rule = {
      *  query (":id" values are read from it). For pages the new admin folds into
      *  one URL, such as Analytics reports. */
     backByQuery?: boolean;
+    /** On the way back: turn the new page's query into what the old page reads.
+     *  Edits `q` in place and returns the old path to use (or null to keep it). */
+    back?: (q: URLSearchParams) => string | null;
 };
+
+// /inbox?c=<source>:<id> → the old page for that source. The old WhatsApp page
+// reads a bare chat id from ?c=, so "whatsapp:<id>" must lose its prefix.
+function inboxBack(q: URLSearchParams): string | null {
+    const c = q.get("c") ?? "";
+    const f = q.get("f") ?? "";
+    q.delete("f");
+    const m = /^(whatsapp|form|request|ai):(.*)$/.exec(c);
+    const source = m?.[1] ?? f;
+    if (m?.[1] === "whatsapp") q.set("c", m[2]);
+    else if (m) q.delete("c");
+    if (source === "form") return "/customers/forms";
+    if (source === "request") return "/customers/requests";
+    if (source === "ai") return "/ai/inbox";
+    return null;
+}
+
+// /orders?view=… → the old list's ?tab=, ?pay= → ?payment=; pre-orders → their old page.
+const VIEW_TO_TAB: Record<string, string> = { packed: "packed", out: "shipped", ready: "pickups", done: "fulfilled", closed: "cancelled", all: "all-orders", unpaid: "all-orders" };
+function ordersBack(q: URLSearchParams): string | null {
+    const view = q.get("view");
+    const pay = q.get("pay");
+    const pre = q.get("preorder") === "1";
+    for (const k of ["view", "pay", "channel", "preorder"]) q.delete(k);
+    if (pre) return "/sales/pre-orders";
+    if (view && VIEW_TO_TAB[view]) q.set("tab", VIEW_TO_TAB[view]);
+    if (pay) q.set("payment", pay);
+    return null;
+}
 
 // Order matters: the first matching rule wins, so specific paths come first.
 const RULES: Rule[] = [
@@ -56,18 +88,18 @@ const RULES: Rule[] = [
     { area: "home", legacy: "/admin", v2: "/home", oneWay: true },
 
     { area: "inbox", legacy: "/customers/whatsapp/teach", v2: "/inbox/teach" },
-    { area: "inbox", legacy: "/customers/whatsapp", v2: "/inbox" },
+    { area: "inbox", legacy: "/customers/whatsapp", v2: "/inbox", back: inboxBack },
     { area: "inbox", legacy: "/customers/forms", v2: "/inbox", query: { f: "form" }, oneWay: true },
     { area: "inbox", legacy: "/customers/requests", v2: "/inbox", query: { f: "request" }, oneWay: true },
     { area: "inbox", legacy: "/ai/inbox", v2: "/inbox", query: { f: "ai" }, oneWay: true },
 
     { area: "orders", legacy: "/sales/orders/:id", v2: "/orders/:id" },
     { area: "orders", legacy: "/admin/orders/:id", v2: "/orders/:id", oneWay: true },
-    { area: "orders", legacy: "/sales/orders", v2: "/orders" },
+    { area: "orders", legacy: "/sales/orders", v2: "/orders", back: ordersBack },
     { area: "orders", legacy: "/sales/pre-orders", v2: "/orders", query: { preorder: "1" }, oneWay: true },
     { area: "orders", legacy: "/customers/abandoned", v2: "/orders/abandoned" },
     { area: "orders", legacy: "/finance/invoices/:id", v2: "/orders/invoices/:id" },
-    { area: "orders", legacy: "/finance/invoices", v2: "/orders/invoices" },
+    { area: "orders", legacy: "/finance/invoices", v2: "/orders/invoices", back: q => (q.get("type") === "link" ? (q.delete("type"), "/finance/links") : null) },
     { area: "orders", legacy: "/finance/links", v2: "/orders/invoices", query: { type: "link" }, oneWay: true },
     { area: "orders", legacy: "/finance", v2: "/orders/invoices", oneWay: true },
 
@@ -206,8 +238,8 @@ export function v2Redirect(
         if (params && !areaOn(r.area, flags, ready)) {
             const q = new URLSearchParams(search);
             for (const k of Object.keys(r.query ?? {})) q.delete(k);
+            const legacy = r.back?.(q) ?? fill(r.legacy, params);
             const s = q.toString();
-            const legacy = fill(r.legacy, params);
             if (legacy !== path) return s ? `${legacy}?${s}` : legacy;
         }
     }

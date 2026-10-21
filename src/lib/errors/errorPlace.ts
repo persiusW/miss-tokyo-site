@@ -74,6 +74,7 @@ export const PAGE_ROUTES: readonly string[] = [
     "/home",
     "/inbox",
     "/inbox/teach",
+    "/orders", "/orders/[id]", "/orders/abandoned", "/orders/invoices", "/orders/invoices/[id]",
     "/invite",
     "/invoice/[id]",
     "/login",
