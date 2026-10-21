@@ -1,0 +1,24 @@
+/* Admin Tools extras. Scoped to .adm2, tokens only. */
+.adm2 .tl-tabs{margin-bottom:var(--s5)}
+.adm2 .tl-tabs .tabs{scroll-snap-type:x proximity}
+.adm2 .tl-tabs .tab{scroll-snap-align:start;white-space:nowrap}
+.adm2 .tl-body{min-width:0}
+.adm2 .tl-figure{font-size:var(--t-2xl);font-weight:600;letter-spacing:-.01em;line-height:var(--lh-tight)}
+.adm2 .tl-split{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--s3)}
+.adm2 .tl-share{border:1px solid var(--line);border-radius:var(--r2);padding:var(--s3) var(--s4);background:var(--card-2)}
+.adm2 .tl-share .tl-pct{font-size:var(--t-xl);font-weight:600}
+.adm2 .tl-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:var(--t-xs);word-break:break-all}
+.adm2 .tl-inline{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:flex-end}
+.adm2 .tl-inline .field{flex:1 1 160px;min-width:0}
+.adm2 .tl-note{border-left:3px solid var(--line-2);padding:var(--s1) 0 var(--s1) var(--s3);color:var(--ink-2)}
+.adm2 .tl-ok{color:var(--ok-ink)}
+.adm2 .tl-warn{color:var(--warn-ink)}
+.adm2 .tl-danger{color:var(--danger-ink)}
+.adm2 .tl-body .tbl-wrap{position:relative}
+.adm2 .tl-env{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--s2)}
+@media (max-width:620px){.adm2 .tl-figure{font-size:var(--t-xl)}}
+.adm2 .steps-list{list-style:none;margin:0;padding:0}
+.adm2 .tl-step{display:flex;gap:var(--s4);align-items:flex-start;padding:var(--s3) 0;border-top:1px solid var(--line)}
+.adm2 .tl-step:first-child{border-top:0;padding-top:0}
+.adm2 .tl-picked td{background:var(--accent-soft)}
+@media (max-width:620px){.adm2 .tl-step{flex-direction:column;gap:var(--s2)}}

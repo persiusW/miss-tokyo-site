@@ -10,7 +10,7 @@
 
 export type V2Area =
     | "home" | "inbox" | "orders" | "till" | "products" | "customers" | "discounts"
-    | "content" | "analytics" | "staff" | "billing" | "settings";
+    | "content" | "analytics" | "staff" | "billing" | "settings" | "tools";
 
 export type V2Flags = {
     admin_v2: boolean;
@@ -24,7 +24,7 @@ export const FLAGS_ALL: V2Flags = { admin_v2: true, admin_v2_products: true, adm
 
 /** Areas whose new pages exist. An area joins this list in the PR that builds it,
  *  so a switch can never send anyone to a page that isn't there yet. */
-export const V2_READY_AREAS: readonly V2Area[] = ["settings", "home", "inbox", "content", "customers", "discounts", "analytics", "staff", "billing", "products", "orders", "till"];
+export const V2_READY_AREAS: readonly V2Area[] = ["settings", "home", "inbox", "content", "customers", "discounts", "analytics", "staff", "billing", "products", "orders", "till", "tools"];
 
 export function areaOn(area: V2Area, flags: V2Flags, ready: readonly V2Area[] = V2_READY_AREAS): boolean {
     if (!flags.admin_v2 || !ready.includes(area)) return false;
@@ -157,12 +157,14 @@ const V2_FALLBACKS: { area: V2Area; v2: string; legacy: string }[] = [
     { area: "analytics", v2: "/analytics", legacy: "/sales/analytics" },
     { area: "staff", v2: "/staff", legacy: "/team" },
     { area: "billing", v2: "/billing", legacy: "/settings" },
+    // Admin tools only exist in the new admin.
+    { area: "tools", v2: "/tools", legacy: "/settings" },
 ];
 
 /** Every top-level prefix the new admin adds. proxy.ts and sw.js must cover these. */
 export const V2_PREFIXES = [
     "/home", "/inbox", "/orders", "/till", "/catalogue", "/discounts", "/content",
-    "/analytics", "/staff", "/billing", "/ui-kit",
+    "/analytics", "/staff", "/billing", "/tools", "/ui-kit",
 ] as const;
 
 function match(pattern: string, path: string): Record<string, string> | null {

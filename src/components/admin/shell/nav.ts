@@ -1,7 +1,7 @@
 // The admin v2 side navigation: one list, two groups.
 import type { IconName } from "@/components/admin/ui/Icon";
 
-export type NavKey = "home" | "inbox" | "orders" | "till" | "products" | "customers" | "discounts" | "content" | "analytics" | "staff" | "billing" | "settings";
+export type NavKey = "home" | "inbox" | "orders" | "till" | "products" | "customers" | "discounts" | "content" | "analytics" | "staff" | "billing" | "settings" | "tools";
 
 export type NavDef = {
     k: NavKey;
@@ -10,6 +10,8 @@ export type NavDef = {
     icon: IconName;
     /** Owners and admins only. Hiding it is not access control: each page checks again. */
     full?: boolean;
+    /** The admin role only (not owners). Hiding it is not access control either. */
+    adminOnly?: boolean;
     /** Old URLs that belong to this item, so it lights up during the rollout too. */
     legacy?: string[];
 };
@@ -30,7 +32,15 @@ export const NAV_GENERAL: NavDef[] = [
     { k: "staff", label: "Staff", href: "/staff", icon: "staff", full: true, legacy: ["/team"] },
     { k: "billing", label: "Billing", href: "/billing", icon: "billing", full: true },
     { k: "settings", label: "Settings", href: "/settings", icon: "settings", full: true, legacy: ["/seo", "/communications"] },
+    { k: "tools", label: "Admin tools", href: "/tools", icon: "wrench", full: true, adminOnly: true },
 ];
+
+/** Whether this role sees a menu item. Each page checks the role again on the server. */
+export function navVisible(item: NavDef, role: string): boolean {
+    if (item.adminOnly) return role === "admin";
+    if (item.full) return role === "admin" || role === "owner";
+    return true;
+}
 
 function under(path: string, prefix: string) {
     return path === prefix || path.startsWith(prefix + "/");

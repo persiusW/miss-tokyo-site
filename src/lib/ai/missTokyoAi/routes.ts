@@ -112,6 +112,7 @@ export const V2_ROUTES = {
     staff_roles: { path: "/staff/permissions", title: "Staff › What each role can do", roles: FULL, area: "staff" },
     staff_activity: { path: "/staff/activity", title: "Staff › Activity", roles: FULL, area: "staff" },
     billing: { path: "/billing", title: "Billing", roles: FULL, area: "billing" },
+    tools: { path: "/tools", title: "Admin tools", roles: ADMIN, area: "tools" },
     settings: { path: "/settings", title: "Settings", roles: FULL, area: "settings", tabs: V2_SETTINGS_SECTIONS, tabStyle: "segment" },
     account: { path: "/settings/account", title: "Your account", roles: ALL, area: "settings" },
 } satisfies Record<string, RouteDef>;

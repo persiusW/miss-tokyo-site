@@ -16,7 +16,7 @@ import { beginThemeFade, signalRouteCommit, startRouteTransition } from "@/compo
 import { createClient } from "@/lib/supabaseBrowser";
 import { AdminV2Context, type AdminV2Ctx, type V2Role } from "./AdminV2Context";
 import { CommandPaletteV2 } from "./CommandPaletteV2";
-import { NAV_GENERAL, NAV_MAIN, ROLE_LABEL, navActive, pageKey, type NavDef } from "./nav";
+import { NAV_GENERAL, NAV_MAIN, ROLE_LABEL, navActive, navVisible, pageKey, type NavDef } from "./nav";
 
 type Theme = "light" | "dark" | "system";
 
@@ -132,7 +132,7 @@ export function AdminV2Shell({ children, businessName, role, user, showCustomReq
     };
 
     const navItem = (n: NavDef) => {
-        if (n.full && !full) return null;
+        if (!navVisible(n, role)) return null;
         const active = navActive(n, pathname);
         const count = n.k === "inbox" ? counts.inbox : n.k === "orders" ? counts.orders : 0;
         return (
@@ -152,7 +152,7 @@ export function AdminV2Shell({ children, businessName, role, user, showCustomReq
     };
 
     const themeAttr = theme === "system" ? undefined : theme;
-    const nav = [...NAV_MAIN, ...NAV_GENERAL].filter(n => !n.full || full);
+    const nav = [...NAV_MAIN, ...NAV_GENERAL].filter(n => navVisible(n, role));
 
     return (
         <MissTokyoAiProvider user={{ name: user.name, role }}>

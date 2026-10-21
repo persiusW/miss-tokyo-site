@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { apiError } from "@/lib/errors/apiError";
+import { payoutFor, postWithPayout } from "@/lib/billing/payoutInit";
 
 /**
  * POST /api/invoice/paystack-link
@@ -62,18 +63,10 @@ export async function POST(req: NextRequest) {
         // Convert GHS amount to pesewas (Paystack uses lowest currency unit)
         const amountInPesewas = Math.round(finalAmount * 100);
 
-        // --- SPLIT GROUP (SPL_xxx) — active for testing ---
-        const paystackSplitCode = process.env.PAYSTACK_SPLIT_CODE;
-        const splitPayload = paystackSplitCode ? { split_code: paystackSplitCode } : {};
-
-        // --- SUBACCOUNT (ACCT_xxx) — commented out while testing split groups ---
-        // const paystackSubaccount = process.env.PAYSTACK_SUBACCOUNT;
-        // const subPct = Number(process.env.PAYSTACK_SUBACCOUNT_PERCENTAGE) || 2.5;
-        // const subaccountPayload = paystackSubaccount ? {
-        //     subaccount: paystackSubaccount,
-        //     bearer: "subaccount",
-        //     transaction_charge: Math.round(amountInPesewas * ((100 - subPct) / 100)),
-        // } : {};
+        // Which Paystack split rides along (the amount is never changed): switch
+        // off = the env split group, as always; on = the admin's exact share
+        // by subaccount (lib/billing/payoutInit).
+        const payout = await payoutFor({ source: "invoice", amountGhs: finalAmount, feeGhs: feeAmount, baseGhs: baseAmount });
 
         const body: Record<string, any> = {
             name: `Invoice #${invoiceId.substring(0, 8).toUpperCase()}`,
@@ -81,7 +74,6 @@ export async function POST(req: NextRequest) {
             amount: amountInPesewas,
             currency: "GHS",
             channels: ["mobile_money", "card", "bank", "bank_transfer", "ussd"],
-            ...splitPayload,
             metadata: {
                 invoice_id: invoiceId,
                 source: "invoice",
@@ -96,14 +88,14 @@ export async function POST(req: NextRequest) {
             ];
         }
 
-        const res = await fetch("https://api.paystack.co/paymentrequest", {
+        const res = await postWithPayout(b => fetch("https://api.paystack.co/paymentrequest", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${secretKey}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify(body),
-        });
+            body: JSON.stringify(b),
+        }), body, payout);
 
         const data = await res.json();
 

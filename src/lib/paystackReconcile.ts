@@ -4,6 +4,7 @@ import { confirmSale, fallbackDecrementFromItems } from "@/lib/inventory";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { zoneLabel } from "@/lib/delivery";
 import { isReclaimableCancellation } from "@/lib/reclaimCancelled";
+import { recordAdminPayout } from "@/lib/billing/payoutLedger";
 
 export { isReclaimableCancellation };
 
@@ -62,7 +63,10 @@ export async function verifyReference(reference: string): Promise<PaystackVerdic
             amount: json.data.amount != null ? json.data.amount / 100 : null,
             requestedAmount: json.data.requested_amount != null ? json.data.requested_amount / 100 : null,
             fees: json.data.fees != null ? json.data.fees / 100 : null,
-            tx: { amount: json.data.amount ?? null, requested_amount: json.data.requested_amount ?? null, fees: json.data.fees ?? null },
+            // The money fields, plus what the payout ledger reads (reference,
+            // fee metadata, split figures). Never the card authorization: the
+            // verdict is sent to staff screens.
+            tx: ledgerTxOf(json.data),
             paidAt: json.data.paid_at ?? null,
             channel: json.data.channel ?? null,
             unknown: false,
@@ -74,8 +78,23 @@ export async function verifyReference(reference: string): Promise<PaystackVerdic
     }
 }
 
-/** The money fields of a raw Paystack transaction object, in pesewas. */
-type PaystackTxMoney = { amount?: number | null; requested_amount?: number | null; fees?: number | null };
+/** The parts of a transaction the charge columns and the payout ledger need, nothing more. */
+export function ledgerTxOf(d: any): PaystackTxMoney {
+    const m = d?.metadata && typeof d.metadata === "object" ? d.metadata : {};
+    const sub = d?.subaccount && typeof d.subaccount === "object" ? { subaccount_code: d.subaccount.subaccount_code ?? null } : null;
+    return {
+        amount: d?.amount ?? null, requested_amount: d?.requested_amount ?? null, fees: d?.fees ?? null,
+        reference: d?.reference ?? null, status: d?.status ?? null, paid_at: d?.paid_at ?? null,
+        metadata: {
+            source: m.source, orderId: m.orderId, pos_session_id: m.pos_session_id, invoice_id: m.invoice_id,
+            platform_fee_amount: m.platform_fee_amount, platform_fee_base: m.platform_fee_base, admin_payout: m.admin_payout,
+        },
+        split: d?.split ?? null, fees_split: d?.fees_split ?? null, subaccount: sub,
+    };
+}
+
+/** The money fields of a raw Paystack transaction object, in pesewas (and whatever else it carries). */
+type PaystackTxMoney = { amount?: number | null; requested_amount?: number | null; fees?: number | null; [k: string]: unknown };
 
 /**
  * What to keep on the order row from a confirmed Paystack transaction.
@@ -96,6 +115,8 @@ export function chargeColumnsFromTx(tx: PaystackTxMoney): { paystack_charged: nu
  * any other failure here must never be what stops a payment being recorded.
  */
 export async function recordPaystackCharge(orderId: string, tx: PaystackTxMoney): Promise<void> {
+    // The admin payout ledger, from the same confirmed transaction (idempotent per reference).
+    await recordAdminPayout(tx);
     const cols = chargeColumnsFromTx(tx);
     if (cols.paystack_charged == null && cols.paystack_fee == null) return;
     const { error } = await supabaseAdmin.from("orders").update(cols).eq("id", orderId);

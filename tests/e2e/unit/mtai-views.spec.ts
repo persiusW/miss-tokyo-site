@@ -208,6 +208,11 @@ test("pages the assistant keeps from sales staff are gated on the server", () =>
             expect(src).toContain(`sec?.mine ? (["admin", "owner", "sales_staff"] as const) : (["admin", "owner"] as const)`);
             continue;
         }
+        if (r.roles.length === 1 && r.roles[0] === "admin") {
+            // Admin-only pages (Admin tools): the admin role and nobody else.
+            expect(src, `${key} (${r.path})`).toMatch(/requireV2Page\([^;]*\[\s*"admin"\s*\]\s*\)/);
+            continue;
+        }
         expect(src, `${key} (${r.path})`).toMatch(ownerAdmin);
     }
     // Sales staff routes don't hide behind an owner/admin guard.

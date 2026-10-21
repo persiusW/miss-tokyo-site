@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { AI_MODEL } from "@/lib/ai/pricing";
 import type { AiSettings } from "@/lib/ai/settings";
 import { todaySpendUsd, withinCap } from "@/lib/ai/spend";
+import { aiPausedByMonthlyCap } from "@/lib/billing/statements";
 import { logCause } from "@/lib/errors/apiError";
 import { runShopTurn } from "./engine";
 import { systemPromptFor } from "./prompt";
@@ -53,6 +54,8 @@ export async function runShopAssistant(args: {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     const switchedOn = args.channel === "whatsapp" ? settings.whatsappEnabled : settings.shop.enabled;
     if (!switchedOn || !apiKey) return cant();
+    // The owner's monthly cap on the features bill pauses replies like the daily limit does.
+    if (await aiPausedByMonthlyCap()) return cant();
     // The shop chat and WhatsApp share one slice of the daily cap.
     const [spentToday, spentWeb, spentWa] = await Promise.all([todaySpendUsd(), todaySpendUsd("web"), todaySpendUsd("whatsapp")]);
     if (spentToday === null || spentWeb === null || spentWa === null) return cant();

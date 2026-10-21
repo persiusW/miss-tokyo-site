@@ -14,6 +14,7 @@ import { ensureCustomerAccount, saveCustomerContact, sendAdminPushNotifications,
 import { releaseDiscountHolds } from "@/lib/discountValidation";
 import { settlePosSession } from "@/lib/posSettlement";
 import { recordPaystackCharge } from "@/lib/paystackReconcile";
+import { recordAdminPayout } from "@/lib/billing/payoutLedger";
 import { recordResult } from "@/lib/payments/attempts";
 import { apiError } from "@/lib/errors/apiError";
 import { handleRefundEvent } from "@/lib/orders/refundWebhook";
@@ -77,6 +78,9 @@ export async function POST(req: Request) {
             const data = event.data;
             const paystackRef: string = data.reference || "";
             after(() => recordResult(paystackRef, data)); // off the settlement path
+            // Every paid payment with a processing fee (checkout, POS, invoices)
+            // gets its admin payout ledger row; idempotent per reference.
+            after(() => recordAdminPayout(data));
             const metadata = data.metadata || {};
 
             // ── Gift card purchase: activate + deliver ─────────────────────────

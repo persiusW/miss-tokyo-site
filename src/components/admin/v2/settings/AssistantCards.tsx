@@ -1,8 +1,9 @@
 "use client";
 
-// Read-only cards under Settings › Assistants, kept in full from /settings/ai:
-// WhatsApp health, WhatsApp results, shop chats, AI insights and the last 20
-// AI turns, plus today's and this month's AI use next to the daily limit.
+// Read-only cards under Settings › Assistants, kept from /settings/ai:
+// WhatsApp health, WhatsApp results, shop chats and AI insights, plus today's
+// and this month's AI use next to the daily limit. The last 20 AI replies
+// (model, tokens, cost) moved to Admin tools › Agents, admin only.
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Badge, Btn, Card, Empty, ErrorState, Kpi, SkeletonRows, ghs, plural, when } from "@/components/admin/ui";
 import { AiInsightCards, WhatsAppResults } from "./InsightCards";
@@ -51,7 +52,7 @@ function since(iso: string | null): string {
     return h < 48 ? `${h} h ago` : when(iso);
 }
 
-function WhatsAppHealth() {
+export function WhatsAppHealth() {
     const [d, setD] = useState<HealthData | null>(null);
     const [failed, setFailed] = useState(false);
     const load = useCallback(() => {
@@ -143,7 +144,7 @@ function ShopChats() {
     );
 }
 
-function RecentTurns({ ai }: { ai: AiActivity | null }) {
+export function RecentTurns({ ai }: { ai: AiActivity | null }) {
     const rows = ai?.recent ?? [];
     return (
         <Card title="Last 20 AI replies">
@@ -165,14 +166,13 @@ function RecentTurns({ ai }: { ai: AiActivity | null }) {
     );
 }
 
-export function AssistantCards({ ai }: { ai: AiActivity | null }) {
+export function AssistantCards(_: { ai: AiActivity | null }) {
     return (
         <div className="stack">
             <WhatsAppHealth />
             <WhatsAppResults />
             <ShopChats />
             <AiInsightCards />
-            <RecentTurns ai={ai} />
         </div>
     );
 }

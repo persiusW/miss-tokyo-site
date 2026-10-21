@@ -118,6 +118,7 @@ export const PAGE_ROUTES: readonly string[] = [
     "/team",
     "/terms",
     "/test-orders",
+    "/tools", "/tools/[tab]",
     "/till", "/till/today",
     "/ui-kit",
     "/track",
@@ -126,7 +127,7 @@ export const PAGE_ROUTES: readonly string[] = [
 
 const STAFF_PREFIXES = ["/overview", "/pos", "/sales", "/catalog", "/customers", "/finance", "/seo", "/settings", "/cms", "/communications", "/team", "/agent", "/ai", "/test-orders",
     // Admin v2
-    "/home", "/inbox", "/orders", "/till", "/catalogue", "/discounts", "/content", "/analytics", "/staff", "/billing", "/ui-kit"];
+    "/home", "/inbox", "/orders", "/till", "/catalogue", "/discounts", "/content", "/analytics", "/staff", "/billing", "/tools", "/ui-kit"];
 const ID_SEGMENT = /^[A-Za-z0-9_-]{1,80}$/;
 const SPLIT = PAGE_ROUTES.map(r => r.split("/").filter(Boolean));
 

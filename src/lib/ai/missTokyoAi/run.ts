@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { AI_MODEL, costUsd } from "@/lib/ai/pricing";
 import { getAiSettings } from "@/lib/ai/settings";
 import { todaySpendUsd, withinCap, startOfTodayUtc } from "@/lib/ai/spend";
+import { aiPausedByMonthlyCap } from "@/lib/billing/statements";
 import { buildSystemPrompt } from "@/lib/ai/missTokyoAi/prompt";
 import { runTool, toolDefsFor } from "@/lib/ai/missTokyoAi/tools";
 import { scrubReply, stripForgedContext } from "@/lib/ai/missTokyoAi/scrub";
@@ -37,6 +38,7 @@ const CALM = {
     off: "Miss Tokyo AI is switched off right now.",
     notSetUp: "Miss Tokyo AI is not set up yet.",
     cap: "Miss Tokyo AI has reached today's limit. It will be back tomorrow.",
+    monthCap: "Miss Tokyo AI is paused: this month's spending cap for the assistants has been reached. The owner can raise it in Billing.",
     personal: "You've used today's Miss Tokyo AI messages. They reset at midnight.",
     rate: "You're sending messages quickly. Please wait a minute and try again.",
     invalid: "Something went wrong with this chat. Please start a new chat.",
@@ -122,6 +124,7 @@ export async function runStoreAssistant(args: {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return { ok: false, status: 503, error: CALM.notSetUp };
 
+    if (await aiPausedByMonthlyCap()) return { ok: false, status: 429, error: CALM.monthCap };
     // Two caps: the shared daily cap, and Miss Tokyo AI's share of it so the
     // WhatsApp agent always keeps the rest.
     const [spentToday, spentDashboard] = await Promise.all([todaySpendUsd(), todaySpendUsd("dashboard")]);
