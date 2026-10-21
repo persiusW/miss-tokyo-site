@@ -7,6 +7,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { normaliseOrderPhone } from "@/lib/phone";
 import webpush from "web-push";
+import { staffPushRecipients } from "@/lib/staffPushRecipients";
 
 // ── Admin web push ────────────────────────────────────────────────────────────
 
@@ -21,12 +22,23 @@ export async function sendAdminPushNotifications(title: string, body: string, ur
     if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return;
     initWebPush();
 
-    const { data: subs } = await supabaseAdmin
+    const { data: rows } = await supabaseAdmin
         .from("admin_push_subscriptions")
-        .select("endpoint, p256dh, auth")
-        .limit(50);
+        .select("user_id, endpoint, p256dh, auth")
+        .limit(200);
+    if (!rows?.length) return;
 
-    if (!subs?.length) return;
+    // Only people who are staff right now: a removed team member's row stays.
+    const userIds = [...new Set(rows.map(r => r.user_id).filter((id): id is string => !!id))];
+    if (!userIds.length) return;
+    const { data: owners, error: ownersError } = await supabaseAdmin
+        .from("profiles")
+        .select("id, role")
+        .in("id", userIds);
+    // Fail closed: if we can't tell who is staff, send to nobody.
+    if (ownersError || !owners) return;
+    const subs = staffPushRecipients(rows, owners).slice(0, 50);
+    if (!subs.length) return;
 
     const payload = JSON.stringify({ title, body, url, icon: "/favicon-96x96.png" });
 
