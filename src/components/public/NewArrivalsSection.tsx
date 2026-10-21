@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { NewArrivalsCarousel } from "./NewArrivalsCarousel";
+import { NEW_ARRIVALS_SHOWN } from "@/lib/content/homeLayout";
 
 interface Product {
     slug: string;
@@ -23,7 +24,7 @@ export async function NewArrivalsSection() {
             .select("slug, name, price_ghs, image_urls, is_sale, discount_value, inventory_count, track_inventory, preorder_enabled, category_ids, category_type")
             .eq("is_active", true)
             .order("created_at", { ascending: false })
-            .limit(16),
+            .limit(NEW_ARRIVALS_SHOWN),
         db
             .from("categories")
             .select("id, name, preorder_enabled")

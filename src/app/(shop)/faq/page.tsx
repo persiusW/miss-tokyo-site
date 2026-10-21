@@ -1,20 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FAQS } from "@/content/shopInfo";
+import type { Faq } from "@/content/shopInfo";
+import { RichLine } from "@/components/public/PolicyBody";
+import { loadFaqs, pageSeo } from "@/lib/content/load";
 
-export const metadata: Metadata = {
-    title: "FAQ — Miss Tokyo",
-    description: "Answers to common questions about orders, returns, shipping, sizing, and more.",
-};
+// Questions are edited in the admin (Content › Pages › FAQ); the original
+// list in content/shopInfo.ts is the fallback.
+export const revalidate = 300;
 
-// Group by section
-const sections = FAQS.reduce<Record<string, typeof FAQS>>((acc, faq) => {
-    if (!acc[faq.section]) acc[faq.section] = [];
-    acc[faq.section].push(faq);
-    return acc;
-}, {});
+export function generateMetadata(): Promise<Metadata> {
+    return pageSeo("/faq", {
+        title: "FAQ — Miss Tokyo",
+        description: "Answers to common questions about orders, returns, shipping, sizing, and more.",
+    });
+}
 
-export default function FAQPage() {
+export default async function FAQPage() {
+    // Group by section, in the order the sections first appear.
+    const sections = (await loadFaqs()).reduce<Record<string, Faq[]>>((acc, faq) => {
+        if (!acc[faq.section]) acc[faq.section] = [];
+        acc[faq.section].push(faq);
+        return acc;
+    }, {});
     return (
         <div className="pt-32 pb-24 px-6 md:px-12 max-w-3xl mx-auto min-h-screen">
             <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-400 mb-4">Help</p>
@@ -34,7 +41,7 @@ export default function FAQPage() {
                                         {faq.question}
                                     </h3>
                                     <p className="text-sm text-neutral-600 leading-relaxed">
-                                        {faq.answer}
+                                        <RichLine text={faq.answer} />
                                     </p>
                                 </div>
                             ))}

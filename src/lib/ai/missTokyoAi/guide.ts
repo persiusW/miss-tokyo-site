@@ -102,7 +102,7 @@ export const GUIDE: GuideEntry[] = [
         id: "gift-cards",
         title: "Gift Cards",
         route: "gift_cards",
-        body: `"Issue Gift Card" → amount → "Recipient Email *" → optional name, sender and message → "Issue & Send Email". "View" shows the balance, "Cancel" (permanent) and "Resend". A card's amount or balance cannot be edited. Online gift-card limits are in Site Settings → CMS → Gift Cards.`,
+        body: `"Issue Gift Card" → amount → "Recipient Email *" → optional name, sender and message → "Issue & Send Email". "View" shows the balance, "Cancel" (permanent) and "Resend". A card's amount or balance cannot be edited. Online gift-card limits are in Content → Pages → Gift cards page (Site Settings → CMS → Gift Cards in the old admin).`,
     },
     {
         id: "products",

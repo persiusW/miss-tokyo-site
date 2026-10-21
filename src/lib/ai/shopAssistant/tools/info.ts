@@ -1,14 +1,17 @@
 // shop_info: the pages' own text, plus live delivery fees and contact details.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { parseDeliverySettings } from "@/lib/delivery";
-import { SHOP_INFO_TOPICS, shopInfoText, type ShopInfoTopic } from "@/content/shopInfo";
+import { SHOP_INFO_TOPICS, type ShopInfoTopic } from "@/content/shopInfo";
+import { loadShopContent } from "@/lib/content/load";
+import { shopInfoTextFor } from "@/lib/content/shopInfoText";
 import { err, ok, pushTalk, type ShopToolContext, type ToolOutcome } from "./context";
 
 export async function shopInfo(input: any, ctx: ShopToolContext): Promise<ToolOutcome> {
     const topic = input?.topic as ShopInfoTopic;
     if (!SHOP_INFO_TOPICS.includes(topic)) return err(`topic must be one of: ${SHOP_INFO_TOPICS.join(", ")}`);
     ctx.notes.topic ??= topic === "faq" ? "a question" : topic;
-    const lines = [shopInfoText(topic)];
+    // The pages as published (Content › Pages), so the chat matches them.
+    const lines = [shopInfoTextFor(topic, await loadShopContent())];
 
     if (topic === "delivery") {
         const { data } = await supabaseAdmin.from("store_settings")
