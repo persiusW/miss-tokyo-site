@@ -6,6 +6,7 @@ import {
     questionItem, replyText, requestChoices, requestItem, sortItems, windowLeft, type FormRow, type QuestionRow, type RequestRow,
 } from "../../../src/lib/admin/v2/inbox";
 import { shapeConversation, type ConversationRow } from "../../../src/lib/whatsapp/inbox";
+import { FLAGS_ALL, FLAGS_OFF, V2_READY_AREAS, v2Redirect } from "../../../src/lib/admin/v2/routeMap";
 
 // Admin v2 Inbox: one list for WhatsApp chats, contact forms, custom requests
 // and questions for admin. Pure: no database.
@@ -104,6 +105,17 @@ test("the contact-form reply escapes what staff type and quotes the customer's m
     expect(shown).toContain("Yes <b>today</b> & tomorrow");
     expect(shown).not.toContain("Where is it?");
     expect(contactReplyEvent(ID).length).toBeLessThanOrEqual(80);
+});
+
+test("the inbox is built and its old URLs go forward and back", () => {
+    expect(V2_READY_AREAS).toContain("inbox");
+    expect(v2Redirect("/customers/whatsapp", `c=${ID}`, FLAGS_ALL)).toBe(`/inbox?c=${ID}`);
+    expect(v2Redirect("/customers/whatsapp/teach", "", FLAGS_ALL)).toBe("/inbox/teach");
+    expect(v2Redirect("/customers/forms", "", FLAGS_ALL)).toBe("/inbox?f=form");
+    expect(v2Redirect("/customers/requests", "", FLAGS_ALL)).toBe("/inbox?f=request");
+    expect(v2Redirect("/ai/inbox", "", FLAGS_ALL)).toBe("/inbox?f=ai");
+    expect(v2Redirect("/inbox", "", FLAGS_OFF)).toBe("/customers/whatsapp");
+    expect(v2Redirect("/inbox/teach", "", FLAGS_OFF)).toBe("/customers/whatsapp/teach");
 });
 
 test("the flashcard count function is closed to the browser roles", () => {
