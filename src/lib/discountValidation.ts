@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { computeDiscountSplit } from "@/lib/discountSplit";
+import { couponTimingBlock } from "@/lib/couponRules";
 
 export type ValidatedDiscount = {
     type: "coupon" | "gift_card";
@@ -51,7 +52,8 @@ async function couponUsesAvailable(
 /**
  * Validates a discount/gift-card code against the DB and computes its value for
  * an order of `orderAmount` GHS. Returns null when the code is missing, unknown,
- * inactive, over its usage limit, or below its minimum order value.
+ * inactive, not started, ended, over its usage limit, or below its minimum
+ * order value.
  */
 export async function validateDiscountCode(
     code: string | undefined | null,
@@ -65,7 +67,7 @@ export async function validateDiscountCode(
     const [{ data: coupon }, { data: card }] = await Promise.all([
         supabaseAdmin
             .from("coupons")
-            .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, expires_at")
+            .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at")
             .ilike("code", normalized)
             .maybeSingle(),
         supabaseAdmin
@@ -76,8 +78,7 @@ export async function validateDiscountCode(
     ]);
 
     if (coupon) {
-        if (!coupon.is_active) return null;
-        if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) return null;
+        if (couponTimingBlock(coupon)) return null;
         // Uses left after live holds — a basket already holding the last use
         // makes this code unavailable to anyone else
         const usesLeft = await couponUsesAvailable(coupon.id, coupon.usage_limit, coupon.used_count);

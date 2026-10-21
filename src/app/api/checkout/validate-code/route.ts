@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { computeDiscountSplit } from "@/lib/discountSplit";
+import { COUPON_BLOCK_TEXT, couponTimingBlock } from "@/lib/couponRules";
 
 // PERF-15: cache DB lookups per code for 30 s — avoids repeated round-trips
 // when a customer types / re-submits the same code during checkout.
@@ -11,7 +12,7 @@ const lookupCode = unstable_cache(
         const [{ data: coupon }, { data: card }] = await Promise.all([
             supabaseAdmin
                 .from("coupons")
-                .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, expires_at")
+                .select("id, code, discount_type, discount_value, min_order_value, usage_limit, used_count, is_active, starts_at, expires_at")
                 .ilike("code", normalized)
                 .maybeSingle(),
             supabaseAdmin
@@ -42,8 +43,10 @@ export async function POST(req: Request) {
 
         // ── Coupon branch ──────────────────────────────────────────────────────
         if (coupon) {
-            if (!coupon.is_active) {
-                return NextResponse.json({ valid: false, error: "This code has expired or is inactive." });
+            // Switched off, not started yet or ended: the same rule as the charge path
+            const block = couponTimingBlock(coupon);
+            if (block) {
+                return NextResponse.json({ valid: false, error: COUPON_BLOCK_TEXT[block] });
             }
             if (coupon.usage_limit !== null && coupon.used_count >= coupon.usage_limit) {
                 return NextResponse.json({ valid: false, error: "This code has reached its maximum usage limit." });
@@ -54,7 +57,6 @@ export async function POST(req: Request) {
                     error: `Minimum order of GH₵ ${Number(coupon.min_order_value).toFixed(2)} required for this code.`,
                 });
             }
-
             const split = computeDiscountSplit({
                 discountType: coupon.discount_type,
                 value: Number(coupon.discount_value),
