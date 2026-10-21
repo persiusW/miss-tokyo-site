@@ -12,6 +12,7 @@ import { saveSiteImage, saveWording } from "./actions";
 import { run } from "./shared";
 
 type View = "wording" | "images";
+const NOT_ON_SHOP = "Not on the shop";
 const groupName = (g: string) => GROUP_LABELS[g] ?? g.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
 
 export function TextTab({ wording, images, view }: { wording: WordingRow[]; images: ImageRow[]; view: View }) {
@@ -33,9 +34,10 @@ function WordingList({ rows }: { rows: WordingRow[] }) {
         const t = q.trim().toLowerCase();
         const hit = rows.filter(r => !t || `${r.label} ${r.value} ${r.key} ${groupName(r.group)}`.toLowerCase().includes(t));
         const by = new Map<string, WordingRow[]>();
-        for (const r of hit) by.set(r.group, [...(by.get(r.group) ?? []), r]);
-        // Groups the shop reads come first.
-        return [...by.entries()].sort((a, b) => Number(b[1].some(r => r.used)) - Number(a[1].some(r => r.used)));
+        for (const r of hit.filter(r => r.used)) by.set(groupName(r.group), [...(by.get(groupName(r.group)) ?? []), r]);
+        // Wording from the old site design that no page shows goes last, on its own.
+        const old = hit.filter(r => !r.used);
+        return [...by.entries(), ...(old.length ? [[NOT_ON_SHOP, old] as [string, WordingRow[]]] : [])];
     }, [rows, q]);
 
     return (
@@ -47,15 +49,16 @@ function WordingList({ rows }: { rows: WordingRow[] }) {
                         body={q ? "Try a word from the text, or clear the search." : "Wording the shop pages read appears here so you can change it."} />
                 ) : groups.map(([g, list]) => (
                     <div key={g}>
-                        <div className="ct-group-h">{groupName(g)}</div>
+                        <div className="ct-group-h">{g}</div>
+                        {g === NOT_ON_SHOP && <p className="help ct-group-note">Wording from the shop&rsquo;s old design. No page shows it now; each says where that text is edited instead.</p>}
                         <div className="rows">
                             {list.map(r => (
                                 <button type="button" key={r.key} className="row click" onClick={() => setEdit(r)}>
                                     <div className="row-main">
                                         <div className="row-title">{r.label}</div>
                                         <div className="row-sub ct-quote">{r.value ? `“${r.value}”` : "Empty"}</div>
+                                        {r.note && <div className="row-sub">{r.note}</div>}
                                     </div>
-                                    {!r.used && <Badge tone="neutral">Not on the shop</Badge>}
                                     <Icon n="chev" style={{ width: 16, height: 16, color: "var(--ink-3)" }} />
                                 </button>
                             ))}
@@ -80,12 +83,12 @@ function WordingPanel({ row, onClose, onSaved }: { row: WordingRow; onClose: () 
         onSaved();
     };
     return (
-        <Panel open onClose={onClose} title={row.label} sub={`Shown on: ${groupName(row.group)}`}
+        <Panel open onClose={onClose} title={row.label} sub={row.used ? `Shown on: ${groupName(row.group)}` : "Not on the shop"}
             footer={<>
                 <Btn kind="ghost" onClick={onClose} disabled={saving}>Cancel</Btn>
                 <Btn kind="primary" onClick={save} disabled={saving || v === row.value}>{saving ? "Saving…" : "Save"}</Btn>
             </>}>
-            {!row.used && <p className="help">The shop doesn&rsquo;t show this wording at the moment. It&rsquo;s kept in case a page uses it again.</p>}
+            {row.note && <p className="help">No shop page shows this wording. {row.note}</p>}
             <Field label="Wording" htmlFor="tw" help={row.hint ?? (row.updatedAt ? `Last changed ${when(row.updatedAt)}` : undefined)}>
                 <textarea id="tw" data-autofocus className="textarea" value={v} onChange={e => setV(e.target.value)} />
             </Field>

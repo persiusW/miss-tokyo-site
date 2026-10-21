@@ -29,6 +29,29 @@ export function wordingText(saved: Record<string, string | null | undefined>, ke
     return typeof v === "string" && v.trim() ? v : (wordingOriginal(key) ?? "");
 }
 
+/** Wording from the old site design that no page has a place for any more,
+ *  and where the same text is edited now. Shown apart, so nobody edits text
+ *  that customers never see. */
+const ABOUT_NOW = "The About page's text is edited in Pages › About.";
+const HERO_NOW = "The home page hero's text is edited in Home page › Hero slides.";
+export const OLD_WORDING: Record<string, string> = {
+    about_hero_title: ABOUT_NOW,
+    about_founder_title: ABOUT_NOW,
+    about_founder_p1: ABOUT_NOW,
+    about_founder_p2: ABOUT_NOW,
+    about_founder_p3: ABOUT_NOW,
+    about_philosophy_quote: ABOUT_NOW,
+    hero_title: HERO_NOW,
+    hero_subtitle: HERO_NOW,
+    hero_cta_text: HERO_NOW,
+};
+
+/** Why a piece of wording isn't on the shop (null when it is). */
+export function wordingNote(key: string): string | null {
+    if (WORDING.some(w => w.key === key)) return null;
+    return OLD_WORDING[key] ?? "No shop page has a place for this wording.";
+}
+
 export const GROUP_LABELS: Record<string, string> = {
     homepage: "Home page",
     about: "About page",

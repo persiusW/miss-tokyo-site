@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { HOME_LAYOUT_KEY, parseLayout, type HomeLayout } from "@/lib/content/homeLayout";
 import { FAQ_COPY_KEY, POLICY_KEYS, POLICY_META, SIZE_GUIDE_PAGE_KEY, SIZE_MODAL_KEY, parseFaqs, parsePolicy, parseSizeGuidePage, type PolicyDoc, type PolicyKey, type SizeGuidePage } from "@/lib/content/pageDocs";
 import { ABOUT_TEXT_KEYS, NAV_KEYS, PDP_KEYS, type AboutIn, type CarouselTab, type GiftCardSettingsIn, type ModalSizeRow, type NavKey, type PdpKey, type SeoIn, type TrustItem } from "@/lib/content/adminInput";
-import { SITE_ASSETS, WORDING, isConfigCopyKey } from "@/lib/content/wording";
+import { SITE_ASSETS, WORDING, isConfigCopyKey, wordingNote } from "@/lib/content/wording";
 import { CAROUSEL_KEY, NEW_ARRIVALS_DEFAULT_LIMIT, NEW_ARRIVALS_DEFAULT_TITLE, REVIEWS_SOURCE_KEY, parseCarouselTabs, parseReviewsSource, type ReviewsSource } from "@/lib/content/homeSections";
 import type { Faq } from "@/content/shopInfo";
 import { SEO_PATHS } from "./pagesList";
@@ -216,7 +216,8 @@ export async function loadReviews(): Promise<{ reviews: Review[]; source: Review
 
 // ── Shop wording and images ──────────────────────────────────────────────────
 
-export type WordingRow = { key: string; label: string; group: string; hint: string | null; value: string; original: string | null; used: boolean; updatedAt: string | null };
+/** `note` says why a row isn't on the shop (and where that text is edited now); null when it is. */
+export type WordingRow = { key: string; label: string; group: string; hint: string | null; value: string; original: string | null; used: boolean; note: string | null; updatedAt: string | null };
 export type ImageRow = { key: string; label: string; group: string; used: boolean; image_url: string; alt_text: string; link_url: string; is_active: boolean | null; updatedAt: string | null };
 
 export async function loadWording(): Promise<{ wording: WordingRow[]; images: ImageRow[] } | null> {
@@ -228,11 +229,11 @@ export async function loadWording(): Promise<{ wording: WordingRow[]; images: Im
     const rows = (copy.data ?? []).filter((r: { copy_key: string }) => !isConfigCopyKey(r.copy_key)) as { copy_key: string; label: string; page_group: string; value: string; hint: string | null; updated_at: string }[];
     const wording: WordingRow[] = rows.map(r => {
         const def = WORDING.find(w => w.key === r.copy_key);
-        return { key: r.copy_key, label: r.label || r.copy_key, group: r.page_group, hint: r.hint ?? def?.hint ?? null, value: r.value ?? "", original: def?.original ?? null, used: !!def, updatedAt: r.updated_at };
+        return { key: r.copy_key, label: def?.label ?? (r.label || r.copy_key), group: def?.group ?? r.page_group, hint: def?.hint ?? r.hint ?? null, value: r.value ?? "", original: def?.original ?? null, used: !!def, note: wordingNote(r.copy_key), updatedAt: r.updated_at };
     });
     // Wording the shop reads but nobody has saved yet: shown with its original.
     for (const w of WORDING) {
-        if (!wording.some(x => x.key === w.key)) wording.push({ key: w.key, label: w.label, group: w.group, hint: w.hint ?? null, value: w.original, original: w.original, used: true, updatedAt: null });
+        if (!wording.some(x => x.key === w.key)) wording.push({ key: w.key, label: w.label, group: w.group, hint: w.hint ?? null, value: w.original, original: w.original, used: true, note: null, updatedAt: null });
     }
     const images: ImageRow[] = SITE_ASSETS.map(a => {
         const r = (assets.data ?? []).find((x: { section_key: string }) => x.section_key === a.key) as Record<string, any> | undefined;

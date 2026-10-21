@@ -11,7 +11,7 @@ import { logCause } from "@/lib/errors/apiError";
 import { errorBody, type ErrorCode } from "@/lib/errors/catalogue";
 import { HOME_LAYOUT_KEY, OWN_SWITCH, cleanLayout, parseLayout, type HomeSectionId, type HomeLayout } from "@/lib/content/homeLayout";
 import { FAQ_COPY_KEY, POLICY_META, SIZE_GUIDE_PAGE_KEY, SIZE_MODAL_KEY, cleanFaqs, cleanPolicy, cleanSizeGuidePage, type PolicyKey } from "@/lib/content/pageDocs";
-import { SITE_ASSETS, isConfigCopyKey } from "@/lib/content/wording";
+import { SITE_ASSETS, WORDING, isConfigCopyKey } from "@/lib/content/wording";
 import { REVIEWS_SOURCE_KEY, type ReviewsSource } from "@/lib/content/homeSections";
 import { NAV_TAG } from "@/lib/content/shopNav";
 import { PAGE_SEO_TAG } from "@/lib/content/load";
@@ -382,8 +382,10 @@ export async function saveWording(key: string, value: string, meta: { label: str
     const text = typeof value === "string" ? value.slice(0, 5000) : "";
     const { error } = await putCopy(key, text, String(meta?.label ?? key).slice(0, 120), String(meta?.group ?? "general").slice(0, 40));
     if (error) return fail("GEN-00", error, { key });
-    revalidatePath("/craft");
-    revalidatePath("/");
+    // The page that shows this wording (old wording has none; refresh both pages that read wording).
+    const path = WORDING.find(w => w.key === key)?.path;
+    if (path) revalidatePath(path);
+    else { revalidatePath("/craft"); revalidatePath("/"); }
     return OK();
 }
 
