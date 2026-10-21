@@ -358,13 +358,20 @@ export function paymentListTable(rows: unknown): Table {
     return { cols: [T("Order"), T("Paystack ref"), T("Customer"), T("Email"), T("Method"), M("Amount"), D("Date")], rows: r };
 }
 
+/** An order's status in words, for the rider report. */
+export const ORDER_STATUS: Record<string, string> = {
+    pending: "Waiting for payment", paid: "Paid", processing: "Paid", packed: "Packed", shipped: "On the way",
+    ready_for_pickup: "Ready for collection", fulfilled: "Delivered", delivered: "Delivered", refunded: "Refunded",
+    cancelled: "Cancelled", failed: "Payment failed", reservation_expired: "Expired",
+};
+
 /** One rider's orders (the old rider page). */
 export function riderOrdersTable(rows: unknown): Table {
     const r = arr(rows).map(x => {
         const a = (x.shipping_address && typeof x.shipping_address === "object" ? x.shipping_address : {}) as Record<string, unknown>;
         return [
             orderRef(x), str(x.customer_name) || str(x.customer_email) || "—", str(x.customer_phone) || "—",
-            str(a.text) || str(a.address) || str(a.city) || "—", num(x.total_amount), str(x.status), str(x.created_at),
+            str(a.text) || str(a.address) || str(a.city) || "—", num(x.total_amount), ORDER_STATUS[str(x.status)] ?? str(x.status), str(x.created_at),
         ] as Cell[];
     });
     return { cols: [T("Order"), T("Customer"), T("Phone"), T("Address"), M("Amount"), T("Status"), D("Date")], rows: r };

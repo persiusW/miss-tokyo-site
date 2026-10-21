@@ -165,6 +165,7 @@ test("customer figures leave out orders with no email instead of counting them a
 test("rider orders show the order number and the address the old page showed", () => {
     const t = riderOrdersTable([{ id: "0a1b2c3d-xxxx", ref: null, customer_name: "Ama", shipping_address: { text: "East Legon" }, total_amount: 10, status: "shipped", created_at: "2026-10-01T00:00:00Z" }]);
     expect(t.rows[0].slice(0, 4)).toEqual(["0A1B2C3D", "Ama", "—", "East Legon"]);
+    expect(t.rows[0][5]).toBe("On the way");
 });
 
 // ── CSV ──────────────────────────────────────────────────────────────────────
