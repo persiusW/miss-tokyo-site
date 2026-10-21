@@ -1,8 +1,9 @@
 "use client";
 
-// Read-only cards under Settings › Assistants, kept in full from /settings/ai:
-// WhatsApp health, WhatsApp results, shop chats, AI insights and the last 20
-// AI turns, plus today's and this month's AI use next to the daily limit.
+// Read-only cards under Settings › Assistants, kept from /settings/ai:
+// WhatsApp health, WhatsApp results, shop chats and AI insights, plus today's
+// and this month's AI use next to the daily limit. The last 20 AI replies
+// (model, tokens, cost) moved to Admin tools › Agents, admin only.
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Badge, Btn, Card, Empty, ErrorState, Kpi, SkeletonRows, ghs, plural, when } from "@/components/admin/ui";
 import { AiInsightCards, WhatsAppResults } from "./InsightCards";
@@ -165,14 +166,13 @@ export function RecentTurns({ ai }: { ai: AiActivity | null }) {
     );
 }
 
-export function AssistantCards({ ai }: { ai: AiActivity | null }) {
+export function AssistantCards(_: { ai: AiActivity | null }) {
     return (
         <div className="stack">
             <WhatsAppHealth />
             <WhatsAppResults />
             <ShopChats />
             <AiInsightCards />
-            <RecentTurns ai={ai} />
         </div>
     );
 }

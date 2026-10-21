@@ -123,15 +123,10 @@ export const SECTIONS: Section[] = [
     },
     {
         g: "Selling", k: "checkout", t: "Checkout",
-        sum: v => {
-            const pct = Number(str(v["store.platform_fee_percentage"])) || 0;
-            if (pct <= 0) return "No processing fee";
-            return `${pct}% processing fee · ${v["store.show_fee_at_checkout"] === true ? "shown as its own line" : "included in shipping and handling"}`;
-        },
+        // The processing fee moved to Admin tools › Fees (admin only, owner decision 2026-10-21).
+        sum: v => (v["store.checkout_undo_removed_enabled"] === true ? "Customers can undo a removed item" : "Removed items stay removed"),
         rows: [
-            { k: "store.platform_fee_percentage", label: "Processing fee", help: "Added to every online order, invoice and pay link to cover Paystack's charge. 0 turns it off.", type: "pct", words: "platform fee service charge" },
-            { k: "store.platform_fee_label", label: "What the fee is called", help: "Shown on the checkout and the receipt.", type: "text", max: 60 },
-            { k: "store.show_fee_at_checkout", label: "Show the fee as its own line", help: "When off, it's added into “Shipping and handling” instead.", type: "switch" },
+            { k: "_fee", label: "Processing fee", help: "Set by your developer. It's added to every online order, invoice and pay link, and shown at checkout.", type: "status", status: () => ({ text: "Set by your developer", tone: "neutral" }), words: "platform fee service charge processing" },
             { k: "store.checkout_undo_removed_enabled", label: "Let customers undo a removed item", help: "When something sells out while they're checking out, it's removed. This lets them put it back if it's free again. It re-checks stock, so a sold-out piece never comes back.", type: "switch", words: "undo" },
         ],
     },
@@ -211,7 +206,6 @@ export const SECTIONS: Section[] = [
             { k: "ai.daily_spend_cap_ghs", label: "Daily AI spending limit", help: "Shared by every assistant. They stop for the day when it's reached, and staff see a notice. Resets at midnight, Ghana time.", type: "money", words: "cap budget" },
             { k: "_aiuse", label: "AI use", help: "Today's spend against the daily limit, and this calendar month so far.", type: "aiuse", words: "spend cost month" },
             { k: "ai.shop_assistant_cap_share_pct", label: "Shop assistant's share of the daily limit", help: "The most the shop chat can use of the daily limit, so staff and WhatsApp keep the rest.", type: "pct", words: "cap share" },
-            { k: "ai.admin_cost_markup_pct", label: "Cost markup", help: "Admin only. Added to AI use above the plan.", type: "pct", adminOnly: true, words: "dev markup" },
             { k: "ai.shop_whatsapp_number", label: "Shop WhatsApp number", help: "Where the shop chat's “Talk to us” button goes. Blank uses the store phone.", type: "text", placeholder: "233…", words: "phone" },
             { k: "_wa", label: "WhatsApp handover and alerts", type: "head" },
             { k: "ai.whatsapp_handoff_number", label: "Send chats that need a person to", help: "They get the customer, the reason, recent messages and a link to reply, by WhatsApp and SMS. Blank uses the shop's WhatsApp number.", type: "text", placeholder: "233…", words: "handoff" },

@@ -67,8 +67,12 @@ test("choices are mapped back to their columns", () => {
 test("values outside what the shop allows are refused with a plain sentence", () => {
     const hold = encodeSection("payments", { "store.pos_hold_minutes": "60" }, saved, "owner", OWNER_VALID);
     expect(hold.ok).toBe(false);
-    const fee = encodeSection("checkout", { "store.platform_fee_percentage": "120" }, saved, "owner", OWNER_VALID);
-    expect(!fee.ok && fee.error).toMatch(/^Processing fee: /);
+    // The processing fee is not a Settings row any more (Admin tools › Fees): never saved from here.
+    for (const role of ["owner", "admin"] as const) {
+        for (const k of ["store.platform_fee_percentage", "store.platform_fee_label", "store.show_fee_at_checkout"]) {
+            expect(encodeSection("checkout", { [k]: k.endsWith("percentage") ? "2" : k.endsWith("label") ? "x" : true }, saved, role, role === "admin" ? VALID : OWNER_VALID).ok, `${role} ${k}`).toBe(false);
+        }
+    }
     const tier = encodeSection("wholesale", { "store.wholesale_tier_2_min": "12" }, saved, "owner", OWNER_VALID);
     expect(!tier.ok && tier.error).toBe("Tier 2: the first number can't be more than the second.");
     const name = encodeSection("profile", { "biz.business_name": "  " }, saved, "owner", OWNER_VALID);
@@ -82,13 +86,12 @@ test("a key from another section, or an unknown one, is never saved", () => {
     expect(encodeSection("nope", { "biz.business_name": "x" }, saved, "owner", OWNER_VALID).ok).toBe(false);
 });
 
-test("the cost markup is admin only, on the server too", () => {
+test("the cost markup moved to Admin tools: Settings never saves or shows it, for anyone", () => {
     expect(encodeSection("assistants", { "ai.admin_cost_markup_pct": "20" }, saved, "owner", OWNER_VALID).ok).toBe(false);
-    const a = encodeSection("assistants", { "ai.admin_cost_markup_pct": "20" }, saved, "admin", VALID);
-    expect(a.ok && a.payload.ai).toEqual([{ key: "admin_cost_markup_pct", value: 20 }]);
+    expect(encodeSection("assistants", { "ai.admin_cost_markup_pct": "20" }, saved, "admin", VALID).ok).toBe(false);
     const ctx = { role: "owner" } as Ctx;
     expect(searchSettings("markup", ctx).length).toBe(0);
-    expect(searchSettings("markup", { ...ctx, role: "admin" }).map(h => h.row.k)).toContain("ai.admin_cost_markup_pct");
+    expect(searchSettings("markup", { ...ctx, role: "admin" }).length).toBe(0);
 });
 
 test("AI settings are typed and numbers normalised before the validators see them", () => {
