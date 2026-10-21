@@ -2,13 +2,11 @@
 
 import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getUrl } from "@/lib/utils/getUrl";
-import { sendSMSOrThrow } from "@/lib/sms";
 import crypto from "crypto";
 import { logActivity } from "@/lib/utils/logActivity";
 import { after } from "next/server";
 import { INVITABLE_ROLES } from "@/lib/teamInvites";
-import { sendEmail } from "@/lib/email";
+import { sendTeamInviteMessages } from "@/lib/teamInviteMessages";
 
 interface InviteData {
     fullName: string;
@@ -54,9 +52,22 @@ export async function inviteTeamMember(data: InviteData) {
     // look like a different person.
     const email = data.email.trim().toLowerCase();
 
+    // An address that's already on the staff list, or deactivated, needs a
+    // role change or Reactivate, not an invite: accepting would quietly reset
+    // their password, and a deactivated account is banned from signing in.
+    const { data: existing } = await supabaseAdmin
+        .from("profiles")
+        .select("role, staff_deactivated_at")
+        .eq("email", email)
+        .maybeSingle();
+    if (existing?.staff_deactivated_at) {
+        return { success: false, error: "This person is deactivated. Reactivate them from the staff list instead." };
+    }
+    if (existing && ["owner", "admin", "sales_staff"].includes(existing.role)) {
+        return { success: false, error: "This person is already on the staff list. Change their role there instead." };
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
-    const dynamicHost = await getUrl();
-    const inviteLink = `${dynamicHost}/invite?token=${token}`;
 
     const { error: insertError } = await supabaseAdmin.from("team_invitations").insert({
         full_name: data.fullName,
@@ -81,43 +92,7 @@ export async function inviteTeamMember(data: InviteData) {
         details: { email, role: data.role }
     }));
 
-    const message = `You have been invited to collaborate on Miss Tokyo as a ${data.role}. Join here: ${inviteLink}`;
-
-    // 1. Format Phone Number (Ghana standard +233)
-    let formattedPhone = data.phone;
-    if (formattedPhone) {
-        formattedPhone = formattedPhone.replace(/\D/g, "");
-        if (formattedPhone.startsWith("0")) {
-            formattedPhone = "233" + formattedPhone.slice(1);
-        } else if (!formattedPhone.startsWith("233")) {
-            formattedPhone = "233" + formattedPhone;
-        }
-        formattedPhone = "+" + formattedPhone;
-    }
-
-    try {
-        await sendEmail({
-            from: process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop",
-            to: email,
-            subject: "Invitation to Join Miss Tokyo Team",
-            text: message,
-            html: `<p>You have been invited to collaborate on Miss Tokyo as a <strong>${data.role}</strong>.</p><p><a href="${inviteLink}">Click here to accept your invitation</a></p>`,
-        }, { event: "team_invite" });
-
-        if (formattedPhone) {
-            try {
-                await sendSMSOrThrow({ to: formattedPhone, message });
-            } catch (smsErr) {
-                console.error("SMS failed, but email sent:", smsErr);
-                return { success: true, warning: 'Email sent, but SMS failed.' };
-            }
-        }
-
-        return { success: true };
-    } catch (err: any) {
-        console.error("Failed to send invite emails:", err);
-        return { success: false, error: "Invitation saved, but failed to dispatch communications." };
-    }
+    return sendTeamInviteMessages({ email, role: data.role, token, phone: data.phone });
 }
 
 export async function removeTeamMember(userId: string) {
