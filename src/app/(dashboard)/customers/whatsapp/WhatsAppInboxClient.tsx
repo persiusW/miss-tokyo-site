@@ -10,10 +10,11 @@
 // the list or one chat, with a back button.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { InboxConversation } from "@/lib/whatsapp/inbox";
+import { canAnswerWaiting, waitingMessages, type InboxConversation } from "@/lib/whatsapp/inbox";
 
 type Message = { id: string; direction: "inbound" | "outbound"; text: string | null; type: string | null; at: string };
-type Thread = { conversation: InboxConversation; messages: Message[] };
+/** loadedAt: when it was fetched, the "now" for what is waiting (render stays pure). */
+type Thread = { conversation: InboxConversation; messages: Message[]; loadedAt: number };
 
 const CALM = "Something happened. Please refresh and try again.";
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
@@ -64,6 +65,7 @@ export default function WhatsAppInboxClient() {
     const [thread, setThread] = useState<Thread | null>(null);
     const [threadError, setThreadError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [answering, setAnswering] = useState<string | null>(null);   // the chat the assistant is replying in
     const [search, setSearch] = useState("");
     const rootRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -78,7 +80,7 @@ export default function WhatsAppInboxClient() {
 
     const loadThread = useCallback(async (id: string) => {
         const r = await getJson(`/api/whatsapp/inbox/${id}`);
-        if (r.ok && r.data?.conversation) { setThread(r.data); setThreadError(null); }
+        if (r.ok && r.data?.conversation) { setThread({ ...r.data, loadedAt: Date.now() }); setThreadError(null); }
         else { setThread(null); setThreadError(r.data?.error ?? CALM); }
     }, []);
 
@@ -130,16 +132,23 @@ export default function WhatsAppInboxClient() {
     const open = (id: string) => router.replace(`/customers/whatsapp?c=${id}`, { scroll: false });
     const close = () => router.replace("/customers/whatsapp", { scroll: false });
 
-    const handBack = async () => {
+    const handBack = async (answer: boolean) => {
         if (!thread) return;
         setBusy(true);
         const r = await getJson(`/api/whatsapp/inbox/${thread.conversation.id}`, {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "hand_back" }),
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "hand_back", answer }),
         });
         setBusy(false);
         if (!r.ok) { setThreadError(r.data?.error ?? CALM); return; }
+        setAnswering(answer ? thread.conversation.id : null);
         await Promise.all([loadThread(thread.conversation.id), loadList()]);
     };
+
+    // Customer messages after our last one. Staff reply from their own WhatsApp, which we don't see, so they choose.
+    const waiting = useMemo(() => (thread ? waitingMessages(thread.messages, thread.loadedAt) : []), [thread]);
+    const offerAnswer = !!thread && canAnswerWaiting(thread.conversation.mode, waiting, thread.loadedAt);
+    const waitingLabel = `(${waiting.length} waiting)`;
+    const wraps = { whiteSpace: "normal", textAlign: "left", maxWidth: "100%" } as const;   // long labels wrap on a phone
 
     const shown = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -237,11 +246,31 @@ export default function WhatsAppInboxClient() {
                                 <a className="ac-btn ac-btn-primary" href={`https://wa.me/${thread.conversation.phone}`} target="_blank" rel="noopener" data-wa-reply>
                                     Reply on WhatsApp
                                 </a>
-                                {thread.conversation.mode === "person" && (
-                                    <button type="button" className="ac-btn" onClick={handBack} disabled={busy} data-wa-hand-back>
-                                        {busy ? "Handing back…" : "Hand back to assistant"}
+                                {thread.conversation.mode === "person" && offerAnswer && (
+                                    <button type="button" className="ac-btn" style={wraps} onClick={() => handBack(true)} disabled={busy} data-wa-hand-back-answer>
+                                        {busy ? "Handing back…" : `Hand back and reply ${waitingLabel}`}
                                     </button>
                                 )}
+                                {thread.conversation.mode === "person" && (
+                                    <button type="button" className="ac-btn" onClick={() => handBack(false)} disabled={busy} data-wa-hand-back>
+                                        {busy ? "Handing back…" : offerAnswer ? "Hand back only" : "Hand back to assistant"}
+                                    </button>
+                                )}
+                                {thread.conversation.mode === "assistant" && offerAnswer && answering !== thread.conversation.id && (
+                                    <button type="button" className="ac-btn" style={wraps} onClick={() => handBack(true)} disabled={busy} data-wa-answer-waiting>
+                                        {busy ? "Asking the assistant…" : `Assistant: reply ${waitingLabel}`}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        {thread && answering === thread.conversation.id && waiting.length > 0 && (
+                            <div style={{ fontSize: 12, color: "var(--ac-ink-3)", marginTop: 8 }} data-wa-answering>
+                                The assistant is replying. Its answer shows here within a minute.
+                            </div>
+                        )}
+                        {thread && offerAnswer && answering !== thread.conversation.id && (
+                            <div style={{ fontSize: 12, color: "var(--ac-ink-3)", marginTop: 8 }}>
+                                Only ask the assistant to reply if nobody has answered these from their own WhatsApp.
                             </div>
                         )}
                         {thread && !thread.conversation.windowOpen && (
