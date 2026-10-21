@@ -1,6 +1,5 @@
-// Abandoned-cart reminders: the one implementation behind the hourly cron
-// (/api/cron/abandoned-cart, Vercel; /api/cron/abandoned-carts, the external
-// cron, now an alias) and the admin's "Send reminder". Server only.
+// Abandoned-cart reminders: the one implementation behind the hourly Vercel
+// cron (/api/cron/abandoned-cart) and the admin's "Send reminder". Server only.
 //
 // The cron's rule is unchanged from the two routes it replaces: pending
 // orders with no Paystack reference, created 24 to 48 hours ago, with an
