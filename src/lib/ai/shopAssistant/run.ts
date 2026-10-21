@@ -9,7 +9,9 @@ import { todaySpendUsd, withinCap } from "@/lib/ai/spend";
 import { logCause } from "@/lib/errors/apiError";
 import { runShopTurn } from "./engine";
 import { systemPromptFor } from "./prompt";
-import { CUSTOMER_TOOL_DEFS, NOTIFY_WHEN_BACK_TOOL, OFFER_CHOICES_TOOL, START_RETURN_TOOL } from "./toolDefs";
+import { CUSTOMER_TOOL_DEFS, NOTIFY_WHEN_BACK_TOOL, OFFER_CHOICES_TOOL, START_RETURN_TOOL, UPDATE_CART_TOOL } from "./toolDefs";
+import { cartFact } from "./cartRules";
+import { loadCart } from "./cartStore";
 import type { ChoicePlan } from "@/lib/whatsapp/choices";
 import { runCustomerTool, type ShopToolContext } from "./tools";
 import { mergeChatState, photoAsNote, trimTranscript } from "./limits";
@@ -85,11 +87,13 @@ export async function runShopAssistant(args: {
             messages, model: AI_MODEL,
             system: systemPromptFor(args.channel, args.identity.phone, { choices, restock, returns, withTeam: wa && !!args.withTeam }),
             lessons: await activeLessonsText(),
-            facts: wa ? args.facts ?? null : null,
+            // The basket rides in the facts every WhatsApp turn, so a long chat never loses it.
+            facts: wa ? [args.facts, await loadCart(chat.visitorKey).then(cartFact).catch(() => null)].filter(Boolean).join("\n") : null,
             // Optional tools after the customer tools, so their cached prefix is unchanged.
             tools: [
                 ...CUSTOMER_TOOL_DEFS, ...(choices ? [OFFER_CHOICES_TOOL] : []), ...(restock ? [NOTIFY_WHEN_BACK_TOOL] : []),
                 ...(returns ? [START_RETURN_TOOL] : []),
+                ...(wa ? [UPDATE_CART_TOOL] : []),
             ],
         },
         { client: deps.client ?? new Anthropic({ apiKey, maxRetries: 0 }), runTool: (n, i) => runCustomerTool(n, i, ctx), fits },
