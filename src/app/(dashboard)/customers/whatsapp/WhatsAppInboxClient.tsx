@@ -1,8 +1,10 @@
 "use client";
 
-// WhatsApp inbox: the chat list and one chat's messages. Staff reply from the
-// main WhatsApp phone (the number here runs through the API, so it has no
-// phone app), then hand the chat back to the assistant.
+// WhatsApp inbox: the chat list (tabs: Needs you, Assistant, Notices, Dealt
+// with) and one chat's messages, with markers for what happened (handed over,
+// handed back, dealt with: by whom) and the customer's orders. Staff reply from
+// the main WhatsApp phone (the number here runs through the API, so it has no
+// phone app), then mark the chat dealt with or hand it back to the assistant.
 //
 // Laid out like WhatsApp on desktop and tablet: the inbox fills the space
 // under the page header, and the list and the open chat each scroll on their
@@ -10,12 +12,19 @@
 // the list or one chat, with a back button.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { canAnswerWaiting, mediaKind, waitingMessages, type InboxConversation } from "@/lib/whatsapp/inbox";
+import { canAnswerWaiting, mediaKind, waitingFor, waitingMessages, type InboxConversation, type InboxTab, type Standing } from "@/lib/whatsapp/inbox";
+import type { CustomerPanel } from "@/lib/whatsapp/customerPanel";
 
 /** media: what can be shown of the message's file (see mediaState); the file itself loads through the media route. */
 type Message = { id: string; direction: "inbound" | "outbound"; text: string | null; type: string | null; at: string; media?: "ready" | "fetch" | "missing" | null };
+type ChatEvent = { id: string; label: string; kind: string; at: string };
 /** loadedAt: when it was fetched, the "now" for what is waiting (render stays pure). */
-type Thread = { conversation: InboxConversation; messages: Message[]; loadedAt: number };
+type Thread = { conversation: InboxConversation; messages: Message[]; events?: ChatEvent[]; customer?: CustomerPanel | null; loadedAt: number };
+type Counts = Record<InboxTab, number>;
+
+const TAB_LABEL: Record<InboxTab, string> = { all: "All", needs: "Needs you", assistant: "Assistant", notices: "Notices", dealt: "Dealt with" };
+const TAB_ORDER: InboxTab[] = ["needs", "all", "assistant", "notices", "dealt"];
+const ghs = (n: number) => `GH₵ ${n.toLocaleString("en-GB", { maximumFractionDigits: 2 })}`;
 
 const CALM = "Something happened. Please refresh and try again.";
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
@@ -44,15 +53,17 @@ async function getJson(url: string, init?: RequestInit): Promise<{ ok: boolean; 
     }
 }
 
-function ModeBadge({ c }: { c: InboxConversation }) {
-    const person = c.mode === "person";
+const STANDING_LABEL: Record<Standing, string> = { needs: "Needs you", dealt: "Dealt with", assistant: "Assistant", notices: "Notices" };
+
+function StandingBadge({ c }: { c: Pick<InboxConversation, "standing"> }) {
+    const needs = c.standing === "needs";
     return (
-        <span style={{
+        <span data-wa-standing={c.standing} style={{
             fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, whiteSpace: "nowrap",
-            background: person ? "color-mix(in oklab, var(--ac-warn) 15%, transparent)" : "var(--ac-line)",
-            color: person ? "var(--ac-warn)" : "var(--ac-ink-3)",
+            background: needs ? "color-mix(in oklab, var(--ac-warn) 15%, transparent)" : "var(--ac-line)",
+            color: needs ? "var(--ac-warn)" : "var(--ac-ink-3)",
         }}>
-            {person ? "Needs a person" : "Assistant"}
+            {STANDING_LABEL[c.standing]}
         </span>
     );
 }
@@ -61,23 +72,35 @@ export default function WhatsAppInboxClient() {
     const router = useRouter();
     const params = useSearchParams();
     const selected = params.get("c");
-    const [list, setList] = useState<InboxConversation[] | null>(null);
+    const [list, setList] = useState<{ chats: InboxConversation[]; counts: Counts; loadedAt: number } | null>(null);
+    // null until the first load picks it: Needs you when someone is waiting, else All.
+    const [tab, setTab] = useState<InboxTab | null>(null);
     const [listError, setListError] = useState<string | null>(null);
     const [thread, setThread] = useState<Thread | null>(null);
     const [threadError, setThreadError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [answering, setAnswering] = useState<string | null>(null);   // the chat the assistant is replying in
     const [search, setSearch] = useState("");
+    const [query, setQuery] = useState("");   // the search, sent once typing pauses
     const rootRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const shownChat = useRef<string | null>(null);
     const lastCount = useRef(0);
 
     const loadList = useCallback(async () => {
-        const r = await getJson("/api/whatsapp/inbox");
-        if (r.ok && Array.isArray(r.data?.conversations)) { setList(r.data.conversations); setListError(null); }
-        else setListError(r.data?.error ?? CALM);
-    }, []);
+        const qs = new URLSearchParams({ tab: tab ?? "all", ...(query ? { q: query } : {}) });
+        const r = await getJson(`/api/whatsapp/inbox?${qs}`);
+        if (r.ok && Array.isArray(r.data?.conversations) && r.data?.counts) {
+            setList({ chats: r.data.conversations, counts: r.data.counts, loadedAt: Date.now() });
+            setListError(null);
+            if (tab === null) setTab(r.data.counts.needs > 0 ? "needs" : "all");
+        } else setListError(r.data?.error ?? CALM);
+    }, [tab, query]);
+
+    useEffect(() => {
+        const t = setTimeout(() => setQuery(search.trim()), 300);
+        return () => clearTimeout(t);
+    }, [search]);
 
     const loadThread = useCallback(async (id: string) => {
         const r = await getJson(`/api/whatsapp/inbox/${id}`);
@@ -133,6 +156,17 @@ export default function WhatsAppInboxClient() {
     const open = (id: string) => router.replace(`/customers/whatsapp?c=${id}`, { scroll: false });
     const close = () => router.replace("/customers/whatsapp", { scroll: false });
 
+    const dealtWith = async () => {
+        if (!thread) return;
+        setBusy(true);
+        const r = await getJson(`/api/whatsapp/inbox/${thread.conversation.id}`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "dealt_with" }),
+        });
+        setBusy(false);
+        if (!r.ok) { setThreadError(r.data?.error ?? CALM); return; }
+        await Promise.all([loadThread(thread.conversation.id), loadList()]);
+    };
+
     const handBack = async (answer: boolean) => {
         if (!thread) return;
         setBusy(true);
@@ -151,22 +185,22 @@ export default function WhatsAppInboxClient() {
     const waitingLabel = `(${waiting.length} waiting)`;
     const wraps = { whiteSpace: "normal", textAlign: "left", maxWidth: "100%" } as const;   // long labels wrap on a phone
 
-    const shown = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        const digits = q.replace(/\D/g, "");
-        if (!list || !q) return list;
-        return list.filter(c => (c.name ?? "").toLowerCase().includes(q)
-            || (digits.length >= 3 && (c.phone.includes(digits) || local(c.phone).includes(digits))));
-    }, [list, search]);
+    // The server filters by tab and search, and puts chats waiting for a person first.
+    const shown = list?.chats ?? null;
 
-    // Messages with a date chip before the first message of each day.
+    // Messages and markers in time order, with a date chip before the first of each day.
     const rows = useMemo(() => {
-        const out: ({ kind: "day"; key: string; label: string } | { kind: "msg"; m: Message })[] = [];
+        type Row = { kind: "day"; key: string; label: string } | { kind: "msg"; m: Message } | { kind: "event"; e: ChatEvent };
+        const items: ({ at: string } & ({ kind: "msg"; m: Message } | { kind: "event"; e: ChatEvent }))[] = [
+            ...(thread?.messages ?? []).map(m => ({ kind: "msg" as const, m, at: m.at })),
+            ...(thread?.events ?? []).map(e => ({ kind: "event" as const, e, at: e.at })),
+        ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+        const out: Row[] = [];
         let day = "";
-        for (const m of thread?.messages ?? []) {
-            const label = dayLabel(m.at);
-            if (label !== day) { out.push({ kind: "day", key: `day-${m.id}`, label }); day = label; }
-            out.push({ kind: "msg", m });
+        for (const it of items) {
+            const label = dayLabel(it.at);
+            if (label !== day) { out.push({ kind: "day", key: `day-${it.kind === "msg" ? it.m.id : it.e.id}`, label }); day = label; }
+            out.push(it.kind === "msg" ? { kind: "msg", m: it.m } : { kind: "event", e: it.e });
         }
         return out;
     }, [thread]);
@@ -193,14 +227,35 @@ export default function WhatsAppInboxClient() {
 
             <div className="ac-card wa-pane wa-list" data-wa-list>
                 <div style={{ padding: 12, borderBottom: "1px solid var(--ac-line)", flex: "none" }}>
-                    <input className="ac-input" type="search" placeholder="Search name or number" value={search}
+                    <input className="ac-input" type="search" placeholder="Search name, number or message" value={search}
                         onChange={e => setSearch(e.target.value)} aria-label="Search chats" data-wa-search />
+                    <div role="tablist" aria-label="Chat filter" style={{ display: "flex", gap: 6, marginTop: 10, overflowX: "auto", paddingBottom: 2 }} data-wa-tabs>
+                        {TAB_ORDER.map(t => {
+                            const on = (tab ?? "all") === t;
+                            const n = list?.counts[t];
+                            return (
+                                <button key={t} type="button" role="tab" aria-selected={on} onClick={() => setTab(t)} data-wa-tab={t}
+                                    style={{
+                                        flex: "none", fontSize: 12, padding: "4px 10px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap",
+                                        border: `1px solid ${on ? "var(--ac-ink)" : "var(--ac-line)"}`,
+                                        background: on ? "var(--ac-ink)" : "transparent", color: on ? "var(--ac-bg, #fff)" : "var(--ac-ink-2, var(--ac-ink))",
+                                    }}>
+                                    {TAB_LABEL[t]}{n !== undefined ? ` ${n}` : ""}
+                                    {t === "needs" && !!n && !on && <span aria-hidden style={{ display: "inline-block", width: 6, height: 6, borderRadius: 999, background: "var(--ac-warn)", marginLeft: 6, verticalAlign: "middle" }} />}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
                 <div className="wa-scroll" data-wa-list-scroll>
                     {listError && <div style={{ padding: 16, ...muted }}>{listError}</div>}
                     {!listError && !list && <div style={{ padding: 16, ...muted }}>Loading…</div>}
-                    {list && list.length === 0 && <div className="ac-empty"><div className="ac-empty-title">No WhatsApp chats yet.</div></div>}
-                    {list && list.length > 0 && shown?.length === 0 && <div style={{ padding: 16, ...muted }}>No chats match that.</div>}
+                    {list && list.counts.all === 0 && <div className="ac-empty"><div className="ac-empty-title">No WhatsApp chats yet.</div></div>}
+                    {list && list.counts.all > 0 && shown?.length === 0 && (
+                        <div style={{ padding: 16, ...muted }}>
+                            {query ? "No chats match that." : tab === "needs" ? "Nobody is waiting for a person." : "No chats here."}
+                        </div>
+                    )}
                     {shown?.map(c => (
                         <button key={c.id} type="button" onClick={() => open(c.id)} data-wa-chat aria-current={c.id === selected ? "true" : undefined}
                             style={{
@@ -217,8 +272,14 @@ export default function WhatsAppInboxClient() {
                                 <span style={{ fontSize: 12, color: "var(--ac-ink-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {c.preview ? `${c.preview.direction === "outbound" ? "You: " : ""}${c.preview.text}` : "No messages yet"}
                                 </span>
-                                <ModeBadge c={c} />
+                                <StandingBadge c={c} />
                             </div>
+                            {c.standing === "needs" && (
+                                <div style={{ display: "flex", gap: 8, marginTop: 4, fontSize: 11, color: "var(--ac-warn)" }} data-wa-waiting>
+                                    {c.wroteAgain && <span data-wa-wrote-again>Wrote again</span>}
+                                    {list && <span>{waitingFor(c.waitingSince, list.loadedAt)}</span>}
+                                </div>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -240,13 +301,18 @@ export default function WhatsAppInboxClient() {
                                     </div>
                                 )}
                             </div>
-                            {thread && <ModeBadge c={thread.conversation} />}
+                            {thread && <StandingBadge c={thread.conversation} />}
                         </div>
                         {thread && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
                                 <a className="ac-btn ac-btn-primary" href={`https://wa.me/${thread.conversation.phone}`} target="_blank" rel="noopener" data-wa-reply>
                                     Reply on WhatsApp
                                 </a>
+                                {thread.conversation.standing === "needs" && (
+                                    <button type="button" className="ac-btn" onClick={dealtWith} disabled={busy} data-wa-dealt>
+                                        {busy ? "Saving…" : "Dealt with"}
+                                    </button>
+                                )}
                                 {thread.conversation.mode === "person" && offerAnswer && (
                                     <button type="button" className="ac-btn" style={wraps} onClick={() => handBack(true)} disabled={busy} data-wa-hand-back-answer>
                                         {busy ? "Handing back…" : `Hand back and reply ${waitingLabel}`}
@@ -279,6 +345,7 @@ export default function WhatsAppInboxClient() {
                                 Their last message was over 24 hours ago, so the assistant can't message them first.
                             </div>
                         )}
+                        {thread?.customer && <CustomerSummary c={thread.customer} />}
                     </div>
                 )}
                 {selected && (
@@ -291,6 +358,10 @@ export default function WhatsAppInboxClient() {
                             {rows.map(r => r.kind === "day" ? (
                                 <div key={r.key} style={{ alignSelf: "center", fontSize: 11, color: "var(--ac-ink-3)", padding: "2px 10px", borderRadius: 999, background: "var(--ac-line)", margin: "6px 0" }}>
                                     {r.label}
+                                </div>
+                            ) : r.kind === "event" ? (
+                                <div key={r.e.id} data-wa-event={r.e.kind} style={{ alignSelf: "center", textAlign: "center", fontSize: 11, color: "var(--ac-ink-3)", padding: "2px 10px", maxWidth: "90%" }}>
+                                    {r.e.label} · {clock(r.e.at)}
                                 </div>
                             ) : (
                                 <div key={r.m.id} style={{ alignSelf: r.m.direction === "outbound" ? "flex-end" : "flex-start", maxWidth: "85%" }}>
@@ -340,4 +411,29 @@ function MediaView({ conversationId, m }: { conversationId: string; m: Message }
     if (kind === "audio") return <audio controls preload="none" src={src} onError={() => setFailed(true)} style={{ display: "block", maxWidth: "100%", ...gap }} data-wa-media="audio" />;
     if (kind === "video") return <video controls preload="metadata" src={src} onError={() => setFailed(true)} style={{ display: "block", maxWidth: "100%", width: 260, borderRadius: 8, ...gap }} data-wa-media="video" />;
     return <a href={src} target="_blank" rel="noopener" style={{ display: "block", color: "inherit", textDecoration: "underline", ...gap }} data-wa-media="file">Open file</a>;
+}
+
+/** The customer's orders on this number, folded: a one-line summary that opens to the last five. */
+function CustomerSummary({ c }: { c: CustomerPanel }) {
+    const line = c.orders === 0
+        ? "No orders on this number yet"
+        : `${c.orders} order${c.orders === 1 ? "" : "s"} · ${ghs(c.spent)} spent${c.paidOrders !== c.orders ? ` (${c.paidOrders} paid)` : ""}`;
+    return (
+        <details style={{ marginTop: 10, fontSize: 12, color: "var(--ac-ink-3)" }} data-wa-customer>
+            <summary style={{ cursor: c.orders ? "pointer" : "default" }}>
+                Customer{c.name ? `: ${c.name}` : ""} · {line}
+            </summary>
+            {c.orders > 0 && (
+                <div style={{ marginTop: 6, display: "grid", gap: 4 }}>
+                    {c.email && <div>Email: {c.email}</div>}
+                    {c.recent.map(o => (
+                        <a key={o.id} href={`/sales/orders/${o.id}`} style={{ color: "inherit", display: "flex", justifyContent: "space-between", gap: 8 }} data-wa-customer-order>
+                            <span>{o.ref ?? o.id.slice(0, 8).toUpperCase()} · {new Date(o.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })}</span>
+                            <span>{ghs(o.total)} · {o.payment ?? "?"}{o.fulfilment ? ` · ${o.fulfilment}` : ""}</span>
+                        </a>
+                    ))}
+                </div>
+            )}
+        </details>
+    );
 }

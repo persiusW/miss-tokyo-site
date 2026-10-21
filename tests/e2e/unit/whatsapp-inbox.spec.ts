@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { canAnswerWaiting, handBackState, mediaKind, mediaPath, mediaState, MAX_WAITING, MISSED_AFTER_MS, previewText, shapeConversation, waitingMessages, windowOpen, type ConversationRow } from "../../../src/lib/whatsapp/inbox";
+import { canAnswerWaiting, eventLabel, handBackState, inTab, mediaKind, sortInbox, standingOf, tabCounts, waitingFor, waitingSince, wroteAgain, mediaPath, mediaState, MAX_WAITING, MISSED_AFTER_MS, previewText, shapeConversation, waitingMessages, windowOpen, type ConversationRow } from "../../../src/lib/whatsapp/inbox";
 
 const NOW = Date.parse("2026-10-14T18:00:00Z");
 const row = (over: Partial<ConversationRow> = {}): ConversationRow => ({
@@ -72,4 +72,48 @@ test("media: each kind shown its own way, kept under the chat by message id, nev
     expect(mediaState(row("inbound", "video", "none:invalid"))).toBe("missing"); // over 5 MB
     expect(mediaState(row("outbound", "image", null))).toBe("missing");         // an old product photo without its link
     expect(mediaState(row("inbound", "text", null))).toBe(null);
+});
+
+// ── Inbox v2: where a chat stands ─────────────────────────────────────────────
+const T = (min: number) => new Date(Date.parse("2026-10-21T10:00:00Z") + min * 60_000).toISOString();
+const chat = (o: { handed_off_at?: string | null; dealt_with_at?: string | null; last_inbound_at?: string | null }) => ({
+    handed_off_at: o.handed_off_at ?? null, dealt_with_at: o.dealt_with_at ?? null, last_inbound_at: o.last_inbound_at === undefined ? T(0) : o.last_inbound_at,
+});
+
+test("standing: needs a person until dealt with; writing again reopens it; notices-only and assistant chats", () => {
+    const handed = chat({ handed_off_at: T(5), last_inbound_at: T(4) });
+    expect([standingOf(handed), waitingSince(handed), wroteAgain(handed)]).toEqual(["needs", T(5), false]);
+
+    const dealt = chat({ handed_off_at: T(5), dealt_with_at: T(20), last_inbound_at: T(4) });
+    expect([standingOf(dealt), waitingSince(dealt)]).toEqual(["dealt", null]);
+
+    const again = chat({ handed_off_at: T(5), dealt_with_at: T(20), last_inbound_at: T(30) });
+    expect([standingOf(again), waitingSince(again), wroteAgain(again)]).toEqual(["needs", T(30), true]);
+
+    expect(standingOf(chat({ last_inbound_at: null }))).toBe("notices");   // only our order updates
+    expect(standingOf(chat({}))).toBe("assistant");
+});
+
+test("the list: people waiting first, longest wait first; then newest; tabs and counts", () => {
+    const c = (id: string, standing: "needs" | "dealt" | "assistant" | "notices", lastMessageAt: string, waitingSince: string | null = null) =>
+        ({ id, standing, lastMessageAt, waitingSince });
+    const list = [c("a", "assistant", T(50)), c("n1", "needs", T(10), T(9)), c("d", "dealt", T(60)), c("n0", "needs", T(40), T(1)), c("x", "notices", T(55))];
+    expect(sortInbox(list).map(x => x.id)).toEqual(["n0", "n1", "d", "x", "a"]);
+    expect(tabCounts(list)).toEqual({ all: 5, needs: 2, assistant: 1, notices: 1, dealt: 1 });
+    expect(list.filter(x => inTab(x, "dealt")).map(x => x.id)).toEqual(["d"]);
+    expect(list.filter(x => inTab(x, "all"))).toHaveLength(5);
+});
+
+test("waiting time and markers read plainly", () => {
+    const now = Date.parse(T(0));
+    expect(waitingFor(T(-0.2), now)).toBe("Waiting 1 min");
+    expect(waitingFor(T(-59), now)).toBe("Waiting 59 min");
+    expect(waitingFor(T(-125), now)).toBe("Waiting 2 h");
+    expect(waitingFor(T(-60 * 72), now)).toBe("Waiting 3 days");
+    expect(waitingFor(null, now)).toBe(null);
+    expect(eventLabel({ kind: "handed_off", reason: "customer_asked", staff_name: null })).toBe("Handed to a person · Asked for a person");
+    expect(eventLabel({ kind: "handed_off", reason: "made_up", staff_name: null })).toBe("Handed to a person");
+    expect(eventLabel({ kind: "handed_back", reason: null, staff_name: "Ama" })).toBe("Handed back to the assistant by Ama");
+    expect(eventLabel({ kind: "dealt_with", reason: null, staff_name: null })).toBe("Marked dealt with");
+    expect(eventLabel({ kind: "auto_resumed", reason: null, staff_name: null })).toBe("Back with the assistant after 24 hours");
 });

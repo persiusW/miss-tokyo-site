@@ -1,12 +1,22 @@
-// Shaping for the WhatsApp inbox: who is talking to whom, whether WhatsApp's
-// 24-hour reply window is open, and a one-line preview. Pure.
+// Shaping for the WhatsApp inbox: who is talking to whom, where each chat
+// stands (needs a person, dealt with, assistant, notices only), whether
+// WhatsApp's 24-hour reply window is open, and a one-line preview. Pure.
 import { REPLY_WINDOW_MS } from "./pipeline";
 
 export type InboxMode = "assistant" | "person";
+/**
+ * needs: with a person and not dealt with (or the customer wrote again after it was);
+ * dealt: with a person, staff marked it handled; assistant: the assistant has it;
+ * notices: only our order updates, the customer never wrote.
+ */
+export type Standing = "needs" | "dealt" | "assistant" | "notices";
+export const TABS = ["all", "needs", "assistant", "notices", "dealt"] as const;
+export type InboxTab = (typeof TABS)[number];
 
 export type ConversationRow = {
     id: string; wa_phone_number: string; wa_contact_name: string | null; state: Record<string, unknown> | null;
     handed_off_at: string | null; last_message_at: string | null; last_inbound_at: string | null; created_at: string;
+    dealt_with_at?: string | null;
 };
 export type MessageRow = {
     id: string; conversation_id: string; direction: "inbound" | "outbound"; content: string | null; message_type: string | null; created_at: string;
@@ -17,7 +27,79 @@ export type InboxConversation = {
     id: string; name: string | null; phone: string; mode: InboxMode; reason: string | null;
     handedOffAt: string | null; lastMessageAt: string | null; windowOpen: boolean;
     preview: { direction: "inbound" | "outbound"; text: string; at: string } | null;
+    standing: Standing;
+    /** With a person: since when the customer has been waiting for one. */
+    waitingSince: string | null;
+    /** The customer wrote again after staff marked the chat dealt with. */
+    wroteAgain: boolean;
 };
+
+const ms = (iso: string | null | undefined) => (iso ? Date.parse(iso) : NaN);
+
+export function standingOf(c: Pick<ConversationRow, "handed_off_at" | "dealt_with_at" | "last_inbound_at">): Standing {
+    if (c.handed_off_at) return wroteAgain(c) || !c.dealt_with_at ? "needs" : "dealt";
+    if (!c.last_inbound_at) return "notices";
+    return "assistant";
+}
+
+export function wroteAgain(c: Pick<ConversationRow, "handed_off_at" | "dealt_with_at" | "last_inbound_at">): boolean {
+    return !!c.handed_off_at && !!c.dealt_with_at && ms(c.last_inbound_at) > ms(c.dealt_with_at);
+}
+
+export function waitingSince(c: Pick<ConversationRow, "handed_off_at" | "dealt_with_at" | "last_inbound_at">): string | null {
+    if (standingOf(c) !== "needs") return null;
+    return wroteAgain(c) ? c.last_inbound_at : c.handed_off_at;
+}
+
+/** Chats waiting for a person first (longest wait first), then the rest by latest message. */
+export function sortInbox<T extends Pick<InboxConversation, "standing" | "waitingSince" | "lastMessageAt">>(list: T[]): T[] {
+    const latest = (c: T) => ms(c.lastMessageAt) || 0;
+    return [...list].sort((a, b) => {
+        const na = a.standing === "needs", nb = b.standing === "needs";
+        if (na !== nb) return na ? -1 : 1;
+        if (na && nb) return (ms(a.waitingSince) || 0) - (ms(b.waitingSince) || 0);
+        return latest(b) - latest(a);
+    });
+}
+
+export function inTab(c: Pick<InboxConversation, "standing">, tab: InboxTab): boolean {
+    return tab === "all" || c.standing === tab;
+}
+
+export function tabCounts(list: Pick<InboxConversation, "standing">[]): Record<InboxTab, number> {
+    const n: Record<InboxTab, number> = { all: list.length, needs: 0, assistant: 0, notices: 0, dealt: 0 };
+    for (const c of list) n[c.standing]++;
+    return n;
+}
+
+/** "Waiting 5 min", "Waiting 2 h", "Waiting 3 days". */
+export function waitingFor(since: string | null, now: number): string | null {
+    const t = ms(since);
+    if (!Number.isFinite(t)) return null;
+    const min = Math.max(0, Math.floor((now - t) / 60_000));
+    if (min < 60) return `Waiting ${Math.max(1, min)} min`;
+    const h = Math.floor(min / 60);
+    return h < 48 ? `Waiting ${h} h` : `Waiting ${Math.floor(h / 24)} days`;
+}
+
+// ── What happened in a chat (whatsapp_conversation_events) ─────────────────────
+
+export type EventKind = "handed_off" | "handed_back" | "dealt_with" | "answered_waiting" | "auto_resumed" | "re_alerted";
+export type EventRow = { id: string; kind: EventKind; reason: string | null; staff_name: string | null; created_at: string };
+
+/** One line for the marker in the chat. */
+export function eventLabel(e: Pick<EventRow, "kind" | "reason" | "staff_name">): string {
+    const by = e.staff_name ? ` by ${e.staff_name}` : "";
+    switch (e.kind) {
+        case "handed_off": return `Handed to a person${e.reason && REASON_LABEL[e.reason] ? ` · ${REASON_LABEL[e.reason]}` : ""}`;
+        case "handed_back": return `Handed back to the assistant${by}`;
+        case "dealt_with": return `Marked dealt with${by}`;
+        case "answered_waiting": return `Assistant asked to reply to waiting messages${by}`;
+        case "auto_resumed": return "Back with the assistant after 24 hours";
+        case "re_alerted": return "Team alerted again: the customer wrote again";
+        default: return "Chat updated";
+    }
+}
 
 const REASON_LABEL: Record<string, string> = {
     customer_asked: "Asked for a person",
@@ -48,6 +130,7 @@ export function shapeConversation(c: ConversationRow, last: MessageRow | null, n
         handedOffAt: c.handed_off_at, lastMessageAt: c.last_message_at,
         windowOpen: windowOpen(c.last_inbound_at, now),
         preview: last ? { direction: last.direction, text: previewText(last), at: last.created_at } : null,
+        standing: standingOf(c), waitingSince: waitingSince(c), wroteAgain: wroteAgain(c),
     };
 }
 
