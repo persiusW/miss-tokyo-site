@@ -13,6 +13,8 @@ export type AiSettings = {
     whatsappHandoffNumber: string | null;
     /** Who gets AI spend and WhatsApp wallet alerts (whatsapp_wallet_alert_number); null = the handoff/team number. */
     alertNumber: string | null;
+    /** Text the alert number when the Chatbots Africa wallet is below this many GHS; 0 = off. */
+    walletAlertGhs: number;
     /** Order updates on WhatsApp (also needs whatsapp_enabled). */
     whatsappStatusNotifications: boolean;
     /** Approved Chatbots Africa template id for updates outside the 24h window; null = text inside the window only. Superseded by whatsappStatusTemplateIds. */
@@ -80,6 +82,9 @@ export const EDITABLE_AI_SETTINGS = {
     ...SHOP_SETTING_VALIDATORS,
     /** Where WhatsApp chats are forwarded when they go to a person; "" = the shop's WhatsApp number. */
     whatsapp_handoff_number: SHOP_SETTING_VALIDATORS.shop_whatsapp_number,
+    /** Who gets wallet and AI budget alerts; "" = the handoff number, else the shop's WhatsApp number. */
+    whatsapp_wallet_alert_number: SHOP_SETTING_VALIDATORS.shop_whatsapp_number,
+    whatsapp_wallet_alert_ghs: (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100_000,
     whatsapp_status_notifications: (v: unknown) => typeof v === "boolean",
     /** "" or the approved template's numeric id. */
     // Meta template ids run to 16 digits (e.g. 1072346328969350); they must stay exact as a number.
@@ -117,6 +122,7 @@ const OFF: AiSettings = {
     whatsappPhoneNumberId: null,
     whatsappHandoffNumber: null,
     alertNumber: null,
+    walletAlertGhs: 0,
     whatsappStatusNotifications: false,
     whatsappStatusTemplateId: null,
     whatsappStatusTemplateIds: {},
@@ -160,6 +166,7 @@ export async function getAiSettings(): Promise<AiSettings> {
             ? map.get("whatsapp_phone_number_id") as string : null,
         whatsappHandoffNumber: normaliseWaNumber(map.get("whatsapp_handoff_number")),
         alertNumber: normaliseWaNumber(map.get("whatsapp_wallet_alert_number")),
+        walletAlertGhs: num("whatsapp_wallet_alert_ghs", 50),
         whatsappStatusNotifications: bool("whatsapp_status_notifications"),
         whatsappStatusTemplateId: templateId(map.get("whatsapp_status_template_id")),
         whatsappStatusTemplateIds: (() => {
