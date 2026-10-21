@@ -8,10 +8,26 @@ import { getAiSettings } from "@/lib/ai/settings";
 import { seedLine, SEED_WINDOW_MINUTES } from "@/lib/ai/missTokyoAi/seed";
 import { checkSeed } from "@/lib/ai/missTokyoAi/seedGate";
 import { signSeedLine } from "@/lib/ai/missTokyoAi/seedSign";
+import { v2View } from "@/lib/admin/v2/server";
+import { refundsLive } from "@/lib/orders/refunds";
+import { OLD_VIEW, viewFromFlags, type AdminView } from "@/lib/ai/missTokyoAi/view";
 
 export const maxDuration = 120;
 
 const STAFF_ROLES: StaffRole[] = ["admin", "owner", "sales_staff"];
+
+/** Which admin this request's person sees: the store switches plus this device's preview
+ *  cookie, as the pages themselves decide. A failed read falls back to the old admin,
+ *  which every old URL still serves. */
+async function requestView(): Promise<AdminView> {
+    try {
+        const [{ flags, preview }, live] = await Promise.all([v2View(), refundsLive().catch(() => false)]);
+        return viewFromFlags(flags, { preview, refundsLive: live });
+    } catch (e) {
+        console.error("[api/ai/agent] admin view unavailable", e);
+        return OLD_VIEW;
+    }
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -54,7 +70,8 @@ export async function POST(req: NextRequest) {
             seedKeyValue = gate.key;
         }
 
-        const result = await runStoreAssistant({ transcript, userId: user.id, role, seedKey: seedKeyValue });
+        const view = await requestView();
+        const result = await runStoreAssistant({ transcript, userId: user.id, role, view, seedKey: seedKeyValue });
         // calm-text: runStoreAssistant only returns its own CALM messages.
         if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status }); // calm-text
         return NextResponse.json({ messages: result.messages, reply: result.reply, effects: result.effects });
@@ -74,11 +91,11 @@ export async function GET() {
         if (!profile || !STAFF_ROLES.includes(profile.role as StaffRole)) {
             return NextResponse.json({ available: false, reason: "forbidden" }, { status: 403 });
         }
-        const settings = await getAiSettings();
+        const [settings, view] = await Promise.all([getAiSettings(), requestView()]);
         const features = settings.mtai;
-        if (!settings.dashboardAgentEnabled) return NextResponse.json({ available: false, reason: "off", features });
-        if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ available: false, reason: "not_set_up", features });
-        return NextResponse.json({ available: true, reason: null, features });
+        if (!settings.dashboardAgentEnabled) return NextResponse.json({ available: false, reason: "off", features, view });
+        if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ available: false, reason: "not_set_up", features, view });
+        return NextResponse.json({ available: true, reason: null, features, view });
     } catch (e) {
         console.error("[api/ai/agent] GET", e);
         return NextResponse.json({ available: false, reason: "error" }, { status: 500 });

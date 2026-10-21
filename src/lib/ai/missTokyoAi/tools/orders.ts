@@ -1,6 +1,7 @@
 // Order tools: returning customers, one order, order lists, and a line-by-line
 // explanation of an order's total.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { isOn } from "@/lib/ai/missTokyoAi/view";
 import {
     cleanSearch, DATE_RE, dayBounds, err, intIn, isPlaceholderEmail, last9, maskGiftCode, money, ok,
     ORDER_STATUSES, str, UUID_RE, type ToolDef,
@@ -148,7 +149,7 @@ export const orderTools: ToolDef[] = [
             description: "Explain an order's total line by line from what was stored: items, discounts, service fee, delivery, and what Paystack actually charged. Use for 'why is the total different' or 'why did the SMS say a different amount'.",
             input_schema: { type: "object", properties: { order: { type: "string", description: "8-character ref or full id." } }, required: ["order"] },
         },
-        async run(input) {
+        async run(input, ctx) {
             const found = await findOrder(str(input?.order, 60));
             if ("error" in found) return err(found.error!);
             const o = found.order;
@@ -180,7 +181,7 @@ export const orderTools: ToolDef[] = [
                 delivery: { method: o.delivery_method, zone: o.delivery_zone, fee_ghs: delivery },
                 order_total_ghs: total,
                 paystack: charged == null
-                    ? { verified: false, note: "Not verified yet. Press 'Verify with Paystack' on the order page." }
+                    ? { verified: false, note: isOn(ctx.view, "orders") ? "Not checked yet. Press 'Check with Paystack' in the order." : "Not verified yet. Press 'Verify with Paystack' on the order page." }
                     : {
                         verified: true,
                         charged_ghs: charged,

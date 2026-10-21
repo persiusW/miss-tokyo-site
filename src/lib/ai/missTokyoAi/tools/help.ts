@@ -1,48 +1,59 @@
 // Help tools: buttons, not actions. Each adds a validated effect; the person
-// taps it. The enums come from the registries, so the model cannot invent a
-// route or a control.
+// taps it. The enums come from the registries for the admin this person sees,
+// so the model cannot invent a route or a control, or name an old page to
+// someone on the new admin.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { navigateEffect, sendToAdminEffect, showMeEffect, walkthroughEffect } from "@/lib/ai/missTokyoAi/effects";
 import { WALKTHROUGHS } from "@/lib/ai/missTokyoAi/walkthroughs";
-import { SHOW_ME_ANCHORS } from "@/lib/ai/missTokyoAi/anchors";
-import { ROUTES, SETTINGS_TABS } from "@/lib/ai/missTokyoAi/routes";
+import { showMeAnchors } from "@/lib/ai/missTokyoAi/anchors";
+import { routeTable, tabsFor } from "@/lib/ai/missTokyoAi/routes";
 import { guideFor } from "@/lib/ai/missTokyoAi/guide";
 import { searchDocs, type SearchDoc } from "@/lib/ai/missTokyoAi/guideSearch";
+import { isOn, type AdminView } from "@/lib/ai/missTokyoAi/view";
 import { err, ok, str, type ToolDef } from "./shared";
+
+/** What the "tab" parameter means in this view. */
+function tabHelp(view: AdminView): string {
+    const parts = [
+        isOn(view, "settings") ? "page=settings: a Settings section" : "page=settings: a Site Settings tab",
+        ...(isOn(view, "analytics") ? ["page=analytics: a report"] : []),
+    ];
+    return `Only for ${parts.join("; ")}.`;
+}
 
 export const helpTools: ToolDef[] = [
     {
-        def: {
+        def: view => ({
             name: "navigate_to",
-            description: "Give staff a 'Take me there' button to a dashboard page (and, for Site Settings, a tab). Use whenever you tell someone where something is.",
+            description: "Give staff a 'Take me there' button to a dashboard page (and, for some pages, a section). Use whenever you tell someone where something is.",
             input_schema: {
                 type: "object",
                 properties: {
-                    page: { type: "string", enum: Object.keys(ROUTES) },
-                    tab: { type: "string", enum: [...SETTINGS_TABS], description: "Only for page=settings." },
+                    page: { type: "string", enum: Object.keys(routeTable(view)) },
+                    tab: { type: "string", enum: tabsFor(view), description: tabHelp(view) },
                 },
                 required: ["page"],
             },
-        },
+        }),
         async run(input, ctx) {
-            const effect = navigateEffect(str(input?.page, 40), ctx.role, str(input?.tab, 40) || null);
+            const effect = navigateEffect(str(input?.page, 40), ctx.role, str(input?.tab, 40) || null, ctx.view);
             if (!effect) return err("That page isn't available to this person. Tell them to ask an admin or owner.");
             ctx.effects.push(effect);
             return ok({ button: effect.label });
         },
     },
     {
-        def: {
+        def: view => ({
             name: "show_me",
             description: "Give staff a 'Show me' button that opens the page and highlights a specific control. Only these controls can be highlighted.",
             input_schema: {
                 type: "object",
-                properties: { control: { type: "string", enum: SHOW_ME_ANCHORS } },
+                properties: { control: { type: "string", enum: showMeAnchors(view) } },
                 required: ["control"],
             },
-        },
+        }),
         async run(input, ctx) {
-            const effect = showMeEffect(str(input?.control, 60), ctx.role);
+            const effect = showMeEffect(str(input?.control, 60), ctx.role, ctx.view);
             if (!effect) return err("That control isn't available to this person. Describe where it is instead.");
             ctx.effects.push(effect);
             return ok({ button: effect.label });
@@ -70,7 +81,7 @@ export const helpTools: ToolDef[] = [
             if (error) console.error("[miss-tokyo-ai] saved answers unavailable", error);
             const docs: SearchDoc[] = [
                 ...(data ?? []).map(a => ({ id: a.id, title: a.title, body: a.body, source: "saved" as const })),
-                ...guideFor(ctx.role).map(e => ({ id: e.id, title: e.title, body: e.body, source: "guide" as const })),
+                ...guideFor(ctx.role, ctx.view).map(e => ({ id: e.id, title: e.title, body: e.body, source: "guide" as const })),
             ];
             const hits = searchDocs(query, docs);
             if (hits.length === 0) return ok({ results: [], note: "Nothing in the guide or the team's saved answers matches." });
@@ -109,7 +120,7 @@ export const helpTools: ToolDef[] = [
             },
         },
         async run(input, ctx) {
-            const effect = walkthroughEffect(str(input?.walkthrough, 40), ctx.role);
+            const effect = walkthroughEffect(str(input?.walkthrough, 40), ctx.role, ctx.view);
             if (!effect) return err("That walkthrough isn't available to this person. Describe the steps instead.");
             ctx.effects.push(effect);
             return ok({ button: effect.label });
