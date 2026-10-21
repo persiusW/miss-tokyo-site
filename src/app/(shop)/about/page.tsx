@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { pageSeo } from "@/lib/content/load";
 import { AboutSections } from "./AboutSections";
 import type { AboutTimelineEntry, AboutValue, AboutTeamMember } from "@/types/settings";
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
-    title: "About — Miss Tokyo",
-    description:
-        "Learn the story behind Miss Tokyo — Accra's favourite women's fashion destination. Cute, cool, and unmistakably feminine.",
-};
+// Search-engine text can be changed in the admin (Content › Pages).
+export function generateMetadata(): Promise<Metadata> {
+    return pageSeo("/about", {
+        title: "About — Miss Tokyo",
+        description:
+            "Learn the story behind Miss Tokyo — Accra's favourite women's fashion destination. Cute, cool, and unmistakably feminine.",
+    });
+}
 
 export default async function AboutPage() {
     const { data: s } = await supabaseAdmin

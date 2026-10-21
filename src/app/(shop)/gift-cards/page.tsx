@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { pageSeo } from "@/lib/content/load";
 import { GiftCardPageClient } from "./GiftCardPageClient";
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
-    title: "Gift Cards — Miss Tokyo",
-    description:
-        "Give the gift of style. Miss Tokyo gift cards are delivered instantly by email and never expire.",
-};
+// Search-engine text can be changed in the admin (Content › Pages).
+export function generateMetadata(): Promise<Metadata> {
+    return pageSeo("/gift-cards", {
+        title: "Gift Cards — Miss Tokyo",
+        description:
+            "Give the gift of style. Miss Tokyo gift cards are delivered instantly by email and never expire.",
+    });
+}
 
 export default async function GiftCardsPage() {
     const { data: s } = await supabaseAdmin

@@ -1,6 +1,8 @@
-// The shop's FAQ and policy text. The FAQ, size guide and policy pages render
-// it, and Ask Miss Tokyo's shop_info tool reads it, so the chat can never say
-// something the pages don't. Change wording here, nowhere else.
+// The shop's original FAQ and policy text. The owner can replace it from the
+// admin (Content › Pages, kept in site_copy); the FAQ, size guide and policy
+// pages and Ask Miss Tokyo's shop_info tool all read the published version
+// with this text as the fallback (lib/content/pageDocs.ts), so the chat can
+// never say something the pages don't.
 import { paymentMethodsText } from "@/lib/checkout/paymentChannels";
 
 export type Faq = { section: string; question: string; answer: string };
