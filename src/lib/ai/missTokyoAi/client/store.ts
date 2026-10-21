@@ -10,6 +10,7 @@ import type { MtaiFeatures } from "@/lib/ai/settings";
 import { ERRORS, isErrorCode } from "@/lib/errors/catalogue";
 import { fallbackFor } from "@/lib/ai/missTokyoAi/seed";
 import type { AskTarget } from "@/lib/toast";
+import { OLD_VIEW, type AdminView } from "@/lib/ai/missTokyoAi/view";
 
 export type Bubble = {
     id: string;
@@ -47,11 +48,15 @@ type State = {
     features: MtaiFeatures;
     /** False until the server has said which extras are on; nothing is cancelled before then. */
     featuresKnown: boolean;
+    /** Which admin this person sees (from the server with the features), so walkthroughs and
+     *  Show me find the page the control is on. */
+    view: AdminView;
     walk: WalkState;
     /** Question ids whose replies are already in the chat (survives New chat). */
     shownReplies: string[];
     hydrate: () => void;
     setFeatures: (f: MtaiFeatures) => void;
+    setView: (v: AdminView) => void;
     setWalk: (w: WalkState) => void;
     sendToAdmin: (bubbleId: string, question: string) => Promise<void>;
     /** Fetch admin replies; append new ones; mark them read when the person can see them. */
@@ -96,6 +101,7 @@ export const useMissTokyoAi = create<State>((set, get) => ({
     spotlight: null,
     features: FEATURES_OFF,
     featuresKnown: false,
+    view: OLD_VIEW,
     walk: null,
     shownReplies: [],
 
@@ -124,6 +130,7 @@ export const useMissTokyoAi = create<State>((set, get) => ({
     },
 
     setFeatures: (features) => set({ features, featuresKnown: true }),
+    setView: (view) => set({ view }),
 
     setWalk: (walk) => {
         set({ walk });

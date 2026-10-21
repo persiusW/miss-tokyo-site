@@ -51,5 +51,5 @@ test("order-page controls are rung only on order-page steps, and Show me never o
     expect(SHOW_ME_ANCHORS).not.toContain("order.cancel");
     expect(SHOW_ME_ANCHORS).toContain("orders.row-menu");
     expect(showMeEffect("order.refund", "admin")).toBeNull();
-    expect(Object.keys(ANCHORS).filter(isOrderPageAnchor).every(id => id.startsWith("order."))).toBe(true);
+    expect(Object.keys(ANCHORS).filter(id => isOrderPageAnchor(id)).every(id => id.startsWith("order."))).toBe(true);
 });

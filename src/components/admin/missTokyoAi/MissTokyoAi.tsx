@@ -14,6 +14,7 @@ import { WalkthroughRunner } from "./WalkthroughRunner";
 import { Spark } from "./icons";
 import "./mtai.css";
 import { setAskHandler, toast } from "@/lib/toast";
+import { parseView } from "@/lib/ai/missTokyoAi/view";
 
 const TIP_KEY = "mt.assistant.tipSeen";
 
@@ -36,7 +37,7 @@ export function MissTokyoAiProvider({ user, children }: { user: { name: string; 
 export function MissTokyoAi() {
     const user = useMissTokyoAiUser();
     const pathname = usePathname();
-    const { open, setOpen, hydrate, hydrated, availability, setAvailability, setFeatures } = useMissTokyoAi();
+    const { open, setOpen, hydrate, hydrated, availability, setAvailability, setFeatures, setView } = useMissTokyoAi();
     const [tip, setTip] = useState(false);
     const [drag, setDrag] = useState(0);
     const dragStart = useRef<number | null>(null);
@@ -57,6 +58,8 @@ export function MissTokyoAi() {
             .then(r => r.json())
             .then(d => {
                 if (cancelled) return;
+                // Before the features: a walkthrough resumes once featuresKnown is true.
+                setView(parseView(d?.view));
                 if (d?.features && typeof d.features === "object") setFeatures({
                     sendToAdmin: d.features.sendToAdmin === true,
                     bell: d.features.bell === true,
@@ -68,7 +71,7 @@ export function MissTokyoAi() {
             })
             .catch(() => { /* leave unknown; the chat itself reports problems */ });
         return () => { cancelled = true; };
-    }, [availability, setAvailability, setFeatures]);
+    }, [availability, setAvailability, setFeatures, setView]);
 
     useEffect(() => {
         try { setTip(localStorage.getItem(TIP_KEY) !== "1"); } catch { setTip(false); }
