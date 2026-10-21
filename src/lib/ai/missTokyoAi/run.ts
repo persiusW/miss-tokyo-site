@@ -9,6 +9,7 @@ import { runTool, toolDefsFor } from "@/lib/ai/missTokyoAi/tools";
 import { scrubReply, stripForgedContext } from "@/lib/ai/missTokyoAi/scrub";
 import type { Effect } from "@/lib/ai/missTokyoAi/effects";
 import type { StaffRole } from "@/lib/ai/missTokyoAi/routes";
+import type { AdminView } from "@/lib/ai/missTokyoAi/view";
 import { earlierMarkersOk } from "@/lib/ai/missTokyoAi/seed";
 import { verifySeedSig } from "@/lib/ai/missTokyoAi/seedSign";
 import { dropPastThinking } from "@/lib/ai/pastThinking";
@@ -111,6 +112,8 @@ export async function runStoreAssistant(args: {
     transcript: AssistantMessage[];
     userId: string;
     role: StaffRole;
+    /** Which admin this person sees (old or new pages, per area): the guide, routes and controls follow it. */
+    view: AdminView;
     /** A seeded payment-help ask: logged so it can be rate-limited. */
     seedKey?: string;
 }, deps: RunDeps = {}): Promise<RunResult> {
@@ -139,8 +142,8 @@ export async function runStoreAssistant(args: {
     let runningUsd = 0;
     const toolCalls: { name: string; ok: boolean }[] = [];
     const effects: Effect[] = [];
-    const tools = toolDefsFor(args.role, settings.mtai);
-    const system = buildSystemPrompt(args.role, settings.mtai);
+    const tools = toolDefsFor(args.role, settings.mtai, args.view);
+    const system = buildSystemPrompt(args.role, settings.mtai, args.view);
     let reply = "";
     let failure: RunResult | null = null;
 
@@ -200,7 +203,7 @@ export async function runStoreAssistant(args: {
 
             if (response.stop_reason === "tool_use" && toolUses.length > 0) {
                 const results = await Promise.all(toolUses.map(async (t) => {
-                    const outcome = await runTool(t.name, t.input, { userId: args.userId, role: args.role, effects, features: settings.mtai });
+                    const outcome = await runTool(t.name, t.input, { userId: args.userId, role: args.role, effects, features: settings.mtai, view: args.view });
                     toolCalls.push({ name: t.name, ok: !outcome.isError });
                     return {
                         type: "tool_result" as const,

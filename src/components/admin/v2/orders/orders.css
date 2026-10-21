@@ -1,0 +1,43 @@
+/* Admin v2 Orders. Scoped to .adm2, tokens only. */
+.adm2 .ord-tools .search{flex:1 1 260px}
+.adm2 .ord-tools .select{width:auto;min-width:0;flex:none}
+.adm2 .ord-date{display:inline-flex;align-items:center;gap:var(--s2);font-size:var(--t-sm);color:var(--ink-3);white-space:nowrap}
+.adm2 .ord-date .input{width:auto;min-width:0}
+.adm2 .ord-tbl tbody tr.click:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+.adm2 .ord-tbl tbody tr.click:focus-visible td{background:var(--card-2)}
+.adm2 .ord-tbl .ord-cust{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm2 .ord-sub{margin-top:2px}
+.adm2 .ord-lines .row{align-items:center}
+.adm2 .ord-line-total{min-width:96px;text-align:right}
+.adm2 .ord-contact{display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.adm2 .ord-contact a{color:inherit}
+.adm2 .ord-verify{display:flex;align-items:center;gap:var(--s3)}
+.adm2 .ord-spin{width:18px;height:18px;border-radius:50%;flex:none}
+.adm2 .ord-total{font-size:var(--t-2xl);font-weight:700}
+.adm2 .ord-doc-line{display:grid;grid-template-columns:minmax(0,1fr) 72px 140px auto;gap:var(--s2);align-items:center}
+.adm2 .ord-kpis{margin-bottom:var(--s4)}
+.adm2 .ord-unit-sm{display:none}
+@media (max-width:620px){
+.adm2 .ord-tools .search{flex-basis:100%}
+.adm2 .ord-tools .select,.adm2 .ord-date{flex:1 1 calc(50% - var(--s3))}
+.adm2 .ord-date .input{flex:1}
+.adm2 .ord-tbl .ord-cust{max-width:140px}
+.adm2 .ord-unit-sm{display:inline}
+.adm2 .ord-line-total{min-width:0}
+.adm2 .ord-doc-line{grid-template-columns:minmax(0,1fr) 64px;}
+.adm2 .ord-doc-line .ord-doc-amt{grid-column:1}
+}
+
+/* Printing a receipt or packing slips: only the print sheet shows. */
+.adm2 .ord-print{display:none}
+@media print{
+  body *{visibility:hidden!important}
+  .adm2 .ord-print,.adm2 .ord-print *{visibility:visible!important}
+  .adm2 .ord-print{display:block!important;position:absolute;left:0;top:0;width:100%;background:Canvas;color:CanvasText;color-scheme:light;font-size:12px}
+  .adm2 .ord-print .sheet{page-break-after:always;padding:16mm}
+  .adm2 .ord-print .sheet:last-child{page-break-after:auto}
+  .adm2 .ord-print table{width:100%;border-collapse:collapse;margin-top:12px}
+  .adm2 .ord-print th,.adm2 .ord-print td{border-bottom:1px solid GrayText;padding:6px 4px;text-align:left}
+  .adm2 .ord-print .r{text-align:right}
+  .adm2 .ord-print h2{font-size:18px;margin:0}
+}

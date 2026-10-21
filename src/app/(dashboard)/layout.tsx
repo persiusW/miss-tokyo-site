@@ -9,6 +9,10 @@ import { AdminShellClient } from "@/components/ui/miss-tokyo/AdminShellClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { logSignIn } from "@/lib/utils/logSignIn";
+import { AdminV2Shell } from "@/components/admin/shell/AdminV2Shell";
+import { v2FontClass } from "@/components/admin/shell/fonts";
+import { v2View } from "@/lib/admin/v2/server";
+import "@/components/admin/ui/admin-v2.css";
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -64,6 +68,14 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         redirect("/admin/login");
     }
 
+    // Two-step sign-in (Settings › Your account): someone who turned it on must
+    // enter their code before the admin opens. Read from the session cookie, so
+    // there's no extra round trip, and only checked while the session is aal1.
+    if (claims?.aal === "aal1") {
+        const { data: aal } = await serverClient.auth.mfa.getAuthenticatorAssuranceLevel().catch(() => ({ data: null }));
+        if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") redirect("/auth/two-step");
+    }
+
     let userRole: string | null = null;
     {
         const { data: profile } = await supabaseAdmin
@@ -95,6 +107,29 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         initials: getInitials(displayName),
         role: userRole ?? "staff",
     };
+
+    // Admin v2: the new shell renders for everyone once the store switch is on,
+    // or on a device that's previewing it. Old pages not yet rebuilt render
+    // inside it unchanged (their --ac-* tokens are mapped to the new ones).
+    const view = await v2View();
+    if (view.shell) {
+        return (
+            <>
+                <AdminV2Shell
+                    businessName={businessName}
+                    role={(userRole ?? "sales_staff") as "admin" | "owner" | "sales_staff"}
+                    user={{ name: displayName, email: (claims?.email as string | undefined) ?? null }}
+                    showCustomRequests={showCustomRequests}
+                    previewOnly={view.preview}
+                    fontClass={v2FontClass}
+                >
+                    {children}
+                </AdminV2Shell>
+                <ErrorNet />
+                <RealtimeStockMonitor />
+            </>
+        );
+    }
 
     return (
         <>

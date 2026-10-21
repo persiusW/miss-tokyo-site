@@ -1,0 +1,15 @@
+/* Staff area extras. Scoped to .adm2, tokens only. */
+.adm2 .stf-tools{align-items:flex-end}
+.adm2 .stf-filter{display:flex;flex-direction:column;gap:var(--s1);min-width:180px;flex:1 1 180px;max-width:280px}
+.adm2 .stf-filter .label{font-size:var(--t-xs);font-weight:600;color:var(--ink-3)}
+.adm2 .stf-act{align-items:flex-start}
+.adm2 .stf-act .avatar,.adm2 .stf-act .badge{margin-top:2px}
+.adm2 .stf-details{margin-top:var(--s2);padding:var(--s3);background:var(--card-2);border-radius:var(--r2)}
+.adm2 .stf-details dd{text-align:left;overflow-wrap:anywhere}
+.adm2 .stf-invite-actions{flex:none}
+@media (max-width:620px){
+.adm2 .stf-filter{max-width:none;flex-basis:100%}
+.adm2 .stf-invite{flex-wrap:wrap}
+.adm2 .stf-invite-actions{width:100%;justify-content:flex-end}
+}
+.adm2 .stf-cell{display:inline-flex;vertical-align:middle;justify-content:flex-end}

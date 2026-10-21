@@ -22,16 +22,23 @@ function filesUnder(dir: string, out: string[] = []): string[] {
     return out;
 }
 
+// During the admin v2 rollout the old and the new page both render a control,
+// but never at the same time, so an anchor may appear once in each.
+const isV2File = (f: string) => /[\\/]components[\\/]admin[\\/](v2|shell)[\\/]|[\\/]\(v2\)[\\/]/.test(f);
+
 test("every registered anchor is on exactly one element, and every data-assist is registered", () => {
     const counts = new Map<string, number>();
+    const v2Counts = new Map<string, number>();
     for (const file of filesUnder(SRC)) {
+        const into = isV2File(file) ? v2Counts : counts;
         // Literal ids only; the Spotlight builds its selector from a variable.
         for (const m of fs.readFileSync(file, "utf8").matchAll(/data-assist="([a-z0-9.-]+)"/g)) {
-            counts.set(m[1], (counts.get(m[1]) ?? 0) + 1);
+            into.set(m[1], (into.get(m[1]) ?? 0) + 1);
         }
     }
     for (const id of Object.keys(ANCHORS)) expect(counts.get(id), `anchor ${id} in JSX`).toBe(1);
-    for (const id of counts.keys()) expect(Object.keys(ANCHORS), `data-assist="${id}" registered`).toContain(id);
+    for (const id of Object.keys(ANCHORS)) expect(v2Counts.get(id) ?? 0, `anchor ${id} in admin v2`).toBeLessThanOrEqual(1);
+    for (const id of [...counts.keys(), ...v2Counts.keys()]) expect(Object.keys(ANCHORS), `data-assist="${id}" registered`).toContain(id);
 });
 
 test("every route is a real dashboard page", () => {
@@ -42,7 +49,7 @@ test("every route is a real dashboard page", () => {
 });
 
 test("Settings tab ids match the tabs on the Settings page", () => {
-    const src = fs.readFileSync(path.join(DASH, "settings", "page.tsx"), "utf8");
+    const src = fs.readFileSync(path.join(DASH, "settings", "LegacySettingsPage.tsx"), "utf8");
     // The page's top-level tabs array only (the CMS sub-tabs are a different list).
     const block = src.slice(src.indexOf("const tabs: { key: TabKey"), src.indexOf("];", src.indexOf("const tabs: { key: TabKey")));
     const keys = [...block.matchAll(/\{ key: "([a-z-]+)",\s+label:/g)].map(m => m[1]);

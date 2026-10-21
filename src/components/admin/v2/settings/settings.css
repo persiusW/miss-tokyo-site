@@ -1,0 +1,40 @@
+/* Settings extras on top of admin-v2.css. Scoped to .adm2, tokens only. */
+.adm2 .set-group-t{font-size:var(--t-lg);font-weight:700;margin:var(--s2) 0 0}
+.adm2 .set-card{text-align:left;border:0;cursor:pointer;display:flex;flex-direction:column;gap:var(--s1);color:inherit;font:inherit;min-height:88px;transition:background var(--dur) var(--ease)}
+.adm2 .set-card:hover{background:var(--card-2)}
+.adm2 .set-card:focus-visible{outline:none;box-shadow:var(--focus)}
+.adm2 .set-card:active{background:var(--card-3)}
+.adm2 .set-nav-item{min-height:38px;justify-content:space-between}
+@media (pointer:coarse){.adm2 .set-nav-item{min-height:var(--tap)}}
+.adm2 .set-head{padding:var(--s5) var(--s5) var(--s1)}
+.adm2 .set-head .section-t{margin:0}
+.adm2 .srow + .set-head{border-top:1px solid var(--line)}
+.adm2 .set-num{width:96px;min-width:0 !important}
+.adm2 .set-count{display:block;text-align:right;margin-top:var(--s1)}
+.adm2 .srow.stacked .srow-ctl{flex-direction:column;align-items:stretch}
+.adm2 .set-logo{max-width:220px}
+.adm2 .set-code{font-size:var(--t-sm);background:var(--card-2);border-radius:var(--r1);padding:var(--s1) var(--s2);word-break:break-all}
+.adm2 .set-test{padding-top:var(--s3);border-top:1px solid var(--line)}
+.adm2 .set-mail{border:1px solid var(--line-2);border-radius:var(--r2);overflow:hidden;background:var(--card-2)}
+.adm2 .set-mail-h{padding:var(--s2) var(--s3);border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.adm2 .set-mail-b{margin:var(--s4);padding:var(--s5);background:var(--card);border-radius:var(--r1);font-size:var(--t-sm);color:var(--ink-2);display:flex;flex-direction:column;gap:var(--s3)}
+.adm2 .set-mail-b p{margin:0}
+.adm2 .set-mail-brand{font-family:var(--f-display);font-size:var(--t-xl);color:var(--ink);letter-spacing:.04em}
+.adm2 .set-mail-kicker{text-transform:uppercase;letter-spacing:.12em;margin-top:calc(var(--s2) * -1)}
+.adm2 .set-mail-foot{border-top:1px solid var(--line);padding-top:var(--s3)}
+.adm2 .set-sms{align-self:flex-start;max-width:300px;background:var(--ink);color:var(--ink-inv);border-radius:16px 16px 16px 4px;padding:var(--s3) var(--s4);white-space:pre-wrap;font-size:var(--t-sm)}
+/* A QR code needs a white quiet zone to scan, in either theme. */
+.adm2 .set-qr{display:flex;justify-content:center;padding:var(--s4);background:#fff;border-radius:var(--r2);border:1px solid var(--line-2)}
+.adm2 .set-tiles .kpi{background:var(--card-2);border-radius:var(--r2);padding:var(--s3) var(--s4)}
+.adm2 .set-tiles .kpi-value{font-size:var(--t-xl)}
+.adm2 .set-chat{padding:var(--s3) var(--s5) var(--s4);background:var(--card-2);display:flex;flex-direction:column;gap:var(--s2)}
+.adm2 .set-chat p{margin:0}
+.adm2 .bar-fill.near{background:var(--warn-ink)}
+.adm2 .bar-fill.over{background:var(--danger-solid)}
+.adm2 .steps-list{margin:0;padding-left:var(--s5)}
+.adm2 .set-tabs-scroll{overflow-x:auto;max-width:100%}
+/* Old editors rendered unchanged inside the new page. */
+.adm2 .set-legacy-card{min-width:0;max-width:100%;overflow-x:auto}
+.adm2 .set-legacy-card .ac-card{border:0;border-radius:var(--r3);background:var(--card)}
+.adm2 .set-legacy-light{padding:var(--s4);border-radius:var(--r3);background:var(--bg)}
+.adm2 .steps-list li{list-style:decimal}

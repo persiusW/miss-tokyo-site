@@ -64,6 +64,35 @@ export type AutoDiscountResult = {
 };
 
 /**
+ * Whether an automatic discount is live at `now`: the exact rule the checkout
+ * charges by (createCheckoutOrder and /api/checkout/auto-discount select
+ * is_active = true, starts_at <= now, ends_at null or > now). A rule with no
+ * start date is not live there, so it isn't here either.
+ *
+ * Every storefront surface that shows a ribbon, badge or discounted price for
+ * an automatic discount filters by this, so a scheduled or ended rule never
+ * advertises a price the checkout won't give.
+ */
+export function isAutoDiscountLive(
+    r: { is_active?: boolean | null; starts_at?: string | null; ends_at?: string | null },
+    now: Date = new Date(),
+): boolean {
+    if (r.is_active !== true) return false;
+    const start = r.starts_at ? new Date(r.starts_at).getTime() : NaN;
+    if (!Number.isFinite(start) || start > now.getTime()) return false;
+    if (r.ends_at) {
+        const end = new Date(r.ends_at).getTime();
+        if (!Number.isFinite(end) || end <= now.getTime()) return false;
+    }
+    return true;
+}
+
+/** The rules live at `now`, for a list read without the date filter (e.g. from a cache). */
+export const liveAutoDiscounts = <T extends { is_active?: boolean | null; starts_at?: string | null; ends_at?: string | null }>(
+    rules: readonly T[], now: Date = new Date(),
+): T[] => rules.filter(r => isAutoDiscountLive(r, now));
+
+/**
  * Given a product's id + category ids and a list of active rules, return the
  * single best rule to surface as a ribbon on a product card / PDP.
  *

@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useMissTokyoAi } from "@/lib/ai/missTokyoAi/client/store";
-import { ANCHORS, type AnchorId } from "@/lib/ai/missTokyoAi/anchors";
+import { anchorFor } from "@/lib/ai/missTokyoAi/anchors";
 
 type Box = { top: number; left: number; width: number; height: number };
 
@@ -18,7 +18,7 @@ function visibleRect(el: Element): DOMRect | null {
 }
 
 export function Spotlight() {
-    const { spotlight, setSpotlight } = useMissTokyoAi();
+    const { spotlight, setSpotlight, view } = useMissTokyoAi();
     const pathname = usePathname();
     const [box, setBox] = useState<Box | null>(null);
     const [missing, setMissing] = useState(false);
@@ -65,7 +65,7 @@ export function Spotlight() {
     }, [spotlight, pathname, setSpotlight]);
 
     if (!spotlight) return null;
-    const label = ANCHORS[spotlight.anchor as AnchorId]?.label ?? "Here it is";
+    const label = anchorFor(spotlight.anchor, view)?.label ?? "Here it is";
 
     if (missing) {
         return (

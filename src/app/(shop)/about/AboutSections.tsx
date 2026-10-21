@@ -2,7 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { AboutTimelineEntry, AboutValue, AboutTeamMember } from "@/types/settings";
+import type { ShownImage } from "@/lib/content/wording";
 
 // ── Animation hook ────────────────────────────────────────────────────────────
 function useReveal<T extends HTMLElement = HTMLDivElement>(delay = 0) {
@@ -70,6 +72,19 @@ const ICONS: Record<string, React.ReactNode> = {
     ),
 };
 
+/** A story tile's fill: the photo from Content › Images when one is on, else
+ *  the original colour gradient. A photo with a link is tappable. */
+function TileFill({ photo, gradient, caption }: { photo?: ShownImage | null; gradient: string; caption: string }) {
+    if (!photo) return <div className="absolute inset-0 w-full h-full" style={{ background: gradient }} />;
+    return (
+        <>
+            <Image src={photo.url} alt={photo.alt || caption} fill sizes="(max-width: 768px) 50vw, 40vw" className="object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" aria-hidden="true" />
+            {photo.link && <Link href={photo.link} className="absolute inset-0 z-10" aria-label={photo.alt || caption} />}
+        </>
+    );
+}
+
 // ── Animated wrappers ─────────────────────────────────────────────────────────
 function Reveal({ delay = 0, className = "", children }: { delay?: number; className?: string; children: React.ReactNode }) {
     const ref = useReveal<HTMLDivElement>(delay);
@@ -90,6 +105,8 @@ type Props = {
     team: AboutTeamMember[];
     ctaEyebrow: string; ctaHeadline: string; ctaBody: string;
     ctaBtnLabel: string; ctaBtnUrl: string;
+    /** The three story photos (Content › Images › About photos), each optional. */
+    photos?: (ShownImage | null)[];
 };
 
 export function AboutSections(p: Props) {
@@ -177,21 +194,21 @@ export function AboutSections(p: Props) {
                         </div>
                     </Reveal>
 
-                    {/* 2b. Image grid — TODO: connect to CMS image upload in a future phase */}
+                    {/* 2b. Image grid — photos from Content › Images › About photos, else gradients */}
                     <Reveal delay={100} className="mt-16 grid grid-cols-2 gap-4">
                         {/* Left: tall portrait */}
                         <div className="relative overflow-hidden rounded-sm" style={{ aspectRatio: "3/4" }}>
-                            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #3d2116 0%, #c4896a 100%)" }} />
+                            <TileFill photo={p.photos?.[0]} caption="Dome Road, Accra" gradient="linear-gradient(135deg, #3d2116 0%, #c4896a 100%)" />
                             <span className="absolute bottom-3 left-4 text-[9px] uppercase tracking-[0.2em] text-white/60">Dome Road, Accra</span>
                         </div>
                         {/* Right: two stacked landscape */}
                         <div className="flex flex-col gap-4">
                             <div className="relative overflow-hidden rounded-sm flex-1">
-                                <div className="absolute inset-0 w-full h-full" style={{ background: "linear-gradient(135deg, #1a1240 0%, #c4386a 60%, #e8a030 100%)" }} />
+                                <TileFill photo={p.photos?.[1]} caption="New Arrivals, Weekly" gradient="linear-gradient(135deg, #1a1240 0%, #c4386a 60%, #e8a030 100%)" />
                                 <span className="absolute bottom-3 left-4 text-[9px] uppercase tracking-[0.2em] text-white/60">New Arrivals, Weekly</span>
                             </div>
                             <div className="relative overflow-hidden rounded-sm flex-1">
-                                <div className="absolute inset-0 w-full h-full" style={{ background: "linear-gradient(135deg, #0a3020 0%, #059669 100%)" }} />
+                                <TileFill photo={p.photos?.[2]} caption="Curated with Love" gradient="linear-gradient(135deg, #0a3020 0%, #059669 100%)" />
                                 <span className="absolute bottom-3 left-4 text-[9px] uppercase tracking-[0.2em] text-white/60">Curated with Love</span>
                             </div>
                         </div>

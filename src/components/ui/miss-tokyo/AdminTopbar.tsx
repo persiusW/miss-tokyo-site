@@ -153,6 +153,17 @@ export function AdminTopbar({ user, onMenu, theme, onTheme }: Props) {
                 </button>
             </div>
 
+            {/* Owners and admins can try the redesigned admin on this device. */}
+            {(user.role === "owner" || user.role === "admin") && (
+                <button type="button" className="ac-btn ac-btn-sm"
+                    onClick={async () => {
+                        await fetch("/api/admin/v2/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: true }) }).catch(() => null);
+                        window.location.href = "/home";
+                    }}>
+                    Try the new admin
+                </button>
+            )}
+
             {/* Bell — Miss Tokyo AI replies / inbox when switched on */}
             <AiBell />
 

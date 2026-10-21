@@ -5,6 +5,7 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { normAttr, variantKey, hasVariantAttrs } from "@/lib/utils/normAttr";
+import { stockTarget, type RefundRow } from "@/lib/orders/refundMath";
 
 export type ReserveItem = {
     productId: string;
@@ -721,12 +722,33 @@ export async function reconcileOrderStock(orderId: string, note?: string): Promi
     const items = Array.isArray(order.items) ? (order.items as any[]) : [];
     if (!items.length) return 0;
 
+    // Refunds (admin v2) can put some units back, or write some off, without
+    // closing the order. The target nets them out so a later status change
+    // never re-takes restocked units or returns written-off ones. With no
+    // refunds the lines and the hold flag come back exactly as before.
+    const target = stockTarget(items, await orderRefundRows(orderId), orderShouldHoldStock(order.status, order.payment_status));
+
     return syncOrderStockPosition(
         orderId,
-        items,
-        orderShouldHoldStock(order.status, order.payment_status),
+        target.items,
+        target.hold,
         note ?? `status=${order.status} payment=${order.payment_status}`,
     );
+}
+
+/** The order's refunds, for reconcileOrderStock. Empty when there are none or the table isn't there yet. */
+async function orderRefundRows(orderId: string): Promise<RefundRow[]> {
+    const { data, error } = await supabaseAdmin
+        .from("refunds")
+        .select("amount_ghs, items, restock, status")
+        .eq("order_id", orderId);
+    if (error) {
+        // Before the refunds migration there is nothing to net out. Anything
+        // else must not reconcile on a guess: fail like the ledger call does.
+        if (error.code === "42P01" || error.code === "PGRST205") return [];
+        throw new Error(error.message);
+    }
+    return (data ?? []) as RefundRow[];
 }
 
 /**
@@ -741,14 +763,55 @@ export async function adjustStock(
     productId: string,
     variantId: string | null,
     delta: number,
+    by?: { actor: string; note?: string },
 ): Promise<void> {
     if (!delta) return;
-    const { error } = await supabaseAdmin.rpc("fn_adjust_stock", {
-        p_product_id: productId,
-        p_variant_id: variantId,
-        p_delta: delta,
-    });
+    // With a staff member to credit, the same admin_adjust movement goes through
+    // fn_apply_stock_movement directly so stock history can say who made it.
+    const { error } = by
+        ? await supabaseAdmin.rpc("fn_apply_stock_movement", {
+            p_product_id: productId,
+            p_variant_id: variantId,
+            p_delta: delta,
+            p_reason: "admin_adjust",
+            p_actor: by.actor,
+            p_note: by.note ?? null,
+        })
+        : await supabaseAdmin.rpc("fn_adjust_stock", {
+            p_product_id: productId,
+            p_variant_id: variantId,
+            p_delta: delta,
+        });
     if (error) throw new Error(error.message);
+}
+
+export type StockAdjustResult = { applied: boolean; duplicate?: boolean; unchanged?: boolean; before?: number; after: number; delta?: number };
+
+/**
+ * One Inventory › Adjust entry (restock, stock count, write-off or correction),
+ * through fn_stock_adjust, which works out the change under the row lock and
+ * records it with fn_apply_stock_movement. `key` makes a retry a no-op.
+ */
+export async function adjustStockFor(input: {
+    productId: string;
+    variantId: string | null;
+    reason: "restock" | "stock_count" | "write_off" | "correction";
+    quantity: number;
+    actor: string;
+    key: string;
+    note?: string | null;
+}): Promise<StockAdjustResult> {
+    const { data, error } = await (supabaseAdmin.rpc as any)("fn_stock_adjust", {
+        p_product_id: input.productId,
+        p_variant_id: input.variantId,
+        p_reason: input.reason,
+        p_quantity: input.quantity,
+        p_actor: input.actor,
+        p_idempotency_key: input.key,
+        p_note: input.note ?? null,
+    });
+    if (error) throw Object.assign(new Error(error.message), { code: error.code });
+    return data as StockAdjustResult;
 }
 
 /**

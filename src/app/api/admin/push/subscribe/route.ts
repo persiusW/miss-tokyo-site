@@ -3,6 +3,14 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { apiError } from "@/lib/errors/apiError";
 
+// Every subscription here receives the staff "new order" pushes (customer
+// names and totals), so only staff may add or remove one. Before this check any
+// signed-in shop customer could subscribe their browser to them.
+async function isStaff(userId: string): Promise<boolean> {
+    const { data } = await supabaseAdmin.from("profiles").select("role").eq("id", userId).maybeSingle();
+    return ["admin", "owner", "sales_staff"].includes(data?.role ?? "");
+}
+
 export async function POST(req: Request) {
     try {
         // Auth via cookie session (same pattern as other protected routes)
@@ -11,6 +19,7 @@ export async function POST(req: Request) {
         if (authErr || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        if (!(await isStaff(user.id))) return apiError("GEN-00", { status: 403, audience: "staff" });
 
         const { subscription } = await req.json();
         if (!subscription?.endpoint) return NextResponse.json({ error: "Invalid subscription" }, { status: 400 });
@@ -46,6 +55,7 @@ export async function DELETE(req: Request) {
         if (authErr || !user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        if (!(await isStaff(user.id))) return apiError("GEN-00", { status: 403, audience: "staff" });
 
         const { endpoint } = await req.json();
         if (!endpoint) return NextResponse.json({ error: "endpoint required" }, { status: 400 });

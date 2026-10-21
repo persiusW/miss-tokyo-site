@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ShoppingBag, Film, Gift, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { tabShown, type ShopNav } from "@/lib/content/shopNav";
 
 const TABS = [
     {
@@ -34,7 +35,9 @@ const TABS = [
     },
 ] as const;
 
-export function MobileTabBar() {
+/** `nav` hides the Snaps and Gift Card tabs when their page is switched off in
+ *  Settings › Shop pages. Without it (the login page) every tab shows. */
+export function MobileTabBar({ nav }: { nav?: ShopNav } = {}) {
     const pathname = usePathname();
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -53,7 +56,7 @@ export function MobileTabBar() {
 
     return (
         <nav className="mobile-tab-bar" aria-label="Main navigation">
-            {TABS.map((tab) => {
+            {TABS.filter((tab) => !nav || tabShown(nav, tab.href)).map((tab) => {
                 const href = tab.href;
                 const label = tab.label;
                 const Icon = tab.Icon;

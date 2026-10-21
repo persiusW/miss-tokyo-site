@@ -12,8 +12,9 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await serverClient.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
-    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Invoices are an owner + admin area (the sidebar hides them from sales staff).
+    if (!caller || !["admin", "owner"].includes(caller.role)) {
+        return apiError("GEN-00", { status: 403, audience: "staff" });
     }
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
@@ -28,15 +29,21 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "invoiceId is required." }, { status: 400 });
         }
 
-        // Fetch invoice amount from DB — never trust client-supplied amount (SEC-17)
-        const { data: invoiceData, error: invoiceError } = await supabaseAdmin
-            .from("invoices")
-            .select("total_amount")
+        // Fetch invoice amount from DB — never trust client-supplied amount (SEC-17).
+        // Invoices, quotes and pay links live in `documents` (amount = the
+        // stored total, tax included); there has never been an `invoices`
+        // table, so this lookup used to fail for every invoice.
+        const { data: doc, error: invoiceError } = await supabaseAdmin
+            .from("documents")
+            .select("amount, status")
             .eq("id", invoiceId)
             .single();
 
-        if (invoiceError || !invoiceData) {
+        if (invoiceError || !doc) {
             return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
+        }
+        if (doc.status === "paid" || doc.status === "cancelled") {
+            return NextResponse.json({ error: doc.status === "paid" ? "This invoice has already been paid." : "This invoice was cancelled." }, { status: 409 });
         }
 
         // Fetch fee settings
@@ -48,7 +55,7 @@ export async function POST(req: NextRequest) {
 
         const feePct = Number(feeData?.platform_fee_percentage) || 0;
         const feeLabel = feeData?.platform_fee_label || "Service Charge";
-        const baseAmount = Number(invoiceData.total_amount);
+        const baseAmount = Number(doc.amount);
         const feeAmount = parseFloat((baseAmount * (feePct / 100)).toFixed(2));
         const finalAmount = parseFloat((baseAmount + feeAmount).toFixed(2));
 

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { V2_PREFIXES, v2Redirect } from "@/lib/admin/v2/routeMap";
+import { PREVIEW_COOKIE, effectiveFlags, getStoreV2Flags } from "@/lib/admin/v2/flags";
 
 // ── Security headers injected on every response ───────────────────────────────
 
@@ -96,7 +98,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         pathname.startsWith("/settings") ||
         pathname.startsWith("/cms") ||
         pathname.startsWith("/communications") ||
-        pathname.startsWith("/team");
+        pathname.startsWith("/team") ||
+        pathname.startsWith("/agent") ||
+        pathname === "/ai" || pathname.startsWith("/ai/") ||
+        pathname.startsWith("/test-orders") ||
+        (pathname.startsWith("/admin/") && !pathname.startsWith("/admin/login")) || pathname === "/admin" ||
+        V2_PREFIXES.some(p => pathname === p || pathname.startsWith(p + "/"));
 
     const isAccount = pathname.startsWith("/account");
 
@@ -110,6 +117,20 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
         // Role-gating for dashboard is handled server-side within each page/layout
         // (via supabaseAdmin profiles lookup) — the edge cannot query the DB.
+    }
+
+    // Admin v2 rollout: old and new admin URLs point at each other, depending
+    // on which switches are on. /admin/login is the old sign-in page; leave it.
+    if (isDashboard && user && pathname !== "/admin/login") {
+        const flags = effectiveFlags(await getStoreV2Flags(), request.cookies.get(PREVIEW_COOKIE)?.value === "1");
+        const to = v2Redirect(pathname, request.nextUrl.search, flags);
+        if (to) {
+            const dest = request.nextUrl.clone();
+            const [p, q] = to.split("?");
+            dest.pathname = p;
+            dest.search = q ? `?${q}` : "";
+            return applySecurityHeaders(NextResponse.redirect(dest));
+        }
     }
 
     // Already authenticated — redirect away from login pages

@@ -9,6 +9,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { reserveStock, releaseReservation, releaseSupersededAttempts, getStockStatus, ONLINE_HOLD_MINUTES, type ReserveItem } from "@/lib/inventory";
 import { variantKey } from "@/lib/utils/normAttr";
 import { validateDiscountCode, holdDiscount, type ValidatedDiscount } from "@/lib/discountValidation";
+import { productCategoryIds, type CodeLine } from "@/lib/couponValue";
 import { DELIVERY_DEFAULTS, parseDeliverySettings, parseZone, resolveDeliveryFee, zoneForRegion, zoneLabel } from "@/lib/delivery";
 import { errorBody } from "@/lib/errors/catalogue";
 import { channelFor, cleanSaleKey, saleKeyFor, withSaleKey } from "@/lib/payments/attemptRules";
@@ -121,6 +122,9 @@ async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, 
 
         // Calculate amount exclusively server-side — never trust client-supplied amounts
         let amountInGHS = 0;
+        // The same lines, at the same unit prices, for a code that prices by
+        // item (a category, sale price or buy X get Y). Whole-cart codes ignore them.
+        let codeLines: CodeLine[] = [];
         if (cartArr.length > 0 || productId) {
             // Priority 2: Recalculate Cart Total or Single Product server-side
             // Wholesale tiers go to a signed-in wholesale account on the
@@ -276,11 +280,16 @@ async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, 
                     const unitPrice = (isWholesaler && tiers)
                         ? resolveWholesalePrice(item.quantity, baseDbPrice, tiers)
                         : baseDbPrice;
+                    codeLines.push({
+                        productId: item.productId, unitPrice, quantity: item.quantity,
+                        categoryIds: productCategoryIds(dbProductMap[item.productId]),
+                    });
                     return acc + (unitPrice * item.quantity);
                 }, 0);
             } else {
                 const baseDbPrice = dbPriceMap[productId] || 0;
                 amountInGHS = baseDbPrice;
+                codeLines = [{ productId, unitPrice: baseDbPrice, quantity: 1, categoryIds: productCategoryIds(dbProductMap[productId]) }];
             }
         }
 
@@ -330,6 +339,7 @@ async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, 
 
                 // Coupon only applies to items NOT covered by auto discounts
                 couponBlocked = cartArr.every(i => autoResult.coveredProductIds.has(i.productId));
+                codeLines = codeLines.map(l => ({ ...l, covered: autoResult.coveredProductIds.has(l.productId) }));
             }
         }
 
@@ -374,7 +384,7 @@ async function runCheckoutOnKey(payload: CheckoutPayload, ctx: CheckoutContext, 
         // recomputed against the server-calculated total.
         let validatedDiscount: ValidatedDiscount | null = null;
         if (clientMetadata?.discount_code && !couponBlocked) {
-            validatedDiscount = await validateDiscountCode(clientMetadata.discount_code, amountInGHS, deliveryFee);
+            validatedDiscount = await validateDiscountCode(clientMetadata.discount_code, amountInGHS, deliveryFee, { email, phone: clientMetadata?.phone }, codeLines);
             const claimedAmount = Number(clientMetadata?.discount_amount) || 0;
             const serverAmount = validatedDiscount?.amount ?? 0;
             if (Math.abs(claimedAmount - serverAmount) > 0.02) {

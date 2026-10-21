@@ -1,0 +1,22 @@
+/* Admin v2 Customers. Scoped to .adm2, tokens only. */
+.adm2 .cust-tools .search{flex:1 1 260px}
+.adm2 .cust-tools .select{width:auto;min-width:0;flex:none}
+.adm2 .cust-date{display:inline-flex;align-items:center;gap:var(--s2);font-size:var(--t-sm);color:var(--ink-3);white-space:nowrap}
+.adm2 .cust-date .input{width:auto;min-width:0}
+.adm2 .cust-tbl .cust-name{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
+.adm2 .cust-tbl .cust-email{overflow-wrap:anywhere}
+.adm2 .cust-tbl .cust-loc{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm2 .cust-tbl tbody tr.click:focus-visible td{background:var(--card-2)}
+.adm2 .cust-tbl tbody tr.click:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+.adm2 .cust-kpi-sm{font-size:var(--t-2xl)}
+.adm2 .cust-contact{display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.adm2 .cust-contact a{color:inherit}
+.adm2 .cust-note-foot{margin-top:var(--s2);align-items:center}
+@media (max-width:620px){
+.adm2 .cust-tools .search{flex-basis:100%}
+.adm2 .cust-tools .select,.adm2 .cust-date{flex:1 1 calc(50% - var(--s3))}
+.adm2 .cust-date .input{flex:1}
+}
+@media (max-width:620px){
+.adm2 .cust-tbl .avatar{display:none}
+}

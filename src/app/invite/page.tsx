@@ -26,6 +26,9 @@ export default async function InvitePage({ searchParams }: { searchParams: Promi
         .select("*")
         .eq("token", token)
         .eq("status", "pending")
+        // "The link works for 7 days": an invite past expires_at is refused, and
+        // Resend on the Staff page pushes the date out again.
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .single();
 
     if (error || !invite) {

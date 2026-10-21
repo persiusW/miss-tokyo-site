@@ -1,22 +1,29 @@
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { loadSiteImages, pageSeo } from "@/lib/content/load";
 import { AboutSections } from "./AboutSections";
 import type { AboutTimelineEntry, AboutValue, AboutTeamMember } from "@/types/settings";
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
-    title: "About — Miss Tokyo",
-    description:
-        "Learn the story behind Miss Tokyo — Accra's favourite women's fashion destination. Cute, cool, and unmistakably feminine.",
-};
+// Search-engine text can be changed in the admin (Content › Pages).
+export function generateMetadata(): Promise<Metadata> {
+    return pageSeo("/about", {
+        title: "About — Miss Tokyo",
+        description:
+            "Learn the story behind Miss Tokyo — Accra's favourite women's fashion destination. Cute, cool, and unmistakably feminine.",
+    });
+}
 
 export default async function AboutPage() {
-    const { data: s } = await supabaseAdmin
-        .from("site_settings")
-        .select("*")
-        .eq("id", "singleton")
-        .single();
+    const [{ data: s }, img] = await Promise.all([
+        supabaseAdmin
+            .from("site_settings")
+            .select("*")
+            .eq("id", "singleton")
+            .single(),
+        loadSiteImages(["about_hero", "about_founder", "about_photo_3"] as const),
+    ]);
 
     const d = {
         eyebrow:        s?.about_eyebrow        ?? "Our story",
@@ -44,6 +51,7 @@ export default async function AboutPage() {
         ctaBody:        s?.about_cta_body       ?? "",
         ctaBtnLabel:    s?.about_cta_btn_label  ?? "Shop Now",
         ctaBtnUrl:      s?.about_cta_btn_url    ?? "/shop",
+        photos:         [img.about_hero, img.about_founder, img.about_photo_3],
     };
 
     return <AboutSections {...d} />;

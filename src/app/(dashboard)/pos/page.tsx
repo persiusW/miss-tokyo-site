@@ -7,7 +7,7 @@ import { toast } from '@/lib/toast';
 import { completedViaFrom, completionBanner, deliveryHeadline, deliveryToast, liveStatusText, TILL_GENERIC, TILL_SERVER_UNREACHABLE, unclearOutcome, type Delivery, type LiveStopped } from '@/lib/pos/tillMessages';
 import { readJson } from '@/lib/http/readJson';
 import type { PosProduct, PosItem, PosDeliveryMethod, PosAppliedDiscount } from '@/types/pos';
-import { computeDiscountSplit } from '@/lib/discountSplit';
+import { splitAppliedCode } from '@/lib/couponValue';
 import { GHANA_REGIONS, COUNTRIES, DEFAULT_COUNTRY, DEFAULT_REGION } from '@/lib/geo';
 import { useViewportHeight } from '@/hooks/useViewportHeight';
 import {
@@ -337,13 +337,11 @@ export default function POSPage() {
     // on a GHC 670 basket still showed GHC 35 of delivery to collect — while the
     // server had already worked the order out as fully covered. Staff would ask
     // for cash the order was never going to record.
+    // An item code (category, sale price, buy X get Y) is priced line by line;
+    // the till has no automatic discounts, so no line is covered.
+    const codeLines = cart.map(i => ({ productId: i.productId, unitPrice: i.price, quantity: i.quantity }));
     const discountSplit = appliedDiscount
-        ? computeDiscountSplit({
-            discountType: appliedDiscount.discount_type,
-            value: appliedDiscount.raw_value ?? appliedDiscount.discount_amount,
-            subtotal: cartTotal,
-            deliveryFee,
-        })
+        ? splitAppliedCode(appliedDiscount, { subtotal: cartTotal, deliveryFee, lines: codeLines })
         : { amount: 0, subtotalAmount: 0, deliveryAmount: 0 };
 
     const discountAmount = discountSplit.amount;
@@ -355,11 +353,12 @@ export default function POSPage() {
 
     // Preview only — send-link recomputes the code's worth server-side and is
     // the value actually charged.
-    const lookupCode = useCallback(async (code: string, subtotal: number, fee: number): Promise<PosAppliedDiscount | string> => {
+    // `who` lets a one-use-per-customer code be checked when it is applied.
+    const lookupCode = useCallback(async (code: string, subtotal: number, fee: number, who?: { email?: string | null; phone?: string | null }, lines?: { productId: string; unitPrice: number; quantity: number }[]): Promise<PosAppliedDiscount | string> => {
         const res = await fetch('/api/checkout/validate-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, subtotal, deliveryFee: fee }),
+            body: JSON.stringify({ code, subtotal, deliveryFee: fee, email: who?.email ?? null, phone: who?.phone ?? null, items: lines ?? [] }),
         });
         const data = await res.json();
         if (!data.valid) return data.error ?? 'Code not found or invalid.';
@@ -370,6 +369,8 @@ export default function POSPage() {
             discount_amount: Number(data.discount_amount) || 0,
             raw_value: data.raw_value != null ? Number(data.raw_value) : undefined,
             label: data.label ?? 'Discount applied',
+            terms: data.terms ?? null,
+            line_categories: data.line_categories ?? null,
         };
     }, []);
 
@@ -379,7 +380,10 @@ export default function POSPage() {
         if (cart.length === 0) { toast.error('Add items before applying a code'); return; }
         setCheckingCode(true);
         try {
-            const result = await lookupCode(code, cartTotal, deliveryFee);
+            const result = await lookupCode(code, cartTotal, deliveryFee, {
+                email: (customerMode === 'new' ? newCustomer.email : selectedContact?.email) || null,
+                phone: customerPhone || selectedContact?.phone || null,
+            }, codeLines);
             if (typeof result === 'string') { toast.error(result); return; }
             setAppliedDiscount(result);
             setDiscountInput('');
@@ -403,7 +407,7 @@ export default function POSPage() {
         if (cart.length === 0) { setAppliedDiscount(null); return; }
         const t = setTimeout(async () => {
             try {
-                const result = await lookupCode(appliedDiscount.code, cartTotal, deliveryFee);
+                const result = await lookupCode(appliedDiscount.code, cartTotal, deliveryFee, undefined, codeLines);
                 if (typeof result === 'string') {
                     setAppliedDiscount(null);
                     toast.error(`${appliedDiscount.code} no longer applies: ${result}`);

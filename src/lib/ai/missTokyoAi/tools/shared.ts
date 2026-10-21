@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { PLACEHOLDER_EMAIL_DOMAIN } from "@/lib/checkout/createCheckoutOrder";
 import type { Effect } from "@/lib/ai/missTokyoAi/effects";
 import type { MtaiFeatures } from "@/lib/ai/settings";
+import type { AdminView } from "@/lib/ai/missTokyoAi/view";
 
 import type { StaffRole } from "@/lib/ai/missTokyoAi/routes";
 export type { StaffRole };
@@ -14,12 +15,15 @@ export type ToolContext = {
     effects: Effect[];
     /** Which switched extras are on for this turn. */
     features: MtaiFeatures;
+    /** Which admin this person sees: picks the routes, controls and guide the help tools offer. */
+    view: AdminView;
 };
 
 export type ToolOutcome = { content: string; isError: boolean };
 
 export type ToolDef = {
-    def: Anthropic.Tool;
+    /** A function when the definition depends on the admin view (enums of pages and controls). */
+    def: Anthropic.Tool | ((view: AdminView) => Anthropic.Tool);
     /** Roles that may see and call the tool. Omitted = every staff role. */
     roles?: StaffRole[];
     /** The switch that must be on for the tool to exist. Omitted = always. */

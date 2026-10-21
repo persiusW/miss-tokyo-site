@@ -5,7 +5,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { getProductBySlug, getRelatedProducts, getProductReviews, getAllProductSlugs } from "@/lib/products";
-import { getApplicableRule } from "@/lib/autoDiscount";
+import { getApplicableRule, liveAutoDiscounts } from "@/lib/autoDiscount";
 
 // PERF-23: deduplicate — generateMetadata and ProductPage both call this;
 // React cache() deduplicates within one render cycle so only one DB query fires.
@@ -21,11 +21,12 @@ const getActiveAutoDiscounts = unstable_cache(
     async () => {
         const { data } = await supabaseAdmin
             .from("automatic_discounts")
-            .select("id, title, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope, min_order_amount")
+            .select("id, title, discount_type, discount_value, applies_to, target_category_ids, target_product_ids, min_quantity, quantity_scope, min_order_amount, is_active, starts_at, ends_at")
             .eq("is_active", true);
         return data ?? [];
     },
-    ["active-auto-discounts-pdp"],
+    // v2: the cached rows now carry is_active/starts_at/ends_at, which the old entries lack
+    ["active-auto-discounts-pdp-v2"],
     { revalidate: 300, tags: ["auto-discounts"] }
 );
 
@@ -166,7 +167,8 @@ export default async function ProductPage({
             .select("track_variant_inventory, preorder_enabled, preorder_estimated_date")
             .eq("id", product.id)
             .maybeSingle(),
-        getActiveAutoDiscounts().catch(() => []),
+        // Dates checked per render against the cached rows, the same rule checkout charges by
+        getActiveAutoDiscounts().then(rules => liveAutoDiscounts(rules)).catch(() => []),
         catConditionsForPreorder.length
             ? supabaseAdmin
                 .from("categories")

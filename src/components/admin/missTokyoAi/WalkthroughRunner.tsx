@@ -9,27 +9,33 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMissTokyoAi } from "@/lib/ai/missTokyoAi/client/store";
 import { useMissTokyoAiUser } from "./MissTokyoAi";
 import { findWalkthrough } from "@/lib/ai/missTokyoAi/walkthroughs";
-import { ROUTES, type StaffRole } from "@/lib/ai/missTokyoAi/routes";
-import { ANCHORS } from "@/lib/ai/missTokyoAi/anchors";
+import { findRoute, routeHref, type StaffRole } from "@/lib/ai/missTokyoAi/routes";
+import { anchorFor } from "@/lib/ai/missTokyoAi/anchors";
+import { isOn } from "@/lib/ai/missTokyoAi/view";
 
-/** An order's own page; its address changes per order. */
+/** An order's own page; its address changes per order. The new admin opens it
+ *  as a panel at /orders/<id> (not /orders/abandoned or /orders/invoices). */
 const ORDER_PAGE = /^\/sales\/orders\/[^/]+$/;
+const ORDER_PANEL = /^\/orders\/(?!abandoned$|invoices$)[^/]+$/;
+
+/** Is the browser on the step's page? Paths compare without their query. */
+const samePage = (pathname: string, path: string) => pathname === path.split("?")[0];
 
 export function WalkthroughRunner() {
-    const { walk, setWalk, setSpotlight, features, featuresKnown } = useMissTokyoAi();
+    const { walk, setWalk, setSpotlight, features, featuresKnown, view } = useMissTokyoAi();
     const user = useMissTokyoAiUser();
     const pathname = usePathname();
     const router = useRouter();
 
-    const tour = walk ? findWalkthrough(walk.id, user.role as StaffRole) : null;
+    const tour = walk ? findWalkthrough(walk.id, user.role as StaffRole, view) : null;
     const step = tour && walk ? tour.steps[walk.step] : null;
-    const stepPath = step ? ROUTES[step.route].path : null;
+    const stepRoute = step ? findRoute(step.route, view) : null;
     const onOrderPage = !!step && "orderPage" in step && !!step.orderPage;
-    const here = onOrderPage ? ORDER_PAGE.test(pathname) : !!stepPath && pathname === stepPath;
-    // A control inside a Settings tab opens that tab.
-    const anchorDef = step?.anchor ? ANCHORS[step.anchor] : null;
-    const tab = anchorDef && "tab" in anchorDef ? String(anchorDef.tab) : null;
-    const stepHref = stepPath && tab ? `${stepPath}?tab=${encodeURIComponent(tab)}` : stepPath;
+    const orderPage = isOn(view, "orders") ? ORDER_PANEL : ORDER_PAGE;
+    // A control inside a Settings tab or section opens it.
+    const anchorDef = step?.anchor ? anchorFor(step.anchor, view) : null;
+    const stepHref = stepRoute ? routeHref(stepRoute, anchorDef?.tab) ?? stepRoute.path : null;
+    const here = onOrderPage ? orderPage.test(pathname) : !!stepHref && samePage(pathname, stepHref);
 
     // A tour the person can no longer run (role changed, switch turned off) just ends.
     useEffect(() => {
@@ -39,9 +45,9 @@ export function WalkthroughRunner() {
     // Ring the step's control once we are on its page.
     useEffect(() => {
         if (!step || !here) return;
-        if (step.anchor) setSpotlight({ anchor: step.anchor, label: ANCHORS[step.anchor].label, startedAt: Date.now() });
+        if (step.anchor) setSpotlight({ anchor: step.anchor, label: anchorFor(step.anchor, view)?.label ?? "Here it is", startedAt: Date.now() });
         else setSpotlight(null);
-    }, [step, here, setSpotlight]);
+    }, [step, here, setSpotlight, view]);
 
     if (!walk || !tour || !step || !features.walkthroughs) return null;
     const last = walk.step >= tour.steps.length - 1;

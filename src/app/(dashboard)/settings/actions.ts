@@ -2,13 +2,11 @@
 
 import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getUrl } from "@/lib/utils/getUrl";
-import { sendSMSOrThrow } from "@/lib/sms";
 import crypto from "crypto";
 import { logActivity } from "@/lib/utils/logActivity";
 import { after } from "next/server";
 import { INVITABLE_ROLES } from "@/lib/teamInvites";
-import { sendEmail } from "@/lib/email";
+import { sendTeamInviteMessages } from "@/lib/teamInviteMessages";
 
 interface InviteData {
     fullName: string;
@@ -54,9 +52,32 @@ export async function inviteTeamMember(data: InviteData) {
     // look like a different person.
     const email = data.email.trim().toLowerCase();
 
+    // An address that's already on the staff list, or deactivated, needs a
+    // role change or Reactivate, not an invite: accepting would quietly reset
+    // their password, and a deactivated account is banned from signing in.
+    const { data: existing } = await supabaseAdmin
+        .from("profiles")
+        .select("role, staff_deactivated_at")
+        .eq("email", email)
+        .maybeSingle();
+    if (existing?.staff_deactivated_at) {
+        return { success: false, error: "This person is deactivated. Reactivate them from the staff list instead." };
+    }
+    if (existing && ["owner", "admin", "sales_staff"].includes(existing.role)) {
+        return { success: false, error: "This person is already on the staff list. Change their role there instead." };
+    }
+
+    const { data: waiting } = await supabaseAdmin
+        .from("team_invitations")
+        .select("id")
+        .eq("email", email)
+        .eq("status", "pending")
+        .limit(1);
+    if (waiting?.length) {
+        return { success: false, error: "An invite is already waiting for this address. Send it again from Invites instead." };
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
-    const dynamicHost = await getUrl();
-    const inviteLink = `${dynamicHost}/invite?token=${token}`;
 
     const { error: insertError } = await supabaseAdmin.from("team_invitations").insert({
         full_name: data.fullName,
@@ -81,43 +102,7 @@ export async function inviteTeamMember(data: InviteData) {
         details: { email, role: data.role }
     }));
 
-    const message = `You have been invited to collaborate on Miss Tokyo as a ${data.role}. Join here: ${inviteLink}`;
-
-    // 1. Format Phone Number (Ghana standard +233)
-    let formattedPhone = data.phone;
-    if (formattedPhone) {
-        formattedPhone = formattedPhone.replace(/\D/g, "");
-        if (formattedPhone.startsWith("0")) {
-            formattedPhone = "233" + formattedPhone.slice(1);
-        } else if (!formattedPhone.startsWith("233")) {
-            formattedPhone = "233" + formattedPhone;
-        }
-        formattedPhone = "+" + formattedPhone;
-    }
-
-    try {
-        await sendEmail({
-            from: process.env.RESEND_FROM_EMAIL || "orders@info.misstokyo.shop",
-            to: email,
-            subject: "Invitation to Join Miss Tokyo Team",
-            text: message,
-            html: `<p>You have been invited to collaborate on Miss Tokyo as a <strong>${data.role}</strong>.</p><p><a href="${inviteLink}">Click here to accept your invitation</a></p>`,
-        }, { event: "team_invite" });
-
-        if (formattedPhone) {
-            try {
-                await sendSMSOrThrow({ to: formattedPhone, message });
-            } catch (smsErr) {
-                console.error("SMS failed, but email sent:", smsErr);
-                return { success: true, warning: 'Email sent, but SMS failed.' };
-            }
-        }
-
-        return { success: true };
-    } catch (err: any) {
-        console.error("Failed to send invite emails:", err);
-        return { success: false, error: "Invitation saved, but failed to dispatch communications." };
-    }
+    return sendTeamInviteMessages({ email, role: data.role, token, phone: data.phone });
 }
 
 export async function removeTeamMember(userId: string) {
@@ -141,26 +126,26 @@ export async function removeTeamMember(userId: string) {
 
     // Demote role to 'customer' so they lose dashboard access without destroying
     // their account or triggering FK constraint failures on orders/pos_sessions/logs.
-    const { data: demoted, error: demoteError } = await supabaseAdmin
-        .from("profiles")
-        .update({ role: "customer" })
-        .eq("id", userId)
-        .select("id, role");
+    // fn_staff_remove does it under the staff lock and refuses to demote the
+    // last owner, which the old page only prevented by hiding the button.
+    const { error: demoteError } = await supabaseAdmin.rpc("fn_staff_remove", { p_target: userId });
 
     if (demoteError) {
         console.error("Failed to demote user ID", userId, demoteError);
+        if (demoteError.message === "last_owner") {
+            return { success: false, error: "The store needs at least one owner. Make someone else an owner first." };
+        }
+        if (demoteError.message === "not_staff" || demoteError.message === "not_found") {
+            return { success: false, error: "That account no longer exists." };
+        }
         return { success: false, error: "Failed to remove team member." };
     }
 
-    // A DB trigger can rewrite the row without raising, and a missing row
-    // updates nothing — both come back as a silent success from PostgREST.
-    // Confirm the demotion actually landed before telling the caller it did.
-    if (!demoted?.length) {
-        console.error("Demote matched no profile row for user ID", userId);
-        return { success: false, error: "That account no longer exists." };
-    }
-    if (demoted[0].role !== "customer") {
-        console.error("Demote was reverted for user ID", userId, "role is still", demoted[0].role);
+    // A DB trigger can rewrite the row without raising. Confirm the demotion
+    // actually landed before telling the caller it did.
+    const { data: demoted } = await supabaseAdmin.from("profiles").select("role").eq("id", userId).maybeSingle();
+    if (demoted?.role !== "customer") {
+        console.error("Demote was reverted for user ID", userId, "role is still", demoted?.role);
         return { success: false, error: "The database blocked this change. Please try again shortly." };
     }
 

@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { logActivity } from "@/lib/utils/logActivity";
 import { revalidatePath } from "next/cache";
 import { reconcileOrderStock } from "@/lib/inventory";
+import { becomesReady, stampReadyAt } from "@/lib/orders/readyAt";
 
 // Keep status and fulfillment_status in sync so tab filtering is always consistent.
 // OrdersClient filters by `status`; order detail page updates `fulfillment_status`.
@@ -17,6 +18,9 @@ const FULFILLMENT_TO_STATUS: Record<string, string> = {
     shipped:           "shipped",
     ready_for_pickup:  "ready_for_pickup",
     delivered:         "delivered",
+    // Admin v2 partial fulfilment: some units packed, the rest still to pack.
+    // Status stays 'paid' so the old admin keeps listing it under Inbox.
+    partial:           "paid",
 };
 
 const STATUS_TO_FULFILLMENT: Record<string, string> = {
@@ -77,6 +81,10 @@ export async function updateOrderStatus(orderId: string, newStatus: string, extr
     };
     if (newStatus === "packed" && !oldData.packed_by) {
         updateData.packed_by = user.id;
+    }
+    // How long a pickup order has waited is counted from here (Home, order panel).
+    if (becomesReady(oldData, updateData)) {
+        updateData.ready_at = new Date().toISOString();
     }
 
     // Determine Action Label
@@ -155,6 +163,7 @@ export async function updateFulfillmentStatus(orderId: string, fulfillment_statu
 
     // Sync the legacy `status` column so Inbox/Packed/Shipped tabs remain accurate.
     const syncedStatus = FULFILLMENT_TO_STATUS[fulfillment_status];
+    if (becomesReady(null, { fulfillment_status })) await stampReadyAt([orderId]);
     const { error } = await supabaseAdmin
         .from("orders")
         .update({
@@ -204,6 +213,7 @@ export async function bulkUpdateOrderStatus(orderIds: string[], newStatus: strin
     if (newStatus === "packed") {
         updateData.packed_by = user.id;
     }
+    if (becomesReady(null, updateData)) await stampReadyAt(orderIds);
 
     const { error } = await supabaseAdmin.from("orders").update(updateData).in("id", orderIds);
     if (error) return { success: false, error: error.message };

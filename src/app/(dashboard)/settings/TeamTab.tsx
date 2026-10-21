@@ -52,6 +52,7 @@ const ACTION_LABELS: Record<string, string> = {
     UPDATE: "Updated",
     DELETE: "Deleted",
     CREATE_DISCOUNT: "Discount Created",
+    UPDATE_DISCOUNT: "Discount Updated",
     TOGGLE_DISCOUNT: "Discount Toggled",
     DELETE_DISCOUNT: "Discount Deleted",
     CREATE_AUTO_DISCOUNT: "Auto-Discount Created",
@@ -72,14 +73,14 @@ const ACTION_LABELS: Record<string, string> = {
 function getActionBadgeClass(actionType: string): string {
     if (["CREATE", "CREATE_DISCOUNT", "CREATE_AUTO_DISCOUNT"].includes(actionType)) return "ac-badge-ok";
     if (["DELETE", "DELETE_DISCOUNT", "DELETE_AUTO_DISCOUNT", "REMOVE_MEMBER"].includes(actionType)) return "ac-badge-danger";
-    if (["UPDATE", "UPDATE_AUTO_DISCOUNT", "UPDATE_STATUS", "TOGGLE_DISCOUNT", "TOGGLE_AUTO_DISCOUNT"].includes(actionType)) return "ac-badge-processing";
+    if (["UPDATE", "UPDATE_DISCOUNT", "UPDATE_AUTO_DISCOUNT", "UPDATE_STATUS", "TOGGLE_DISCOUNT", "TOGGLE_AUTO_DISCOUNT"].includes(actionType)) return "ac-badge-processing";
     if (["SIGN_IN"].includes(actionType)) return "ac-badge-packed";
     return "ac-badge-inactive";
 }
 
 function getPageLabel(actionType: string, resource?: string): string {
     if (["PACKED_ORDER", "DISPATCHED_ORDER", "DELIVERED_ORDER", "ASSIGNED_RIDER", "UPDATE_STATUS"].includes(actionType)) return "Orders";
-    if (["CREATE_DISCOUNT", "TOGGLE_DISCOUNT", "DELETE_DISCOUNT"].includes(actionType)) return "Discounts";
+    if (["CREATE_DISCOUNT", "UPDATE_DISCOUNT", "TOGGLE_DISCOUNT", "DELETE_DISCOUNT"].includes(actionType)) return "Discounts";
     if (["CREATE_AUTO_DISCOUNT", "UPDATE_AUTO_DISCOUNT", "TOGGLE_AUTO_DISCOUNT", "DELETE_AUTO_DISCOUNT"].includes(actionType)) return "Auto Discounts";
     if (["CREATE", "UPDATE", "DELETE"].includes(actionType)) {
         if (resource === "category") return "Categories";
@@ -99,6 +100,7 @@ function getSummary(log: any): string {
         case "DELIVERED_ORDER":      return `Delivered Order #${d.order_number ?? "—"}`;
         case "UPDATE_STATUS":        return `Order #${d.order_number ?? "—"}: ${d.previous_status ?? d.new_fulfillment_status ?? "?"} → ${d.new_status ?? "?"}`;
         case "CREATE_DISCOUNT":      return `Created discount ${d.code ?? "—"}`;
+        case "UPDATE_DISCOUNT":      return `Updated discount ${d.code ?? "—"}`;
         case "TOGGLE_DISCOUNT":      return `${d.is_active ? "Enabled" : "Disabled"} discount ${d.code ?? "—"}`;
         case "DELETE_DISCOUNT":      return `Deleted discount ${d.code ?? "—"}`;
         case "CREATE_AUTO_DISCOUNT": return `Created auto-discount: ${d.title ?? "—"}`;
@@ -517,6 +519,7 @@ export function TeamTab() {
                                     </optgroup>
                                     <optgroup label="Discounts">
                                         <option value="CREATE_DISCOUNT">Discount Created</option>
+                                        <option value="UPDATE_DISCOUNT">Discount Updated</option>
                                         <option value="TOGGLE_DISCOUNT">Discount Toggled</option>
                                         <option value="DELETE_DISCOUNT">Discount Deleted</option>
                                         <option value="CREATE_AUTO_DISCOUNT">Auto-Discount Created</option>

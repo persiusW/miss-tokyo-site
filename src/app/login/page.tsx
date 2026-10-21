@@ -28,6 +28,14 @@ export default function LoginPage() {
                 return;
             }
             if (data.user) {
+                // Staff signing in here go to the admin (or the page they were
+                // sent from); customers go to their account.
+                const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+                if (["owner", "admin", "sales_staff"].includes(profile?.role ?? "")) {
+                    const next = new URLSearchParams(window.location.search).get("next") || "";
+                    window.location.href = next.startsWith("/") && !next.startsWith("//") ? next : "/overview";
+                    return;
+                }
                 router.push("/account");
                 router.refresh();
             }

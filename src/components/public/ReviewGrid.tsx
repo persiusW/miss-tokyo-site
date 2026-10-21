@@ -1,4 +1,5 @@
 import type { HomepageReview } from "@/types/settings";
+import { reviewSummary } from "@/lib/content/homeSections";
 
 interface ReviewGridProps {
   reviews: HomepageReview[];
@@ -22,6 +23,8 @@ function StarRating({ rating }: { rating: number }) {
 
 export function ReviewGrid({ reviews }: ReviewGridProps) {
   if (reviews.length === 0) return null;
+  // The average of the reviews shown here, never a made-up figure.
+  const summary = reviewSummary(reviews.map((r) => r.star_rating));
 
   return (
     <section style={{ backgroundColor: "var(--sand)" }} className="py-24">
@@ -36,14 +39,14 @@ export function ReviewGrid({ reviews }: ReviewGridProps) {
           </div>
 
           {/* Aggregate rating */}
-          <div className="hidden md:flex flex-col items-end gap-1">
-            <div className="flex items-center gap-1 text-[#C8A97A] text-lg">
-              ★★★★★
+          {summary && (
+            <div className="hidden md:flex flex-col items-end gap-1">
+              <StarRating rating={Math.round(Number(summary.average))} />
+              <p className="text-xs tracking-widest text-neutral-500 uppercase">
+                {summary.average} / 5 &nbsp;({summary.count} {summary.count === 1 ? "review" : "reviews"})
+              </p>
             </div>
-            <p className="text-xs tracking-widest text-neutral-500 uppercase">
-              4.9 / 5 &nbsp;(200+ reviews)
-            </p>
-          </div>
+          )}
         </div>
 
         {/* Reviews grid */}

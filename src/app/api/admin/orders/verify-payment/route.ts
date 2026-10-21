@@ -30,18 +30,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Applying takes stock and can email a customer, so it needs more than a
-    // till login behind it.
     const { orderId, apply = false, notify = true } = await req.json();
     if (!orderId) {
         return NextResponse.json({ error: "orderId is required" }, { status: 400 });
     }
-    if (apply && !["admin", "owner"].includes(caller.role)) {
-        return NextResponse.json(
-            { error: "Only an admin or owner can apply a payment correction." },
-            { status: 403 },
-        );
-    }
+    // Any staff member may apply it (owner decision 2026-10-21): the order's
+    // status can already be set to Paid by anyone on the team.
 
     const { data: order } = await supabaseAdmin
         .from("orders")
