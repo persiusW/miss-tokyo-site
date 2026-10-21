@@ -290,7 +290,7 @@ export const methodName = (m: string | null | undefined) => METHOD_LABEL[m ?? ""
 /** What each stock-ledger reason in the write-off report means. */
 export const WRITEOFF_REASON: Record<string, string> = {
     write_off: "Written off (damaged or lost)",
-    admin_adjust: "Taken off by hand (no reason recorded)",
+    admin_adjust: "Taken off by hand",
     correction: "Correction",
 };
 export const writeoffReason = (r: string) => WRITEOFF_REASON[r] ?? r;

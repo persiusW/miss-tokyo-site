@@ -142,9 +142,9 @@ test("report tables keep the old columns, with totals", () => {
 
 test("the write-off report says plainly why each item came off", () => {
     expect(writeoffReason("write_off")).toBe("Written off (damaged or lost)");
-    expect(writeoffReason("admin_adjust")).toBe("Taken off by hand (no reason recorded)");
+    expect(writeoffReason("admin_adjust")).toBe("Taken off by hand");
     const t = writeoffTable([{ at: "2026-10-01T10:00:00Z", reason: "admin_adjust", qty: 2, product: "Satin Slip Dress", size: "M", color: "Black", note: null, by: "Ama" }]);
-    expect(t.rows[0]).toEqual(["2026-10-01T10:00:00Z", "Satin Slip Dress", "M / Black", 2, "Taken off by hand (no reason recorded)", "—", "Ama"]);
+    expect(t.rows[0]).toEqual(["2026-10-01T10:00:00Z", "Satin Slip Dress", "M / Black", 2, "Taken off by hand", "—", "Ama"]);
     expect(t.foot?.[3]).toBe(2);
 });
 
