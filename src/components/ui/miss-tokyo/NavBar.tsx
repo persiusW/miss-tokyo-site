@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { X, Search } from "lucide-react";
 import { CartButton } from "./CartButton";
 import { supabase } from "@/lib/supabase";
+import { DEFAULT_NAV, navLinkShown, shopNavFrom, type ShopNav } from "@/lib/content/shopNav";
+import { NAV_KEYS, type NavKey } from "@/lib/content/adminInput";
 
 const NAV_LINKS = [
     { href: "/",             label: "Home",         navKey: "nav_show_home" },
@@ -21,22 +23,18 @@ const NAV_LINKS = [
 
 const TRENDING_SEARCHES = ["DRESSES", "NEW ARRIVALS", "SALE", "BLACK"];
 
-export function NavBar({ initialUser }: { initialUser?: { id: string } | null }) {
+/**
+ * `nav` is the menu as the shop layout read it on the server (Content › Menu
+ * and Settings › Shop pages). Pages without it (the login page) read it here.
+ */
+export function NavBar({ initialUser, nav: serverNav }: { initialUser?: { id: string } | null; nav?: ShopNav }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [isLoggedIn, setIsLoggedIn] = useState(!!initialUser);
-    const [navSettings, setNavSettings] = useState({
-        nav_show_home: true,
-        nav_show_shop: true,
-        nav_show_gallery: true,
-        nav_show_sale: true,
-        nav_show_dresses: true,
-        nav_show_new_arrivals: true,
-        nav_show_gift_card: true,
-        nav_show_contact: true,
-        nav_show_about: true,
-    });
+    const [clientNav, setClientNav] = useState<ShopNav>(DEFAULT_NAV);
+    const nav = serverNav ?? clientNav;
+    const shown = (l: (typeof NAV_LINKS)[number]) => !l.navKey || navLinkShown(nav, l.navKey as NavKey);
     const pathname = usePathname();
     const router = useRouter();
 
@@ -50,15 +48,17 @@ export function NavBar({ initialUser }: { initialUser?: { id: string } | null })
     }, []);
 
     useEffect(() => {
-        supabase
-            .from("site_settings")
-            .select("nav_show_home, nav_show_shop, nav_show_gallery, nav_show_sale, nav_show_dresses, nav_show_new_arrivals, nav_show_gift_card, nav_show_contact, nav_show_about")
-            .eq("id", "singleton")
-            .single()
-            .then(({ data }: { data: any }) => {
-                if (data) setNavSettings(data);
-            });
-    }, []);
+        if (serverNav) return;
+        Promise.all([
+            supabase.from("site_settings").select(NAV_KEYS.join(", ")).eq("id", "singleton").maybeSingle(),
+            supabase.from("store_settings").select("enable_gallery, enable_gift_cards").eq("id", "default").maybeSingle(),
+        ]).then(([site, store]: [{ data: unknown }, { data: unknown }]) => {
+            setClientNav(shopNavFrom(
+                (site.data ?? null) as Parameters<typeof shopNavFrom>[0],
+                (store.data ?? null) as Parameters<typeof shopNavFrom>[1],
+            ));
+        }).catch(() => { /* keep every link */ });
+    }, [serverNav]);
 
     useEffect(() => {
         document.documentElement.style.setProperty("--nav-h", "80px");
@@ -90,7 +90,7 @@ export function NavBar({ initialUser }: { initialUser?: { id: string } | null })
                 </Link>
 
                 <nav className="space-x-4 lg:space-x-8 text-[10px] md:text-xs tracking-[0.2em] font-medium uppercase hidden xl:block">
-                    {NAV_LINKS.filter(l => !l.navKey || navSettings[l.navKey as keyof typeof navSettings]).map(l => {
+                    {NAV_LINKS.filter(shown).map(l => {
                         const linkPath = l.href.split("?")[0];
                         const isActive = pathname === linkPath && (linkPath !== "/shop" || l.href === "/shop");
                         return (
@@ -212,7 +212,7 @@ export function NavBar({ initialUser }: { initialUser?: { id: string } | null })
 
                     {/* Links */}
                     <nav className="flex-1 flex flex-col items-center justify-center gap-6 pb-16 px-6 overflow-y-auto">
-                        {NAV_LINKS.filter(l => !l.navKey || navSettings[l.navKey as keyof typeof navSettings]).map(l => {
+                        {NAV_LINKS.filter(shown).map(l => {
                             const linkPath = l.href.split("?")[0];
                             const isActive = pathname === linkPath && (linkPath !== "/shop" || l.href === "/shop");
                             return (

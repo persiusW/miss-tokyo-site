@@ -4,7 +4,8 @@
 // service role, so each one checks the caller's role itself; the page hiding a
 // control gates nothing.
 import { after } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { NAV_TAG } from "@/lib/content/shopNav";
 import { createClient } from "@/lib/supabaseServer";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { logActivity } from "@/lib/utils/logActivity";
@@ -60,6 +61,8 @@ export async function saveSettingsSection(section: string, changes: Values): Pro
         return { ok: false, error: SAVE_FAILED };
     }
     if (section === "rollout") clearV2FlagCache();
+    // The shop menu hides Gallery and Gift cards when their page is off.
+    if (enc.keys.some(k => k === "store.enable_gallery" || k === "store.enable_gift_cards")) updateTag(NAV_TAG);
     after(() => logActivity({
         userId: me.userId, userRole: me.role, actionType: "UPDATE", resource: "settings", resourceId: section,
         details: { section, changed: enc.keys },

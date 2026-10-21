@@ -4,7 +4,7 @@
 // run on the service role, so each one re-checks that the caller is an owner
 // or admin first (the old CMS tabs wrote straight from the browser). Each
 // refreshes the shop pages it changes.
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireStaff } from "@/lib/ai/requireStaff";
 import { logCause } from "@/lib/errors/apiError";
@@ -12,6 +12,7 @@ import { errorBody, type ErrorCode } from "@/lib/errors/catalogue";
 import { HOME_LAYOUT_KEY, OWN_SWITCH, cleanLayout, parseLayout, type HomeSectionId, type HomeLayout } from "@/lib/content/homeLayout";
 import { FAQ_COPY_KEY, POLICY_META, SIZE_GUIDE_PAGE_KEY, SIZE_MODAL_KEY, cleanFaqs, cleanPolicy, cleanSizeGuidePage, type PolicyKey } from "@/lib/content/pageDocs";
 import { SITE_ASSETS, isConfigCopyKey } from "@/lib/content/wording";
+import { NAV_TAG } from "@/lib/content/shopNav";
 import {
     NAV_KEYS, PDP_KEYS, cleanAbout, cleanCarouselTabs, cleanFeatured, cleanGiftCards, cleanImage, cleanLink, cleanModalRows,
     cleanReview, cleanSeo, cleanSlide, cleanTrustItems, isUuid, type NavKey, type PdpKey, type SeoIn,
@@ -241,6 +242,8 @@ export async function setNavShown(key: NavKey, on: boolean): Promise<Done> {
     if (!(NAV_KEYS as readonly string[]).includes(key)) return nope("That menu link wasn't found.");
     const { error } = await updateSiteSettings({ [key]: !!on });
     if (error) return fail("GEN-00", error, { key });
+    // The menu is on every shop page, read through one cached value.
+    updateTag(NAV_TAG);
     return OK();
 }
 
