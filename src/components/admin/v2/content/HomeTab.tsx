@@ -14,9 +14,10 @@ import { TrustPanel } from "./home/TrustPanel";
 import { FeaturedPanel } from "./home/FeaturedPanel";
 import { NewArrivalsPanel } from "./home/NewArrivalsPanel";
 import { NewsletterPanel } from "./home/NewsletterPanel";
+import { ReviewsSourcePanel } from "./home/ReviewsSourcePanel";
 
-type PanelKey = "trust" | "categories" | "new_arrivals" | "newsletter";
-const EDITABLE: Partial<Record<HomeSectionId, PanelKey>> = { trust: "trust", categories: "categories", new_arrivals: "new_arrivals", newsletter: "newsletter" };
+type PanelKey = "trust" | "categories" | "new_arrivals" | "reviews" | "newsletter";
+const EDITABLE: Partial<Record<HomeSectionId, PanelKey>> = { trust: "trust", categories: "categories", new_arrivals: "new_arrivals", reviews: "reviews", newsletter: "newsletter" };
 
 export function HomeTab({ data }: { data: HomeData }) {
     const router = useRouter();
@@ -97,7 +98,9 @@ export function HomeTab({ data }: { data: HomeData }) {
                 return `“${na.title}” · ${what}${cat ? ` from ${cat}` : ""}`;
             }
             case "reviews":
-                return "Review widget from Transparent Turtle";
+                return data.reviews.source === "own"
+                    ? `Your reviews · ${plural(data.reviews.shown, "review")} showing`
+                    : "Review widget from Transparent Turtle";
             case "newsletter":
                 return `${data.newsletter.title ? `“${data.newsletter.title}” · ` : ""}${plural(data.newsletter.subscribers, "subscriber")}`;
             case "instagram":
@@ -166,6 +169,7 @@ export function HomeTab({ data }: { data: HomeData }) {
             {panel === "trust" && <TrustPanel items={data.trustItems} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
             {panel === "categories" && <FeaturedPanel slots={data.featured} categories={data.categories} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
             {panel === "new_arrivals" && <NewArrivalsPanel value={data.newArrivals} categories={data.categories} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
+            {panel === "reviews" && <ReviewsSourcePanel source={data.reviews.source} shown={data.reviews.shown} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
             {panel === "newsletter" && <NewsletterPanel value={data.newsletter} onClose={() => setPanel(null)} onSaved={() => { setPanel(null); router.refresh(); }} />}
         </>
     );

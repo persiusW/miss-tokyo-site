@@ -3,7 +3,7 @@
 
 /** site_copy rows that hold settings or whole pages, not a line of wording.
  *  They have their own editors and never show in the Shop wording list. */
-export const CONFIG_COPY_KEYS = ["size_guide_rows", "carousel_config", "wholesale_tiers", "homepage_layout"] as const;
+export const CONFIG_COPY_KEYS = ["size_guide_rows", "carousel_config", "wholesale_tiers", "homepage_layout", "homepage_reviews_source"] as const;
 export const isConfigCopyKey = (k: string) => (CONFIG_COPY_KEYS as readonly string[]).includes(k) || k.startsWith("page_");
 
 export type WordingDef = { key: string; label: string; group: string; hint?: string; original: string; path: string };

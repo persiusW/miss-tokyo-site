@@ -13,7 +13,7 @@ export default async function ContentReviewsPage() {
     const data = await loadReviews();
     return (
         <ContentFrame tab="reviews">
-            {data ? <ReviewsTab reviews={data} /> : <LoadFailed what="the reviews" />}
+            {data ? <ReviewsTab reviews={data.reviews} source={data.source} /> : <LoadFailed what="the reviews" />}
         </ContentFrame>
     );
 }

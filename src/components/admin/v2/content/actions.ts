@@ -12,6 +12,7 @@ import { errorBody, type ErrorCode } from "@/lib/errors/catalogue";
 import { HOME_LAYOUT_KEY, OWN_SWITCH, cleanLayout, parseLayout, type HomeSectionId, type HomeLayout } from "@/lib/content/homeLayout";
 import { FAQ_COPY_KEY, POLICY_META, SIZE_GUIDE_PAGE_KEY, SIZE_MODAL_KEY, cleanFaqs, cleanPolicy, cleanSizeGuidePage, type PolicyKey } from "@/lib/content/pageDocs";
 import { SITE_ASSETS, isConfigCopyKey } from "@/lib/content/wording";
+import { REVIEWS_SOURCE_KEY, type ReviewsSource } from "@/lib/content/homeSections";
 import { NAV_TAG } from "@/lib/content/shopNav";
 import { PAGE_SEO_TAG } from "@/lib/content/load";
 import {
@@ -296,6 +297,16 @@ export async function deleteReview(id: string): Promise<Done> {
 }
 
 export async function reorderReviews(ids: string[]): Promise<Done> { return reorder("homepage_reviews", ids); }
+
+/** Which reviews the home page shows: the Transparent Turtle widget or the team's own. */
+export async function setReviewsSource(source: ReviewsSource): Promise<Done> {
+    const denied = await gate(); if (denied) return denied;
+    if (source !== "widget" && source !== "own") return nope("Choose which reviews to show.");
+    const { error } = await putCopy(REVIEWS_SOURCE_KEY, source, "Home page reviews", "homepage");
+    if (error) return fail("GEN-00", error);
+    refreshHome();
+    return OK();
+}
 
 // ── Pages ────────────────────────────────────────────────────────────────────
 

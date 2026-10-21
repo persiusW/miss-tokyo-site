@@ -1,11 +1,12 @@
-// What the home page's New Arrivals section shows,
+// What the home page's New Arrivals and Customer reviews sections show,
 // worked out from what Content › Home page saved. Pure: the page loads the
 // rows. With nothing saved, each gives what the shop showed before it read
-// these settings (the 16 newest products in one list).
+// these settings (the 16 newest products, one list, the review widget).
 import { cleanCarouselTabs, type CarouselTab } from "./adminInput";
 import { wordingText } from "./wording";
 
 export const CAROUSEL_KEY = "carousel_config";
+export const REVIEWS_SOURCE_KEY = "homepage_reviews_source";
 export const NEW_ARRIVALS_WORDING = ["home_new_arrivals_eyebrow", "home_new_arrivals_link"] as const;
 
 export const NEW_ARRIVALS_DEFAULT_LIMIT = 16;
@@ -47,4 +48,14 @@ export function splitLastWord(text: string): [string, string] {
     const t = text.trim();
     const i = t.lastIndexOf(" ");
     return i < 0 ? ["", t] : [t.slice(0, i), t.slice(i + 1)];
+}
+
+export type ReviewsSource = "widget" | "own";
+export const parseReviewsSource = (raw: string | null | undefined): ReviewsSource => (raw?.trim() === "own" ? "own" : "widget");
+
+/** The average shown beside the team's own reviews, from the reviews shown. */
+export function reviewSummary(ratings: number[]): { average: string; count: number } | null {
+    const ok = ratings.map(Number).filter(r => Number.isFinite(r) && r >= 1 && r <= 5);
+    if (!ok.length) return null;
+    return { average: (ok.reduce((a, b) => a + b, 0) / ok.length).toFixed(1), count: ok.length };
 }

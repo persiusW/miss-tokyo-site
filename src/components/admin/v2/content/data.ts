@@ -7,7 +7,7 @@ import { HOME_LAYOUT_KEY, parseLayout, type HomeLayout } from "@/lib/content/hom
 import { FAQ_COPY_KEY, POLICY_KEYS, POLICY_META, SIZE_GUIDE_PAGE_KEY, SIZE_MODAL_KEY, parseFaqs, parsePolicy, parseSizeGuidePage, type PolicyDoc, type PolicyKey, type SizeGuidePage } from "@/lib/content/pageDocs";
 import { ABOUT_TEXT_KEYS, NAV_KEYS, PDP_KEYS, type AboutIn, type CarouselTab, type GiftCardSettingsIn, type ModalSizeRow, type NavKey, type PdpKey, type SeoIn, type TrustItem } from "@/lib/content/adminInput";
 import { SITE_ASSETS, WORDING, isConfigCopyKey } from "@/lib/content/wording";
-import { CAROUSEL_KEY, NEW_ARRIVALS_DEFAULT_LIMIT, NEW_ARRIVALS_DEFAULT_TITLE, parseCarouselTabs } from "@/lib/content/homeSections";
+import { CAROUSEL_KEY, NEW_ARRIVALS_DEFAULT_LIMIT, NEW_ARRIVALS_DEFAULT_TITLE, REVIEWS_SOURCE_KEY, parseCarouselTabs, parseReviewsSource, type ReviewsSource } from "@/lib/content/homeSections";
 import type { Faq } from "@/content/shopInfo";
 import { SEO_PATHS } from "./pagesList";
 
@@ -29,19 +29,22 @@ export type HomeData = {
     newArrivals: { title: string; categoryId: string | null; limit: number; tabs: CarouselTab[] };
     newsletter: { enabled: boolean; title: string; subtitle: string; couponEnabled: boolean; couponCode: string; couponPct: number; subscribers: number };
     instagram: string | null;
+    /** Which reviews the home page shows, and how many of the team's own are switched on. */
+    reviews: { source: ReviewsSource; shown: number };
 };
 
 const STR = ["eyebrow", "headline_line1", "headline_line2", "headline_line3", "body_text", "cta_primary_label", "cta_primary_url", "cta_secondary_label", "cta_secondary_url", "image_url"] as const;
 
 export async function loadHome(): Promise<HomeData | null> {
     try {
-        const [s, slides, cats, feat, copy, subs] = await Promise.all([
+        const [s, slides, cats, feat, copy, subs, ownReviews] = await Promise.all([
             supabaseAdmin.from("site_settings").select("trust_bar_enabled, trust_bar_items, homepage_new_arrivals_category_id, homepage_new_arrivals_title, homepage_new_arrivals_limit, optin_section_enabled, optin_title, optin_subtitle, welcome_coupon_enabled, welcome_coupon_code, welcome_coupon_percentage, social_instagram").eq("id", "singleton").maybeSingle(),
             supabaseAdmin.from("hero_slides").select("*").order("position", { ascending: true }),
             supabaseAdmin.from("categories").select("id, name, slug").eq("is_active", true).order("name"),
             supabaseAdmin.from("featured_categories").select("*").order("position"),
-            supabaseAdmin.from("site_copy").select("copy_key, value").in("copy_key", [HOME_LAYOUT_KEY, "carousel_config"]),
+            supabaseAdmin.from("site_copy").select("copy_key, value").in("copy_key", [HOME_LAYOUT_KEY, CAROUSEL_KEY, REVIEWS_SOURCE_KEY]),
             supabaseAdmin.from("newsletter_subscribers").select("id", { count: "exact", head: true }),
+            supabaseAdmin.from("homepage_reviews").select("id", { count: "exact", head: true }).eq("enabled", true),
         ]);
         if (s.error || slides.error || cats.error || feat.error || copy.error) throw s.error ?? slides.error ?? cats.error ?? feat.error ?? copy.error;
         const st = (s.data ?? {}) as Record<string, any>;
@@ -81,6 +84,7 @@ export async function loadHome(): Promise<HomeData | null> {
                 subscribers: subs.count ?? 0,
             },
             instagram: st.social_instagram ?? null,
+            reviews: { source: parseReviewsSource(cv[REVIEWS_SOURCE_KEY]), shown: ownReviews.count ?? 0 },
         };
     } catch (e) {
         console.error("[content] home load failed", e);
@@ -198,10 +202,16 @@ export type Review = {
     avatar_color: string; star_rating: number; review_text: string;
 };
 
-export async function loadReviews(): Promise<Review[] | null> {
-    const { data, error } = await supabaseAdmin.from("homepage_reviews").select("*").order("position", { ascending: true });
-    if (error) { console.error("[content] reviews load failed", error); return null; }
-    return (data ?? []).map((r: Record<string, any>) => ({ ...r, reviewer_location: r.reviewer_location ?? "", avatar_initials: r.avatar_initials ?? "", review_text: r.review_text ?? "" })) as Review[];
+export async function loadReviews(): Promise<{ reviews: Review[]; source: ReviewsSource } | null> {
+    const [{ data, error }, src] = await Promise.all([
+        supabaseAdmin.from("homepage_reviews").select("*").order("position", { ascending: true }),
+        supabaseAdmin.from("site_copy").select("value").eq("copy_key", REVIEWS_SOURCE_KEY).maybeSingle(),
+    ]);
+    if (error || src.error) { console.error("[content] reviews load failed", error ?? src.error); return null; }
+    return {
+        reviews: (data ?? []).map((r: Record<string, any>) => ({ ...r, reviewer_location: r.reviewer_location ?? "", avatar_initials: r.avatar_initials ?? "", review_text: r.review_text ?? "" })) as Review[],
+        source: parseReviewsSource(src.data?.value),
+    };
 }
 
 // ── Shop wording and images ──────────────────────────────────────────────────
