@@ -8,7 +8,7 @@ export type StaffRoleKey = (typeof STAFF_ROLES)[number];
 export const ROLE_LABEL: Record<StaffRoleKey, string> = { owner: "Owner", admin: "Admin", sales_staff: "Sales staff" };
 
 export const ROLE_DESC: Record<StaffRoleKey, string> = {
-    owner: "Everything, including staff, billing and settings. Can refund and mark orders paid.",
+    owner: "Everything, including staff, billing and settings. Can refund orders.",
     admin: "Everything an owner can do, plus AI settings and the admin inbox. For your developer.",
     sales_staff: "Orders, the till, products, customers, discounts, inbox and analytics. No settings, staff, billing or content.",
 };
@@ -67,7 +67,7 @@ export type PermRow = { area: string; owner: PermCell; admin: PermCell; sales: P
 export const PERMS: PermRow[] = [
     { area: "Home, orders, till and inbox", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Change an order's status, including cancelled, refunded and paid", owner: "yes", admin: "yes", sales: "yes" },
-    { area: "Mark an order paid after a Paystack check", owner: "yes", admin: "yes", sales: "no" },
+    { area: "Mark an order paid (after a Paystack check, or by hand)", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Change or cancel another person's till sale", owner: "yes", admin: "yes", sales: "no" },
     { area: "Products, inventory, categories, gift cards and customers", owner: "yes", admin: "yes", sales: "yes" },
     { area: "Discount codes", owner: "yes", admin: "yes", sales: "yes" },

@@ -16,12 +16,12 @@ import {
     type TimelineItem,
 } from "@/lib/admin/v2/orders";
 import type { OrderDetail } from "@/lib/admin/v2/ordersLoad";
-import { getOrder, getTimeline, markFinished, saveStaffNote } from "./actions";
+import { getOrder, getTimeline, markFinished, markPaid, saveStaffNote } from "./actions";
 import { CancelPanel, NoteModal, PackPanel, RefundPanel, ShipPanel } from "./OrderFlows";
 import { Receipt } from "./PrintSheets";
 
 type Role = "admin" | "owner" | "sales_staff";
-type Sub = null | "pack" | "ship" | "refund" | "cancel" | "note" | "apply";
+type Sub = null | "pack" | "ship" | "refund" | "cancel" | "note" | "apply" | "paid";
 
 type Verdict = {
     checked: boolean; reason?: string; message?: string; mismatch?: boolean; alreadyFulfilled?: boolean;
@@ -175,6 +175,15 @@ export function OrderPanel({ orderId, role, initial, onClose, onChanged }: {
         changed();
     };
 
+    const paid = async () => {
+        setBusy(true);
+        const r = await markPaid(o.id);
+        setBusy(false);
+        if (!r.ok) { toast.error(r.error); return; }
+        toast.success(`#${ref} marked as paid`);
+        changed();
+    };
+
     const resend = async () => {
         const { ok, data } = await postJson("/api/admin/orders/resend-confirmation", { orderId: o.id });
         if (!ok) { toast.fromResponse(data, { audience: "staff", fallback: "EML-01" }); return; }
@@ -217,6 +226,7 @@ export function OrderPanel({ orderId, role, initial, onClose, onChanged }: {
     const more = (
         <span data-assist="orders.row-menu" style={{ display: "contents" }}>
             <Menu up label="More order actions" items={[
+                ...(o.payment_status !== "paid" && o.payment_status !== "refunded" ? [{ l: "Mark as paid", icon: "check" as const, onClick: () => setSub("paid") }] : []),
                 ...(PAID_STATUSES.includes(String(o.status)) && email ? [{ l: "Resend confirmation", icon: "mail" as const, onClick: () => void resend() }] : []),
                 { l: "Print receipt", icon: "print" as const, onClick: () => setPrinting(true) },
                 { l: "Copy delivery details", icon: "copy" as const, onClick: () => void copyDetails() },
@@ -277,11 +287,10 @@ export function OrderPanel({ orderId, role, initial, onClose, onChanged }: {
                             <div className="inset ord-verify"><div className="skel ord-spin" /><span className="muted">Checking with Paystack…</span></div>
                         ) : v && verify && (
                             <Banner tone={v.ok && !verify.mismatch ? "ok" : "warn"} title={v.title}
-                                action={verify.mismatch && full ? <Btn sm kind="primary" onClick={() => setSub("apply")}>Mark this order paid</Btn> : undefined}>
+                                action={verify.mismatch ? <Btn sm kind="primary" onClick={() => setSub("apply")}>Mark this order paid</Btn> : undefined}>
                                 {v.body}
                                 {verify.mismatch && ` This customer paid, but the order is marked ${verify.order?.payment_status === "cancelled" ? "cancelled" : "unpaid"}.`}
                                 {verify.mismatch && verify.alreadyFulfilled && " The goods have already gone out, so only the record is wrong."}
-                                {verify.mismatch && !full && " Ask an owner or admin to mark it paid."}
                                 {verify.checked && verify.paystack?.requestedAmount != null && Math.abs(verify.paystack.requestedAmount - total) > 0.005 &&
                                     ` Paystack was asked for ${ghs(verify.paystack.requestedAmount)} but this order totals ${ghs(total)}. The order has changed since checkout.`}
                             </Banner>
@@ -400,6 +409,12 @@ export function OrderPanel({ orderId, role, initial, onClose, onChanged }: {
                     confirmLabel="Mark paid" onConfirm={() => void check(true)}
                     consequenceTitle={`Paystack confirms ${ghs(verify.paystack?.amount ?? total)} was paid`}
                     consequence={<>The order is marked paid and its items are taken from stock. {verify.alreadyFulfilled ? "It has already been delivered, so no email goes to the customer." : "The customer gets the order confirmation email."}</>} />
+            )}
+            {sub === "paid" && (
+                <ConfirmPanel open level={2} onClose={() => setSub(null)} title="Mark as paid" sub={`Order #${ref}`} tone="warn" busy={busy}
+                    confirmLabel="Mark paid" onConfirm={() => void paid()}
+                    consequenceTitle={`${ghs(total)} is recorded as paid`}
+                    consequence={<>Use this when you've seen the money arrive another way (cash, bank transfer, Mobile money outside Paystack). Paystack isn't checked. The order is marked paid and its items are taken from stock. No email goes to the customer.</>} />
             )}
             {printing && <Receipt d={d} />}
         </>

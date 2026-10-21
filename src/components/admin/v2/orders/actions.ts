@@ -160,6 +160,24 @@ export async function markFinished(id: string): Promise<Result> {
     return { ok: true };
 }
 
+/**
+ * Mark as paid, for any staff member (owner decision: the old admin's status
+ * picker lets anyone set Paid without a Paystack check). The same
+ * updateOrderStatus("paid") the picker uses, so stock is taken through the
+ * same reconcile. Only orders that aren't paid or refunded.
+ */
+export async function markPaid(id: string): Promise<Result> {
+    if (!(await me())) return DENIED;
+    if (!UUID.test(id)) return { ok: false, error: GONE };
+    const { data: o } = await db.from("orders").select("payment_status").eq("id", id).maybeSingle();
+    if (!o) return { ok: false, error: GONE };
+    if (o.payment_status === "paid" || o.payment_status === "refunded") return { ok: false, error: "This order is already paid. Refresh to see where it is." };
+    const r = await updateOrderStatus(id, "paid");
+    if (!r.success) return { ok: false, error: FAILED };
+    refresh(id);
+    return { ok: true };
+}
+
 /** Cancel without a refund (unpaid orders, or paid ones already paid back another way). Stock comes back through the same reconcile. */
 export async function cancelOrder(id: string): Promise<Result> {
     if (!(await me())) return DENIED;
