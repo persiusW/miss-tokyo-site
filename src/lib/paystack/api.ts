@@ -64,13 +64,15 @@ export function maskAccount(n: unknown): string {
 
 export type SplitShare = { subaccountCode: string; businessName: string; bank: string; account: string; accountName: string; share: number };
 export type Split = {
+    /** Paystack's numeric id: what PUT /split/:id takes. */
+    id: string;
     code: string; name: string; type: string; bearerType: string; active: boolean; createdAt: string | null;
     shares: SplitShare[];
 };
 
 function parseSplit(d: any): Split {
     return {
-        code: str(d?.split_code), name: str(d?.name), type: str(d?.type), bearerType: str(d?.bearer_type),
+        id: str(d?.id), code: str(d?.split_code), name: str(d?.name), type: str(d?.type), bearerType: str(d?.bearer_type),
         active: d?.active === true || d?.active === 1, createdAt: d?.createdAt ? str(d.createdAt) : null,
         shares: (Array.isArray(d?.subaccounts) ? d.subaccounts : []).map((s: any) => ({
             subaccountCode: str(s?.subaccount?.subaccount_code), businessName: str(s?.subaccount?.business_name),
@@ -82,6 +84,14 @@ function parseSplit(d: any): Split {
 
 export const getSplit = (code: string, d?: PaystackDeps) =>
     call(`/split/${encodeURIComponent(code)}`, { method: "GET", parse: parseSplit }, d);
+
+/** Turn a split group off or back on. Never deletes it. */
+export const setSplitActive = (id: string, active: boolean, d?: PaystackDeps) =>
+    call(`/split/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ active }), parse: parseSplit }, d);
+
+/** One transaction by reference, raw (server-side only: it carries the card authorization). */
+export const verifyTransactionRaw = (reference: string, d?: PaystackDeps) =>
+    call(`/transaction/verify/${encodeURIComponent(reference)}`, { method: "GET", parse: (x: any) => (x && typeof x === "object" ? x as Record<string, unknown> : {}) }, d);
 
 export const listSplits = (d?: PaystackDeps) =>
     call(`/split?perPage=50`, { method: "GET", parse: (x: any) => (Array.isArray(x) ? x.map(parseSplit) : []) }, d);

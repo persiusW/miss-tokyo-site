@@ -10,11 +10,14 @@
 // subaccount receives exactly the admin share planned for this payment, plus
 // anything still owed. The env split is the fallback while no subaccount is
 // stored. If Paystack refuses the split, the payment is retried once without
-// it (same amount) and the ledger records the share as owed.
+// it (same amount) and the ledger records the share as owed. A split the
+// cutover turned off (or that Paystack reports inactive) is never sent.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getBillingSettings, shareRuleOf, type BillingSettings } from "./settings";
 import { planTake, shareDue, type SkipReason } from "./payoutRules";
 import { numOrNull } from "./money";
+import { getSplit } from "@/lib/paystack/api";
+import { cachedPs, TEN_MIN } from "@/lib/paystack/cache";
 
 export type PayoutSource = "checkout" | "pos" | "invoice";
 
@@ -49,7 +52,15 @@ export type PayoutDeps = {
     settings?: () => Promise<BillingSettings>;
     owedGhs?: () => Promise<number>;
     envSplitCode?: string | null;
+    /** Is the env split still active in Paystack? Unknown (null) counts as active, as before. */
+    envSplitActive?: (code: string) => Promise<boolean | null>;
 };
+
+/** The split's active flag, read from Paystack and cached 10 minutes. */
+async function readSplitActive(code: string): Promise<boolean | null> {
+    const r = await cachedPs(`split:${code}`, TEN_MIN, () => getSplit(code));
+    return r.ok ? r.data.active : null;
+}
 
 async function readOwed(): Promise<number> {
     const { data, error } = await (supabaseAdmin as any).rpc("fn_admin_payout_totals");
@@ -66,12 +77,18 @@ export function envSplitFields(source: PayoutSource, amountGhs: number, code: st
 }
 
 export async function payoutFor(a: PayoutArgs, deps: PayoutDeps = {}): Promise<Payout> {
-    const envCode = deps.envSplitCode !== undefined ? deps.envSplitCode : process.env.PAYSTACK_SPLIT_CODE ?? null;
+    let envCode = deps.envSplitCode !== undefined ? deps.envSplitCode : process.env.PAYSTACK_SPLIT_CODE ?? null;
     const base = { platform_fee_base: a.feeGhs > 0 ? a.baseGhs : undefined };
     const env = (meta: Record<string, unknown>): Payout => ({ fields: envSplitFields(a.source, a.amountGhs, envCode), meta: { ...base, ...meta }, dynamic: false, fallback: null });
 
     let s: BillingSettings;
     try { s = await (deps.settings ?? getBillingSettings)(); } catch { return env({}); }
+    // Never send a split the cutover turned off, or one Paystack says is inactive.
+    if (envCode && s.cutover.retired?.[envCode]) envCode = null;
+    else if (envCode && envSplitFields(a.source, a.amountGhs, envCode).split_code) {
+        const active = await (deps.envSplitActive ?? readSplitActive)(envCode).catch(() => null);
+        if (active === false) envCode = null;
+    }
     if (!s.payoutSplitLive) return env({});
 
     const due = shareDue(shareRuleOf(s), { totalGhs: a.amountGhs, feeGhs: a.feeGhs, baseGhs: a.baseGhs });
@@ -91,7 +108,7 @@ export async function payoutFor(a: PayoutArgs, deps: PayoutDeps = {}): Promise<P
         return { fields: {}, meta: { ...base, ...note(plan.reason ?? "small", 0) }, dynamic: false, fallback: null };
     }
     return {
-        fields: { subaccount: s.adminSubaccountCode, transaction_charge: plan.transactionChargeP, bearer: "account" },
+        fields: { subaccount: s.adminSubaccountCode, transaction_charge: plan.transactionChargeP, bearer: s.payoutBearer },
         meta: { ...base, ...note("requested", plan.takeGhs) },
         dynamic: true,
         fallback: { fields: {}, meta: { ...base, ...note("split_failed", 0) } },

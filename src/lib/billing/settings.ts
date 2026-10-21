@@ -5,6 +5,7 @@ import { numOrNull } from "./money";
 import { DEFAULT_SHARE_PCT, SHARE_MODES, type ShareMode, type ShareRule } from "./payoutRules";
 import { DEFAULT_VISIBILITY, type Rates, type Visibility } from "./statement";
 import { clampCutoff } from "./period";
+import { parseCutover, type Cutover } from "./cutover";
 
 export type BillingSettings = {
     payoutSplitLive: boolean;
@@ -12,6 +13,9 @@ export type BillingSettings = {
     sharePct: number;
     paystackFeePct: number;
     payoutMinGhs: number;
+    /** Who Paystack books its fee to on the per-payment split. */
+    payoutBearer: "account" | "subaccount";
+    cutover: Cutover;
     adminSubaccountCode: string | null;
     adminSubaccountLabel: string | null;
     adminSubaccountSetAt: string | null;
@@ -33,7 +37,7 @@ export type BillingSettings = {
 
 /** What the code does when the row can't be read: today's behaviour, automatic share off. */
 export const BILLING_DEFAULTS: BillingSettings = {
-    payoutSplitLive: false, shareMode: "pct_of_order_total", sharePct: DEFAULT_SHARE_PCT, paystackFeePct: 1.95, payoutMinGhs: 5,
+    payoutSplitLive: false, shareMode: "pct_of_order_total", sharePct: DEFAULT_SHARE_PCT, paystackFeePct: 1.95, payoutMinGhs: 5, payoutBearer: "account", cutover: {},
     adminSubaccountCode: null, adminSubaccountLabel: null, adminSubaccountSetAt: null,
     usdToGhs: 15.5, aiRateUnit: "cost", aiRateGhs: null, smsRateGhs: null, waMessageRateGhs: null, waTemplateRateGhs: null,
     markupPct: 0, cutoffDay: 28, billingStart: "2026-10-08", ownerVisibility: DEFAULT_VISIBILITY,
@@ -51,6 +55,8 @@ export function parseBillingRow(row: Record<string, unknown> | null | undefined)
         sharePct: n("admin_share_pct", DEFAULT_SHARE_PCT),
         paystackFeePct: n("paystack_fee_pct", 1.95),
         payoutMinGhs: n("payout_min_ghs", 5),
+        payoutBearer: row.payout_bearer === "subaccount" ? "subaccount" : "account",
+        cutover: parseCutover(row.cutover),
         adminSubaccountCode: typeof row.admin_subaccount_code === "string" && /^ACCT_[A-Za-z0-9]+$/.test(row.admin_subaccount_code) ? row.admin_subaccount_code : null,
         adminSubaccountLabel: typeof row.admin_subaccount_label === "string" ? row.admin_subaccount_label : null,
         adminSubaccountSetAt: typeof row.admin_subaccount_set_at === "string" ? row.admin_subaccount_set_at : null,

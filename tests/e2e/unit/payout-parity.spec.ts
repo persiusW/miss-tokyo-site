@@ -12,7 +12,7 @@ const ROOT = path.resolve(__dirname, "../../..");
 const ENV = "SPL_1SuC2NjD2J";
 const OFF: BillingSettings = { ...BILLING_DEFAULTS };
 const ON: BillingSettings = { ...BILLING_DEFAULTS, payoutSplitLive: true, adminSubaccountCode: "ACCT_admin123" };
-const deps = (s: BillingSettings, owed = 0) => ({ settings: async () => s, owedGhs: async () => owed, envSplitCode: ENV });
+const deps = (s: BillingSettings, owed = 0) => ({ settings: async () => s, owedGhs: async () => owed, envSplitCode: ENV, envSplitActive: async () => true });
 
 // Bodies as each path builds them before the split is added.
 function baseBody(source: PayoutSource, a: PayoutArgs) {
@@ -69,6 +69,10 @@ test("the amount and every non-split field are identical with the switch off and
 test("switch on: the admin subaccount gets exactly the planned share, the main account the rest", async () => {
     const p = await payoutFor({ source: "checkout", amountGhs: 137.5, feeGhs: 2.5, baseGhs: 100 }, deps(ON));
     expect(p.fields).toEqual({ subaccount: "ACCT_admin123", transaction_charge: 13406, bearer: "account" });
+    expect(p.fields).not.toHaveProperty("split_code");
+    // The bearer is the admin's setting.
+    const sub = await payoutFor({ source: "checkout", amountGhs: 137.5, feeGhs: 2.5, baseGhs: 100 }, deps({ ...ON, payoutBearer: "subaccount" }));
+    expect(sub.fields.bearer).toBe("subaccount");
     expect(p.meta.admin_payout).toEqual({ r: "requested", due: 3.44, take: 3.44 });
     // Owed shares ride along.
     const carry = await payoutFor({ source: "pos", amountGhs: 445, feeGhs: 10, baseGhs: 400 }, deps(ON, 4.5));
@@ -82,8 +86,22 @@ test("switch on: the admin subaccount gets exactly the planned share, the main a
     expect(noAcct.fields).toEqual({ split_code: ENV });
     expect(noAcct.meta.admin_payout).toMatchObject({ r: "no_account" });
     // Settings unreadable: behaves as off.
-    const broken = await payoutFor({ source: "checkout", amountGhs: 137.5, feeGhs: 2.5, baseGhs: 100 }, { settings: async () => { throw new Error("db"); }, envSplitCode: ENV });
+    const broken = await payoutFor({ source: "checkout", amountGhs: 137.5, feeGhs: 2.5, baseGhs: 100 }, { settings: async () => { throw new Error("db"); }, envSplitCode: ENV, envSplitActive: async () => true });
     expect(broken.fields).toEqual({ split_code: ENV });
+});
+
+test("after the cutover turns the old split off, its split_code is never sent again", async () => {
+    const a: PayoutArgs = { source: "checkout", amountGhs: 137.5, feeGhs: 2.5, baseGhs: 100 };
+    const retired = { ...OFF, cutover: { retired: { [ENV]: "2026-10-25T10:00:00Z" } } };
+    expect((await payoutFor(a, deps(retired))).fields).toEqual({});
+    // Paystack reports it inactive (turned off by hand): not sent either.
+    expect((await payoutFor(a, { ...deps(OFF), envSplitActive: async () => false })).fields).toEqual({});
+    // Couldn't read Paystack: today's behaviour (send it).
+    expect((await payoutFor(a, { ...deps(OFF), envSplitActive: async () => null })).fields).toEqual({ split_code: ENV });
+    // Below GH₵ 5 the split was never sent, so Paystack isn't even asked.
+    let asked = 0;
+    await payoutFor({ ...a, amountGhs: 4 }, { ...deps(OFF), envSplitActive: async () => { asked += 1; return true; } });
+    expect(asked).toBe(0);
 });
 
 test("a refused split retries once without it, same amount, share recorded as owed", async () => {
