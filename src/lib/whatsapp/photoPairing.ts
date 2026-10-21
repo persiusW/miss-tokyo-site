@@ -7,8 +7,7 @@
 //
 // Both sides decide from the same stored receive times, so exactly one turn
 // answers each photo: the photo's turn waits out the window and stands down
-// when a text arrived inside it; the text's turn takes the bare photos that
-// arrived inside the window before it.
+// when a text arrived inside it; that text's burst (below) carries it.
 //
 // Pure: the event reader, parser, clock and sleep are passed in.
 import type { InboundMessage, InboundParser } from "./pipeline";
@@ -58,17 +57,66 @@ export async function textFollows(photo: InboundMessage, receivedAt: string, dep
         ms(at) > ms(receivedAt) && digits(m.from) === digits(photo.from) && canCarryPhoto(m));
 }
 
-/** For a text: the bare photos from the same sender that arrived inside the window before it, oldest first. */
+/** For a text: the bare photos it answers (see carriedBefore), oldest first. */
 export async function photosBefore(text: InboundMessage, receivedAt: string, deps: PairingDeps): Promise<InboundMessage[]> {
-    if (!canCarryPhoto(text) || !digits(text.from)) return [];
-    const from = new Date(ms(receivedAt) - PAIR_WINDOW_MS - 1).toISOString();
-    const events = await deps.eventsBetween(from, receivedAt, digits(text.from));
+    return (await carriedBefore(text, receivedAt, deps)).photos;
+}
+
+// ── Bursts of texts ───────────────────────────────────────────────────────────
+// "Hi" / "I want this" / "size M" typed in a few seconds are one question. A
+// text stands down when the same sender's next text came within BURST_MS; the
+// last text of the burst (the chain) carries the earlier ones, and the bare
+// photos whose first following text is in the chain. Same rule both sides.
+
+export const BURST_MS = 2_500;
+/** How long after the burst window a following text's stored row is trusted to be visible. */
+export const BURST_SETTLE_MS = 1_000;
+/** How far back a chain is looked for. */
+const LOOKBACK_MS = 90_000;
+
+/** For a text: waits out the burst window; true when the same sender's next text came inside it (that one answers). */
+export async function textFollowsSoon(text: InboundMessage, receivedAt: string, deps: PairingDeps): Promise<boolean> {
+    if (!canCarryPhoto(text) || !digits(text.from)) return false;
+    const now = deps.now?.() ?? new Date();
+    const wait = ms(receivedAt) + BURST_MS + BURST_SETTLE_MS - now.getTime();
+    if (wait > 0) await (deps.sleep ?? (t => new Promise(r => setTimeout(r, t))))(wait);
+    const until = new Date(ms(receivedAt) + BURST_MS + 1).toISOString();
+    const events = await deps.eventsBetween(receivedAt, until, digits(text.from));
+    return messagesIn(events, deps.parse).some(({ m, receivedAt: at }) =>
+        ms(at) > ms(receivedAt) && digits(m.from) === digits(text.from) && canCarryPhoto(m) && m.messageId !== text.messageId);
+}
+
+/**
+ * For the text that answers: the earlier texts of its burst (oldest first) and the bare photos it
+ * answers: those whose first following text from the sender is this text or one of its burst.
+ */
+export async function carriedBefore(text: InboundMessage, receivedAt: string, deps: PairingDeps): Promise<{ texts: InboundMessage[]; photos: InboundMessage[] }> {
+    if (!canCarryPhoto(text) || !digits(text.from)) return { texts: [], photos: [] };
+    const from = new Date(ms(receivedAt) - LOOKBACK_MS).toISOString();
     const seen = new Set<string>();
-    return messagesIn(events, deps.parse)
-        .filter(({ m, receivedAt: at }) => ms(at) < ms(receivedAt) && ms(receivedAt) - ms(at) <= PAIR_WINDOW_MS
-            && digits(m.from) === digits(text.from) && isBarePhoto(m))
-        .sort((a, b) => ms(a.receivedAt) - ms(b.receivedAt))
+    const mine = messagesIn(await deps.eventsBetween(from, receivedAt, digits(text.from)), deps.parse)
+        .filter(({ m, receivedAt: at }) => ms(at) < ms(receivedAt) && digits(m.from) === digits(text.from))
+        .filter(({ m }) => { const k = m.messageId ?? `${m.type}:${m.mediaId ?? m.text}`; if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((a, b) => ms(a.receivedAt) - ms(b.receivedAt));
+
+    // The chain: walk back from this text while each earlier carrying text is within BURST_MS of the next.
+    const texts = mine.filter(x => canCarryPhoto(x.m));
+    const chain: typeof texts = [];
+    let next = ms(receivedAt);
+    for (let i = texts.length - 1; i >= 0; i--) {
+        if (next - ms(texts[i].receivedAt) > BURST_MS) break;
+        chain.unshift(texts[i]);
+        next = ms(texts[i].receivedAt);
+    }
+    const chainTimes = new Set([...chain.map(x => x.receivedAt), receivedAt]);
+    const allTexts = [...texts, { m: text, receivedAt }];
+    const photos = mine
+        .filter(({ m, receivedAt: at }) => {
+            if (!isBarePhoto(m)) return false;
+            const first = allTexts.find(t => ms(t.receivedAt) > ms(at));
+            return !!first && ms(first.receivedAt) - ms(at) <= PAIR_WINDOW_MS && chainTimes.has(first.receivedAt);
+        })
         .map(p => p.m)
-        .filter(m => { const k = m.mediaId!; if (seen.has(k)) return false; seen.add(k); return true; })
         .slice(-MAX_PAIRED_PHOTOS);
+    return { texts: chain.map(x => x.m), photos };
 }

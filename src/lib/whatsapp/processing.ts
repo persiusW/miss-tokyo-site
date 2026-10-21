@@ -16,14 +16,15 @@ import { providerMessage } from "./choices";
 import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnNote, setOptOut, waitingInbound } from "./conversationStore";
 import { forwardToTeam, localNumber, whyText, type HandoffReason } from "./handoff";
 import { logConversationEvent } from "./events";
-import { claimReferral, claimTeamAlert } from "./teamWatch";
+import { claimReferral, claimTeamAlert, claimTurnLock, releaseTurnLock } from "./teamWatch";
+import { withTurnLock } from "./turnLock";
 import { factsFor } from "./customerFacts";
 import { sendAdminPushNotifications } from "@/lib/orderSettlement";
 import { canAnswerWaiting } from "./inbox";
 import { archiveInboundMedia, type Download } from "./media";
 import { toModelPhoto } from "./photo";
 import type { MediaResult } from "@/lib/messaging/provider";
-import { photosBefore, textFollows, type PairingDeps } from "./photoPairing";
+import { carriedBefore, textFollows, textFollowsSoon, type PairingDeps } from "./photoPairing";
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
 import { FALLBACK_TEXT, type Conversation, type InboundMessage, type InboundParser, type PipelineDeps } from "./pipeline";
 import { supabaseInboundStore } from "./pipelineStore";
@@ -139,7 +140,8 @@ export async function pipelineFor(
             return toModelPhoto(r.bytes);
         },
         textFollows: (m, at) => textFollows(m, at, pairing),
-        photosBefore: (m, at) => photosBefore(m, at, pairing),
+        carriedBefore: (m, at) => carriedBefore(m, at, pairing),
+        textFollowsSoon: (m, at) => textFollowsSoon(m, at, pairing),
         perDay: settings.shop.dailyMessagesPerVisitor,
         teamNumber,
         // The team has the chat and the customer wrote again: alert them, at most once an hour.
@@ -149,6 +151,7 @@ export async function pipelineFor(
             await forward(c.id, "wrote_again");
         },
         referToTeam: id => claimReferral(id),
+        turnLock: (id, fn) => withTurnLock(id, fn, { claim: claimTurnLock, release: releaseTurnLock }),
         run: async a => runShopAssistant({
             channel: "whatsapp", identity: { customerId: a.customerId, phone: a.phone }, chat: a.chat, text: a.text,
             settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, images: a.images, withTeam: a.withTeam,

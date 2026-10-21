@@ -33,6 +33,7 @@ const conv = { id: "c1", handedOffAt: null };
 function harness(o: {
     reply?: string; buttons?: ShopButton[]; failed?: boolean; counts?: { lastMinute: number; today: number } | null; sendOk?: boolean; photo?: boolean; notice?: string;
     follows?: boolean | "throws"; before?: InboundMessage[]; teamNumber?: string; refer?: boolean;
+    earlier?: InboundMessage[]; soon?: boolean;
 } = {}) {
     const sent: string[] = [];
     const images: string[] = [];
@@ -61,7 +62,8 @@ function harness(o: {
         perDay: 20,
         fetchPhoto: async id => (o.photo ? { data: `BASE64-${id}`.replace("BASE64-2000000000000001", "BASE64"), mediaType: "image/jpeg" as const } : null),
         textFollows: async () => { if (o.follows === "throws") throw new Error("db down"); return !!o.follows; },
-        photosBefore: async () => o.before ?? [],
+        carriedBefore: async () => ({ texts: o.earlier ?? [], photos: o.before ?? [] }),
+        textFollowsSoon: async () => !!o.soon,
         teamNumber: o.teamNumber,
         withTeam: async () => { alerts.push("alert"); },
         referToTeam: async () => { refers.push("refer"); return o.refer ?? true; },
@@ -296,4 +298,13 @@ test("with the team, asking for a person again: no second handover, 'our team ha
     const voice = harness({ refer: true });
     await voice.handle(msg({ type: "audio", text: null }), withTeam);
     expect([voice.handoffs, voice.sent, voice.runs]).toEqual([[], [WA_LINES.teamHasIt], []]);
+});
+
+test("a burst: an earlier text stands down; the last one answers all of them in one turn", async () => {
+    const early = harness({ soon: true });
+    await early.handle(msg({ text: "Hi" }), conv, AT);
+    expect([early.runs, early.sent]).toEqual([[], []]);
+    const last = harness({ earlier: [msg({ text: "Hi" }), msg({ text: "I want the brown dress" })] });
+    await last.handle(msg({ text: "size M" }), conv, AT);
+    expect(last.runs).toEqual(["Hi\nI want the brown dress\nsize M"]);
 });
