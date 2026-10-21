@@ -47,6 +47,12 @@ export function AdminV2Shell({ children, businessName, role, user, showCustomReq
         const t = localStorage.getItem("ac-theme");
         if (t === "light" || t === "dark" || t === "system") setTheme(t);
         setCollapsed(localStorage.getItem("ac-sidebar-collapsed") === "true");
+        // Settings › Your account › Appearance (and other tabs) change it too.
+        const s = (e: StorageEvent) => {
+            if (e.key === "ac-theme" && (e.newValue === "light" || e.newValue === "dark" || e.newValue === "system")) setTheme(e.newValue);
+        };
+        window.addEventListener("storage", s);
+        return () => window.removeEventListener("storage", s);
     }, []);
     const pickTheme = (t: Theme) => { setTheme(t); localStorage.setItem("ac-theme", t); };
     const toggleRail = () => setCollapsed(c => { localStorage.setItem("ac-sidebar-collapsed", String(!c)); return !c; });
