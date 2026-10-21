@@ -152,7 +152,8 @@ export const GUIDE: GuideEntry[] = [
         title: "Site Settings",
         route: "settings",
         roles: FULL,
-        body: `Tabs (Take me there can open each one): Business (logo, tax, contact, social links), Store (store pickup on/off, maintenance mode, landing page, global sizes/colours/brands, Payment Link Hold 15/30/45, platform fee %, checkout undo, Delivery Fees — Charge Delivery, Within Accra, Outside Accra — feature toggles, wholesale tiers), Shipping (pickup instructions, address, phone, wait time only; delivery fees are in Store), CMS (hero slides, trust bar, sections, navigation, reviews, about page, gift cards, site assets), SEO, Emails (email and SMS templates, test send), Notifications (desktop alerts for new orders), Riders (Add Rider), Size Guide, Product Page.`,
+        body: `New admin: Settings lists sections in groups (Store, Selling, Customers, Online store, Team, Money, Your account) with a search box that finds any setting. Edits are kept until "Save changes" in the bar at the bottom; "Discard" throws them away, and leaving with unsaved changes asks first. Store details (name, contact, logo, 8 social links); Location and pickup; Checkout (processing fee %, its label, show as its own line, undo removed items); Payments (Payment Link Hold 15/30/45, live payment status at the till); Shipping and delivery (Charge for delivery, Within Greater Accra, Outside Accra, Manage riders); Taxes; Wholesale (tiers, wholesale-only categories); Messages to customers (email, SMS and WhatsApp templates with Send a test); Assistants (AI switches, limits, WhatsApp health and AI use); Shop open or closed; Shop pages; Shop layout; Product options (sizes, colours, brands); Search engines; Staff and notifications (new-order alerts on this device). Old admin (Settings tabs): Business (logo, tax, contact, social links), Store (store pickup on/off, maintenance mode, landing page, global sizes/colours/brands, Payment Link Hold, platform fee %, checkout undo, Delivery Fees, feature toggles, wholesale tiers), Shipping (pickup instructions, address, phone, wait time), CMS, SEO, Emails (email and SMS templates, test send), Notifications (desktop alerts for new orders), Riders (Add Rider), Size Guide, Product Page.`,
+
     },
     {
         id: "team",
@@ -166,7 +167,7 @@ export const GUIDE: GuideEntry[] = [
         title: "AI Settings",
         route: "ai_settings",
         roles: FULL,
-        body: `Switch Miss Tokyo AI and the WhatsApp agent on or off, set the daily spend limit, and see recent usage. Also switches the Miss Tokyo AI extras: Send to admin, the bell count, walkthroughs and voice input (each off until tested).`,
+        body: `Settings › Assistants in the new admin (AI Settings in the old one). Switch Miss Tokyo AI and the WhatsApp agent on or off, set the daily spend limit, and see recent usage. Also switches the Miss Tokyo AI extras: Send to admin, the bell count, walkthroughs and voice input (each off until tested).`,
     },
     {
         id: "ai-inbox",

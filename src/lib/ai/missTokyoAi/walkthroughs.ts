@@ -114,8 +114,8 @@ export const WALKTHROUGHS = [
         title: "Change delivery fees",
         roles: ["admin", "owner"],
         steps: [
-            { route: "settings", anchor: "settings.tabs", text: "Site Settings has tabs across the top. Open Store." },
-            { route: "settings", anchor: "settings.delivery-fees", text: "Set the Within Accra and Outside Accra fees here, then save the store settings." },
+            { route: "settings", anchor: "settings.tabs", text: "Settings lists its sections here. Open Shipping and delivery (the Store tab in the old admin)." },
+            { route: "settings", anchor: "settings.delivery-fees", text: "Set the Within Accra and Outside Accra fees here, then press Save changes (Save Store Settings in the old admin)." },
         ],
     },
 ] as const satisfies readonly Walkthrough[];
