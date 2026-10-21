@@ -221,7 +221,7 @@ export const SECTIONS: Section[] = [
             { k: "ai.whatsapp_choices_enabled", label: "Tappable answers", help: "The assistant asks with buttons or a list (size, colour, which piece, delivery or pickup), so customers tap instead of typing.", type: "switch" },
             { k: "ai.whatsapp_returns_enabled", label: "Returns and exchanges", help: "The assistant explains the returns policy, confirms the order, asks what's wrong, then passes the chat to your team with a summary.", type: "switch" },
             { k: "_mtai", label: "Miss Tokyo AI extras", help: "Each can be turned off on its own. The rest keep working.", type: "head" },
-            { k: "ai.mtai_send_to_admin_enabled", label: "Send to admin", help: "When Miss Tokyo AI can't answer, owners and staff can send the question to the admin's AI Inbox and get the reply in the chat.", type: "switch" },
+            { k: "ai.mtai_send_to_admin_enabled", label: "Send to admin", help: "When Miss Tokyo AI can't answer, owners and staff can send the question to the admin (Inbox › Questions for admin) and get the reply in the chat.", type: "switch" },
             { k: "ai.mtai_bell_enabled", label: "Bell count", help: "The top bar bell shows unread replies (staff and owners) or open questions (admin).", type: "switch" },
             { k: "ai.mtai_walkthroughs_enabled", label: "Walkthroughs", help: "Miss Tokyo AI can start a step-by-step tour that highlights each control in turn.", type: "switch" },
             { k: "ai.mtai_voice_enabled", label: "Voice input", help: "A microphone button fills the chat box from speech. It never sends by itself.", type: "switch" },
