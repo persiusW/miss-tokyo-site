@@ -8,8 +8,8 @@ const hash = (s: string) => createHash("sha256").update(s).digest("hex").slice(0
 // Any change to the assistant's wording moves these on purpose: update the hash in the same
 // commit, and read the new wording through once (it changes how every customer is answered).
 test("the assistant's prompt is pinned", () => {
-    expect(hash(SHOP_SYSTEM_PROMPT)).toBe("80cb68cfc9cd26b5");
-    expect(hash(systemPromptFor("whatsapp", "233200000041", { choices: true, restock: true, returns: true, withTeam: true }))).toBe("d58fc7fba72fe75e");
+    expect(hash(SHOP_SYSTEM_PROMPT)).toBe("a28231e641e503e1");
+    expect(hash(systemPromptFor("whatsapp", "233200000041", { choices: true, restock: true, returns: true, withTeam: true }))).toBe("2759a7510b7e2319");
 });
 
 test("the prompt carries the behaviour rules from the shared spec", () => {
@@ -23,6 +23,8 @@ test("the prompt carries the behaviour rules from the shared spec", () => {
         /my_orders lists the orders placed with their WhatsApp number/,
         /photo lessons .* look that piece up by its SKU first/,
         /add it with update_cart .* read the basket back .* from_cart true/,
+        /Always ask for their email .* carry on without it/,
+        /pickup needs no address/,
     ]) expect(wa).toMatch(rule);
     // Per-turn facts never enter the cached prompt.
     expect(wa).not.toMatch(/Today is/);

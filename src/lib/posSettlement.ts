@@ -17,7 +17,7 @@ import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { POS_FALLBACK_EMAIL, isNotNullViolation } from "@/lib/posContact";
 import { zoneLabel } from "@/lib/delivery";
 import { buildShippingAddress } from "@/lib/geo";
-import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
+import { ensureCustomerAccount, saveCustomerContact, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
 import { releaseDiscountHolds } from "@/lib/discountValidation";
 
 /**
@@ -262,6 +262,11 @@ export async function settlePosSession(
     if (posSession.customer_email) {
         const account = await ensureCustomerAccount(posSession.customer_email, posSession.customer_name);
         if (account.userId) {
+            await saveCustomerContact(account.userId, {
+                phone: posSession.customer_phone,
+                address: deliveryMethod === "delivery" && posSession.customer_address
+                    ? { line: posSession.customer_address, region: posSession.customer_region ?? null, country: posSession.customer_country ?? null } : null,
+            });
             setupLink = account.setupLink;
             isFirstTimeBuyer = account.isNewUser;
         }

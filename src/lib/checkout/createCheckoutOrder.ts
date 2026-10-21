@@ -3,6 +3,7 @@
 // createCheckoutOrder(). One path, so stock holds, variant resolution, pricing
 // and the Paystack webhook behave identically wherever an order starts.
 
+import { normaliseOrderPhone } from "@/lib/phone";
 import { CHECKOUT_CHANNELS } from "@/lib/checkout/paymentChannels";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { reserveStock, releaseReservation, releaseSupersededAttempts, getStockStatus, ONLINE_HOLD_MINUTES, type ReserveItem } from "@/lib/inventory";
@@ -828,10 +829,9 @@ export type QuoteCheckoutOrderResult =
 const fail = (code: string, error: string) => ({ success: false as const, code, error });
 
 /** Ghana numbers as 233 + the last 9 digits, whatever form they were typed in. */
+/** Ghana numbers to 233XXXXXXXXX; another country's number is kept as given (see lib/phone). */
 export function normaliseGhanaPhone(phone: string): string | null {
-    const digits = (phone ?? "").replace(/\D/g, "");
-    if (digits.length < 9) return null;
-    return `233${digits.slice(-9)}`;
+    return normaliseOrderPhone(phone);
 }
 
 function codeForStatus(status: number, body?: any): string {

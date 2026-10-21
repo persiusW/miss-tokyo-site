@@ -10,7 +10,7 @@ import { sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { notifyOrderOnWhatsApp } from "@/lib/whatsapp/notifyOrder";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { activateAndDeliverGiftCard } from "@/lib/giftCardDelivery";
-import { ensureCustomerAccount, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
+import { ensureCustomerAccount, saveCustomerContact, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
 import { releaseDiscountHolds } from "@/lib/discountValidation";
 import { settlePosSession } from "@/lib/posSettlement";
 import { recordPaystackCharge } from "@/lib/paystackReconcile";
@@ -273,6 +273,10 @@ export async function POST(req: Request) {
                 const account = await ensureCustomerAccount(customerEmail, fullName);
                 if (account.userId) {
                     customerId = account.userId;
+                    // Their phone, and the delivery address (not for pickup), onto their account.
+                    await saveCustomerContact(account.userId, {
+                        phone, address: !isPickupOrder && address ? { line: address, region: region || null, country: country || null } : null,
+                    });
                     setupLink = account.setupLink;
                     isFirstTimeBuyer = account.isNewUser;
                 }

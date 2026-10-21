@@ -5,6 +5,7 @@
 // implementation of each.
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { normaliseOrderPhone } from "@/lib/phone";
 import webpush from "web-push";
 
 // ── Admin web push ────────────────────────────────────────────────────────────
@@ -50,6 +51,41 @@ export async function sendAdminPushNotifications(title: string, body: string, ur
  * Ensures a Supabase auth user exists for customerEmail.
  * Returns userId + setupLink (only when a NEW user is created = first-time buyer).
  */
+/**
+ * The phone and delivery address from a paid order, kept on the customer's
+ * account (POS and online alike): the phone on profiles (the latest one used),
+ * a delivery address added to their saved addresses when it is new (the
+ * default when they have none yet). Pickup orders add no address. Best effort:
+ * it never fails a settlement.
+ */
+export async function saveCustomerContact(
+    userId: string,
+    contact: { phone?: string | null; address?: { line: string; region?: string | null; country?: string | null } | null },
+): Promise<void> {
+    if (!userId) return;
+    try {
+        const phone = normaliseOrderPhone(contact.phone);
+        if (phone) {
+            const { error } = await supabaseAdmin.from("profiles").update({ phone }).eq("id", userId);
+            if (error) console.error("[settlement] phone not saved to the profile", { code: error.code });
+        }
+        const line = contact.address?.line?.replace(/\s+/g, " ").trim().slice(0, 300);
+        if (!line) return;
+        const { data: saved, error: readErr } = await supabaseAdmin.from("addresses").select("address_line").eq("user_id", userId).limit(50);
+        if (readErr) { console.error("[settlement] addresses not read", { code: readErr.code }); return; }
+        const same = (a: string) => a.replace(/\s+/g, " ").trim().toLowerCase() === line.toLowerCase();
+        if ((saved ?? []).some(a => same(String(a.address_line ?? "")))) return;
+        const { error } = await supabaseAdmin.from("addresses").insert({
+            user_id: userId, label: "Delivery", address_line: line,
+            region: contact.address?.region || null, country: contact.address?.country || "Ghana",
+            is_default: (saved ?? []).length === 0,
+        });
+        if (error) console.error("[settlement] address not saved", { code: error.code });
+    } catch (e) {
+        console.error("[settlement] contact not saved", { err: String(e) });
+    }
+}
+
 export async function ensureCustomerAccount(
     customerEmail: string,
     fullName?: string | null,
