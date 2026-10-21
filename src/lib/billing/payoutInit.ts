@@ -56,10 +56,21 @@ export type PayoutDeps = {
     envSplitActive?: (code: string) => Promise<boolean | null>;
 };
 
-/** The split's active flag, read from Paystack and cached 10 minutes. */
+let unknownAt = 0;
+
+/**
+ * The split's active flag, read from Paystack and cached 10 minutes. It sits
+ * on the checkout path, so it gives up after 2.5 s and, after a failure,
+ * doesn't ask again for a minute: unknown counts as active (today's behaviour).
+ */
 async function readSplitActive(code: string): Promise<boolean | null> {
-    const r = await cachedPs(`split:${code}`, TEN_MIN, () => getSplit(code));
-    return r.ok ? r.data.active : null;
+    if (Date.now() - unknownAt < 60_000) return null;
+    const r = await Promise.race([
+        cachedPs(`split:${code}`, TEN_MIN, () => getSplit(code)),
+        new Promise<null>(res => setTimeout(() => res(null), 2_500)),
+    ]);
+    if (!r || !r.ok) { unknownAt = Date.now(); return null; }
+    return r.data.active;
 }
 
 async function readOwed(): Promise<number> {
