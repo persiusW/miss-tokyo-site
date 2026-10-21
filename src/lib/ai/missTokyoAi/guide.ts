@@ -173,7 +173,7 @@ export const GUIDE: GuideEntry[] = [
         title: "Team",
         route: "team",
         roles: FULL,
-        body: `Active Members, Pending Invites, Activity Logs (filter by date, staff and action — answers "who changed this order"). "Invite Member" can invite Sales Staff or Admin (not Owner). "Reset" sends a password link.`,
+        body: `Called Staff in the new admin. Tabs: People (Active Members in the old admin), Invites (Pending Invites), What each role can do, and Activity (Activity Logs; filter by person, action and day — answers "who changed this order"). "Invite staff" ("Invite Member" in the old admin) can invite Sales staff or Admin, not Owner; to make someone an owner, change their role afterwards. Tap a person to change their role, "Send reset link" ("Reset" in the old admin), "Sign out everywhere", "Deactivate" (tap twice; they can't sign in until someone taps "Reactivate"), or "Remove from staff" (they keep a shop account). The store always keeps at least one owner. Invites can be resent or revoked (tap twice); an invite link works for 7 days.`,
     },
     {
         id: "ai-settings",
