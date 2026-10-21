@@ -1,0 +1,60 @@
+/* Admin v2 Till. Scoped to .adm2, tokens only. The grid, tiles and sticky
+   sale card come from admin-v2.css (.till, .tile-grid, .tile, .till-cart). */
+.adm2 .till-tools .search{flex:1 1 260px}
+.adm2 .till-tools .select{width:auto;min-width:0;flex:none}
+.adm2 .till-more{margin-top:calc(var(--s2) * -1)}
+.adm2 .tile[disabled]{opacity:.5;cursor:not-allowed}
+.adm2 .tile[disabled]:hover{background:var(--card)}
+.adm2 .tile:focus-visible{outline:none;box-shadow:var(--focus)}
+.adm2 .tile:active:not([disabled]){transform:scale(.98)}
+.adm2 .tile .thumb{aspect-ratio:4/5;height:auto}
+.adm2 .tile .thumb img{object-position:top}
+.adm2 .tile-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.adm2 .tile-was{text-decoration:line-through;color:var(--ink-3);font-weight:400;margin-left:var(--s1)}
+.adm2 .tile-skel{background:var(--card);border-radius:var(--r3);padding:var(--s2);display:flex;flex-direction:column;gap:var(--s2)}
+.adm2 .tile-skel .skel:first-child{aspect-ratio:4/5;border-radius:var(--r2)}
+.adm2 .till-seg-wrap .seg{display:flex;width:100%}
+.adm2 .till-seg-wrap .seg button{flex:1 1 0;white-space:normal;line-height:1.2;padding:var(--s1) var(--s2);min-height:var(--tap)}
+.adm2 .till-line .qty button{height:var(--tap)}
+.adm2 .till-line .row-main{min-width:0}
+.adm2 .till-line .row-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm2 .till-total dt.strong{color:var(--ink);font-size:var(--t-md)}
+.adm2 .till-total dd.till-big{font-family:var(--f-display);font-weight:600;font-size:28px;line-height:1.05}
+.adm2 .till-total .till-struck{text-decoration:line-through;color:var(--ink-3);margin-right:var(--s2)}
+.adm2 .till-covered{color:var(--ok-ink)}
+.adm2 .till-who{display:flex;align-items:center;gap:var(--s3)}
+.adm2 .till-who .grow{min-width:0;overflow-wrap:anywhere}
+.adm2 .till-results{border:1px solid var(--input-line);border-radius:var(--r2);overflow:hidden;max-height:260px;overflow-y:auto}
+.adm2 .till-results .row{min-height:var(--tap);width:100%;border:0;background:var(--input-bg);text-align:left;cursor:pointer;font:inherit;color:inherit}
+.adm2 .till-results .row:hover,.adm2 .till-results .row:focus-visible{background:var(--card-2);outline:none}
+.adm2 .till-code{display:flex;gap:var(--s2)}
+.adm2 .till-code .input{text-transform:uppercase;flex:1;min-width:0}
+.adm2 .till-change{font-family:var(--f-display);font-weight:600;font-size:34px;line-height:1.05}
+.adm2 .till-change.short{color:var(--danger-ink)}
+.adm2 .till-count{font-family:var(--f-display);font-weight:600;font-size:22px;font-variant-numeric:tabular-nums}
+.adm2 .till-assist{display:inline-flex}
+.adm2 .till-opt-one{font-size:var(--t-sm);color:var(--ink-2)}
+.adm2 .till-tbl td{white-space:nowrap}
+.adm2 .till-tbl td.till-cust{white-space:normal;min-width:140px;max-width:260px;overflow-wrap:anywhere}
+.adm2 .till-tbl tbody tr.click:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+.adm2 .till-tbl tbody tr.click:focus-visible td{background:var(--card-2)}
+.adm2 .till-jump{display:none}
+@media (max-width:900px){
+  /* Stacked: the sale card follows the grid, so a bar at the bottom jumps to it. */
+  .adm2 .till-cart{scroll-margin-top:calc(var(--top-h) + var(--s4))}
+  .adm2 .till-jump{display:block;position:sticky;bottom:var(--s4);z-index:2}
+  .adm2 .till-jump .btn{box-shadow:var(--sh-pop)}
+}
+@media (pointer:coarse){
+  .adm2 .till .search .icon-btn{width:var(--tap)!important;height:var(--tap)!important}
+}
+@media (max-width:620px){
+  .adm2 .till-cats{flex-wrap:nowrap;overflow-x:auto;padding-bottom:var(--s1);scrollbar-width:thin}
+  .adm2 .till-cats .chip{flex:none}
+  .adm2 .till .tile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .adm2 .till-tools .search{flex-basis:100%}
+  .adm2 .till-tools .select,.adm2 .till-tools .ord-date{flex:1 1 calc(50% - var(--s3))}
+}
+/* Miss Tokyo AI's launcher sits left of the sale card, never over its button. */
+@media (min-width:900px){.adm2 .mtai-launcher.on-pos{right:calc(380px + var(--s7) + var(--s4))}.adm2 .mtai-tip.on-pos{right:calc(380px + var(--s7) + var(--s4))}}
+@media (min-width:900px) and (max-width:1180px){.adm2 .mtai-launcher.on-pos,.adm2 .mtai-tip.on-pos{right:calc(330px + var(--s7) + var(--s4))}}
