@@ -35,3 +35,44 @@ export function prefersReducedMotion(): boolean {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
     try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
 }
+
+// ── Route view transitions ─────────────────────────────────────────────────
+
+let commits = 0;
+let release: (() => void) | null = null;
+
+/** The shell calls this once the new route has rendered. */
+export function signalRouteCommit() {
+    commits++;
+    const r = release;
+    release = null;
+    r?.();
+}
+
+function samePath(href: string): boolean {
+    try { return new URL(href, window.location.href).pathname === window.location.pathname; } catch { return true; }
+}
+
+type VTDoc = Document & { startViewTransition?: (cb: () => Promise<void> | void) => unknown };
+
+/**
+ * Starts a cross-fade for a navigation the caller is about to make. The
+ * navigation itself runs as normal (call this, then router.push or let the
+ * Link continue). The fade waits for the new route to render, at most
+ * ROUTE_TRANSITION_CAP_MS, then lets go whatever happened.
+ */
+export function startRouteTransition(href: string) {
+    if (typeof document === "undefined") return;
+    const d = document as VTDoc;
+    if (typeof d.startViewTransition !== "function" || prefersReducedMotion() || samePath(href)) return;
+    const before = commits;
+    release?.();
+    try {
+        d.startViewTransition(() => new Promise<void>(resolve => {
+            if (commits !== before) { resolve(); return; }
+            const t = setTimeout(() => { if (release === go) release = null; resolve(); }, ROUTE_TRANSITION_CAP_MS);
+            const go = () => { clearTimeout(t); resolve(); };
+            release = go;
+        }));
+    } catch { /* the navigation goes ahead without the fade */ }
+}

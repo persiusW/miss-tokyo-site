@@ -405,6 +405,25 @@
 .adm2 .palette-list{max-height:52vh;overflow-y:auto;padding:var(--s2)}
 .adm2 .palette-list button{display:flex;width:100%;gap:var(--s3);align-items:center;padding:var(--s2) var(--s3);min-height:var(--tap);border:0;background:none;border-radius:var(--r1);text-align:left;cursor:pointer;color:var(--ink)}
 .adm2 .palette-list button[aria-selected="true"]{background:var(--card-2)}
+/* ── Motion ── (owner's spec; durations and curves are the tokens above).
+   Only opacity and transform animate, plus colour transitions; the one
+   exception is the chart line drawing in (stroke-dashoffset). */
+
+/* Page change: the wrapper is remounted per page (AdminV2Shell), each direct
+   child fades up 8px, 35ms apart, the 6th and later together. Backwards fill
+   only, so no child keeps a transform (it would trap position:fixed inside). */
+@keyframes page-in{from{opacity:0;transform:translateY(8px)}}
+.adm2 .page>*{animation:page-in var(--dur-slow) var(--ease) backwards}
+.adm2 .page>:nth-child(2){animation-delay:var(--stagger)}
+.adm2 .page>:nth-child(3){animation-delay:calc(var(--stagger)*2)}
+.adm2 .page>:nth-child(4){animation-delay:calc(var(--stagger)*3)}
+.adm2 .page>:nth-child(5){animation-delay:calc(var(--stagger)*4)}
+.adm2 .page>:nth-child(n+6){animation-delay:calc(var(--stagger)*5)}
+/* Route view transitions (motion.ts startRouteTransition): a short root
+   cross-fade that never takes the clicks. */
+html:has(.adm2)::view-transition{pointer-events:none}
+html:has(.adm2)::view-transition-old(root),html:has(.adm2)::view-transition-new(root){animation-duration:200ms}
+
 /* Reduced motion: no animation or transition anywhere in the admin, the theme
    cross-fade included, and no route cross-fade. Panels and modals then close
    on the same frame (motion.ts skips the exit copy too). */

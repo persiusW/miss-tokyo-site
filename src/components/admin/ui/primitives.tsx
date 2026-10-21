@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode, type KeyboardEvent, type SelectHTMLAttributes } from "react";
 import Link from "next/link";
 import { Icon, type IconName } from "./Icon";
+import { startRouteTransition } from "./motion";
 
 export type Tone = "warn" | "danger" | "ok" | "neutral" | "info";
 
@@ -25,7 +26,7 @@ export function Btn({ kind, sm, icon, block, className = "", children, type = "b
 export function BtnLink({ kind, sm, icon, href, children, external }: { kind?: BtnKind; sm?: boolean; icon?: IconName; href: string; children: ReactNode; external?: boolean }) {
     const cls = `btn${kind ? ` btn-${kind}` : ""}${sm ? " btn-sm" : ""}`;
     if (external) return <a className={cls} href={href} target="_blank" rel="noopener noreferrer">{icon && <Icon n={icon} />}{children}</a>;
-    return <Link className={cls} href={href}>{icon && <Icon n={icon} />}{children}</Link>;
+    return <Link className={cls} href={href} onNavigate={() => startRouteTransition(href)}>{icon && <Icon n={icon} />}{children}</Link>;
 }
 
 export function IconBtn({ label, icon, pip, ...p }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> & { label: string; icon: IconName; pip?: boolean }) {
@@ -199,7 +200,7 @@ export function Tabs<V extends string>({ tabs, value, onChange, label }: { tabs:
                 const inner = <>{t.l}{t.c != null && <span className="cnt">{t.c}</span>}{t.dot && <span className="nav-dot" style={{ marginLeft: 4 }} aria-label="Needs attention" />}</>;
                 const common = { role: "tab", "aria-selected": value === t.v, tabIndex: value === t.v ? 0 : -1, className: "tab" } as const;
                 return t.href
-                    ? <Link key={t.v} href={t.href} {...common} scroll={false}>{inner}</Link>
+                    ? <Link key={t.v} href={t.href} {...common} scroll={false} onNavigate={() => startRouteTransition(t.href!)}>{inner}</Link>
                     : <button key={t.v} type="button" {...common} onClick={() => onChange?.(t.v)}>{inner}</button>;
             })}
         </div>
@@ -211,7 +212,7 @@ export function PageHeader({ title, sub, actions, crumb, crumbHref }: { title: R
         <header className="ph">
             <div className="ph-text">
                 {crumb && crumbHref && (
-                    <div className="crumb"><Link href={crumbHref}>{crumb}</Link><Icon n="chev" style={{ width: 12, height: 12 }} /></div>
+                    <div className="crumb"><Link href={crumbHref} onNavigate={() => startRouteTransition(crumbHref)}>{crumb}</Link><Icon n="chev" style={{ width: 12, height: 12 }} /></div>
                 )}
                 <h1>{title}</h1>
                 {sub && <p className="ph-sub">{sub}</p>}
@@ -381,7 +382,7 @@ export function TwoTap({ label, armed, onConfirm, sm, kind = "danger", icon, dis
 
 /** Small wrapper so a Next <Link> row and a button row share one look. */
 export function RowLink({ href, children, onClick }: { href?: string; children: ReactNode; onClick?: () => void }) {
-    if (href) return <Link href={href} className="row click" scroll={false} style={{ color: "inherit", textDecoration: "none" }}>{children}</Link>;
+    if (href) return <Link href={href} className="row click" scroll={false} style={{ color: "inherit", textDecoration: "none" }} onNavigate={() => startRouteTransition(href)}>{children}</Link>;
     return <button type="button" className="row click" onClick={onClick}>{children}</button>;
 }
 

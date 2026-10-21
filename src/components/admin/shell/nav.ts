@@ -43,3 +43,25 @@ export function navActive(item: NavDef, pathname: string): boolean {
 }
 
 export const ROLE_LABEL: Record<string, string> = { owner: "Owner", admin: "Admin", sales_staff: "Sales staff" };
+
+// Paths under a list that only open a panel over it (pushed with
+// history.pushState, so usePathname changes without a new page). They keep
+// the list's key so the page isn't remounted when a panel opens.
+const PANEL_PARENTS: { base: string; pages: string[] }[] = [
+    { base: "/orders/invoices", pages: [] },
+    { base: "/orders", pages: ["invoices", "abandoned"] },
+    { base: "/catalogue", pages: ["categories", "gift-cards", "inventory"] },
+    { base: "/customers", pages: ["whatsapp", "forms", "requests", "abandoned"] },
+    { base: "/discounts", pages: [] },
+];
+
+/** What the page wrapper is keyed by: the pathname, minus any panel opened over a list. */
+export function pageKey(pathname: string): string {
+    const p = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+    for (const { base, pages } of PANEL_PARENTS) {
+        if (!p.startsWith(base + "/")) continue;
+        const seg = p.slice(base.length + 1).split("/")[0];
+        if (seg && !pages.includes(seg)) return base;
+    }
+    return p || "/";
+}

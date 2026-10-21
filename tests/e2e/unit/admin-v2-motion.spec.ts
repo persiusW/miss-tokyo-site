@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import fs from "fs";
 import path from "path";
 import { STAGGER_CAP, STAGGER_MS, nodeText, staggerDelayMs } from "../../../src/components/admin/ui/motion";
+import { pageKey } from "../../../src/components/admin/shell/nav";
 
 const ROOT = path.resolve(__dirname, "../../..");
 const CSS = fs.readFileSync(path.join(ROOT, "src/components/admin/ui/admin-v2.css"), "utf8");
@@ -47,6 +48,14 @@ test("page stagger: 35ms steps, the 6th child and later share the last step", ()
     expect(staggerDelayMs(Number.NaN)).toBe(0);
 });
 
+test("the CSS page stagger matches staggerDelayMs", () => {
+    for (let i = 1; i < STAGGER_CAP - 1; i++) {
+        const want = i === 1 ? "var(--stagger)" : `calc(var(--stagger)*${i})`;
+        expect(CSS, `child ${i + 1}`).toContain(`.adm2 .page>:nth-child(${i + 1}){animation-delay:${want}}`);
+    }
+    expect(CSS).toContain(`.adm2 .page>:nth-child(n+${STAGGER_CAP}){animation-delay:calc(var(--stagger)*${STAGGER_CAP - 1})}`);
+});
+
 test("nodeText keys a KPI value by what it shows", () => {
     expect(nodeText("GH₵ 3,860")).toBe("GH₵ 3,860");
     expect(nodeText(12)).toBe("12");
@@ -54,4 +63,25 @@ test("nodeText keys a KPI value by what it shows", () => {
     expect(nodeText(false)).toBe("");
     expect(nodeText(["a", 1, null, ["b"]])).toBe("a1b");
     expect(nodeText({ props: { children: { props: { children: ["GH₵ ", 40] } } } })).toBe("GH₵ 40");
+});
+
+test("pageKey keeps a list's key while a panel is open over it", () => {
+    expect(pageKey("/orders")).toBe("/orders");
+    expect(pageKey("/orders/3f2b1c9e-0000-4000-8000-000000000000")).toBe("/orders");
+    expect(pageKey("/orders/abandoned")).toBe("/orders/abandoned");
+    expect(pageKey("/orders/invoices")).toBe("/orders/invoices");
+    expect(pageKey("/orders/invoices/abc")).toBe("/orders/invoices");
+    expect(pageKey("/catalogue/new")).toBe("/catalogue");
+    expect(pageKey("/catalogue/p-1")).toBe("/catalogue");
+    expect(pageKey("/catalogue/inventory")).toBe("/catalogue/inventory");
+    expect(pageKey("/catalogue/gift-cards")).toBe("/catalogue/gift-cards");
+    expect(pageKey("/customers/ama%40example.com")).toBe("/customers");
+    expect(pageKey("/customers/whatsapp")).toBe("/customers/whatsapp");
+    expect(pageKey("/discounts/d1")).toBe("/discounts");
+    // Real pages keep their own key.
+    expect(pageKey("/settings/delivery")).toBe("/settings/delivery");
+    expect(pageKey("/settings")).toBe("/settings");
+    expect(pageKey("/till/today")).toBe("/till/today");
+    expect(pageKey("/home/")).toBe("/home");
+    expect(pageKey("/")).toBe("/");
 });

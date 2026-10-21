@@ -2,7 +2,7 @@
 
 // Admin v2 shell: one side navigation, a sticky top bar with ⌘K search and the
 // user menu, and the Settings leave-without-saving guard.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { MissTokyoAi, MissTokyoAiProvider } from "@/components/admin/missTokyoAi/MissTokyoAi";
@@ -12,10 +12,11 @@ import { Btn, IconBtn } from "@/components/admin/ui/primitives";
 import { Menu, Modal } from "@/components/admin/ui/overlays";
 import { initials, plural } from "@/components/admin/ui/format";
 import { ToasterV2 } from "@/components/admin/ui/Toaster";
+import { signalRouteCommit, startRouteTransition } from "@/components/admin/ui/motion";
 import { createClient } from "@/lib/supabaseBrowser";
 import { AdminV2Context, type AdminV2Ctx, type V2Role } from "./AdminV2Context";
 import { CommandPaletteV2 } from "./CommandPaletteV2";
-import { NAV_GENERAL, NAV_MAIN, ROLE_LABEL, navActive, type NavDef } from "./nav";
+import { NAV_GENERAL, NAV_MAIN, ROLE_LABEL, navActive, pageKey, type NavDef } from "./nav";
 
 type Theme = "light" | "dark" | "system";
 
@@ -105,8 +106,12 @@ export function AdminV2Shell({ children, businessName, role, user, showCustomReq
     const go = useCallback((href: string) => {
         const leavingSettings = pathname.startsWith("/settings") && !href.startsWith("/settings");
         if (dirty > 0 && leavingSettings) { setPending(href); return; }
+        startRouteTransition(href);
         router.push(href);
     }, [dirty, pathname, router]);
+
+    // A route view transition waits for the new page; this is its cue.
+    useLayoutEffect(() => { signalRouteCommit(); }, [pathname]);
 
     const ctx: AdminV2Ctx = useMemo(() => ({
         role, userName: user.name, isFullAccess: full, isAdmin: role === "admin", showCustomRequests,
@@ -131,7 +136,8 @@ export function AdminV2Shell({ children, businessName, role, user, showCustomReq
                 onClick={e => {
                     setNavOpen(false);
                     if (dirty > 0 && pathname.startsWith("/settings") && !n.href.startsWith("/settings")) { e.preventDefault(); setPending(n.href); }
-                }}>
+                }}
+                onNavigate={() => startRouteTransition(n.href)}>
                 <Icon n={n.icon} />
                 <span>{n.label}</span>
                 {n.k === "settings" && dirty > 0
@@ -196,7 +202,10 @@ export function AdminV2Shell({ children, businessName, role, user, showCustomReq
                                     </button>
                                 )} />
                             </div>
-                            <main id="main" className="page" tabIndex={-1}>
+                            {/* Remounted per page so its children play the entrance again (admin-v2.css, Motion).
+                                Keyed by page, not raw pathname: opening an order or a product pushes
+                                its own path, and that must not remount the list under the panel. */}
+                            <main key={pageKey(pathname)} id="main" className="page" tabIndex={-1}>
                                 {children}
                             </main>
                         </div>
@@ -204,7 +213,7 @@ export function AdminV2Shell({ children, businessName, role, user, showCustomReq
                     <CommandPaletteV2 open={pal} onClose={() => setPal(false)} go={go} pages={nav} />
                     <Modal open={!!pending} onClose={() => setPending(null)} title="Leave without saving?" footer={<>
                         <Btn kind="ghost" onClick={() => setPending(null)}>Keep editing</Btn>
-                        <Btn kind="danger-solid" onClick={() => { discardRef.current?.(); setDirty(0); const p = pending; setPending(null); if (p) router.push(p); }}>Discard {plural(dirty, "change")}</Btn>
+                        <Btn kind="danger-solid" onClick={() => { discardRef.current?.(); setDirty(0); const p = pending; setPending(null); if (p) { startRouteTransition(p); router.push(p); } }}>Discard {plural(dirty, "change")}</Btn>
                     </>}>
                         <p className="ink2">You have {plural(dirty, "unsaved change")} in Settings. If you leave now, they&apos;ll be lost.</p>
                     </Modal>
