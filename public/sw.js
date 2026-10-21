@@ -10,9 +10,14 @@
 // revalidated. Staff iPads kept serving a months-old till and never saw
 // features added since. The bump is what evicts those copies; adding the
 // prefix alone would leave every existing device stuck.
-const SHELL_CACHE  = "mt-shell-v4";
-const IMAGE_CACHE  = "mt-images-v4";
-const DATA_CACHE   = "mt-data-v4";
+// v5: shop pages outside the stale-while-revalidate list ("/", /about,
+// /craft, /faq, the policies…) hit the same cache-first catch-all, so a
+// returning visitor kept their first copy for good and never saw a Content
+// edit. Pages and their client-side navigation payloads are now network-first
+// (the cached copy only when offline); the bump evicts the permanent copies.
+const SHELL_CACHE  = "mt-shell-v5";
+const IMAGE_CACHE  = "mt-images-v5";
+const DATA_CACHE   = "mt-data-v5";
 
 // ─── Private route prefixes — NEVER cached (auth-gated admin dashboard) ───────
 // Mirrors the dashboard/account protection in src/proxy.ts. Caching these would
@@ -126,7 +131,17 @@ self.addEventListener("fetch", (event) => {
         return;
     }
 
-    // ── App shell (fonts, CSS, JS, HTML): Cache-First ──
+    // ── Every other page, and Next's client-navigation payloads (RSC):
+    //    Network-First, so customers see what the shop shows now; the cached
+    //    copy (or the offline page) only when the network fails. ──
+    const isPage = request.mode === "navigate" || request.destination === "document" ||
+        request.headers.get("RSC") === "1" || url.searchParams.has("_rsc");
+    if (isPage) {
+        event.respondWith(networkFirst(SHELL_CACHE, request, 10000));
+        return;
+    }
+
+    // ── App shell (fonts, CSS, JS): Cache-First ──
     event.respondWith(cacheFirst(SHELL_CACHE, request, null));
 });
 
