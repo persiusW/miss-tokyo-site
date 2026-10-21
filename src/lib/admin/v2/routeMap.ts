@@ -24,7 +24,7 @@ export const FLAGS_ALL: V2Flags = { admin_v2: true, admin_v2_products: true, adm
 
 /** Areas whose new pages exist. An area joins this list in the PR that builds it,
  *  so a switch can never send anyone to a page that isn't there yet. */
-export const V2_READY_AREAS: readonly V2Area[] = ["settings", "home", "inbox", "content", "customers", "discounts", "analytics", "staff", "billing"];
+export const V2_READY_AREAS: readonly V2Area[] = ["settings", "home", "inbox", "content", "customers", "discounts", "analytics", "staff", "billing", "products"];
 
 export function areaOn(area: V2Area, flags: V2Flags, ready: readonly V2Area[] = V2_READY_AREAS): boolean {
     if (!flags.admin_v2 || !ready.includes(area)) return false;
@@ -76,7 +76,8 @@ const RULES: Rule[] = [
 
     { area: "products", legacy: "/catalog/products/new", v2: "/catalogue/new" },
     { area: "products", legacy: "/admin/products/new", v2: "/catalogue/new", oneWay: true },
-    { area: "products", legacy: "/catalog/products/low-stock", v2: "/catalogue/inventory" },
+    // The old Low Stock page is Inventory's Running low view.
+    { area: "products", legacy: "/catalog/products/low-stock", v2: "/catalogue/inventory", query: { view: "low" } },
     { area: "products", legacy: "/catalog/products/:id/edit", v2: "/catalogue/:id" },
     { area: "products", legacy: "/catalog/products", v2: "/catalogue" },
     { area: "products", legacy: "/catalog/categories", v2: "/catalogue/categories" },
