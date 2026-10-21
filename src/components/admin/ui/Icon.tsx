@@ -58,6 +58,8 @@ const IP = {
     rail: "M4 4h16v16H4zM9 4v16",
     chat: "M4 5h16v11H8l-4 4z",
     gift: "M4 10h16v10H4zM3 7h18v3H3zM12 7v13M12 7c-2-3-5-3-5-1s5 1 5 1zM12 7c2-3 5-3 5-1s-5 1-5 1z",
+    wrench: "M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 8-8M14.7 6.3 13 4.5a4 4 0 0 0-5.6 5L3 14l3 3 4.5-4.5",
+    bank: "M3 10 12 4l9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18",
 } as const;
 
 export type IconName = keyof typeof IP;

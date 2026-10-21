@@ -387,12 +387,13 @@ export function RowLink({ href, children, onClick }: { href?: string; children: 
 }
 
 /** What a role without access sees instead of the page. */
-export function Denied({ title }: { title: string }) {
+export function Denied({ title, adminOnly }: { title: string; adminOnly?: boolean }) {
     return (
         <>
             <PageHeader title={title} />
             <Card pad>
-                <Empty icon="lock" title="Only owners and admins can open this page" body="Ask the owner if you need something changed here."
+                <Empty icon="lock" title={adminOnly ? "Only the admin can open this page" : "Only owners and admins can open this page"}
+                    body={adminOnly ? "These tools are for the developer who looks after the shop. Ask them if something needs changing here." : "Ask the owner if you need something changed here."}
                     action={<BtnLink href="/home">Go to Home</BtnLink>} />
             </Card>
         </>

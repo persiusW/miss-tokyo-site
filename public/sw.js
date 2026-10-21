@@ -30,7 +30,7 @@ const PRIVATE_PREFIXES = [
     "/pos", "/agent", "/ai", "/test-orders",
     // Admin v2 (keep in step with V2_PREFIXES in src/lib/admin/v2/routeMap.ts)
     "/home", "/inbox", "/orders", "/till", "/catalogue", "/discounts", "/content",
-    "/analytics", "/staff", "/billing", "/ui-kit",
+    "/analytics", "/staff", "/billing", "/tools", "/ui-kit",
 ];
 
 // ─── App Shell URLs to precache on install ────────────────────────────────────

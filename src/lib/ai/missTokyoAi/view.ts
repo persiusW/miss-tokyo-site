@@ -10,7 +10,7 @@ export type { V2Area };
 
 /** Every area, in the side menu's order. */
 export const V2_AREAS: readonly V2Area[] = [
-    "home", "inbox", "orders", "till", "products", "customers", "discounts", "content", "analytics", "staff", "billing", "settings",
+    "home", "inbox", "orders", "till", "products", "customers", "discounts", "content", "analytics", "staff", "billing", "settings", "tools",
 ];
 
 export type AdminView = {
