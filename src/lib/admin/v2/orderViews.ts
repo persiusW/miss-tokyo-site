@@ -16,10 +16,10 @@ interface Filterable {
 // interface instantiates its whole generic type and blows the compiler's depth.
 const f = (q: unknown) => q as Filterable;
 
-/** Paid, not packed: fulfilment still inbox/processing, and not closed. */
+/** Paid, not packed: fulfilment still inbox/processing (or only partly packed), and not closed. */
 export function applyToPack<T>(q: T): T {
     return f(q).eq("payment_status", "paid")
-        .in("fulfillment_status", ["inbox", "processing"])
+        .in("fulfillment_status", ["inbox", "processing", "partial"])
         .not("status", "in", "(cancelled,refunded,fulfilled,delivered)") as T;
 }
 

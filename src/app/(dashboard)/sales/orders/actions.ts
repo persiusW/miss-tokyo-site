@@ -18,6 +18,9 @@ const FULFILLMENT_TO_STATUS: Record<string, string> = {
     shipped:           "shipped",
     ready_for_pickup:  "ready_for_pickup",
     delivered:         "delivered",
+    // Admin v2 partial fulfilment: some units packed, the rest still to pack.
+    // Status stays 'paid' so the old admin keeps listing it under Inbox.
+    partial:           "paid",
 };
 
 const STATUS_TO_FULFILLMENT: Record<string, string> = {

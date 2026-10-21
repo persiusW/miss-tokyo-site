@@ -230,7 +230,8 @@ test("waiting to pack is exactly the side-nav Orders count", () => {
     applyToPack(r.b);
     expect(r.calls).toEqual([
         ["eq", "payment_status", "paid"],
-        ["in", "fulfillment_status", ["inbox", "processing"]],
+        // "partial": partly packed orders still have items to pack (admin v2 Orders, gap 5).
+        ["in", "fulfillment_status", ["inbox", "processing", "partial"]],
         ["not", "status", "in", "(cancelled,refunded,fulfilled,delivered)"],
     ]);
     const u = recorder(); applyUnpaid(u.b);
