@@ -15,7 +15,7 @@
 //
 // A reply that could not be sent is not retried (that would run the model
 // again): the chat goes to a person instead, so the message is never ignored.
-import { cleanCustomerText, visitorOver } from "@/lib/ai/shopAssistant/limits";
+import { cleanCustomerText, visitorLimit, WA_PER_MINUTE } from "@/lib/ai/shopAssistant/limits";
 import type { ShopRunResult } from "@/lib/ai/shopAssistant/run";
 import type { ShopChat } from "@/lib/ai/shopAssistant/types";
 import type { MessagingResult } from "@/lib/messaging/provider";
@@ -165,7 +165,10 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         const { chat, customerId } = await deps.chatFor(c, from);
         const counts = await deps.counts(chat);
         if (!counts) return toPerson(c, from, "assistant_failed", WA_LINES.cantChat);
-        if (visitorOver({ ...counts, perDay: deps.perDay })) return toPerson(c, from, "daily_limit", WA_LINES.limit);
+        // The day's allowance goes to a person; a fast burst only slows down, the chat stays here.
+        const limit = visitorLimit({ ...counts, perDay: deps.perDay, perMinute: WA_PER_MINUTE });
+        if (limit === "day") return toPerson(c, from, "daily_limit", WA_LINES.limit);
+        if (limit === "minute") { await reply(c, from, WA_LINES.pace); return; }
 
         const result = await deps.run({ chat, text: said, phone: from, customerId, conversationId: c.id, images: photos, withTeam: !!c.handedOffAt, staffNote });
         const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
