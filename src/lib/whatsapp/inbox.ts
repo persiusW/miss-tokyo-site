@@ -27,6 +27,8 @@ export type MessageRow = {
 export type InboxConversation = {
     id: string; name: string | null; phone: string; mode: InboxMode; reason: string | null;
     handedOffAt: string | null; lastMessageAt: string | null; windowOpen: boolean;
+    /** The customer's last message: WhatsApp's 24-hour reply window runs from here. */
+    lastInboundAt: string | null;
     preview: { direction: "inbound" | "outbound"; text: string; at: string } | null;
     standing: Standing;
     /** With a person: since when the customer has been waiting for one. */
@@ -132,7 +134,7 @@ export function shapeConversation(c: ConversationRow, last: MessageRow | null, n
         mode: c.handed_off_at ? "person" : "assistant",
         reason: c.handed_off_at && reason ? REASON_LABEL[reason] ?? null : null,
         handedOffAt: c.handed_off_at, lastMessageAt: c.last_message_at,
-        windowOpen: windowOpen(c.last_inbound_at, now),
+        windowOpen: windowOpen(c.last_inbound_at, now), lastInboundAt: c.last_inbound_at,
         preview: last ? { direction: last.direction, text: previewText(last), at: last.created_at } : null,
         standing: standingOf(c), waitingSince: waitingSince(c), wroteAgain: wroteAgain(c),
     };

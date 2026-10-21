@@ -135,10 +135,23 @@ export const GUIDE: GuideEntry[] = [
         body: `Export, "Add Contact", search, source and date filters; click a row for the profile (total spent, contact details, last address, orders, forms, invoices). Only manually added contacts can be deleted.`,
     },
     {
+        id: "inbox",
+        title: "Inbox and WhatsApp chats",
+        route: "whatsapp",
+        body: `New admin: Inbox has two tabs, "Conversations" and "Teach the assistant" (owners and admins). Chips: Needs a person (the default, same count as the side menu), All, WhatsApp, Contact form, Custom requests (when switched on in Store settings) and Questions for admin (admin only); a search box finds a name, number, email or words in a message. Pick a conversation to open it beside the list (one at a time on a phone, with a back arrow). A WhatsApp chat shows every message with photos, voice notes, videos and files, markers for what happened (handed over and why, handed back, marked done, team alerted again, back with the assistant after 24 hours), and under the name the customer's orders on that number and what is in the assistant's basket. "Customer" opens their customer page when an email is known. The "…" menu has Hand back to the assistant, Hand back and reply (N waiting) when the customer's messages are unanswered, Teach the assistant from this chat, Mark as done and Open in WhatsApp. Under the chat: "Reply myself" sends from the shop's WhatsApp line (the assistant then stays quiet in that chat until it is handed back) and "Tell the assistant" (owners and admins) gives it a note for this chat and can remember it as a lesson. WhatsApp only lets us write within 24 hours of the customer's last message; the box says how long is left, after that reply from the shop's phone. "Correct" under one of the assistant's replies teaches it the right answer. Chats handed to a person go back to the assistant by themselves after 24 hours. The WhatsApp chip also shows Chats, Ordered with the assistant, Handed to your team and Waiting on your team for the last 7 days. Old admin: WhatsApp Chats page with tabs Needs you, All, Assistant, Notices, Dealt with, buttons "Reply on WhatsApp", "Dealt with" (= Mark as done) and "Hand back to assistant".`,
+    },
+    {
+        id: "teach",
+        title: "Teach the assistant",
+        route: "whatsapp_teach",
+        roles: FULL,
+        body: `Inbox › Teach the assistant (owners and admins; "Teach the assistant" button on the old WhatsApp Chats page). "Add a note" saves something the shop assistant should always know (title and up to 400 characters; no prices or times, those come from products and hours); it uses notes on WhatsApp and the website from the next message, up to 40 at a time. Tap a note to edit it or "Retire note" (tap twice). Photo flashcards: choose up to 10 photos, the assistant guesses which piece each shows, answer That's right, Wrong (pick the product) or Skip; each answer becomes a photo lesson. The card says how many active products don't have a flashcard yet. The admin also sees "Answers Miss Tokyo AI gives staff": add, edit, choose who gets each one, or switch one off.`,
+    },
+    {
         id: "forms-requests",
-        title: "Form Submissions and Custom Requests",
+        title: "Contact forms and custom requests",
         route: "forms",
-        body: `Form Submissions: search, topic and status filters; "View" marks it read; "Mark as Replied"; "Reply via Email". Custom Requests (when switched on in Store settings): status per row Inquiry → Material Confirmation → Production → Completed / Cancelled.`,
+        body: `New admin: Inbox › Contact form chip. Opening a message marks it read; reply in the box to email the customer from the shop's address (it is marked replied), or "Use my email app". The "…" menu has Mark as done (replied), Mark as unread and Open in your email app. Custom requests (when switched on in Store settings): Inbox › Custom requests chip; open one and change its Status: Inquiry → Material confirmation → Production → Completed / Cancelled. Old admin: Form Submissions (search, topic and status filters, "View" marks it read, "Mark as Replied", "Reply via Email") and Custom Requests (status per row).`,
     },
     {
         id: "invoices",
@@ -171,10 +184,10 @@ export const GUIDE: GuideEntry[] = [
     },
     {
         id: "ai-inbox",
-        title: "AI Inbox",
+        title: "Questions for admin (AI Inbox)",
         route: "ai_inbox",
         roles: ["admin"],
-        body: `Settings → AI Inbox (admin only). Questions staff sent with "Send to admin" when Miss Tokyo AI couldn't answer. Open tab: read the chat before they asked, write a reply ("Send reply"), and tick "Also save as an answer for all staff" so the assistant gives that answer next time; or Dismiss (tap twice). The reply appears in the asker's Miss Tokyo AI chat. Saved answers tab: add, edit, choose which roles see each one, or switch one off. Nothing is deleted.`,
+        body: `New admin: Inbox › Questions for admin chip (admin only). Open a question to read the chat before they asked, write the answer and Send; switch on "Save as an answer the assistant can give next time" (with a title) so Miss Tokyo AI gives it to the next person who asks; or Dismiss (tap twice). Saved answers are under Inbox › Teach the assistant › Answers Miss Tokyo AI gives staff. Old admin: AI Inbox (admin only). Questions staff sent with "Send to admin" when Miss Tokyo AI couldn't answer. Open tab: read the chat before they asked, write a reply ("Send reply"), and tick "Also save as an answer for all staff" so the assistant gives that answer next time; or Dismiss (tap twice). The reply appears in the asker's Miss Tokyo AI chat. Saved answers tab: add, edit, choose which roles see each one, or switch one off. Nothing is deleted.`,
     },
 ];
 

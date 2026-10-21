@@ -1,5 +1,7 @@
 // The only pages Miss Tokyo AI may send staff to. Roles mirror the real gates
 // (sidebar + any page/server checks); tests compare this with the sidebar.
+// Paths are the old admin's: while the new admin is on, each one redirects to
+// its new page (lib/admin/v2/routeMap.ts), so a link works in both.
 export type StaffRole = "admin" | "owner" | "sales_staff";
 
 const ALL: StaffRole[] = ["admin", "owner", "sales_staff"];
@@ -30,14 +32,16 @@ export const ROUTES = {
     low_stock: { path: "/catalog/products/low-stock", title: "Low Stock", roles: ALL },
     categories: { path: "/catalog/categories", title: "Categories", roles: ALL },
     contacts: { path: "/customers", title: "Contact List", roles: ALL },
-    forms: { path: "/customers/forms", title: "Form Submissions", roles: ALL },
-    custom_requests: { path: "/customers/requests", title: "Custom Requests", roles: ALL },
+    whatsapp: { path: "/customers/whatsapp", title: "Inbox (WhatsApp chats)", roles: ALL },
+    whatsapp_teach: { path: "/customers/whatsapp/teach", title: "Teach the assistant", roles: FULL },
+    forms: { path: "/customers/forms", title: "Inbox (contact forms)", roles: ALL },
+    custom_requests: { path: "/customers/requests", title: "Inbox (custom requests)", roles: ALL },
     pay_links: { path: "/finance/links", title: "Pay Links", roles: FULL },
     invoices: { path: "/finance/invoices", title: "Invoices", roles: FULL },
     settings: { path: "/settings", title: "Site Settings", roles: FULL, tabs: SETTINGS_TABS },
     team: { path: "/team", title: "Team", roles: FULL },
     ai_settings: { path: "/settings/ai", title: "AI Settings", roles: FULL },
-    ai_inbox: { path: "/ai/inbox", title: "AI Inbox", roles: ADMIN },
+    ai_inbox: { path: "/ai/inbox", title: "Inbox (questions for admin)", roles: ADMIN },
     assistant: { path: "/agent", title: "Miss Tokyo AI", roles: ALL },
 } satisfies Record<string, RouteDef>;
 

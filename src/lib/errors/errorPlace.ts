@@ -61,6 +61,8 @@ export const PAGE_ROUTES: readonly string[] = [
     "/gift-cards",
     "/gift-cards/success",
     "/home",
+    "/inbox",
+    "/inbox/teach",
     "/invite",
     "/invoice/[id]",
     "/login",
