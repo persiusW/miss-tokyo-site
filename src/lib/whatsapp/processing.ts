@@ -14,7 +14,10 @@ import { sendSMS } from "@/lib/sms";
 import { createWhatsAppHandler } from "./assistantHandler";
 import { providerMessage } from "./choices";
 import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnNote, setOptOut, waitingInbound } from "./conversationStore";
-import { forwardToTeam, type HandoffReason } from "./handoff";
+import { forwardToTeam, localNumber, whyText, type HandoffReason } from "./handoff";
+import { logConversationEvent } from "./events";
+import { claimReferral, claimTeamAlert } from "./teamWatch";
+import { sendAdminPushNotifications } from "@/lib/orderSettlement";
 import { canAnswerWaiting } from "./inbox";
 import { archiveInboundMedia, type Download } from "./media";
 import { toModelPhoto } from "./photo";
@@ -90,7 +93,15 @@ export async function pipelineFor(
         sendTemplate: (to, templateId) => sender.sendTemplate(to, { templateId, type: "text" }, { event: "whatsapp_handoff_team" }),
         sendSms: (to, text) => sendSMS({ to, message: text }, { event: "whatsapp_handoff_team" }),
         inboxUrl: id => `${site}/customers/whatsapp?c=${id}`,
-    }).then(() => undefined);
+    }).then(async () => {
+        // Staff with notifications on hear about it on their phone or laptop too. Best effort.
+        const c = await loadWaConversation(conversationId).catch(() => null);
+        const who = c?.name ?? (c ? localNumber(c.phone) : "A customer");
+        await sendAdminPushNotifications(
+            reason === "wrote_again" ? "WhatsApp: wrote again" : "WhatsApp: needs a person",
+            `${who} ${whyText(reason)}.`, `/customers/whatsapp?c=${conversationId}`,
+        ).catch(e => console.error("[whatsapp] push not sent", { err: String(e) }));
+    });
 
     const handOff = async (conversationId: string, reason: HandoffReason) => {
         const moved = await supabaseInboundStore.handOff(conversationId, reason, new Date());
@@ -129,9 +140,17 @@ export async function pipelineFor(
         textFollows: (m, at) => textFollows(m, at, pairing),
         photosBefore: (m, at) => photosBefore(m, at, pairing),
         perDay: settings.shop.dailyMessagesPerVisitor,
+        teamNumber,
+        // The team has the chat and the customer wrote again: alert them, at most once an hour.
+        withTeam: async c => {
+            if (!(await claimTeamAlert(c.id))) return;
+            await logConversationEvent(c.id, "re_alerted");
+            await forward(c.id, "wrote_again");
+        },
+        referToTeam: id => claimReferral(id),
         run: a => runShopAssistant({
             channel: "whatsapp", identity: { customerId: a.customerId, phone: a.phone }, chat: a.chat, text: a.text,
-            settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, images: a.images,
+            settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, images: a.images, withTeam: a.withTeam,
         }),
         siteUrl: site,
     });
@@ -140,6 +159,8 @@ export async function pipelineFor(
         store: supabaseInboundStore,
         parse,
         handle,
+        // WHATSAPP_AGENT_DURING_HANDOFF=off: the bot stays silent while a person has the chat.
+        quietWhileWithTeam: (process.env.WHATSAPP_AGENT_DURING_HANDOFF ?? "").trim().toLowerCase() === "off",
         answerWaiting: handle.answerWaiting,
         // The copy is the last use of the file in this event; its bytes are let go after it.
         afterLog: async (conversationId, m) => {

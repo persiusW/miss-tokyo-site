@@ -11,7 +11,9 @@
 // well, every time, and the inbox always has the full chat.
 import type { MessagingResult } from "@/lib/messaging/provider";
 
-export type HandoffReason = "customer_asked" | "unsupported_message" | "awaiting_assistant" | "processing_failed" | "daily_limit" | "assistant_failed" | "return_request";
+export type HandoffReason = "customer_asked" | "unsupported_message" | "awaiting_assistant" | "processing_failed" | "daily_limit" | "assistant_failed" | "return_request"
+    /** Not a handover: the team already has the chat and the customer wrote again. */
+    | "wrote_again";
 
 const WHY: Record<HandoffReason, string> = {
     customer_asked: "asked for a person",
@@ -21,7 +23,11 @@ const WHY: Record<HandoffReason, string> = {
     daily_limit: "reached today's chat limit with the assistant",
     assistant_failed: "hit a problem with the assistant",
     return_request: "wants to return or exchange an order",
+    wrote_again: "wrote again while waiting for a person",
 };
+
+/** "asked for a person", for alerts. */
+export const whyText = (reason: HandoffReason) => WHY[reason];
 
 export type HistoryLine = { direction: "inbound" | "outbound"; content: string | null; type: string | null; at: string };
 
