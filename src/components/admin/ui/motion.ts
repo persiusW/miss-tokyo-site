@@ -118,3 +118,17 @@ export function startRouteTransition(href: string) {
         }));
     } catch { /* the navigation goes ahead without the fade */ }
 }
+
+// ── Theme cross-fade ───────────────────────────────────────────────────────
+
+let themeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Adds html.theming for THEME_FADE_MS so the colour change cross-fades. Call it just before the theme changes. */
+export function beginThemeFade() {
+    if (typeof document === "undefined" || prefersReducedMotion()) return;
+    const html = document.documentElement;
+    html.classList.add("theming");
+    if (themeTimer) clearTimeout(themeTimer);
+    // A little past the fade so no transition is cut on its last frame.
+    themeTimer = setTimeout(() => { html.classList.remove("theming"); themeTimer = null; }, THEME_FADE_MS + 50);
+}

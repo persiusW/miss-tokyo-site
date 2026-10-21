@@ -12,7 +12,7 @@ import { Btn, IconBtn } from "@/components/admin/ui/primitives";
 import { Menu, Modal } from "@/components/admin/ui/overlays";
 import { initials, plural } from "@/components/admin/ui/format";
 import { ToasterV2 } from "@/components/admin/ui/Toaster";
-import { signalRouteCommit, startRouteTransition } from "@/components/admin/ui/motion";
+import { beginThemeFade, signalRouteCommit, startRouteTransition } from "@/components/admin/ui/motion";
 import { createClient } from "@/lib/supabaseBrowser";
 import { AdminV2Context, type AdminV2Ctx, type V2Role } from "./AdminV2Context";
 import { CommandPaletteV2 } from "./CommandPaletteV2";
@@ -50,12 +50,16 @@ export function AdminV2Shell({ children, businessName, role, user, showCustomReq
         setCollapsed(localStorage.getItem("ac-sidebar-collapsed") === "true");
         // Settings › Your account › Appearance (and other tabs) change it too.
         const s = (e: StorageEvent) => {
-            if (e.key === "ac-theme" && (e.newValue === "light" || e.newValue === "dark" || e.newValue === "system")) setTheme(e.newValue);
+            if (e.key === "ac-theme" && (e.newValue === "light" || e.newValue === "dark" || e.newValue === "system")) { beginThemeFade(); setTheme(e.newValue); }
         };
         window.addEventListener("storage", s);
-        return () => window.removeEventListener("storage", s);
+        // "Match this device" follows the OS; cross-fade that switch too.
+        const mq = window.matchMedia("(prefers-color-scheme: dark)");
+        const os = () => { const t = localStorage.getItem("ac-theme"); if (!t || t === "system") beginThemeFade(); };
+        mq.addEventListener("change", os);
+        return () => { window.removeEventListener("storage", s); mq.removeEventListener("change", os); };
     }, []);
-    const pickTheme = (t: Theme) => { setTheme(t); localStorage.setItem("ac-theme", t); };
+    const pickTheme = (t: Theme) => { beginThemeFade(); setTheme(t); localStorage.setItem("ac-theme", t); };
     const toggleRail = () => setCollapsed(c => { localStorage.setItem("ac-sidebar-collapsed", String(!c)); return !c; });
 
     // ⌘K / Ctrl+K. Extensions dispatch synthetic key events with no key at all.

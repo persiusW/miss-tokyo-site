@@ -468,6 +468,9 @@
 .adm2 .menu,.adm2 .bulkbar,.adm2 .banner,.adm2 .unsaved{animation:rise var(--dur) var(--ease)}
 @keyframes hl-out{from{background-color:var(--warn-bg)}to{background-color:transparent}}
 .adm2 .srow.hl{animation:hl-out 2.6s var(--ease-in) forwards}
+/* Theme switch: beginThemeFade() puts .theming on <html> for 300ms so every
+   colour cross-fades instead of snapping. */
+html.theming .adm2,html.theming .adm2 *,html.theming .adm2 *::before,html.theming .adm2 *::after{transition:color 300ms var(--ease),background-color 300ms var(--ease),border-color 300ms var(--ease),fill 300ms var(--ease),stroke 300ms var(--ease),outline-color 300ms var(--ease),text-decoration-color 300ms var(--ease)!important;transition-delay:0s!important}
 /* Route view transitions (motion.ts startRouteTransition): a short root
    cross-fade that never takes the clicks. */
 html:has(.adm2)::view-transition{pointer-events:none}
