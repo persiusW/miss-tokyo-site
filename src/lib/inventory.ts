@@ -741,13 +741,25 @@ export async function adjustStock(
     productId: string,
     variantId: string | null,
     delta: number,
+    by?: { actor: string; note?: string },
 ): Promise<void> {
     if (!delta) return;
-    const { error } = await supabaseAdmin.rpc("fn_adjust_stock", {
-        p_product_id: productId,
-        p_variant_id: variantId,
-        p_delta: delta,
-    });
+    // With a staff member to credit, the same admin_adjust movement goes through
+    // fn_apply_stock_movement directly so stock history can say who made it.
+    const { error } = by
+        ? await supabaseAdmin.rpc("fn_apply_stock_movement", {
+            p_product_id: productId,
+            p_variant_id: variantId,
+            p_delta: delta,
+            p_reason: "admin_adjust",
+            p_actor: by.actor,
+            p_note: by.note ?? null,
+        })
+        : await supabaseAdmin.rpc("fn_adjust_stock", {
+            p_product_id: productId,
+            p_variant_id: variantId,
+            p_delta: delta,
+        });
     if (error) throw new Error(error.message);
 }
 

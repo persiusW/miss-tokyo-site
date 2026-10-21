@@ -85,6 +85,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "name, slug, and price_ghs are required" }, { status: 400 });
     }
 
+    // Opening stock goes through the ledger like every other change: the rows
+    // start at 0 and the typed counts are applied as movements below, so stock
+    // history starts with "Corrected +N by <staff>" instead of a number nobody
+    // recorded. An untracked product still gets the 9999 "not tracked" flag.
+    const tracked = (track_inventory ?? true) !== false;
+    const byVariant = tracked && track_variant_inventory === true;
+    const openingStock = tracked && !byVariant ? Math.max(0, Math.trunc(Number(inventory_count) || 0)) : 0;
+
     const { data, error } = await supabaseAdmin
         .from("products")
         .insert([{
@@ -92,7 +100,7 @@ export async function POST(req: NextRequest) {
             slug,
             sku: sku ?? null,
             price_ghs: Number(price_ghs),
-            inventory_count: track_inventory && !track_variant_inventory ? Number(inventory_count) : 9999,
+            inventory_count: tracked ? 0 : 9999,
             track_inventory: track_inventory ?? true,
             track_variant_inventory: track_variant_inventory ?? false,
             description,
@@ -118,20 +126,31 @@ export async function POST(req: NextRequest) {
         return apiError("GEN-00", { status: 500, audience: "staff", cause: error });
     }
 
+    const by = { actor: user.id, note: "Opening stock" };
+    if (openingStock > 0) {
+        try {
+            await adjustStock(data.id, null, openingStock, by);
+        } catch (e: any) {
+            console.error("[admin/products POST] opening stock failed:", e?.message, { id: data.id });
+            return NextResponse.json({ error: "The product was added, but its stock wasn't saved. Open it and enter the stock again." }, { status: 500 });
+        }
+    }
+
     // Insert per-variant inventory rows when tracking by variant
-    if (track_inventory && track_variant_inventory && variants && variants.length > 0) {
+    if (byVariant && variants && variants.length > 0) {
         const toInsert = variants.map((v: any) => ({
             product_id: data.id,
             size: v.size || null,
             color: v.color || null,
             brand: v.brand || null,
             sku: v.sku || null,
-            inventory_count: v.inventory_count ?? 0,
+            inventory_count: 0,
         }));
 
-        const { error: insertErr } = await supabaseAdmin
+        const { data: inserted, error: insertErr } = await supabaseAdmin
             .from("product_variants")
-            .insert(toInsert);
+            .insert(toInsert)
+            .select("id, size, color, brand");
 
         if (insertErr) {
             console.error("[admin/products POST] variant insert failed:", insertErr.message);
@@ -139,11 +158,22 @@ export async function POST(req: NextRequest) {
             return apiError("GEN-00", { status: 500, audience: "staff", cause: insertErr });
         }
 
-        // Sync product-level inventory_count to variant sum. The product was
-        // inserted with the 9999 sentinel; leaving it there would read as
-        // unlimited stock for a product that does track inventory.
-        await syncProductStockFromVariants(data.id);
+        // Each size's opening count moves its row and the product roll-up
+        // together, so the roll-up ends up as the sum without a rebuild.
+        const keyOf = (v: { size?: string | null; color?: string | null; brand?: string | null }) => `${normAttr(v.size)}|${normAttr(v.color)}|${normAttr(v.brand)}`;
+        const idByKey = new Map((inserted ?? []).map((v: any) => [keyOf(v), v.id as string]));
+        try {
+            for (const v of variants) {
+                const n = Math.max(0, Math.trunc(Number(v.inventory_count) || 0));
+                const vid = idByKey.get(keyOf(v));
+                if (vid && n > 0) await adjustStock(data.id, vid, n, by);
+            }
+        } catch (e: any) {
+            console.error("[admin/products POST] opening variant stock failed:", e?.message, { id: data.id });
+            return NextResponse.json({ error: "The product was added, but some of its stock wasn't saved. Open it and check the stock." }, { status: 500 });
+        }
     }
+
 
     revalidatePath("/", "page");
     revalidatePath("/shop", "page");
@@ -231,6 +261,7 @@ export async function PATCH(req: NextRequest) {
         variants,
         inventory_baseline,
     } = fields;
+    const by = { actor: user.id };
 
     // Stock is never written as an absolute value from this form.
     //
@@ -295,7 +326,7 @@ export async function PATCH(req: NextRequest) {
     // Product-level stock for a product that does not track by variant.
     if (productStockDelta !== 0) {
         try {
-            await adjustStock(id, null, productStockDelta);
+            await adjustStock(id, null, productStockDelta, by);
         } catch (e: any) {
             console.error("[admin/products PATCH] stock adjust failed:", e?.message, { id, productStockDelta });
             return NextResponse.json({ error: "Stock update failed. Nothing was changed." }, { status: 500 });
@@ -340,13 +371,15 @@ export async function PATCH(req: NextRequest) {
             const desired = Number(v.inventory_count ?? 0);
 
             if (!existing) {
+                // A new size starts at 0; its count goes through the ledger below.
                 toInsert.push({
                     product_id: id,
                     size: v.size || null,
                     color: v.color || null,
                     brand: v.brand || null,
                     sku: v.sku || null,
-                    inventory_count: Number.isFinite(desired) ? desired : 0,
+                    inventory_count: 0,
+                    _opening: Number.isFinite(desired) ? Math.max(0, Math.trunc(desired)) : 0,
                 });
                 continue;
             }
@@ -361,7 +394,7 @@ export async function PATCH(req: NextRequest) {
 
             if (delta !== 0) {
                 try {
-                    await adjustStock(id, existing.id, delta);
+                    await adjustStock(id, existing.id, delta, by);
                 } catch (e: any) {
                     console.error("[admin/products PATCH] variant stock adjust failed:", e?.message, { id, variantId: existing.id, delta });
                     return NextResponse.json({ error: "Stock update failed. Nothing was changed." }, { status: 500 });
@@ -375,11 +408,24 @@ export async function PATCH(req: NextRequest) {
         }
 
         if (toInsert.length > 0) {
-            const { error: insertErr } = await supabaseAdmin.from("product_variants").insert(toInsert);
+            const { data: inserted, error: insertErr } = await supabaseAdmin.from("product_variants")
+                .insert(toInsert.map(({ _opening, ...row }) => row))
+                .select("id, size, color, brand");
             if (insertErr) {
                 console.error("[admin/products PATCH] variant insert failed:", insertErr.message);
                 { const dup = uniqueViolationMessage(insertErr); if (dup) return NextResponse.json({ error: dup }, { status: 409 }); }
                 return apiError("GEN-00", { status: 500, audience: "staff", cause: insertErr });
+            }
+            const idByKey = new Map((inserted ?? []).map((v: any) => [keyOf(v), v.id as string]));
+            for (const row of toInsert) {
+                const vid = idByKey.get(keyOf(row));
+                if (!vid || !row._opening) continue;
+                try {
+                    await adjustStock(id, vid, row._opening, { actor: user.id, note: "Opening stock" });
+                } catch (e: any) {
+                    console.error("[admin/products PATCH] new variant stock failed:", e?.message, { id, variantId: vid });
+                    return NextResponse.json({ error: "Stock update failed for a new size. Open the product and check its stock." }, { status: 500 });
+                }
             }
         }
 
