@@ -73,13 +73,13 @@ export function SettingsApp({ data, section, ai = null, hl = null, legacyTab = n
         if (target && target !== section && sections.some(s => s.k === target)) router.replace(`/settings/${target}`);
     }, [legacyTab, spotlight, section, sections, router]);
 
-    // Jump to a row from search and highlight it for 2.5 s.
+    // Jump to a row from search: it flashes amber and fades out over 2.6 s (admin-v2.css, .srow.hl).
     const [lit, setLit] = useState<string | null>(hl);
     useEffect(() => {
         setLit(hl);
         if (!hl) return;
         const t1 = setTimeout(() => document.getElementById(rowId(hl))?.scrollIntoView({ block: "center", behavior: "smooth" }), 80);
-        const t2 = setTimeout(() => setLit(null), 2500);
+        const t2 = setTimeout(() => setLit(null), 2600);
         return () => { clearTimeout(t1); clearTimeout(t2); };
     }, [hl, section]);
 
