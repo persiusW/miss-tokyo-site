@@ -78,6 +78,8 @@ export async function freezeStatement(period: Period, s: BillingSettings, by: st
 /** Send one frozen statement to Dashttp. A GH₵ 0 statement is closed without an invoice. */
 export async function submitStatement(st: StatementRow, clientId: string): Promise<"submitted" | "skipped" | "not_connected" | "failed"> {
     const now = new Date().toISOString();
+    // The local test fixture never writes invoice ids into the real statements table.
+    if (dashttpMode() === "mock") return "not_connected";
     if (!(st.total_ghs > 0)) {
         await db.from("billing_statements").update({ status: "void", last_error: null, updated_at: now }).eq("id", st.id);
         return "skipped";

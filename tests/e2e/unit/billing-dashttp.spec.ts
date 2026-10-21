@@ -54,6 +54,7 @@ test("the mock answers like the contract and is idempotent", async () => {
     const env = { DASHTTP_MOCK: "1" };
     const b = await getDashttpBilling({ env });
     expect(b.ok && b.data.plan.name).toContain("fixture");
+    expect(b.ok && b.data.openInvoices.map(i => i.number)).toEqual(["TEST-U-0000"]);
     const a1 = await submitUsageInvoice({ periodStart: "2026-10-08", periodEnd: "2026-10-28", lines: [], totalGhs: 10 }, "k", { env });
     const a2 = await submitUsageInvoice({ periodStart: "2026-10-08", periodEnd: "2026-10-28", lines: [], totalGhs: 10 }, "k", { env });
     expect(a1.ok && a2.ok && a1.data.id === a2.data.id).toBe(true);

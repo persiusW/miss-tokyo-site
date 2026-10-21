@@ -4,7 +4,13 @@
 // figures are fixture values, not Miss Tokyo's plan.
 
 type Inv = Record<string, unknown>;
-const state: { invoices: Inv[]; seq: number } = { invoices: [], seq: 1 };
+// One open features invoice so the Pay now path can be tried locally.
+const SEED = (): Inv[] => [{
+    id: "uinv_test_0", number: "TEST-U-0000", periodStart: "2026-09-29", periodEnd: "2026-10-28", issuedAt: "2026-10-29T01:05:00.000Z",
+    dueAt: "2026-11-12T00:00:00.000Z", amountGhs: 12.5, status: "open", payUrl: null, pdfUrl: null,
+    lines: [{ service: "sms", description: "SMS messages (fixture)", quantity: 250, unit: "SMS unit", amountGhs: 12.5 }],
+}];
+const state: { invoices: Inv[]; seq: number } = { invoices: SEED(), seq: 1 };
 
 const PLAN = {
     name: "Test plan (fixture)", amount: 100, currency: "GHS", interval: "monthly", status: "active",
@@ -15,7 +21,7 @@ const RECEIPTS = [
 ];
 
 export function resetMockDashttp() {
-    state.invoices = [];
+    state.invoices = SEED();
     state.seq = 1;
 }
 
@@ -48,6 +54,7 @@ export function mockDashttp(method: string, path: string, body: unknown): unknow
         if (!inv) return null;
         if (method === "POST" && one[2]) {
             const cb = String((body as Record<string, unknown>)?.callbackUrl ?? "");
+            inv.status = "paid"; // the fixture's "payment" completes at once
             return { authorizationUrl: `${cb}${cb.includes("?") ? "&" : "?"}mock_pay=${encodeURIComponent(String(inv.id))}`, reference: `test_ref_${inv.id}` };
         }
         if (method === "GET") return inv;
