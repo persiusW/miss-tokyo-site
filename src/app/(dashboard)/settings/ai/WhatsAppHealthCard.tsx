@@ -43,6 +43,30 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
     const [templateIds, setTemplateIds] = useState<Record<StatusTemplateEvent, string>>(
         () => Object.fromEntries(STATUS_TEMPLATE_EVENTS.map(e => [e, String(savedIds[e] ?? "")])) as Record<StatusTemplateEvent, string>);
     const [savingUpdates, setSavingUpdates] = useState(false);
+    const alertRow = settings.find(s => s.key === "whatsapp_wallet_alert_number");
+    const walletRow = settings.find(s => s.key === "whatsapp_wallet_alert_ghs");
+    const [alertNumber, setAlertNumber] = useState(String(alertRow?.value ?? ""));
+    const [walletBelow, setWalletBelow] = useState(String(walletRow?.value ?? "50"));
+    const [savingAlerts, setSavingAlerts] = useState(false);
+
+    async function saveAlerts() {
+        const number = alertNumber.trim() === "" ? "" : normaliseWaNumber(alertNumber);
+        if (number === null) { toast.error("Enter a Ghana phone number, or leave it blank to use the shop's WhatsApp number."); return; }
+        const below = Number(walletBelow);
+        if (!Number.isFinite(below) || below < 0) { toast.error("Enter an amount in cedis, or 0 to turn the wallet alert off."); return; }
+        const changes: [string, unknown][] = [];
+        if (alertRow && number !== String(alertRow.value ?? "")) changes.push(["whatsapp_wallet_alert_number", number]);
+        if (walletRow && below !== Number(walletRow.value)) changes.push(["whatsapp_wallet_alert_ghs", below]);
+        if (changes.length === 0) { toast.info("Nothing to save."); return; }
+        setSavingAlerts(true);
+        try {
+            for (const [k, v] of changes) if (!(await patch(k, v))) return;
+            setAlertNumber(number);
+            toast.success("Saved. Wallet and AI budget alerts go to that number.");
+        } catch {
+            toast.error("We couldn't save that. Please check your connection and try again.");
+        } finally { setSavingAlerts(false); onSaved(); }
+    }
 
     async function patch(key: string, value: unknown): Promise<boolean> {
         const res = await fetch("/api/ai/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, value }) });
@@ -141,6 +165,24 @@ export default function WhatsAppHealthCard({ settings, onSaved }: { settings: { 
                 </label>
                 <button type="button" className="ac-btn ac-btn-primary" onClick={saveHandoff} disabled={saving || !saved}>
                     {saving ? "Saving…" : "Save"}
+                </button>
+            </div>
+            <div style={{ marginTop: 18, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }} data-wa-alerts>
+                <label style={{ flex: "1 1 240px" }}>
+                    <span className="ac-label">Send wallet and AI budget alerts to</span>
+                    <input className="ac-input" inputMode="tel" placeholder="Blank = the shop's WhatsApp number"
+                        value={alertNumber} onChange={e => setAlertNumber(e.target.value)} disabled={!alertRow} data-wa-alert-number />
+                    <span style={{ display: "block", fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>
+                        By SMS, at most once a day each: the wallet running low, and the AI spend reaching 80% and 100% of the daily cap.
+                    </span>
+                </label>
+                <label style={{ flex: "0 1 180px" }}>
+                    <span className="ac-label">Wallet alert below (GHS)</span>
+                    <input className="ac-input" inputMode="decimal" value={walletBelow} onChange={e => setWalletBelow(e.target.value)} disabled={!walletRow} data-wa-wallet-below />
+                    <span style={{ display: "block", fontSize: 11, color: "var(--ac-ink-4)", marginTop: 4 }}>Checked hourly. 0 turns it off.</span>
+                </label>
+                <button type="button" className="ac-btn ac-btn-primary" onClick={saveAlerts} disabled={savingAlerts || (!alertRow && !walletRow)}>
+                    {savingAlerts ? "Saving…" : "Save"}
                 </button>
             </div>
             <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--ac-line)" }} data-wa-updates>
