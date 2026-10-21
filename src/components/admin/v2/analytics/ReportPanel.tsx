@@ -209,9 +209,9 @@ function Body({ k, data, q, page, setPage, openRider, openDiscount }: {
             const t = writeoffTable(data.rows);
             const hasWriteOff = rows(data.rows).some(x => x.reason === "write_off");
             return <>
-                {!hasWriteOff && (
-                    <Banner tone="info" title="Stock changes don't record a reason yet">
-                        This lists every time stock was taken off by hand, which can be damage, loss or a count that was corrected. Once adjusting stock asks for a reason, items written off as damaged or lost show here on their own line.
+                {!hasWriteOff && t.rows.length > 0 && (
+                    <Banner tone="info" title="Nothing was written off as damaged or lost in these dates">
+                        These are stock corrections made by hand. Items written off with Products › Inventory › Adjust › Damaged or lost show here with that reason.
                     </Banner>
                 )}
                 {t.rows.length ? <ReportTable t={t} label="Stock written off" /> : empty("No stock taken off in these dates", "Items appear here when someone lowers stock by hand or writes items off.", "box")}
