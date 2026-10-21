@@ -435,6 +435,22 @@
 .adm2 .modal-wrap.closing>.scrim{animation:fade-out 150ms var(--ease-in) forwards!important}
 .adm2 .modal-wrap.closing>.modal,.adm2 .modal-wrap.closing>.palette{animation:pop-out 150ms var(--ease-in) forwards!important}
 @media (max-width:620px){.adm2 .panel.closing,.adm2 .panel.wide.closing{animation:sheet-out 170ms var(--ease-in) forwards}}
+/* Tabs: the underline is a bar that grows from the centre when a tab is
+   picked (the 2px border stays for layout, and comes back in forced colours). */
+.adm2 .tab{position:relative;transition:color var(--dur-fast) var(--ease)}
+.adm2 .tab[aria-selected="true"]{border-bottom-color:transparent}
+.adm2 .tab::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:2px;background:var(--ink);transform:scaleX(0);pointer-events:none}
+.adm2 .tab[aria-selected="true"]::after{transform:none;animation:grow-x var(--dur) var(--ease)}
+@keyframes grow-x{from{transform:scaleX(0)}}
+@media (forced-colors:active){.adm2 .tab[aria-selected="true"]{border-bottom-color:CanvasText}.adm2 .tab::after{display:none}}
+/* Buttons, chips, radio cards and tiles: colour over 140ms, .97 when pressed
+   (the press rule is under "Press feedback" below). */
+.adm2 .btn,.adm2 .icon-btn,.adm2 .chip,.adm2 .rcard,.adm2 .tile{transition:background-color var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
+/* A panel's body fades up 4px when its tab changes (Panel flips the class). */
+@keyframes tab-in-1{from{opacity:0;transform:translateY(4px)}}
+@keyframes tab-in-2{from{opacity:0;transform:translateY(4px)}}
+.adm2 .panel-body.tab-in-1{animation:tab-in-1 var(--dur) var(--ease)}
+.adm2 .panel-body.tab-in-2{animation:tab-in-2 var(--dur) var(--ease)}
 /* Route view transitions (motion.ts startRouteTransition): a short root
    cross-fade that never takes the clicks. */
 html:has(.adm2)::view-transition{pointer-events:none}
@@ -469,7 +485,7 @@ html:has(.adm2)::view-transition-old(root),html:has(.adm2)::view-transition-new(
 .adm2 a.tab,.adm2 a.nav-item,.adm2 a.tab:hover,.adm2 a.nav-item:hover{text-decoration:none}
 
 /* Press feedback for every button-like control. */
-.adm2 .btn:active:not([disabled]),.adm2 .chip:active,.adm2 .icon-btn:active,.adm2 .rcard:active{transform:translateY(1px)}
+.adm2 .btn:active:not([disabled]),.adm2 .chip:active,.adm2 .icon-btn:active:not([disabled]),.adm2 .rcard:active:not([aria-disabled="true"]){transform:scale(.97)}
 
 /* Toast tones: errors keep the ink bar with a danger edge. */
 .adm2 .toast.err{box-shadow:inset 4px 0 0 var(--danger-solid),var(--sh-pop)}

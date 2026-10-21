@@ -109,6 +109,11 @@ export function Panel<T extends string>({ open, onClose, title, sub, head, tabs,
     const mounted = useMounted();
     const host = mounted ? portalHost() : null;
     useExit(open && !!host, EXIT_MS.panel, scrimRef, ref);
+    // A tab change fades the body in again: alternate two identical keyframes
+    // so the animation restarts without remounting what's inside.
+    const [seenTab, setSeenTab] = useState(tab);
+    const [flip, setFlip] = useState<0 | 1 | 2>(0);
+    if (tab !== seenTab) { setSeenTab(tab); setFlip(f => (f === 1 ? 2 : 1)); }
     if (!open || !host) return null;
     const lv = level === 2 ? " stack-2" : "";
     return createPortal(
@@ -121,7 +126,7 @@ export function Panel<T extends string>({ open, onClose, title, sub, head, tabs,
                     <IconBtn label="Close" icon="x" onClick={onClose} />
                 </div>
                 {tabs && tab != null && <Tabs tabs={tabs} value={tab} onChange={onTab} label="Panel sections" />}
-                <div className="panel-body">{children}</div>
+                <div className={`panel-body${flip ? ` tab-in-${flip}` : ""}`}>{children}</div>
                 {(footer || footerLeft) && <div className="panel-f"><div className="left">{footerLeft}</div>{footer}</div>}
             </aside>
         </>,

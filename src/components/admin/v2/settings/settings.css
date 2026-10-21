@@ -1,6 +1,7 @@
 /* Settings extras on top of admin-v2.css. Scoped to .adm2, tokens only. */
 .adm2 .set-group-t{font-size:var(--t-lg);font-weight:700;margin:var(--s2) 0 0}
-.adm2 .set-card{text-align:left;border:0;cursor:pointer;display:flex;flex-direction:column;gap:var(--s1);color:inherit;font:inherit;min-height:88px;transition:background var(--dur) var(--ease)}
+.adm2 .set-card{text-align:left;border:0;cursor:pointer;display:flex;flex-direction:column;gap:var(--s1);color:inherit;font:inherit;min-height:88px;transition:background-color var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
+@media (hover:hover){.adm2 .set-card:hover{transform:translateY(-1px)}}
 .adm2 .set-card:hover{background:var(--card-2)}
 .adm2 .set-card:focus-visible{outline:none;box-shadow:var(--focus)}
 .adm2 .set-card:active{background:var(--card-3)}
