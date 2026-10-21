@@ -191,11 +191,13 @@ export async function POST(req: NextRequest) {
     // Re-validate the staff-entered coupon / gift card against the DB. The till
     // only ever sends a code; its worth is computed here against the
     // server-calculated subtotal, exactly as /api/paystack/initialize does.
-    const validatedDiscount = await validateDiscountCode(session.discount_code, totalGHS, deliveryFee);
+    const validatedDiscount = await validateDiscountCode(session.discount_code, totalGHS, deliveryFee, {
+        email: session.customer_email, phone: session.customer_phone,
+    });
 
     if (session.discount_code && !validatedDiscount) {
         return NextResponse.json({
-            error: `Code "${session.discount_code}" is no longer valid — it may have expired, been fully redeemed, or hit its usage limit. Remove it and try again.`,
+            error: `Code "${session.discount_code}" is no longer valid — it may have expired, been fully redeemed, hit its usage limit, or (for a one-use-per-customer code) already been used by this customer. Remove it and try again.`,
         }, { status: 409 });
     }
 

@@ -1,0 +1,25 @@
+/* Admin v2 Discounts. Scoped to .adm2, tokens only. */
+.adm2 .disc-overlaps{margin-bottom:var(--s4)}
+.adm2 .disc-tools .search{flex:1 1 260px}
+.adm2 .disc-tbl .disc-name{overflow-wrap:anywhere}
+.adm2 .disc-tbl .disc-applies{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm2 .disc-tbl tbody tr.click:focus-visible td{background:var(--card-2)}
+.adm2 .disc-tbl tbody tr.click:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+.adm2 .disc-fields{border:0;margin:0;padding:0;min-width:0}
+.adm2 .disc-fields:disabled{opacity:.75}
+.adm2 .disc-code-row{flex-wrap:wrap}
+.adm2 .disc-code-row .disc-code{flex:1 1 180px;text-transform:uppercase;letter-spacing:.04em}
+.adm2 .disc-narrow{max-width:220px}
+.adm2 .disc-qty{max-width:120px}
+.adm2 .disc-limit{max-width:160px}
+.adm2 .disc-date{min-width:0;max-width:240px}
+.adm2 .disc-schedule{background:var(--card-2)}
+.adm2 .disc-picks{max-height:220px;overflow-y:auto;padding:2px}
+.adm2 .disc-order{color:inherit;text-decoration:none}
+.adm2 .disc-order .r{text-align:right;flex:none}
+.adm2 .disc-fields .seg{flex-wrap:wrap}
+@media (max-width:620px){
+.adm2 .disc-tools .search{flex-basis:100%}
+.adm2 .disc-kpis{grid-template-columns:minmax(0,1fr)}
+.adm2 .disc-date{max-width:none;width:100%}
+}

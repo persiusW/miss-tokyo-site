@@ -34,7 +34,7 @@ export const ANCHORS = {
     "poshistory.cancel": { route: "pos_history", label: "Cancel Session" },
     "products.new": { route: "products", label: "New Product button" },
     "products.low-stock": { route: "products", label: "Low Stock button" },
-    "discounts.new": { route: "discounts", label: "New Discount button" },
+    "discounts.new": { route: "discounts", label: "Create discount button (New Discount in the old admin)" },
     "giftcards.issue": { route: "gift_cards", label: "Issue Gift Card button" },
     "settings.tabs": { route: "settings", label: "Settings tabs" },
     "settings.delivery-fees": { route: "settings", label: "Delivery Fees", tab: "store" },

@@ -355,11 +355,12 @@ export default function POSPage() {
 
     // Preview only — send-link recomputes the code's worth server-side and is
     // the value actually charged.
-    const lookupCode = useCallback(async (code: string, subtotal: number, fee: number): Promise<PosAppliedDiscount | string> => {
+    // `who` lets a one-use-per-customer code be checked when it is applied.
+    const lookupCode = useCallback(async (code: string, subtotal: number, fee: number, who?: { email?: string | null; phone?: string | null }): Promise<PosAppliedDiscount | string> => {
         const res = await fetch('/api/checkout/validate-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, subtotal, deliveryFee: fee }),
+            body: JSON.stringify({ code, subtotal, deliveryFee: fee, email: who?.email ?? null, phone: who?.phone ?? null }),
         });
         const data = await res.json();
         if (!data.valid) return data.error ?? 'Code not found or invalid.';
@@ -379,7 +380,10 @@ export default function POSPage() {
         if (cart.length === 0) { toast.error('Add items before applying a code'); return; }
         setCheckingCode(true);
         try {
-            const result = await lookupCode(code, cartTotal, deliveryFee);
+            const result = await lookupCode(code, cartTotal, deliveryFee, {
+                email: (customerMode === 'new' ? newCustomer.email : selectedContact?.email) || null,
+                phone: customerPhone || selectedContact?.phone || null,
+            });
             if (typeof result === 'string') { toast.error(result); return; }
             setAppliedDiscount(result);
             setDiscountInput('');

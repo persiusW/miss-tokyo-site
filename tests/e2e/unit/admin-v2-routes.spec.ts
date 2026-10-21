@@ -17,6 +17,8 @@ test("old URLs go forward only while their area is on and built", () => {
     expect(v2Redirect("/sales/wholesalers", "", FLAGS_ALL, ALL)).toBe("/customers?segment=wholesale");
     expect(v2Redirect("/settings/ai", "", FLAGS_ALL, ALL)).toBe("/settings/assistants");
     expect(v2Redirect("/sales/orders", "tab=packed&page=2", FLAGS_ALL, ALL)).toBe("/orders?tab=packed&page=2");
+    expect(v2Redirect("/catalog/discounts", "", FLAGS_ALL, ALL)).toBe("/discounts");
+    expect(v2Redirect("/catalog/auto-discounts", "", FLAGS_ALL, ALL)).toBe("/discounts?type=auto");
 });
 
 test("high-risk areas wait for their own switch", () => {
@@ -36,6 +38,8 @@ test("new URLs go back while their area is off", () => {
     expect(v2Redirect("/catalogue/new", "", FLAGS_OFF, ALL)).toBe("/catalog/products/new");
     expect(v2Redirect("/billing", "", FLAGS_OFF, ALL)).toBe("/settings");
     expect(v2Redirect("/settings/assistants", "", FLAGS_OFF, ALL)).toBe("/settings/ai");
+    expect(v2Redirect("/discounts", "status=active", FLAGS_OFF, ALL)).toBe("/catalog/discounts?status=active");
+    expect(v2Redirect("/discounts/c90ace37-332e-4947-8601-a841661ad450", "", FLAGS_OFF, ALL)).toBe("/catalog/discounts");
     expect(v2Redirect("/home", "", FLAGS_ALL, ALL)).toBeNull();
 });
 
@@ -47,7 +51,7 @@ test("shared paths are never redirected", () => {
 });
 
 test("no redirect ever loops", () => {
-    const paths = ["/overview", "/home", "/sales/orders", "/orders", "/orders/abandoned", "/pos", "/till", "/catalogue", "/catalog/products", "/team", "/staff", "/cms", "/content"];
+    const paths = ["/overview", "/home", "/sales/orders", "/orders", "/orders/abandoned", "/pos", "/till", "/catalogue", "/catalog/products", "/team", "/staff", "/cms", "/content", "/catalog/discounts", "/catalog/auto-discounts", "/discounts", "/discounts/abc"];
     for (const flags of [FLAGS_ALL, FLAGS_OFF, { ...FLAGS_OFF, admin_v2: true }]) {
         for (const p of paths) {
             const once = v2Redirect(p, "", flags, ALL);
