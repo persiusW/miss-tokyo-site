@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Btn, Card, Empty, Icon, Switch, Thumb, plural, toast } from "@/components/admin/ui";
-import { HOME_SECTIONS, NEW_ARRIVALS_SHOWN, OWN_SWITCH, type HomeSectionId } from "@/lib/content/homeLayout";
+import { HOME_SECTIONS, OWN_SWITCH, type HomeSectionId } from "@/lib/content/homeLayout";
 import type { HomeData, Slide } from "./data";
 import { reorderSlides, saveHomeOrder, setHomeSectionShown } from "./actions";
 import { MoveButtons, quickSwitch, run, swap } from "./shared";
@@ -88,8 +88,14 @@ export function HomeTab({ data }: { data: HomeData }) {
                     .map(f => f.custom_label || data.categories.find(c => c.id === f.category_id)?.name).filter(Boolean);
                 return names.length ? names.join(", ") : "No categories picked";
             }
-            case "new_arrivals":
-                return `The ${NEW_ARRIVALS_SHOWN} newest products`;
+            case "new_arrivals": {
+                const na = data.newArrivals;
+                const cat = na.categoryId ? data.categories.find(c => c.id === na.categoryId)?.name ?? "one category" : null;
+                const what = na.tabs.length > 1
+                    ? `${na.tabs.length} tabs: ${na.tabs.map(t => t.label || "Untitled").join(", ")}`
+                    : `The ${na.limit} ${na.tabs[0]?.mode === "sort_order" ? "first products in shop order" : "newest products"}`;
+                return `“${na.title}” · ${what}${cat ? ` from ${cat}` : ""}`;
+            }
             case "reviews":
                 return "Review widget from Transparent Turtle";
             case "newsletter":

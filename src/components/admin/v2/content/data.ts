@@ -7,6 +7,7 @@ import { HOME_LAYOUT_KEY, parseLayout, type HomeLayout } from "@/lib/content/hom
 import { FAQ_COPY_KEY, POLICY_KEYS, POLICY_META, SIZE_GUIDE_PAGE_KEY, SIZE_MODAL_KEY, parseFaqs, parsePolicy, parseSizeGuidePage, type PolicyDoc, type PolicyKey, type SizeGuidePage } from "@/lib/content/pageDocs";
 import { ABOUT_TEXT_KEYS, NAV_KEYS, PDP_KEYS, type AboutIn, type CarouselTab, type GiftCardSettingsIn, type ModalSizeRow, type NavKey, type PdpKey, type SeoIn, type TrustItem } from "@/lib/content/adminInput";
 import { SITE_ASSETS, WORDING, isConfigCopyKey } from "@/lib/content/wording";
+import { CAROUSEL_KEY, NEW_ARRIVALS_DEFAULT_LIMIT, NEW_ARRIVALS_DEFAULT_TITLE, parseCarouselTabs } from "@/lib/content/homeSections";
 import type { Faq } from "@/content/shopInfo";
 import { SEO_PATHS } from "./pagesList";
 
@@ -31,10 +32,6 @@ export type HomeData = {
 };
 
 const STR = ["eyebrow", "headline_line1", "headline_line2", "headline_line3", "body_text", "cta_primary_label", "cta_primary_url", "cta_secondary_label", "cta_secondary_url", "image_url"] as const;
-const DEFAULT_TABS: CarouselTab[] = [
-    { label: "New In", mode: "newest", category_name: "" },
-    { label: "Bestsellers", mode: "sort_order", category_name: "" },
-];
 
 export async function loadHome(): Promise<HomeData | null> {
     try {
@@ -49,8 +46,6 @@ export async function loadHome(): Promise<HomeData | null> {
         if (s.error || slides.error || cats.error || feat.error || copy.error) throw s.error ?? slides.error ?? cats.error ?? feat.error ?? copy.error;
         const st = (s.data ?? {}) as Record<string, any>;
         const cv = Object.fromEntries((copy.data ?? []).map((r: { copy_key: string; value: string }) => [r.copy_key, r.value]));
-        let tabs = DEFAULT_TABS;
-        try { const p = JSON.parse(cv.carousel_config ?? ""); if (Array.isArray(p.tabs) && p.tabs.length) tabs = p.tabs; } catch { /* keep defaults */ }
         const featured: FeaturedSlot[] = [0, 1, 2, 3].map(pos => {
             const f = (feat.data ?? []).find((x: { position: number }) => x.position === pos) as Record<string, any> | undefined;
             return f
@@ -68,11 +63,12 @@ export async function loadHome(): Promise<HomeData | null> {
             trustItems: Array.isArray(st.trust_bar_items) ? st.trust_bar_items : [],
             categories: (cats.data ?? []) as Category[],
             featured,
+            // Same fallbacks as the home page (lib/content/homeSections).
             newArrivals: {
-                title: st.homepage_new_arrivals_title ?? "New Arrivals",
+                title: st.homepage_new_arrivals_title?.trim() || NEW_ARRIVALS_DEFAULT_TITLE,
                 categoryId: st.homepage_new_arrivals_category_id ?? null,
-                limit: st.homepage_new_arrivals_limit ?? 8,
-                tabs,
+                limit: st.homepage_new_arrivals_limit ?? NEW_ARRIVALS_DEFAULT_LIMIT,
+                tabs: parseCarouselTabs(cv[CAROUSEL_KEY]),
             },
             newsletter: {
                 // Same fallbacks as the home page itself.

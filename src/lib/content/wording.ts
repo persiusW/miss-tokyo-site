@@ -6,19 +6,28 @@
 export const CONFIG_COPY_KEYS = ["size_guide_rows", "carousel_config", "wholesale_tiers", "homepage_layout"] as const;
 export const isConfigCopyKey = (k: string) => (CONFIG_COPY_KEYS as readonly string[]).includes(k) || k.startsWith("page_");
 
-export type WordingDef = { key: string; label: string; group: string; hint?: string; original: string };
+export type WordingDef = { key: string; label: string; group: string; hint?: string; original: string; path: string };
 
 /** Wording the shop reads, with the text it shows when nothing is saved.
- *  A pages's code imports its fallback from here, so "Use the original
- *  wording" always puts back exactly what customers saw. */
+ *  A page's code takes its fallback from here, so "Use the original
+ *  wording" always puts back exactly what customers saw. `path` is the page
+ *  that shows it (refreshed when it is saved). */
 export const WORDING: WordingDef[] = [
-    { key: "craft_heritage_heading", group: "craft", label: "Heritage heading", hint: "The Craft page, section 01", original: "The Name Is Personal" },
-    { key: "craft_heritage_body", group: "craft", label: "Heritage text", hint: "The Craft page, section 01", original: "MISS TOKYO is more than a label; it is a lineage. Born in Accra, our atelier honors the artisanal legacy of Ghana by refusing the shortcuts of mass production. Every stitch is a deliberate act of preservation." },
-    { key: "craft_philosophy_heading", group: "craft", label: "Philosophy heading", hint: "The Craft page, section 02", original: "Visual Silence" },
-    { key: "craft_philosophy_body", group: "craft", label: "Philosophy text", hint: "The Craft page, section 02", original: "We strip away the extraneous to leave only the essential structure. True luxury is found in the quiet details: unbranded surfaces, perfectly skived edges, and leathers selected to age alongside you. Elegance is refusal." },
+    { key: "home_new_arrivals_eyebrow", group: "homepage", label: "New arrivals small heading", hint: "The home page, above the New Arrivals title", original: "JUST LANDED", path: "/" },
+    { key: "home_new_arrivals_link", group: "homepage", label: "New arrivals link", hint: "The home page, the link to the shop beside the New Arrivals title", original: "VIEW ALL", path: "/" },
+    { key: "craft_heritage_heading", group: "craft", label: "Heritage heading", hint: "The Craft page, section 01", original: "The Name Is Personal", path: "/craft" },
+    { key: "craft_heritage_body", group: "craft", label: "Heritage text", hint: "The Craft page, section 01", original: "MISS TOKYO is more than a label; it is a lineage. Born in Accra, our atelier honors the artisanal legacy of Ghana by refusing the shortcuts of mass production. Every stitch is a deliberate act of preservation.", path: "/craft" },
+    { key: "craft_philosophy_heading", group: "craft", label: "Philosophy heading", hint: "The Craft page, section 02", original: "Visual Silence", path: "/craft" },
+    { key: "craft_philosophy_body", group: "craft", label: "Philosophy text", hint: "The Craft page, section 02", original: "We strip away the extraneous to leave only the essential structure. True luxury is found in the quiet details: unbranded surfaces, perfectly skived edges, and leathers selected to age alongside you. Elegance is refusal.", path: "/craft" },
 ];
 
 export const wordingOriginal = (key: string) => WORDING.find(w => w.key === key)?.original;
+
+/** A saved value, or the original when nothing (or only spaces) is saved. */
+export function wordingText(saved: Record<string, string | null | undefined>, key: string): string {
+    const v = saved[key];
+    return typeof v === "string" && v.trim() ? v : (wordingOriginal(key) ?? "");
+}
 
 export const GROUP_LABELS: Record<string, string> = {
     homepage: "Home page",
