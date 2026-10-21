@@ -17,6 +17,7 @@ import { chatForConversation, latestNotice, loadWaConversation, logOutbound, off
 import { forwardToTeam, localNumber, whyText, type HandoffReason } from "./handoff";
 import { logConversationEvent } from "./events";
 import { claimReferral, claimTeamAlert } from "./teamWatch";
+import { factsFor } from "./customerFacts";
 import { sendAdminPushNotifications } from "@/lib/orderSettlement";
 import { canAnswerWaiting } from "./inbox";
 import { archiveInboundMedia, type Download } from "./media";
@@ -148,9 +149,10 @@ export async function pipelineFor(
             await forward(c.id, "wrote_again");
         },
         referToTeam: id => claimReferral(id),
-        run: a => runShopAssistant({
+        run: async a => runShopAssistant({
             channel: "whatsapp", identity: { customerId: a.customerId, phone: a.phone }, chat: a.chat, text: a.text,
             settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, images: a.images, withTeam: a.withTeam,
+            facts: await factsFor(a.conversationId, a.phone),
         }),
         siteUrl: site,
     });

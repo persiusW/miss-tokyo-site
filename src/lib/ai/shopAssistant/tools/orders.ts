@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { cleanTrackQuery } from "@/lib/orders/trackQuery";
 import { findOrderByRef } from "@/lib/orders/findOrderByRef";
+import { last9 } from "@/lib/phoneTail";
 import { publicOrder, repayButton, type OrderRow } from "../format";
 import { trackLocked } from "../guards";
 import { LINES } from "../lines";
@@ -30,9 +31,12 @@ function offerPay(ctx: ShopToolContext, row: OrderRow) {
 export async function trackOrder(input: any, ctx: ShopToolContext): Promise<ToolOutcome> {
     ctx.notes.topic = "my order";
     if (input?.my_orders === true) {
-        if (!ctx.identity.customerId) return ok({ note: "The customer isn't signed in. Ask for the order number and the email or phone used on it." });
-        const { data, error } = await supabaseAdmin.from("orders").select(FIELDS)
-            .eq("customer_id", ctx.identity.customerId).order("created_at", { ascending: false }).limit(5);
+        // On WhatsApp the sender's own number is the proof (as for track_order): their orders are the ones with that phone.
+        const tail = ctx.channel === "whatsapp" ? last9(ctx.identity.phone) : null;
+        if (!ctx.identity.customerId && !tail) return ok({ note: "The customer isn't signed in. Ask for the order number and the email or phone used on it." });
+        const base = supabaseAdmin.from("orders").select(FIELDS);
+        const { data, error } = await (ctx.identity.customerId ? base.eq("customer_id", ctx.identity.customerId) : base.ilike("customer_phone", `%${tail}`))
+            .order("created_at", { ascending: false }).limit(5);
         if (error) throw error;
         for (const r of data ?? []) { remember(ctx, r.id); offerPay(ctx, r as OrderRow); }
         return ok({ orders: (data ?? []).map(r => publicOrder(r as OrderRow)) });

@@ -33,6 +33,8 @@ export async function runShopAssistant(args: {
     settings: AiSettings; whatsappNumber: string | null;
     /** WhatsApp only: the whatsapp_conversations row, so the turn is metered against it. */
     waConversationId?: string | null;
+    /** WhatsApp only: facts from our records for this turn (date, what we know about the number, gap). */
+    facts?: string | null;
     /** WhatsApp only: a member of our team has the chat; the assistant answers what it can. */
     withTeam?: boolean;
     /** WhatsApp only: photos the customer sent with this message, read in this turn only. */
@@ -81,6 +83,7 @@ export async function runShopAssistant(args: {
         {
             messages, model: AI_MODEL,
             system: systemPromptFor(args.channel, args.identity.phone, { choices, restock, returns, withTeam: wa && !!args.withTeam }),
+            facts: wa ? args.facts ?? null : null,
             // Optional tools after the customer tools, so their cached prefix is unchanged.
             tools: [
                 ...CUSTOMER_TOOL_DEFS, ...(choices ? [OFFER_CHOICES_TOOL] : []), ...(restock ? [NOTIFY_WHEN_BACK_TOOL] : []),

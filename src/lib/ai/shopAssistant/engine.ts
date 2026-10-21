@@ -26,7 +26,8 @@ export type EngineResult =
 const KNOWN = new Set<string>([...CUSTOMER_TOOL_NAMES, ...OPTIONAL_TOOL_NAMES]);
 const ENDS_TURN = new Set<string>(END_TURN_TOOL_NAMES);
 
-export async function runShopTurn(args: { messages: Msg[]; system: string; tools: Anthropic.Tool[]; model: string }, deps: EngineDeps): Promise<EngineResult> {
+/** facts: per-turn facts from our records, a second system block after the cached one so the cache holds. */
+export async function runShopTurn(args: { messages: Msg[]; system: string; facts?: string | null; tools: Anthropic.Tool[]; model: string }, deps: EngineDeps): Promise<EngineResult> {
     const now = deps.now ?? Date.now;
     const started = now();
     const messages: Msg[] = [...args.messages];
@@ -47,7 +48,10 @@ export async function runShopTurn(args: { messages: Msg[]; system: string; tools
                 {
                     model: args.model,
                     max_tokens: MAX_TOKENS,
-                    system: [{ type: "text", text: args.system, cache_control: { type: "ephemeral" } }],
+                    system: [
+                        { type: "text", text: args.system, cache_control: { type: "ephemeral" } },
+                        ...(args.facts ? [{ type: "text", text: args.facts }] : []),
+                    ],
                     tools: args.tools,
                     tool_choice: { type: "auto" },
                     thinking: { type: "adaptive" },
