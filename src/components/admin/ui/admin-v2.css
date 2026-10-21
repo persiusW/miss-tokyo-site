@@ -10,7 +10,7 @@
 --r1:6px;--r2:10px;--r3:14px;--rp:999px;
 --tap:44px;--ctl:40px;--ctl-sm:34px;
 --side-w:248px;--top-h:60px;--content-max:1600px;--gutter:24px;--panel-w:560px;--panel-wide:760px;
---ease:cubic-bezier(.2,.7,.2,1);--dur:220ms;
+--dur-fast:140ms;--dur:220ms;--dur-slow:320ms;--ease:cubic-bezier(.2,.7,.2,1);--ease-in:cubic-bezier(.4,0,1,1);--stagger:35ms;
 --bg:#f2efe8;--nav:#e9e5dc;--card:#fffefb;--card-2:#f7f4ee;--card-3:#efebe3;
 --line:rgba(40,32,18,.10);--line-2:rgba(40,32,18,.16);--input-line:#cfc8ba;--input-bg:#fffefb;
 --ink:#1c1a16;--ink-2:#46423a;--ink-3:#625d53;--ink-inv:#fffefb;
@@ -405,7 +405,11 @@
 .adm2 .palette-list{max-height:52vh;overflow-y:auto;padding:var(--s2)}
 .adm2 .palette-list button{display:flex;width:100%;gap:var(--s3);align-items:center;padding:var(--s2) var(--s3);min-height:var(--tap);border:0;background:none;border-radius:var(--r1);text-align:left;cursor:pointer;color:var(--ink)}
 .adm2 .palette-list button[aria-selected="true"]{background:var(--card-2)}
-@media (prefers-reduced-motion:reduce){.adm2,.adm2 *,.adm2 *::before,.adm2 *::after{animation:none!important;transition:none!important}}
+/* Reduced motion: no animation or transition anywhere in the admin, the theme
+   cross-fade included, and no route cross-fade. Panels and modals then close
+   on the same frame (motion.ts skips the exit copy too). */
+@media (prefers-reduced-motion:reduce){.adm2,.adm2 *,.adm2 *::before,.adm2 *::after,html.theming,html.theming *,html.theming *::before,html.theming *::after{animation:none!important;transition:none!important}
+::view-transition-group(*),::view-transition-image-pair(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
 
 /* ── Additions beyond the prototype ── */
 
