@@ -67,6 +67,16 @@ export async function inviteTeamMember(data: InviteData) {
         return { success: false, error: "This person is already on the staff list. Change their role there instead." };
     }
 
+    const { data: waiting } = await supabaseAdmin
+        .from("team_invitations")
+        .select("id")
+        .eq("email", email)
+        .eq("status", "pending")
+        .limit(1);
+    if (waiting?.length) {
+        return { success: false, error: "An invite is already waiting for this address. Send it again from Invites instead." };
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
 
     const { error: insertError } = await supabaseAdmin.from("team_invitations").insert({

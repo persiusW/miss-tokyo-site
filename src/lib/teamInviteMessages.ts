@@ -7,7 +7,7 @@ import { sendEmail } from "@/lib/email";
  * first invite and "Resend" so both say the same thing and use the same link.
  * Server only.
  */
-export async function sendTeamInviteMessages(invite: { email: string; role: string; token: string; phone?: string | null }): Promise<{ success: true; warning?: string } | { success: false; error: string }> {
+export async function sendTeamInviteMessages(invite: { email: string; role: string; token: string; phone?: string | null }): Promise<{ success: boolean; warning?: string; error?: string }> {
     const dynamicHost = await getUrl();
     const inviteLink = `${dynamicHost}/invite?token=${invite.token}`;
     const message = `You have been invited to collaborate on Miss Tokyo as a ${invite.role}. Join here: ${inviteLink}`;
