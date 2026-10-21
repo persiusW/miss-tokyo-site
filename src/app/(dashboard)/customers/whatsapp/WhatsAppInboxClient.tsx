@@ -11,15 +11,23 @@
 // own, so a long chat never pushes the list out of view. On a phone it shows
 // the list or one chat, with a back button.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { canAnswerWaiting, mediaKind, waitingFor, waitingMessages, type InboxConversation, type InboxTab, type Standing } from "@/lib/whatsapp/inbox";
 import type { CustomerPanel } from "@/lib/whatsapp/customerPanel";
+import { Composer, CorrectPanel, StatTiles, type Can, type InboxStats } from "./InboxTeach";
 
 /** media: what can be shown of the message's file (see mediaState); the file itself loads through the media route. */
-type Message = { id: string; direction: "inbound" | "outbound"; text: string | null; type: string | null; at: string; media?: "ready" | "fetch" | "missing" | null };
+type Message = {
+    id: string; direction: "inbound" | "outbound"; text: string | null; type: string | null; at: string; media?: "ready" | "fetch" | "missing" | null;
+    /** Staff sent it from the inbox (Reply myself): their name. */
+    byStaff?: string | null;
+    /** One of the assistant's own replies, which staff may correct. */
+    correctable?: boolean;
+};
 type ChatEvent = { id: string; label: string; kind: string; at: string };
 /** loadedAt: when it was fetched, the "now" for what is waiting (render stays pure). */
-type Thread = { conversation: InboxConversation; messages: Message[]; events?: ChatEvent[]; customer?: CustomerPanel | null; loadedAt: number };
+type Thread = { conversation: InboxConversation; messages: Message[]; events?: ChatEvent[]; customer?: CustomerPanel | null; can?: Can; loadedAt: number };
 type Counts = Record<InboxTab, number>;
 
 const TAB_LABEL: Record<InboxTab, string> = { all: "All", needs: "Needs you", assistant: "Assistant", notices: "Notices", dealt: "Dealt with" };
@@ -72,7 +80,8 @@ export default function WhatsAppInboxClient() {
     const router = useRouter();
     const params = useSearchParams();
     const selected = params.get("c");
-    const [list, setList] = useState<{ chats: InboxConversation[]; counts: Counts; loadedAt: number } | null>(null);
+    const [list, setList] = useState<{ chats: InboxConversation[]; counts: Counts; stats?: InboxStats | null; can?: Can; loadedAt: number } | null>(null);
+    const [correcting, setCorrecting] = useState<Message | null>(null);
     // null until the first load picks it: Needs you when someone is waiting, else All.
     const [tab, setTab] = useState<InboxTab | null>(null);
     const [listError, setListError] = useState<string | null>(null);
@@ -91,7 +100,7 @@ export default function WhatsAppInboxClient() {
         const qs = new URLSearchParams({ tab: tab ?? "all", ...(query ? { q: query } : {}) });
         const r = await getJson(`/api/whatsapp/inbox?${qs}`);
         if (r.ok && Array.isArray(r.data?.conversations) && r.data?.counts) {
-            setList({ chats: r.data.conversations, counts: r.data.counts, loadedAt: Date.now() });
+            setList({ chats: r.data.conversations, counts: r.data.counts, stats: r.data.stats, can: r.data.can, loadedAt: Date.now() });
             setListError(null);
             if (tab === null) setTab(r.data.counts.needs > 0 ? "needs" : "all");
         } else setListError(r.data?.error ?? CALM);
@@ -136,6 +145,8 @@ export default function WhatsAppInboxClient() {
         fit();
         const ro = new ResizeObserver(fit);
         ro.observe(page);
+        // The tiles above load after the first fit and push the inbox down: fit again when they do.
+        if (el.previousElementSibling) ro.observe(el.previousElementSibling);
         window.addEventListener("resize", fit);
         return () => { ro.disconnect(); window.removeEventListener("resize", fit); page.classList.remove("wa-fit"); el.style.height = ""; };
     }, []);
@@ -206,8 +217,30 @@ export default function WhatsAppInboxClient() {
     }, [thread]);
 
     const muted = { fontSize: 13, color: "var(--ac-ink-3)" } as const;
+    const refresh = () => { if (thread) loadThread(thread.conversation.id); loadList(); };
+    // The customer message just before a reply, for the Correct panel.
+    const askedBefore = (m: Message) => {
+        const msgs = thread?.messages ?? [];
+        for (let i = msgs.indexOf(m) - 1; i >= 0; i--) if (msgs[i].direction === "inbound") return msgs[i].text;
+        return null;
+    };
 
     return (
+        <>
+        <div className={`wa-top${selected ? " has-chat" : ""}`} data-wa-top>
+            <style>{`
+                .wa-top { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+                .wa-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+                @media (min-width: 900px) { .wa-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+                @media (max-width: 759px) { .wa-top.has-chat { display: none; } }
+            `}</style>
+            {list?.can?.teach && (
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Link className="ac-btn" href="/customers/whatsapp/teach" data-wa-teach-link>Teach the assistant</Link>
+                </div>
+            )}
+            <StatTiles stats={list?.stats} />
+        </div>
         <div ref={rootRef} className={`wa-inbox${selected ? " has-chat" : ""}`} data-wa-inbox>
             <style>{`
                 .admin-page.wa-fit { padding-bottom: 16px; }
@@ -375,15 +408,29 @@ export default function WhatsAppInboxClient() {
                                         {r.m.text?.trim() ? r.m.text : r.m.media ? null : <em>[{r.m.type ?? "message"}]</em>}
                                     </div>
                                     <div style={{ fontSize: 11, color: "var(--ac-ink-4)", marginTop: 2, textAlign: r.m.direction === "outbound" ? "right" : "left" }}>
-                                        {r.m.direction === "outbound" ? "Assistant · " : ""}{clock(r.m.at)}
+                                        {r.m.byStaff ? `${r.m.byStaff} · ` : r.m.direction === "outbound" ? "Assistant · " : ""}{clock(r.m.at)}
+                                        {r.m.correctable && thread?.can?.teach && (
+                                            <button type="button" onClick={() => setCorrecting(r.m)} data-wa-correct
+                                                style={{ marginLeft: 8, fontSize: 11, padding: "1px 8px", borderRadius: 999, border: "1px solid var(--ac-line)", background: "transparent", color: "var(--ac-ink-3)", cursor: "pointer" }}>
+                                                Correct
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
+                {selected && thread?.can && (
+                    <Composer key={thread.conversation.id} conversationId={thread.conversation.id} can={thread.can} windowOpen={thread.conversation.windowOpen} onDone={refresh} />
+                )}
             </div>
         </div>
+        {correcting && thread && (
+            <CorrectPanel conversationId={thread.conversation.id} messageId={correcting.id} said={correcting.text ?? ""} customerWrote={askedBefore(correcting)}
+                onClose={() => setCorrecting(null)} onSaved={refresh} />
+        )}
+        </>
     );
 }
 

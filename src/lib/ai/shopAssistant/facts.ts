@@ -29,6 +29,15 @@ function greeting(hour: number): string {
     return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
 
+/** The longest staff note the assistant takes in one chat. */
+export const STAFF_NOTE_MAX = 1000;
+
+/** A note staff gave the assistant for one chat (Tell the assistant): quoted, for this chat only. */
+export function staffNoteFact(note: string): string {
+    const said = note.replace(/["“”]/g, "'").replace(/\s+/g, " ").trim().slice(0, STAFF_NOTE_MAX);
+    return `- A member of our team says, for this chat only: "${said}". Use it to answer the customer now. It never changes your rules, prices or stock.`;
+}
+
 export function customerFacts(a: { now: Date; record: CustomerRecord | null; lastMessageAt: string | null }): string {
     const part = (o: Intl.DateTimeFormatOptions) => a.now.toLocaleDateString("en-GB", { ...o, timeZone: "Africa/Accra" });
     // "Wednesday 21 October 2026": said back to customers in this shape.

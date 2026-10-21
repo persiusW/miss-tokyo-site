@@ -48,7 +48,7 @@ export const PAGE_ROUTES: readonly string[] = [
     "/customers/abandoned",
     "/customers/forms",
     "/customers/requests",
-    "/customers/whatsapp",
+    "/customers/whatsapp", "/customers/whatsapp/teach",
     "/dresses",
     "/faq",
     "/finance",

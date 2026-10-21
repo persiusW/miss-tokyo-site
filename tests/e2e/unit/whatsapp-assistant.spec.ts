@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { LINES } from "../../../src/lib/ai/shopAssistant/lines";
 import type { ShopButton, ShopChat } from "../../../src/lib/ai/shopAssistant/types";
-import { createWhatsAppHandler, type AssistantDeps } from "../../../src/lib/whatsapp/assistantHandler";
+import { createWhatsAppHandler, TELL_TEXT, type AssistantDeps } from "../../../src/lib/whatsapp/assistantHandler";
 import type { InboundMessage } from "../../../src/lib/whatsapp/pipeline";
 import { handedOffLine, renderForWhatsApp, WA_LINES, WA_TEXT_MAX } from "../../../src/lib/whatsapp/render";
 
@@ -46,6 +46,7 @@ function harness(o: {
     const alerts: string[] = [];
     const refers: string[] = [];
     const withTeamRuns: boolean[] = [];
+    const staffNotes: (string | null)[] = [];
     let human = false;
     const deps: AssistantDeps = {
         send: async (_to, text) => { sent.push(text); return o.sendOk === false ? { ok: false, code: "network" } : { ok: true, messageId: "wamid.OUT" }; },
@@ -67,10 +68,10 @@ function harness(o: {
         teamNumber: o.teamNumber,
         withTeam: async () => { alerts.push("alert"); },
         referToTeam: async () => { refers.push("refer"); return o.refer ?? true; },
-        run: async a => { withTeamRuns.push(!!a.withTeam); runs.push(a.text); runImages.push(a.images); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
+        run: async a => { withTeamRuns.push(!!a.withTeam); staffNotes.push(a.staffNote ?? null); runs.push(a.text); runImages.push(a.images); return { reply: o.reply ?? "Yes, size M is in stock.", buttons: o.buttons ?? [], chat, failed: !!o.failed }; },
         siteUrl: SITE,
     };
-    return { handle: createWhatsAppHandler(deps), sent, images, logged, loggedMedia, handoffs, runs, runImages, optOuts, alerts, refers, withTeamRuns };
+    return { handle: createWhatsAppHandler(deps), sent, images, logged, loggedMedia, handoffs, runs, runImages, optOuts, alerts, refers, withTeamRuns, staffNotes };
 }
 
 test("a text gets the assistant's reply, sent and logged, with no handoff", async () => {
@@ -307,4 +308,19 @@ test("a burst: an earlier text stands down; the last one answers all of them in 
     const last = harness({ earlier: [msg({ text: "Hi" }), msg({ text: "I want the brown dress" })] });
     await last.handle(msg({ text: "size M" }), conv, AT);
     expect(last.runs).toEqual(["Hi\nI want the brown dress\nsize M"]);
+});
+
+// ── Teach the assistant: quiet while staff reply; Tell the assistant ─────────
+test("Reply myself: while staff reply in a chat the assistant says nothing, but the team still hears about new messages", async () => {
+    const h = harness();
+    await h.handle(msg({ text: "Hello?" }), { id: "c1", handedOffAt: "2026-10-21T08:00:00Z", quiet: true });
+    expect([h.runs, h.sent, h.alerts]).toEqual([[], [], ["alert"]]);
+});
+
+test("Tell the assistant: one turn now, with the staff note, replying to the customer", async () => {
+    const h = harness({ reply: "Good news, the green one in L is ready for pickup at Osu." });
+    await h.handle.answerWithNote(conv, PHONE, "She wants the green one in L; offer pickup at Osu.");
+    expect(h.runs).toEqual([TELL_TEXT]);
+    expect(h.staffNotes).toEqual(["She wants the green one in L; offer pickup at Osu."]);
+    expect(h.sent).toEqual(["Good news, the green one in L is ready for pickup at Osu."]);
 });

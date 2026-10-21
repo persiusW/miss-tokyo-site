@@ -12,7 +12,7 @@ export default async function WhatsAppInboxPage() {
             <div className="ac-page-head">
                 <div>
                     <h1 className="ac-page-h1">WhatsApp Chats</h1>
-                    <p className="ac-page-sub">Every WhatsApp chat with Ask Miss Tokyo, messages in and out. When a chat needs a person, reply from the main WhatsApp phone, then hand it back to the assistant.</p>
+                    <p className="ac-page-sub">Every WhatsApp chat with Ask Miss Tokyo, messages in and out. When a chat needs a person, reply here or from the main WhatsApp phone, mark it dealt with, or hand it back to the assistant.</p>
                 </div>
             </div>
             {"status" in auth ? (

@@ -18,6 +18,7 @@ import { dedupeButtons, talkButton, waSummary } from "./format";
 import { LINES } from "./lines";
 import { settleQuote } from "./guards";
 import { loadChat, saveChat, saveStateOnly } from "./store";
+import { activeLessonsText } from "@/lib/ai/teach/lessons";
 import type { ShopButton, ShopChannel, ShopChat, ShopIdentity } from "./types";
 
 const RESERVE_USD = 0.08;
@@ -83,6 +84,7 @@ export async function runShopAssistant(args: {
         {
             messages, model: AI_MODEL,
             system: systemPromptFor(args.channel, args.identity.phone, { choices, restock, returns, withTeam: wa && !!args.withTeam }),
+            lessons: await activeLessonsText(),
             facts: wa ? args.facts ?? null : null,
             // Optional tools after the customer tools, so their cached prefix is unchanged.
             tools: [
