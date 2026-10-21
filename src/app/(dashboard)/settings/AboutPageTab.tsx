@@ -141,7 +141,7 @@ export function AboutPageTab() {
     const removeBtn = { background: "none", border: "none", cursor: "pointer", color: "var(--ac-ink-4)", flexShrink: 0, marginTop: 2 };
 
     return (
-        <div style={{ maxWidth: 760, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* HERO */}
             <Accordion title="Hero Section">

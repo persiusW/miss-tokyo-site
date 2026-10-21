@@ -1152,7 +1152,7 @@ function CommunicationsTab() {
     if (loading) return <p className="text-neutral-400 italic font-serif">Loading...</p>;
 
     return (
-        <div className="space-y-8 max-w-3xl">
+        <div className="space-y-8">
             <div className="bg-white border border-neutral-200 p-8">
                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4 mb-6">Communication Templates</h2>
                 <p className="text-[10px] text-neutral-400 tracking-wider uppercase mb-6">

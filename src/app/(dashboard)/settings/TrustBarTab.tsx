@@ -76,7 +76,7 @@ export function TrustBarTab() {
     if (loading) return <div className="ac-empty"><p className="ac-empty-title">Loading…</p></div>;
 
     return (
-        <div style={{ maxWidth: 580, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div>
                 <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-4)", marginBottom: 4 }}>Trust Bar</p>
                 <p style={{ fontSize: 13, color: "var(--ac-ink-3)" }}>The thin message strip displayed below the navigation.</p>

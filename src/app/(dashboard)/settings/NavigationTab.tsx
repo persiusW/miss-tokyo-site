@@ -95,7 +95,7 @@ export function NavigationTab() {
     }
 
     return (
-        <div className="max-w-xl space-y-6">
+        <div className="space-y-6">
             <div>
                 <h2 className="text-xs font-semibold uppercase tracking-widest mb-1">
                     Navigation Visibility

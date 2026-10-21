@@ -96,7 +96,7 @@ export function ShippingTab() {
     const disabled = !form.pickup_enabled;
 
     return (
-        <div className="space-y-8 max-w-4xl">
+        <div className="space-y-8">
             {/* Section header */}
             <div className="bg-white border border-neutral-200 p-8 space-y-6">
                 <h2 className="text-xs font-semibold uppercase tracking-widest border-b border-neutral-100 pb-4">Store Pickup</h2>

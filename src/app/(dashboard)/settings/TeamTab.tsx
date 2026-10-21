@@ -340,7 +340,7 @@ export function TeamTab() {
     };
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 1000 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {/* Header / Tabs */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
                 <div className="ac-tabs" style={{ flex: 1, minWidth: 0 }}>

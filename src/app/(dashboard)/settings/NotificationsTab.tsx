@@ -183,7 +183,7 @@ export function NotificationsTab() {
     }
 
     return (
-        <div className="space-y-10 max-w-2xl">
+        <div className="space-y-10">
 
             {/* ── Push Notifications ── */}
             <div className="bg-white border border-neutral-200 p-6 space-y-6">

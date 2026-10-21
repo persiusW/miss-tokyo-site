@@ -313,7 +313,7 @@ export function HomepageSectionsTab() {
     }
 
     return (
-        <div className="max-w-3xl space-y-10">
+        <div className="space-y-10">
             {/* ---- Featured Categories ---- */}
             <div className="space-y-4">
                 <div>

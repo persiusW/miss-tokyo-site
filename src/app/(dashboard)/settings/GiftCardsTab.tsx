@@ -76,7 +76,7 @@ export function GiftCardsTab() {
     });
 
     return (
-        <div style={{ maxWidth: 560, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div className="ac-card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 24 }}>
                 <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 600, color: "var(--ac-ink-3)" }}>Gift Card Settings</p>
 
