@@ -763,6 +763,35 @@ export async function adjustStock(
     if (error) throw new Error(error.message);
 }
 
+export type StockAdjustResult = { applied: boolean; duplicate?: boolean; unchanged?: boolean; before?: number; after: number; delta?: number };
+
+/**
+ * One Inventory › Adjust entry (restock, stock count, write-off or correction),
+ * through fn_stock_adjust, which works out the change under the row lock and
+ * records it with fn_apply_stock_movement. `key` makes a retry a no-op.
+ */
+export async function adjustStockFor(input: {
+    productId: string;
+    variantId: string | null;
+    reason: "restock" | "stock_count" | "write_off" | "correction";
+    quantity: number;
+    actor: string;
+    key: string;
+    note?: string | null;
+}): Promise<StockAdjustResult> {
+    const { data, error } = await (supabaseAdmin.rpc as any)("fn_stock_adjust", {
+        p_product_id: input.productId,
+        p_variant_id: input.variantId,
+        p_reason: input.reason,
+        p_quantity: input.quantity,
+        p_actor: input.actor,
+        p_idempotency_key: input.key,
+        p_note: input.note ?? null,
+    });
+    if (error) throw Object.assign(new Error(error.message), { code: error.code });
+    return data as StockAdjustResult;
+}
+
 /**
  * Recomputes products.inventory_count from the variant rows.
  *
