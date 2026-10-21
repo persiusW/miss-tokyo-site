@@ -61,10 +61,17 @@ export const RESTOCK_PROMPT_NOTE = `
 export const RETURNS_PROMPT_NOTE = `
 - For a return or exchange: read the policy with shop_info topic "returns" and tell them the key points (72 hours from delivery, unworn with tags, exchange or store credit, no cash refunds). Look the order up with track_order, ask what is wrong and whether they'd like an exchange or store credit, and ask for a photo if the piece is faulty or the wrong item. Then call start_return; our team takes it from there.`;
 
+/** Added on WhatsApp while a member of our team has the chat. */
+export const WITH_TEAM_PROMPT_NOTE = `
+- A member of our team is looking after this chat and will reply from our main WhatsApp line. Keep answering what you can with your tools (stock, sizes, prices, delivery, order status). For anything else, or if they ask for a person, call shop_info with topic "contact": the team already has the chat, so never say you are passing it on again.`;
+
 /** The system prompt for a channel. On WhatsApp the customer's own number is part of it. */
-export function systemPromptFor(channel: "web" | "whatsapp", phone?: string | null, opts: { choices?: boolean; restock?: boolean; returns?: boolean } = {}): string {
+export function systemPromptFor(
+    channel: "web" | "whatsapp", phone?: string | null,
+    opts: { choices?: boolean; restock?: boolean; returns?: boolean; withTeam?: boolean } = {},
+): string {
     if (channel !== "whatsapp") return SHOP_SYSTEM_PROMPT;
     const digits = String(phone ?? "").replace(/\D/g, "");
     const local = /^233\d{9}$/.test(digits) ? `0${digits.slice(3)}` : digits ? `+${digits}` : null;
-    return SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE + (opts.choices ? CHOICES_PROMPT_NOTE : "") + (opts.restock ? RESTOCK_PROMPT_NOTE : "") + (opts.returns ? RETURNS_PROMPT_NOTE : "") + (local ? `\n\nThe customer's WhatsApp number: ${local}` : "");
+    return SHOP_SYSTEM_PROMPT + WHATSAPP_PROMPT_NOTE + (opts.choices ? CHOICES_PROMPT_NOTE : "") + (opts.restock ? RESTOCK_PROMPT_NOTE : "") + (opts.returns ? RETURNS_PROMPT_NOTE : "") + (opts.withTeam ? WITH_TEAM_PROMPT_NOTE : "") + (local ? `\n\nThe customer's WhatsApp number: ${local}` : "");
 }

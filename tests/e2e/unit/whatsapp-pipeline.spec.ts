@@ -92,14 +92,20 @@ test("a replayed message id is not handled twice", async () => {
     expect(handled).toHaveLength(1);
 });
 
-test("a conversation a person holds is logged and tracked, not answered by the bot", async () => {
-    const { store, convs, logged } = fakeStore([{ id: "a" }]);
+test("a conversation a person holds is still answered (the assistant knows the team has it), unless switched to quiet", async () => {
+    const { store, convs, logged } = fakeStore([{ id: "a" }, { id: "b" }]);
     convs.set("c-233241234567", { id: "c-233241234567", phone: "233241234567", last_inbound_at: ago(3600_000), handed_off_at: ago(3600_000), state: { mode: "human" } });
     const { d, handled } = deps(store);
     expect(await processInboundEvent("a", d)).toBe("processed");
-    expect(handled).toHaveLength(0);
+    expect(handled).toHaveLength(1);
     expect(logged).toHaveLength(1);
     expect(convs.get("c-233241234567")!.last_inbound_at).toBe(ago(60_000));
+
+    // WHATSAPP_AGENT_DURING_HANDOFF=off: logged and tracked, not answered.
+    const quiet = deps(store, { parsed: { externalId: "evt-2", messages: [msg({ messageId: "wamid.2" })] } });
+    expect(await processInboundEvent("b", { ...quiet.d, quietWhileWithTeam: true })).toBe("processed");
+    expect(quiet.handled).toHaveLength(0);
+    expect(logged).toHaveLength(2);
 });
 
 test("a failure under the cap is kept for the sweep, and the window is still tracked", async () => {
@@ -124,9 +130,16 @@ test("at the cap: given up, handed to a person, one fallback note", async () => 
     expect(ev.get("a")!.gave_up_at).not.toBeNull();
     expect(convs.get("c-233241234567")).toMatchObject({ state: { mode: "human", reason: "processing_failed" } });
     expect(fallbacks).toEqual(["233241234567"]);
-    // The customer's next message now waits for the person: logged, not given to the bot, no second note.
-    expect(await processInboundEvent("b", d)).toBe("processed");
+    // The customer's next message: the bot tries again (it keeps answering while the team has the chat),
+    // and failing again never sends a second note: the chat is already with a person.
+    expect(await processInboundEvent("b", d)).toBe("gave_up");
     expect(fallbacks).toHaveLength(1);
+    // Quiet mode: logged for the person, not given to the bot.
+    const { store: s2, convs: c2 } = fakeStore([{ id: "c", attempts: MAX_ATTEMPTS - 1, last_attempt_at: ago(RETRY_AFTER_MS) }]);
+    c2.set("c-233241234567", { ...convs.get("c-233241234567")! });
+    const quiet = deps(s2, { handleThrows: true, parsed: { externalId: null, messages: [msg({ messageId: null })] } });
+    expect(await processInboundEvent("c", { ...quiet.d, quietWhileWithTeam: true })).toBe("processed");
+    expect(quiet.fallbacks).toHaveLength(0);
     expect(FALLBACK_TEXT).not.toMatch(/cash|error|sorry/i);
 });
 

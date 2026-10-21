@@ -13,6 +13,8 @@ export const WA_LINES = {
     stopped: "Done. You won't get order updates from us on WhatsApp anymore. You can still chat with us here. Reply START to turn them back on.",
     started: "Order updates on WhatsApp are back on. Reply STOP at any time to turn them off.",
     handedOff: "A member of our team will continue this chat with you shortly.",
+    /** While the team has the chat and the customer asks for them again: at most once every 6 hours. */
+    teamHasIt: "Our team has your message and will reply to you shortly.",
     limit: "We've reached today's chat limit with our assistant. A member of our team will follow up with you here.",
     cantChat: "Our assistant can't chat right now. A member of our team will follow up with you here.",
     trackLocked: "I can't look up more orders in this chat. A member of our team will help you here shortly.",
@@ -24,6 +26,17 @@ const SWAP: Record<string, string> = {
     [LINES.trackLocked]: WA_LINES.trackLocked,
     [LINES.refusal]: WA_LINES.refusal,
 };
+
+/**
+ * The handover line. Staff reply from the team's own WhatsApp, so the customer is told which number
+ * to expect: a message from an unknown number gets reported (GlowBook had a number restricted).
+ */
+export function handedOffLine(teamNumber: string | null | undefined): string {
+    const digits = String(teamNumber ?? "").replace(/\D/g, "");
+    if (!digits) return WA_LINES.handedOff;
+    const local = /^233\d{9}$/.test(digits) ? `0${digits.slice(3)}` : `+${digits}`;
+    return `A member of our team will message you shortly from ${local}.`;
+}
 
 export type WhatsAppImage = { url: string; caption: string };
 export type WhatsAppReply = { text: string; wantsPerson: boolean; images: WhatsAppImage[] };

@@ -6,8 +6,12 @@
 // words is answered with the text that follows it, when one does (photoPairing).
 //
 // A person takes the chat when the customer asks for one (the assistant's
-// "talk to us"), when the assistant fails, or at the daily limit. The bot then
-// stays quiet in that chat until staff hand it back from the inbox.
+// "talk to us"), when the assistant fails, or at the daily limit. The
+// assistant keeps answering while the team has the chat (stock, prices,
+// orders) and knows they have it; asking for a person again gets "our team
+// has your message" at most every 6 hours, and the team is alerted again when
+// the customer writes after an hour. Back with the assistant when staff hand
+// it back, or after 24 hours.
 //
 // A reply that could not be sent is not retried (that would run the model
 // again): the chat goes to a person instead, so the message is never ignored.
@@ -22,7 +26,7 @@ import type { ModelPhoto } from "./photo";
 import type { HandoffReason } from "./handoff";
 import type { Conversation, InboundMessage } from "./pipeline";
 import { isBarePhoto, MAX_PAIRED_PHOTOS } from "./photoPairing";
-import { renderForWhatsApp, WA_LINES, type WhatsAppReply } from "./render";
+import { handedOffLine, renderForWhatsApp, WA_LINES, type WhatsAppReply } from "./render";
 
 export type AssistantDeps = {
     send: (to: string, text: string) => Promise<MessagingResult>;
@@ -44,7 +48,14 @@ export type AssistantDeps = {
     quoted: (conversationId: string, waMessageId: string) => Promise<string | null>;
     counts: (chat: ShopChat) => Promise<{ lastMinute: number; today: number } | null>;
     perDay: number;
-    run: (a: { chat: ShopChat; text: string; phone: string; customerId: string | null; conversationId: string; images: ModelPhoto[] }) => Promise<ShopRunResult>;
+    /** withTeam: a person has the chat; the assistant answers what it can and leaves the rest to them. */
+    run: (a: { chat: ShopChat; text: string; phone: string; customerId: string | null; conversationId: string; images: ModelPhoto[]; withTeam?: boolean }) => Promise<ShopRunResult>;
+    /** The number staff reply from, named in the handover line. */
+    teamNumber?: string | null;
+    /** The customer wrote while the team has the chat: alert the team again if the last alert is an hour old. Never throws. */
+    withTeam?: (c: Conversation) => Promise<void>;
+    /** True when "our team has your message" may be sent now (at most every 6 hours); records it. */
+    referToTeam?: (conversationId: string) => Promise<boolean>;
     /** A customer's photo, ready for the model; null when it can't be fetched or isn't an image. */
     fetchPhoto: (mediaId: string) => Promise<ModelPhoto | null>;
     /** Bare photo: waits out the pairing window; true when a text that arrived inside it will answer the photo. */
@@ -77,8 +88,15 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
     }
 
     async function toPerson(c: Conversation, to: string, reason: HandoffReason, said: string | null): Promise<void> {
+        if (c.handedOffAt) {
+            // Already with the team: no second handover, and the reminder that they have it is rationed.
+            const refer = await deps.referToTeam?.(c.id).catch(() => false);
+            const text = [said, refer ? WA_LINES.teamHasIt : null].filter(Boolean).join("\n\n");
+            if (text) await reply(c, to, text);
+            return;
+        }
         const moved = await deps.handOff(c.id, reason);
-        const text = [said, moved ? WA_LINES.handedOff : null].filter(Boolean).join("\n\n");
+        const text = [said, moved ? handedOffLine(deps.teamNumber) : null].filter(Boolean).join("\n\n");
         if (text) await reply(c, to, text);
     }
 
@@ -108,6 +126,7 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
     }
 
     async function notReadable(c: Conversation, m: InboundMessage): Promise<void> {
+        if (c.handedOffAt) return m.from ? toPerson(c, m.from, "unsupported_message", null) : undefined;
         const moved = await deps.handOff(c.id, "unsupported_message");
         if (moved && m.from) await reply(c, m.from, WA_LINES.textOnly);
     }
@@ -130,7 +149,7 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         if (!counts) return toPerson(c, from, "assistant_failed", WA_LINES.cantChat);
         if (visitorOver({ ...counts, perDay: deps.perDay })) return toPerson(c, from, "daily_limit", WA_LINES.limit);
 
-        const result = await deps.run({ chat, text: said, phone: from, customerId, conversationId: c.id, images: photos });
+        const result = await deps.run({ chat, text: said, phone: from, customerId, conversationId: c.id, images: photos, withTeam: !!c.handedOffAt });
         const out = renderForWhatsApp(result.reply, result.buttons, deps.siteUrl);
         if (result.failed) return toPerson(c, from, "assistant_failed", out.text);
         if (out.wantsPerson) return toPerson(c, from, result.handoff ?? "customer_asked", out.text);
@@ -162,6 +181,13 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
 
     /** receivedAt: when we stored the message; without it photos are not paired. */
     const handle = async (m: InboundMessage, c: Conversation, receivedAt?: string): Promise<void> => {
+        // The team has the chat and the customer wrote: they hear about it (rationed to once an hour),
+        // alongside the reply rather than before it.
+        const alerting = c.handedOffAt ? deps.withTeam?.(c).catch(() => undefined) : undefined;
+        try { await respond(m, c, receivedAt); } finally { await alerting; }
+    };
+
+    const respond = async (m: InboundMessage, c: Conversation, receivedAt?: string): Promise<void> => {
         // Photos are read (a screenshot's SKU, or the style and colour); voice notes, files and the rest go to a person.
         let photos: ModelPhoto[] = [];
         let tapped: string | null = null;   // "[tapped: …]": an option we offered, so ours

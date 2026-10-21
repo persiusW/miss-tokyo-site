@@ -111,7 +111,7 @@ export const supabaseInboundStore: InboundStore & {
         const state = { ...(row.state ?? {}), mode: "human", reason, since: now.toISOString() };
         // Only the run that finds it unassigned makes the move, so the customer is told once.
         const { data: moved, error: upError } = await db.from("whatsapp_conversations")
-            .update({ state, handed_off_at: now.toISOString(), dealt_with_at: null })
+            .update({ state, handed_off_at: now.toISOString(), dealt_with_at: null, team_alerted_at: now.toISOString(), team_referred_at: null })
             .eq("id", conversationId).is("handed_off_at", null).select("id");
         if (upError) fail("hand off", upError);
         const did = (moved ?? []).length > 0;
