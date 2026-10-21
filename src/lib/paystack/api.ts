@@ -57,7 +57,7 @@ const str = (v: unknown) => (typeof v === "string" ? v : v == null ? "" : String
 /** "•••• 4821": the last four only. */
 export function maskAccount(n: unknown): string {
     const s = str(n).replace(/\s+/g, "");
-    return s ? `•••• ${s.slice(-4)}` : "";
+    return s ? `••••\u00a0${s.slice(-4)}` : "";
 }
 
 // ── Splits ───────────────────────────────────────────────────────────────

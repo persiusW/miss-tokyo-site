@@ -51,7 +51,7 @@ function since(iso: string | null): string {
     return h < 48 ? `${h} h ago` : when(iso);
 }
 
-function WhatsAppHealth() {
+export function WhatsAppHealth() {
     const [d, setD] = useState<HealthData | null>(null);
     const [failed, setFailed] = useState(false);
     const load = useCallback(() => {
@@ -143,7 +143,7 @@ function ShopChats() {
     );
 }
 
-function RecentTurns({ ai }: { ai: AiActivity | null }) {
+export function RecentTurns({ ai }: { ai: AiActivity | null }) {
     const rows = ai?.recent ?? [];
     return (
         <Card title="Last 20 AI replies">

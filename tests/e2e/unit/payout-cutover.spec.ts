@@ -76,7 +76,7 @@ test("the split as read from Paystack, account numbers masked", async () => {
     const f = fakeFetch({ id: 9, split_code: ENV, name: "Admin 2.5", type: "percentage", bearer_type: "subaccount", active: true,
         subaccounts: [{ share: 2.5, subaccount: { subaccount_code: "ACCT_x", business_name: "PERSIUS NII-ADDO ADDO", settlement_bank: "Stanbic Bank", account_number: "9040001234567", account_name: "P N A" } }] });
     const r = await getSplit(ENV, f.deps);
-    expect(r.ok && r.data).toMatchObject({ id: "9", code: ENV, active: true, bearerType: "subaccount", shares: [{ subaccountCode: "ACCT_x", share: 2.5, account: "•••• 4567", bank: "Stanbic Bank" }] });
+    expect(r.ok && r.data).toMatchObject({ id: "9", code: ENV, active: true, bearerType: "subaccount", shares: [{ subaccountCode: "ACCT_x", share: 2.5, account: "••••\u00a04567", bank: "Stanbic Bank" }] });
     expect(JSON.stringify(r)).not.toContain("9040001234567");
 });
 
