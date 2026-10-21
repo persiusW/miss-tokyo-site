@@ -12,8 +12,9 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await serverClient.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { data: caller } = await supabaseAdmin.from("profiles").select("role").eq("id", user.id).single();
-    if (!caller || !["admin", "owner", "sales_staff"].includes(caller.role)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Invoices are an owner + admin area (the sidebar hides them from sales staff).
+    if (!caller || !["admin", "owner"].includes(caller.role)) {
+        return apiError("GEN-00", { status: 403, audience: "staff" });
     }
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
@@ -28,10 +29,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "invoiceId is required." }, { status: 400 });
         }
 
-        // Fetch invoice amount from DB — never trust client-supplied amount (SEC-17)
+        // Fetch invoice amount from DB — never trust client-supplied amount (SEC-17).
+        // Invoices live in `documents`; `amount` is the stored total (line items
+        // plus tax), the same figure the invoice page shows. There has never been
+        // an `invoices` table, so this used to answer "Invoice not found" every time.
         const { data: invoiceData, error: invoiceError } = await supabaseAdmin
-            .from("invoices")
-            .select("total_amount")
+            .from("documents")
+            .select("amount")
             .eq("id", invoiceId)
             .single();
 
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
 
         const feePct = Number(feeData?.platform_fee_percentage) || 0;
         const feeLabel = feeData?.platform_fee_label || "Service Charge";
-        const baseAmount = Number(invoiceData.total_amount);
+        const baseAmount = Number(invoiceData.amount);
         const feeAmount = parseFloat((baseAmount * (feePct / 100)).toFixed(2));
         const finalAmount = parseFloat((baseAmount + feeAmount).toFixed(2));
 

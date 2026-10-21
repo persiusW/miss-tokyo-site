@@ -3,9 +3,16 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PrintButton } from "./PrintButton";
 import { InvoiceActions } from "./InvoiceActions";
+import { requireStaff } from "@/lib/ai/requireStaff";
+import { OWNER_ADMIN, OwnerAdminNotice } from "@/components/admin/OwnerAdminGate";
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+
+    // The finance layout gates this too, but this page loads the invoice on the
+    // server, so it checks the role itself before reading anything.
+    const auth = await requireStaff([...OWNER_ADMIN]);
+    if ("status" in auth) return <OwnerAdminNotice what="invoices and pay links" />;
 
     const [{ data: doc }, { data: biz }] = await Promise.all([
         supabase.from("documents").select("*").eq("id", id).single(),
