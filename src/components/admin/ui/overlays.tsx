@@ -166,13 +166,15 @@ export function Menu({ label = "More actions", items, up, left, trigger }: { lab
 }
 
 /** For anything that moves money or stock: the consequence in one banner, and a danger-solid primary. */
-export function ConfirmPanel({ open, onClose, title, sub, consequenceTitle, consequence, tone = "danger", confirmLabel, cancelLabel = "Cancel", onConfirm, busy, children, level }: {
+export function ConfirmPanel({ open, onClose, title, sub, consequenceTitle, consequence, tone = "danger", confirmLabel, cancelLabel = "Cancel", onConfirm, busy, children, level, confirmDisabled }: {
     open: boolean; onClose: () => void; title: string; sub?: ReactNode; consequenceTitle: ReactNode; consequence: ReactNode;
     tone?: "danger" | "warn"; confirmLabel: string; cancelLabel?: string; onConfirm: () => void; busy?: boolean; children?: ReactNode; level?: 1 | 2;
+    /** Holds the primary back until the form inside is complete (e.g. the cash received covers the total). */
+    confirmDisabled?: boolean;
 }) {
     return (
         <Panel open={open} onClose={onClose} title={title} sub={sub} level={level}
-            footer={<><Btn kind="ghost" onClick={onClose} disabled={busy}>{cancelLabel}</Btn><Btn kind="danger-solid" onClick={onConfirm} disabled={busy}>{busy ? "Working…" : confirmLabel}</Btn></>}>
+            footer={<><Btn kind="ghost" onClick={onClose} disabled={busy}>{cancelLabel}</Btn><Btn kind="danger-solid" onClick={onConfirm} disabled={busy || confirmDisabled}>{busy ? "Working…" : confirmLabel}</Btn></>}>
             {children}
             <Banner tone={tone} title={consequenceTitle}>{consequence}</Banner>
         </Panel>
