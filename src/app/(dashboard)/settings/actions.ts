@@ -116,26 +116,26 @@ export async function removeTeamMember(userId: string) {
 
     // Demote role to 'customer' so they lose dashboard access without destroying
     // their account or triggering FK constraint failures on orders/pos_sessions/logs.
-    const { data: demoted, error: demoteError } = await supabaseAdmin
-        .from("profiles")
-        .update({ role: "customer" })
-        .eq("id", userId)
-        .select("id, role");
+    // fn_staff_remove does it under the staff lock and refuses to demote the
+    // last owner, which the old page only prevented by hiding the button.
+    const { error: demoteError } = await supabaseAdmin.rpc("fn_staff_remove", { p_target: userId });
 
     if (demoteError) {
         console.error("Failed to demote user ID", userId, demoteError);
+        if (demoteError.message === "last_owner") {
+            return { success: false, error: "The store needs at least one owner. Make someone else an owner first." };
+        }
+        if (demoteError.message === "not_staff" || demoteError.message === "not_found") {
+            return { success: false, error: "That account no longer exists." };
+        }
         return { success: false, error: "Failed to remove team member." };
     }
 
-    // A DB trigger can rewrite the row without raising, and a missing row
-    // updates nothing — both come back as a silent success from PostgREST.
-    // Confirm the demotion actually landed before telling the caller it did.
-    if (!demoted?.length) {
-        console.error("Demote matched no profile row for user ID", userId);
-        return { success: false, error: "That account no longer exists." };
-    }
-    if (demoted[0].role !== "customer") {
-        console.error("Demote was reverted for user ID", userId, "role is still", demoted[0].role);
+    // A DB trigger can rewrite the row without raising. Confirm the demotion
+    // actually landed before telling the caller it did.
+    const { data: demoted } = await supabaseAdmin.from("profiles").select("role").eq("id", userId).maybeSingle();
+    if (demoted?.role !== "customer") {
+        console.error("Demote was reverted for user ID", userId, "role is still", demoted?.role);
         return { success: false, error: "The database blocked this change. Please try again shortly." };
     }
 
