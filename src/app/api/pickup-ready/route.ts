@@ -49,6 +49,16 @@ export async function POST(req: NextRequest) {
       .from("orders")
       .update({ status: "ready_for_pickup" })
       .in("id", orderIds);
+    // Keep fulfillment_status in step (sales/orders/actions.ts maps), except
+    // on a partly packed order, which still has items to pack.
+    if (!updateError) {
+      const { error: fulError } = await supabaseAdmin
+        .from("orders")
+        .update({ fulfillment_status: "ready_for_pickup" })
+        .in("id", orderIds)
+        .neq("fulfillment_status", "partial");
+      if (fulError) console.error("[pickup-ready] fulfillment_status not updated", { code: fulError.code });
+    }
 
     if (updateError) {
       return NextResponse.json({ error: "Failed to update orders." }, { status: 500 });
