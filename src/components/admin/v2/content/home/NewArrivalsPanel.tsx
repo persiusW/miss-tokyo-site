@@ -49,8 +49,10 @@ export function NewArrivalsPanel({ value, categories, onClose, onSaved }: { valu
                     <input id="na-n" className="input" inputMode="numeric" value={limit} onChange={e => setLimit(e.target.value.replace(/\D/g, ""))} />
                 </Field>
             </div>
-            <div className="section-t">Tabs</div>
-            <p className="help">With one tab the carousel shows on its own. With two or more, customers tap a tab name above the products. A tab with no products is left out.</p>
+            <div>
+                <div className="section-t">Tabs</div>
+                <p className="help">With one tab the carousel shows on its own. With two or more, customers tap a tab name above the products. A tab with no products is left out.</p>
+            </div>
             {tabs.map((t, i) => (
                 <div className="ct-item" key={i}>
                     <div className="grow">
