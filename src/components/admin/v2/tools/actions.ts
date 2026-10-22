@@ -26,7 +26,8 @@ import { normaliseWaNumber } from "@/lib/ai/shopAssistant/settingsRules";
 import { STATUS_TEMPLATE_EVENTS, templateIdValue } from "@/lib/ai/templateSettings";
 import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { sendSMS } from "@/lib/sms";
-import { syncPaystackSettlements } from "@/lib/billing/settlementSync";
+import { syncPaystackSettlements, syncNote } from "@/lib/billing/settlementSync";
+import { withCronRun } from "@/lib/billing/cronRuns";
 import { SWITCHES, type SwitchKey } from "./switchList";
 
 type R<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -361,7 +362,7 @@ export async function syncSettlementsNow(): Promise<R> {
     const me = await toolsAdmin();
     if (!me) return DENIED;
     try {
-        const r = await syncPaystackSettlements(new Date());
+        const r = await withCronRun("paystack-sync", () => syncPaystackSettlements(new Date()), syncNote);
         log(me, "payouts", "sync_settlements", { skipped: r.skipped, settlements: r.settlements, txs: r.txs, snapshot: r.snapshot, failed: r.failed.length });
         revalidatePath("/tools/payouts");
         const PART: Record<string, string> = { settlements: "the settlements", transactions: "the payments inside them", snapshot: "this period's bill", settings: "reading the settings" };

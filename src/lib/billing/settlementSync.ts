@@ -73,6 +73,9 @@ export type SyncResult = { skipped: boolean; settlements: number; txs: number; s
 
 type OrderMatch = { id: string; source: string; paystack_reference: string | null; ref: string | null };
 
+/** The line the cron_runs note shows for a run, for the hourly job and Sync now alike. */
+export const syncNote = (r: SyncResult) => `settlements ${r.settlements}, txs ${r.txs}${r.snapshot ? ", snapshot" : ""}${r.skipped ? ", switched off" : ""}${r.failed.length ? `, failed ${r.failed.join("/")}` : ""}`;
+
 export type SyncDeps = {
     /** The switch. Throws when it cannot be read: a broken read never runs a sync silently. */
     enabled: () => Promise<boolean>;
