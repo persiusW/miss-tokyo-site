@@ -88,6 +88,8 @@ export type SyncDeps = {
     maxSettledAt: () => Promise<string | null>;
     /** The oldest settled_at among saved settlements Paystack has not yet marked successful (still pending or processing). */
     oldestOpenSettledAt: () => Promise<string | null>;
+    /** Of these ids, the ones already saved as admin settlements. */
+    savedAdminIds: (ids: string[]) => Promise<string[]>;
     upsertSettlements: (rows: SettlementRow[]) => Promise<void>;
     /** Admin settlements whose transactions are unsaved, or that settled at or after `recentIso`. */
     settlementsNeedingTxs: (recentIso: string) => Promise<{ id: string; subaccount_code: string | null }[]>;
@@ -145,6 +147,15 @@ const realDeps: SyncDeps = {
             .order("settled_at", { ascending: true }).limit(1);
         if (error) throw error;
         return data?.[0]?.settled_at ?? null;
+    },
+    async savedAdminIds(ids) {
+        const found: string[] = [];
+        for (const part of chunks(ids, 100)) {
+            const { data, error } = await db.from("paystack_settlements").select("id").eq("is_admin", true).in("id", part);
+            if (error) throw error;
+            found.push(...(data ?? []).map((r: { id: string }) => r.id));
+        }
+        return found;
     },
     async upsertSettlements(rows) {
         if (!rows.length) return;
@@ -230,6 +241,10 @@ export async function syncPaystackSettlements(now: Date, deps: Partial<SyncDeps>
             if (page >= pages) complete = true;
         }
         if (complete) {
+            // An admin settlement stays admin: a code missing from this run's
+            // list never turns a saved admin settlement into a main one.
+            const wasAdmin = new Set(rows.length ? await d.savedAdminIds(rows.map(r => r.id)) : []);
+            for (const r of rows) if (wasAdmin.has(r.id)) r.is_admin = true;
             await d.upsertSettlements(rows);
             result.settlements = rows.length;
         }

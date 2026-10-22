@@ -134,6 +134,7 @@ function harness(opts: {
         currentBill: async () => ({ bill: BILL, settings: { ...BILLING_DEFAULTS } }),
         maxSettledAt: async () => [...settlements.values()].map(r => r.settled_at).filter(Boolean).sort().pop() ?? null,
         oldestOpenSettledAt: async () => [...settlements.values()].filter(r => r.settled_at && !["success", "paid"].includes(r.status)).map(r => r.settled_at).sort()[0] ?? null,
+        savedAdminIds: async ids => ids.filter(id => settlements.get(id)?.is_admin === true),
         upsertSettlements: async rows => { for (const r of rows) settlements.set(r.id, { ...settlements.get(r.id), ...r }); },
         settlementsNeedingTxs: async recentIso => [...settlements.values()]
             .filter(r => r.is_admin && (!r.txs_synced_at || (r.settled_at && r.settled_at >= recentIso)))
@@ -296,6 +297,29 @@ test("sync: unreadable admin codes save no settlements, say 'settings' failed, a
     expect(r).toMatchObject({ skipped: false, settlements: 0, txs: 1, snapshot: true, failed: ["settings"] });
     expect(h.calls.listPage).toHaveLength(0);
     expect([...h.settlements.keys()]).toEqual(["old"]);
+});
+
+test("sync: a saved admin settlement stays admin when this run's codes no longer include its subaccount", async () => {
+    const h = harness({
+        adminCodes: ["ACCT_new"], pages: [[sett("9001", { subaccountCode: ADMIN }), sett("9002", { subaccountCode: null })]], txs: { "9001": [] },
+        store: { settlements: [
+            { id: "9001", status: "success", is_admin: true, subaccount_code: ADMIN, settled_at: "2026-10-21T00:00:00.000Z" },
+            { id: "9002", status: "success", is_admin: false, subaccount_code: null, settled_at: "2026-10-21T00:00:00.000Z" },
+        ] },
+    });
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(r.failed).toEqual([]);
+    expect(h.settlements.get("9001").is_admin).toBe(true);
+    expect(h.settlements.get("9002").is_admin).toBe(false);
+});
+
+test("sync: a failed read of saved admin ids saves no settlements", async () => {
+    const h = harness({ pages: [[sett("9001")]] });
+    h.deps.savedAdminIds = async () => { throw new Error("db down"); };
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(r.failed).toContain("settlements");
+    expect(r.settlements).toBe(0);
+    expect(h.settlements.size).toBe(0);
 });
 
 test("adminSubaccountCodesStrict: stored code plus the split's codes; an unreadable split is a failure, not a shorter list", async () => {
