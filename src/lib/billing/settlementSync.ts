@@ -241,12 +241,15 @@ export async function syncPaystackSettlements(now: Date, deps: Partial<SyncDeps>
             if (page >= pages) complete = true;
         }
         if (complete) {
+            // A settlement can move between pages while we read them: keep
+            // one row per id (the last read), or the single upsert would fail.
+            const unique = [...new Map(rows.map(r => [r.id, r])).values()];
             // An admin settlement stays admin: a code missing from this run's
             // list never turns a saved admin settlement into a main one.
-            const wasAdmin = new Set(rows.length ? await d.savedAdminIds(rows.map(r => r.id)) : []);
-            for (const r of rows) if (wasAdmin.has(r.id)) r.is_admin = true;
-            await d.upsertSettlements(rows);
-            result.settlements = rows.length;
+            const wasAdmin = new Set(unique.length ? await d.savedAdminIds(unique.map(r => r.id)) : []);
+            for (const r of unique) if (wasAdmin.has(r.id)) r.is_admin = true;
+            await d.upsertSettlements(unique);
+            result.settlements = unique.length;
         }
     } catch (e) { fail("settlements", e); }
 

@@ -313,6 +313,17 @@ test("sync: a saved admin settlement stays admin when this run's codes no longer
     expect(h.settlements.get("9002").is_admin).toBe(false);
 });
 
+test("sync: a settlement read on two pages is upserted once, the last read winning", async () => {
+    const h = harness({ pages: [[sett("9001", { status: "pending" }), sett("9002")], [sett("9001", { status: "success" })]], txs: { "9001": [] } });
+    const upserted: string[][] = [];
+    const real = h.deps.upsertSettlements;
+    h.deps.upsertSettlements = async rows => { upserted.push(rows.map(r => r.id)); return real(rows); };
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(upserted).toEqual([["9001", "9002"]]);
+    expect(r.settlements).toBe(2);
+    expect(h.settlements.get("9001").status).toBe("success");
+});
+
 test("sync: a failed read of saved admin ids saves no settlements", async () => {
     const h = harness({ pages: [[sett("9001")]] });
     h.deps.savedAdminIds = async () => { throw new Error("db down"); };
