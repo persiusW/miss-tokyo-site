@@ -153,17 +153,19 @@ export const updateSubaccount = (code: string, p: { businessName: string; bankCo
 
 export type Settlement = { id: string; status: string; amountGhs: number; feesGhs: number | null; settledAt: string | null; subaccountCode: string | null };
 
+function parseSettlement(row: any): Settlement | null {
+    const amount = pesewas(row?.total_amount) ?? pesewas(row?.effective_amount);
+    if (amount === null) return null;
+    const sub = row?.subaccount && typeof row.subaccount === "object" ? str(row.subaccount.subaccount_code) || null : null;
+    const fees = pesewas(row?.total_fees);
+    return {
+        id: str(row?.id), status: str(row?.status) || "unknown", amountGhs: amount / 100, feesGhs: fees === null ? null : fees / 100,
+        settledAt: row?.settlement_date ? str(row.settlement_date) : row?.updatedAt ? str(row.updatedAt) : null, subaccountCode: sub,
+    };
+}
+
 function parseSettlements(x: any): Settlement[] {
-    return (Array.isArray(x) ? x : []).map((row: any): Settlement | null => {
-        const amount = pesewas(row?.total_amount) ?? pesewas(row?.effective_amount);
-        if (amount === null) return null;
-        const sub = row?.subaccount && typeof row.subaccount === "object" ? str(row.subaccount.subaccount_code) || null : null;
-        const fees = pesewas(row?.total_fees);
-        return {
-            id: str(row?.id), status: str(row?.status) || "unknown", amountGhs: amount / 100, feesGhs: fees === null ? null : fees / 100,
-            settledAt: row?.settlement_date ? str(row.settlement_date) : row?.updatedAt ? str(row.updatedAt) : null, subaccountCode: sub,
-        };
-    }).filter((r): r is Settlement => r !== null);
+    return (Array.isArray(x) ? x : []).map(parseSettlement).filter((r): r is Settlement => r !== null);
 }
 
 export const listSettlements = (perPage = 50, d?: PaystackDeps) =>
@@ -173,10 +175,15 @@ export const listSettlements = (perPage = 50, d?: PaystackDeps) =>
 export const listSettlementsPage = (page: number, perPage: number, from?: string, d?: PaystackDeps) =>
     call(`/settlement?perPage=${perPage}&page=${page}${from ? `&from=${encodeURIComponent(from)}` : ""}`, {
         method: "GET",
-        parse: (x: any, body: any) => ({
-            rows: parseSettlements(x), raw: Array.isArray(x) ? x as unknown[] : [],
-            pageCount: Math.max(1, Math.floor(pesewas(body?.meta?.pageCount) ?? 1)),
-        }),
+        parse: (x: any, body: any) => {
+            // rows[i] and raw[i] come from the same Paystack row: a row we cannot read is dropped from both.
+            const rows: Settlement[] = [], raw: unknown[] = [];
+            for (const row of Array.isArray(x) ? x : []) {
+                const parsed = parseSettlement(row);
+                if (parsed) { rows.push(parsed); raw.push(row); }
+            }
+            return { rows, raw, pageCount: Math.max(1, Math.floor(pesewas(body?.meta?.pageCount) ?? 1)) };
+        },
     }, d);
 
 export type SettlementTx = {

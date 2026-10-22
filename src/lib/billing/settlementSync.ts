@@ -1,6 +1,5 @@
 // Paystack settlements and their transactions, mapped to the rows Command
-// reads. Pure: no network, no database. The hourly sync (same file, below)
-// fetches, maps with these and saves.
+// reads. Pure: no network, no database.
 import type { Settlement, SettlementTx } from "@/lib/paystack/api";
 import { ratesOf, type BillingSettings } from "./settings";
 import type { Bill } from "./statements";

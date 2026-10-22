@@ -76,6 +76,18 @@ test("listSettlementsPage: pages, keeps raw rows, reports pageCount; from is pas
     expect(f.urls[0]).toContain("from=2026-10-01");
 });
 
+test("listSettlementsPage: a row we cannot read is dropped from rows and raw together", async () => {
+    const good = (id: number) => ({ id, total_amount: 100 * id, total_fees: 0, status: "success", settlement_date: "2026-10-21" });
+    const bad = { id: 2, status: "success" };
+    const f = fakeFetch({ status: true, data: [good(1), bad, good(3)], meta: { pageCount: 1 } });
+    const r = await listSettlementsPage(1, 50, undefined, { fetchImpl: f.impl, secret: "sk_test" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.data.rows.map(x => x.id)).toEqual(["1", "3"]);
+    expect(r.data.raw).toHaveLength(r.data.rows.length);
+    r.data.rows.forEach((row, i) => expect(String((r.data.raw[i] as any).id)).toBe(row.id));
+});
+
 test("settlementTransactions now carries raw and fees", async () => {
     const t = { reference: "r1", amount: 13750, fees: 274, paid_at: "2026-10-20T10:00:00.000Z", channel: "card" };
     const f = fakeFetch({ status: true, data: [t] });
