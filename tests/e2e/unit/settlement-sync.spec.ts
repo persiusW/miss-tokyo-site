@@ -1,7 +1,7 @@
 import "./stubSupabaseEnv";
 import { test, expect } from "@playwright/test";
 import { listSettlementsPage, settlementTransactions, type Settlement, type SettlementTx } from "../../../src/lib/paystack/api";
-import { settlementRow, snapshotRow, sourceOf, syncPaystackSettlements, txRow, type SyncDeps } from "../../../src/lib/billing/settlementSync";
+import { settlementRow, snapshotRow, sourceOf, syncPaystackSettlements, TERMINAL_STATUSES, txRow, type SyncDeps } from "../../../src/lib/billing/settlementSync";
 import { BILLING_DEFAULTS } from "../../../src/lib/billing/settings";
 
 const NOW = new Date("2026-10-22T12:00:00.000Z");
@@ -133,7 +133,7 @@ function harness(opts: {
         },
         currentBill: async () => ({ bill: BILL, settings: { ...BILLING_DEFAULTS } }),
         maxSettledAt: async () => [...settlements.values()].map(r => r.settled_at).filter(Boolean).sort().pop() ?? null,
-        oldestOpenSettledAt: async () => [...settlements.values()].filter(r => r.settled_at && !["success", "paid"].includes(r.status)).map(r => r.settled_at).sort()[0] ?? null,
+        oldestOpenSettledAt: async () => [...settlements.values()].filter(r => r.settled_at && !TERMINAL_STATUSES.includes(r.status)).map(r => r.settled_at).sort()[0] ?? null,
         savedAdminIds: async ids => ids.filter(id => settlements.get(id)?.is_admin === true),
         upsertSettlements: async rows => { for (const r of rows) settlements.set(r.id, { ...settlements.get(r.id), ...r }); },
         settlementsNeedingTxs: async recentIso => [...settlements.values()]
@@ -203,6 +203,17 @@ test("sync: a pending settlement older than the newest pulls from back to its ow
     ] } });
     await syncPaystackSettlements(NOW, h.deps);
     expect(h.calls.listPage[0].from).toBe("2026-10-10");
+});
+
+test("sync: failed and reversed settlements are final, so an old one does not pull from back", async () => {
+    expect(TERMINAL_STATUSES).toEqual(expect.arrayContaining(["success", "paid", "failed", "reversed"]));
+    const h = harness({ pages: [[]], store: { settlements: [
+        { id: "new", status: "success", is_admin: false, settled_at: "2026-10-20T00:00:00.000Z" },
+        { id: "f", status: "failed", is_admin: false, settled_at: "2026-09-01T00:00:00.000Z" },
+        { id: "r", status: "reversed", is_admin: false, settled_at: "2026-09-05T00:00:00.000Z" },
+    ] } });
+    await syncPaystackSettlements(NOW, h.deps);
+    expect(h.calls.listPage[0].from).toBe("2026-10-17");
 });
 
 test("sync: an undefined dep does not replace the real one", async () => {

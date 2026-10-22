@@ -86,7 +86,7 @@ export type SyncDeps = {
     /** The period's bill with the settings it was priced under. */
     currentBill: (now: Date) => Promise<{ bill: Bill; settings: BillingSettings }>;
     maxSettledAt: () => Promise<string | null>;
-    /** The oldest settled_at among saved settlements Paystack has not yet marked successful (still pending or processing). */
+    /** The oldest settled_at among saved settlements whose status is not final (still pending or processing). */
     oldestOpenSettledAt: () => Promise<string | null>;
     /** Of these ids, the ones already saved as admin settlements. */
     savedAdminIds: (ids: string[]) => Promise<string[]>;
@@ -108,7 +108,7 @@ const MAX_PAGES = 200;
 const MAX_TX_SETTLEMENTS = 30;
 
 /** Paystack settlement statuses that will not change again. Anything else (pending, processing) is re-read on every run. */
-const TERMINAL_STATUSES = ["success", "paid"];
+export const TERMINAL_STATUSES = ["success", "paid", "failed", "reversed"];
 
 const db = supabaseAdmin as any;
 
