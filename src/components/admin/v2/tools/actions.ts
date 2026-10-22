@@ -26,6 +26,8 @@ import { normaliseWaNumber } from "@/lib/ai/shopAssistant/settingsRules";
 import { STATUS_TEMPLATE_EVENTS, templateIdValue } from "@/lib/ai/templateSettings";
 import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { sendSMS } from "@/lib/sms";
+import { syncPaystackSettlements, syncNote } from "@/lib/billing/settlementSync";
+import { withCronRun } from "@/lib/billing/cronRuns";
 import { SWITCHES, type SwitchKey } from "./switchList";
 
 type R<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -351,6 +353,24 @@ export async function submitStatementsNow(): Promise<R<{ result: CutoffResult }>
         return { ok: true, result };
     } catch (e) {
         logCause("GEN-00", e, { where: "tools.submitNow" });
+        return { ok: false, error: FAILED };
+    }
+}
+
+/** Save Paystack's settlements and the period's bill now, instead of waiting for the hourly run. */
+export async function syncSettlementsNow(): Promise<R> {
+    const me = await toolsAdmin();
+    if (!me) return DENIED;
+    try {
+        const r = await withCronRun("paystack-sync", () => syncPaystackSettlements(new Date()), syncNote);
+        log(me, "payouts", "sync_settlements", { skipped: r.skipped, settlements: r.settlements, txs: r.txs, snapshot: r.snapshot, failed: r.failed.length });
+        revalidatePath("/tools/payouts");
+        const PART: Record<string, string> = { settlements: "the settlements", transactions: "the payments inside them", snapshot: "this period's bill", settings: "reading the settings" };
+        if (r.failed.length) return { ok: false, error: `Some of the sync didn't finish (${r.failed.map(f => PART[f] ?? f).join(", ")}). Settlements already saved are kept. Please try again shortly.` };
+        if (r.skipped) return { ok: false, error: "Saving Paystack payouts is switched off, so there was nothing to sync. Turn it on under Switches." };
+        return { ok: true };
+    } catch (e) {
+        logCause("GEN-00", e, { where: "tools.syncSettlementsNow" });
         return { ok: false, error: FAILED };
     }
 }

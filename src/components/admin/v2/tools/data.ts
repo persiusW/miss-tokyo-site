@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getBillingSettings, type BillingSettings } from "@/lib/billing/settings";
 import { getSplit, listSplits, fetchSubaccount, getBalance, type Split, type Subaccount } from "@/lib/paystack/api";
 import { cachedPs, TEN_MIN } from "@/lib/paystack/cache";
-import { adminSubaccountCodes, settlementsView, type SettlementView } from "@/lib/billing/paystackReports";
+import { adminSubaccountCodes, settlementsFor, type SettlementView } from "@/lib/billing/paystackReports";
 import { currentBill, listStatements, type Bill, type StatementRow } from "@/lib/billing/statements";
 import { loadOtherLines } from "@/lib/billing/usageLoad";
 import { dashttpMode, type DashttpMode } from "@/lib/billing/dashttp";
@@ -65,7 +65,8 @@ export type PayoutsData = {
     otherSplits: Part<Split[]>;
     adminAccount: Part<Subaccount | null>;
     balance: Part<{ currency: string; balanceGhs: number }[]>;
-    settlements: SettlementView;
+    /** `syncedAt` is present (maybe null) only when read from the saved rows. */
+    settlements: SettlementView & { syncedAt?: string | null };
     ledger: Part<{ totals: LedgerTotals; rows: LedgerView[] }>;
     paystackConnected: boolean;
 };
@@ -82,7 +83,7 @@ export async function loadPayouts(): Promise<PayoutsData> {
         cachedPs("balance", 5 * 60_000, () => getBalance()),
         part(() => loadLedger(100), "ledger"),
     ]);
-    const settlements = await settlementsView(await adminSubaccountCodes(settings.adminSubaccountCode));
+    const settlements = await settlementsFor(await adminSubaccountCodes(settings.adminSubaccountCode));
     return {
         settings, envSplitCode, envSplit: psPart(envSplit),
         otherSplits: splits.ok ? { ok: true, data: splits.data.filter(s => s.code !== envSplitCode) } : { ok: false },

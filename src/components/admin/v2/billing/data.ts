@@ -4,7 +4,7 @@
 import { getBillingSettings } from "@/lib/billing/settings";
 import { currentBill, listStatements } from "@/lib/billing/statements";
 import { loadDashttpBilling, confirmInvoicePayment, type BillingState } from "@/lib/billing/dashttpState";
-import { adminSubaccountCodes, paymentsSummary, settlementsView, type PaymentsSummary } from "@/lib/billing/paystackReports";
+import { adminSubaccountCodes, paymentsSummary, settlementsFor, type PaymentsSummary } from "@/lib/billing/paystackReports";
 import { periodLabel } from "@/lib/billing/period";
 import type { ClientLine } from "@/lib/billing/statement";
 import type { Settlement } from "@/lib/paystack/api";
@@ -53,7 +53,7 @@ export async function loadBillingPage(role: "owner" | "admin", paidInvoice: stri
     const codes = role === "admin" ? await adminSubaccountCodes(s.adminSubaccountCode) : [];
     const [summary, sv, ledger] = await Promise.all([
         from && to ? part(() => paymentsSummary(from, to, s.paystackFeePct), "payments summary") : Promise.resolve({ ok: false as const }),
-        settlementsView(codes),
+        settlementsFor(codes),
         role === "admin" ? part(async () => (await loadLedger(1)).totals, "ledger") : Promise.resolve({ ok: false as const }),
     ]);
     return {

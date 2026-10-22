@@ -21,6 +21,29 @@ export async function adminSubaccountCodes(stored: string | null): Promise<strin
     return [...codes];
 }
 
+type SplitReader = (code: string) => Promise<PsResult<{ shares: { subaccountCode: string }[] }>>;
+
+/**
+ * The same codes, for the settlement sync: a split group that cannot be read
+ * is a failure, never a shorter list. A shorter list would save admin
+ * settlements as not admin. `splitCode` and `readSplit` are for tests.
+ */
+export async function adminSubaccountCodesStrict(
+    stored: string | null,
+    opts: { splitCode?: string | null; readSplit?: SplitReader } = {},
+): Promise<PsResult<string[]>> {
+    const codes = new Set<string>();
+    if (stored) codes.add(stored);
+    const env = "splitCode" in opts ? opts.splitCode : process.env.PAYSTACK_SPLIT_CODE;
+    if (env) {
+        const read = opts.readSplit ?? ((c: string) => cachedPs(`split:${c}`, TEN_MIN, () => getSplit(c)));
+        const s = await read(env);
+        if (!s.ok) return { ok: false, reason: s.reason, message: s.message };
+        for (const sh of s.data.shares) if (sh.subaccountCode) codes.add(sh.subaccountCode);
+    }
+    return { ok: true, data: [...codes] };
+}
+
 export type SettlementView = { checkedAt: number | null } & (
     | { ok: true; main: Settlement[]; admin: Settlement[] }
     | { ok: false; reason: "not_configured" | "unavailable" | "refused" });
@@ -33,6 +56,68 @@ export async function settlementsView(adminCodes: string[]): Promise<SettlementV
         main: r.data.filter(s => !s.subaccountCode),
         admin: r.data.filter(s => s.subaccountCode && adminCodes.includes(s.subaccountCode)),
     };
+}
+
+/** What savedSettlementsView reads: the saved rows and when the sync last finished well. Injectable for tests. */
+export type SavedReader = () => Promise<{ rows: SavedSettlementRow[]; syncedAt: string | null }>;
+export type SavedSettlementRow = { id: string; status: string; settled_at: string | null; fees_ghs: number | null; net_ghs: number; subaccount_code: string | null };
+
+/**
+ * Reads the latest 50 saved settlements. `syncedAt` is the newest `synced_at`
+ * in the table: every successful read of the settlement list re-saves recent
+ * rows with synced_at = now, and a failed read saves nothing, so it is the
+ * last successful read of the settlement list. A run whose list read worked
+ * advances it even if a later part (transactions, snapshot) failed. A
+ * cron_runs "ok" proves nothing here: the job is ok even when the sync
+ * reports failed parts. Takes the client so tests can pass a fake.
+ */
+export function savedReader(client: any = db): SavedReader {
+    return async () => {
+        const [s, c] = await Promise.all([
+            client.from("paystack_settlements").select("id, status, settled_at, fees_ghs, net_ghs, subaccount_code").order("settled_at", { ascending: false, nullsFirst: false }).limit(50),
+            client.from("paystack_settlements").select("synced_at").order("synced_at", { ascending: false, nullsFirst: false }).limit(1),
+        ]);
+        if (s.error) throw s.error;
+        return {
+            rows: ((s.data ?? []) as any[]).map(r => ({ ...r, net_ghs: Number(r.net_ghs), fees_ghs: r.fees_ghs == null ? null : Number(r.fees_ghs) })),
+            // The last-synced time is a nicety: if its read fails the list still shows.
+            syncedAt: c.error ? null : ((c.data ?? [])[0]?.synced_at ?? null),
+        };
+    };
+}
+const readSaved: SavedReader = savedReader();
+
+/**
+ * The same view as settlementsView, from the rows the hourly sync saved.
+ * The admin/main split uses the admin codes passed in, exactly as the live
+ * view does. A read failure is a calm "unavailable"; the detail is logged.
+ */
+export async function savedSettlementsView(adminCodes: string[], read: SavedReader = readSaved): Promise<SettlementView & { syncedAt: string | null }> {
+    try {
+        const { rows, syncedAt } = await read();
+        const all: Settlement[] = rows.map(r => ({ id: r.id, status: r.status, amountGhs: r.net_ghs, feesGhs: r.fees_ghs, settledAt: r.settled_at, subaccountCode: r.subaccount_code }));
+        return {
+            ok: true, checkedAt: null, syncedAt,
+            main: all.filter(s => !s.subaccountCode),
+            admin: all.filter(s => s.subaccountCode && adminCodes.includes(s.subaccountCode)),
+        };
+    } catch (e) {
+        console.error("[saved-settlements] read failed", e instanceof Error ? e.message : e);
+        return { ok: false, reason: "unavailable", checkedAt: null, syncedAt: null };
+    }
+}
+
+/** Saved settlements when the sync switch is on, else live from Paystack. An unreadable switch falls back to live. */
+export async function settlementsFor(adminCodes: string[]): Promise<SettlementView & { syncedAt?: string | null }> {
+    let on = false;
+    try {
+        const { data, error } = await db.from("store_settings").select("paystack_sync_enabled").eq("id", "default").maybeSingle();
+        if (error) throw error;
+        on = !!data && data.paystack_sync_enabled !== false;
+    } catch (e) {
+        console.error("[saved-settlements] switch unreadable, reading live", e instanceof Error ? e.message : e);
+    }
+    return on ? savedSettlementsView(adminCodes) : settlementsView(adminCodes);
 }
 
 export async function settlementDetail(id: string, subaccountCode: string | null): Promise<PsResult<SettlementTx[]>> {
