@@ -334,6 +334,33 @@ export type Database = {
           },
         ]
       }
+      billing_period_snapshot: {
+        Row: {
+          base_ghs: number
+          computed_at: string
+          internal: Json
+          period_end: string
+          period_start: string
+          total_ghs: number
+        }
+        Insert: {
+          base_ghs: number
+          computed_at?: string
+          internal: Json
+          period_end: string
+          period_start: string
+          total_ghs: number
+        }
+        Update: {
+          base_ghs?: number
+          computed_at?: string
+          internal?: Json
+          period_end?: string
+          period_start?: string
+          total_ghs?: number
+        }
+        Relationships: []
+      }
       business_settings: {
         Row: {
           address: string | null
@@ -1384,6 +1411,99 @@ export type Database = {
           },
         ]
       }
+      paystack_settlement_txs: {
+        Row: {
+          admin_share_ghs: number | null
+          amount_ghs: number
+          order_id: string | null
+          paid_at: string | null
+          paystack_cut_ghs: number | null
+          raw: Json
+          reference: string
+          settlement_id: string
+          source: string
+        }
+        Insert: {
+          admin_share_ghs?: number | null
+          amount_ghs: number
+          order_id?: string | null
+          paid_at?: string | null
+          paystack_cut_ghs?: number | null
+          raw?: Json
+          reference: string
+          settlement_id: string
+          source: string
+        }
+        Update: {
+          admin_share_ghs?: number | null
+          amount_ghs?: number
+          order_id?: string | null
+          paid_at?: string | null
+          paystack_cut_ghs?: number | null
+          raw?: Json
+          reference?: string
+          settlement_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paystack_settlement_txs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paystack_settlement_txs_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "paystack_settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paystack_settlements: {
+        Row: {
+          fees_ghs: number | null
+          gross_ghs: number | null
+          id: string
+          is_admin: boolean
+          net_ghs: number
+          raw: Json
+          settled_at: string | null
+          status: string
+          subaccount_code: string | null
+          synced_at: string
+          txs_synced_at: string | null
+        }
+        Insert: {
+          fees_ghs?: number | null
+          gross_ghs?: number | null
+          id: string
+          is_admin?: boolean
+          net_ghs: number
+          raw?: Json
+          settled_at?: string | null
+          status: string
+          subaccount_code?: string | null
+          synced_at?: string
+          txs_synced_at?: string | null
+        }
+        Update: {
+          fees_ghs?: number | null
+          gross_ghs?: number | null
+          id?: string
+          is_admin?: boolean
+          net_ghs?: number
+          raw?: Json
+          settled_at?: string | null
+          status?: string
+          subaccount_code?: string | null
+          synced_at?: string
+          txs_synced_at?: string | null
+        }
+        Relationships: []
+      }
       pos_reservations: {
         Row: {
           expires_at: string
@@ -2383,6 +2503,7 @@ export type Database = {
           homepage_route: string
           id: string
           maintenance_mode: boolean | null
+          paystack_sync_enabled: boolean
           platform_fee_label: string | null
           platform_fee_percentage: number | null
           pos_hold_minutes: number
@@ -2419,6 +2540,7 @@ export type Database = {
           homepage_route?: string
           id?: string
           maintenance_mode?: boolean | null
+          paystack_sync_enabled?: boolean
           platform_fee_label?: string | null
           platform_fee_percentage?: number | null
           pos_hold_minutes?: number
@@ -2455,6 +2577,7 @@ export type Database = {
           homepage_route?: string
           id?: string
           maintenance_mode?: boolean | null
+          paystack_sync_enabled?: boolean
           platform_fee_label?: string | null
           platform_fee_percentage?: number | null
           pos_hold_minutes?: number
