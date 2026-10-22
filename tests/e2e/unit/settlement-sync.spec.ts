@@ -1,7 +1,7 @@
 import "./stubSupabaseEnv";
 import { test, expect } from "@playwright/test";
 import { listSettlementsPage, settlementTransactions, type Settlement, type SettlementTx } from "../../../src/lib/paystack/api";
-import { settlementRow, snapshotRow, sourceOf, txRow } from "../../../src/lib/billing/settlementSync";
+import { settlementRow, snapshotRow, sourceOf, syncPaystackSettlements, txRow, type SyncDeps } from "../../../src/lib/billing/settlementSync";
 import { BILLING_DEFAULTS } from "../../../src/lib/billing/settings";
 
 const NOW = new Date("2026-10-22T12:00:00.000Z");
@@ -93,4 +93,166 @@ test("settlementTransactions now carries raw and fees", async () => {
     const f = fakeFetch({ status: true, data: [t] });
     const r = await settlementTransactions("9001", null, { fetchImpl: f.impl, secret: "sk_test" });
     expect(r.ok && r.data[0]).toMatchObject({ reference: "r1", amountGhs: 137.5, feesGhs: 2.74, raw: t });
+});
+
+// ── syncPaystackSettlements, with fakes ──────────────────────────────────
+
+const DAY = 86_400_000;
+const sett = (id: string, over: Partial<Settlement> = {}): Settlement => ({ id, status: "success", amountGhs: 10, feesGhs: 0, settledAt: "2026-10-21T00:00:00.000Z", subaccountCode: ADMIN, ...over });
+const stx = (reference: string): SettlementTx => ({ reference, amountGhs: 50, paidAt: "2026-10-20T10:00:00.000Z", channel: "card", subaccountShareGhs: 1.25, feesGhs: 0.9, raw: { reference } });
+
+const BILL: any = {
+    period: { start: "2026-10-01", end: "2026-10-31", fromIso: "2026-10-01T00:00:00.000Z", toIso: "2026-11-01T00:00:00.000Z" },
+    usage: {}, priced: [], totalGhs: 12,
+};
+
+function harness(opts: {
+    pages?: Settlement[][]; txs?: Record<string, SettlementTx[]>; enabled?: boolean | Error; orders?: any[];
+    store?: { settlements?: any[]; txs?: any[] }; pageError?: boolean; txPages?: Record<string, SettlementTx[][]>;
+} = {}) {
+    const pages = opts.pages ?? [[sett("9001"), sett("9002", { subaccountCode: null })], [sett("9003", { settledAt: "2026-10-10T00:00:00.000Z" })]];
+    const txs = opts.txs ?? { "9001": [stx("r1"), stx("r2")], "9003": [stx("r3"), stx("r4")] };
+    const settlements = new Map<string, any>((opts.store?.settlements ?? []).map(r => [r.id, r]));
+    const txStore = new Map<string, any>((opts.store?.txs ?? []).map(r => [`${r.settlement_id}|${r.reference}`, r]));
+    const snapshots = new Map<string, any>();
+    const calls = { listPage: [] as any[], txPage: [] as any[], orders: [] as string[][] };
+    const deps: SyncDeps = {
+        enabled: async () => { if (opts.enabled instanceof Error) throw opts.enabled; return opts.enabled ?? true; },
+        adminCodes: async () => [ADMIN],
+        listPage: async (page, perPage, from) => {
+            calls.listPage.push({ page, perPage, from });
+            if (opts.pageError) return { ok: false, reason: "unavailable" };
+            const rows = pages[page - 1] ?? [];
+            return { ok: true, data: { rows, raw: rows.map(r => ({ id: r.id })), pageCount: pages.length } };
+        },
+        txPage: async (id, sub, page) => {
+            calls.txPage.push({ id, sub, page });
+            if (opts.txPages) return { ok: true, data: opts.txPages[id]?.[page - 1] ?? [] };
+            return { ok: true, data: page === 1 ? txs[id] ?? [] : [] };
+        },
+        currentBill: async () => ({ bill: BILL, settings: { ...BILLING_DEFAULTS } }),
+        maxSettledAt: async () => [...settlements.values()].map(r => r.settled_at).filter(Boolean).sort().pop() ?? null,
+        upsertSettlements: async rows => { for (const r of rows) settlements.set(r.id, { ...settlements.get(r.id), ...r }); },
+        settlementsNeedingTxs: async recentIso => [...settlements.values()]
+            .filter(r => r.is_admin && (!r.txs_synced_at || (r.settled_at && r.settled_at >= recentIso)))
+            .map(r => ({ id: r.id, subaccount_code: r.subaccount_code })),
+        ordersFor: async refs => { calls.orders.push(refs); return opts.orders ?? []; },
+        upsertTxs: async rows => { for (const r of rows) txStore.set(`${r.settlement_id}|${r.reference}`, r); },
+        markTxsSynced: async (id, iso) => { settlements.get(id).txs_synced_at = iso; },
+        upsertSnapshot: async row => { snapshots.set(row.period_start, row); },
+    };
+    return { deps, settlements, txStore, snapshots, calls };
+}
+
+test("sync: two runs over the same pages leave 3 settlements and 4 txs, not 6 and 8", async () => {
+    const h = harness();
+    const first = await syncPaystackSettlements(NOW, h.deps);
+    expect(first).toEqual({ skipped: false, settlements: 3, txs: 4, snapshot: true, failed: [] });
+    await syncPaystackSettlements(new Date(NOW.getTime() + 3_600_000), h.deps);
+    expect(h.settlements.size).toBe(3);
+    expect(h.txStore.size).toBe(4);
+    expect(h.snapshots.size).toBe(1);
+    expect(h.settlements.get("9002").is_admin).toBe(false);
+    expect(h.calls.txPage.every(c => c.id !== "9002")).toBe(true);
+});
+
+test("sync: a settlement returned again as success overwrites its stored pending status", async () => {
+    const h = harness({ pages: [[sett("9001", { status: "success" })]], txs: { "9001": [] }, store: { settlements: [{ id: "9001", status: "pending", is_admin: true, settled_at: "2026-10-21T00:00:00.000Z", txs_synced_at: "2026-10-21T01:00:00.000Z" }] } });
+    await syncPaystackSettlements(NOW, h.deps);
+    expect(h.settlements.get("9001").status).toBe("success");
+});
+
+test("sync: disabled gives skipped and makes no Paystack calls", async () => {
+    const h = harness({ enabled: false });
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(r).toMatchObject({ skipped: true, settlements: 0, txs: 0, snapshot: false });
+    expect(h.calls.listPage).toHaveLength(0);
+    expect(h.calls.txPage).toHaveLength(0);
+    expect(h.settlements.size).toBe(0);
+});
+
+test("sync: an unreadable switch skips and says 'settings' failed", async () => {
+    const h = harness({ enabled: new Error("boom") });
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(r).toMatchObject({ skipped: true, failed: ["settings"] });
+    expect(h.calls.listPage).toHaveLength(0);
+});
+
+test("sync: a Paystack page error says 'settlements' failed and keeps the stored rows", async () => {
+    const stored = { id: "9001", status: "success", is_admin: true, settled_at: "2026-10-01T00:00:00.000Z", txs_synced_at: "2026-10-02T00:00:00.000Z" };
+    const h = harness({ pageError: true, store: { settlements: [stored] } });
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(r.failed).toEqual(["settlements"]);
+    expect(r.settlements).toBe(0);
+    expect(h.settlements.get("9001")).toMatchObject(stored);
+});
+
+test("sync: empty store pages from the start; a stored max of 2026-10-20 uses from=2026-10-17", async () => {
+    const empty = harness({ pages: [[]] });
+    await syncPaystackSettlements(NOW, empty.deps);
+    expect(empty.calls.listPage[0].from).toBeUndefined();
+    expect(empty.calls.listPage[0].page).toBe(1);
+
+    const stored = harness({ pages: [[]], store: { settlements: [{ id: "9000", is_admin: false, settled_at: "2026-10-20T00:00:00.000Z" }] } });
+    await syncPaystackSettlements(NOW, stored.deps);
+    expect(stored.calls.listPage[0].from).toBe("2026-10-17");
+});
+
+test("sync: transactions are matched to orders by paystack_reference, else ref", async () => {
+    const h = harness({
+        pages: [[sett("9001")]], txs: { "9001": [stx("PSREF1"), stx("3512F7BD"), stx("NOORDER")] },
+        orders: [
+            { id: "o1", source: "pos", paystack_reference: "PSREF1", ref: "AAAAAAAA" },
+            { id: "o2", source: "storefront", paystack_reference: null, ref: "3512F7BD" },
+        ],
+    });
+    await syncPaystackSettlements(NOW, h.deps);
+    expect(h.calls.orders).toHaveLength(1);
+    expect(h.txStore.get("9001|PSREF1")).toMatchObject({ order_id: "o1", source: "pos" });
+    expect(h.txStore.get("9001|3512F7BD")).toMatchObject({ order_id: "o2", source: "checkout" });
+    expect(h.txStore.get("9001|NOORDER")).toMatchObject({ order_id: null, source: "other" });
+});
+
+test("sync: a settled-and-synced settlement older than 3 days is not fetched again", async () => {
+    const h = harness({
+        pages: [[]], store: { settlements: [
+            { id: "old", is_admin: true, settled_at: "2026-10-10T00:00:00.000Z", txs_synced_at: "2026-10-11T00:00:00.000Z", subaccount_code: ADMIN },
+            { id: "new", is_admin: true, settled_at: new Date(NOW.getTime() - DAY).toISOString(), txs_synced_at: "2026-10-21T13:00:00.000Z", subaccount_code: ADMIN },
+        ] }, txs: { new: [stx("n1")], old: [stx("o1")] },
+    });
+    await syncPaystackSettlements(NOW, h.deps);
+    expect(h.calls.txPage.map(c => c.id)).toEqual(["new"]);
+});
+
+test("sync: a settlement with 100 transactions on page 1 fetches page 2 until fewer than 100 come back", async () => {
+    const many = (a: number, n: number) => Array.from({ length: n }, (_, i) => stx(`t${a + i}`));
+    const h = harness({ pages: [[sett("9001")]], txPages: { "9001": [many(0, 100), many(100, 100), many(200, 7)] } });
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(h.calls.txPage.map(c => c.page)).toEqual([1, 2, 3]);
+    expect(r.txs).toBe(207);
+    expect(h.txStore.size).toBe(207);
+});
+
+test("sync: a failed transaction page leaves the settlement unmarked so the next run retries it", async () => {
+    const h = harness({ pages: [[sett("9001")]] });
+    h.deps.txPage = async () => ({ ok: false, reason: "unavailable" });
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(r.failed).toEqual(["transactions"]);
+    expect(h.settlements.get("9001").txs_synced_at).toBeUndefined();
+    expect(r.snapshot).toBe(true);
+});
+
+test("sync: a failed snapshot says 'snapshot' failed and does not throw", async () => {
+    const h = harness({ pages: [[]] });
+    h.deps.currentBill = async () => { throw new Error("db down"); };
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(r).toMatchObject({ snapshot: false, failed: ["snapshot"] });
+});
+
+test("settlementTransactions: page 2 is asked for with &page=2, page 1 keeps the old URL", async () => {
+    const f = fakeFetch({ status: true, data: [] });
+    await settlementTransactions("9001", null, { fetchImpl: f.impl, secret: "sk_test" });
+    await settlementTransactions("9001", null, { fetchImpl: f.impl, secret: "sk_test" }, 2);
+    expect(f.urls[0]).toMatch(/\/settlement\/9001\/transactions\?perPage=100$/);
+    expect(f.urls[1]).toContain("perPage=100&page=2");
 });

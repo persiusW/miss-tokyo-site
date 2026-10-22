@@ -194,8 +194,9 @@ export type SettlementTx = {
     raw: unknown;
 };
 
-export const settlementTransactions = (id: string, subaccountCode: string | null, d?: PaystackDeps) =>
-    call(`/settlement/${encodeURIComponent(id)}/transactions?perPage=100`, {
+/** One page (100 rows) of a settlement's transactions. `page` is 1 unless a caller is paging through a large settlement. */
+export const settlementTransactions = (id: string, subaccountCode: string | null, d?: PaystackDeps, page = 1) =>
+    call(`/settlement/${encodeURIComponent(id)}/transactions?perPage=100${page > 1 ? `&page=${page}` : ""}`, {
         method: "GET",
         parse: (x: any): SettlementTx[] => (Array.isArray(x) ? x : []).map((t: any) => {
             const share = subaccountCode ? subaccountShareOf(t, subaccountCode) : null;
