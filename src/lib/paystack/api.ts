@@ -20,7 +20,7 @@ function secretOf(d: PaystackDeps): string | null {
     return (d.secret !== undefined ? d.secret : process.env.PAYSTACK_SECRET_KEY) || null;
 }
 
-async function call<T>(path: string, init: RequestInit & { parse: (data: any) => T }, d: PaystackDeps = {}): Promise<PsResult<T>> {
+async function call<T>(path: string, init: RequestInit & { parse: (data: any, body?: any) => T }, d: PaystackDeps = {}): Promise<PsResult<T>> {
     const secret = secretOf(d);
     if (!secret) return { ok: false, reason: "not_configured" };
     const doFetch = d.fetchImpl ?? fetch;
@@ -38,7 +38,7 @@ async function call<T>(path: string, init: RequestInit & { parse: (data: any) =>
             console.error("[paystack]", init.method ?? "GET", path.split("?")[0], res.status, message ?? "");
             return { ok: false, reason: "refused", message };
         }
-        return { ok: true, data: init.parse(json.data) };
+        return { ok: true, data: init.parse(json.data, json) };
     } catch (e) {
         console.error("[paystack] unreachable", path.split("?")[0], String((e as Error)?.name ?? e));
         return { ok: false, reason: "unavailable" };
@@ -169,17 +169,35 @@ function parseSettlements(x: any): Settlement[] {
 export const listSettlements = (perPage = 50, d?: PaystackDeps) =>
     call(`/settlement?perPage=${perPage}`, { method: "GET", parse: parseSettlements }, d);
 
-export type SettlementTx = { reference: string; amountGhs: number; paidAt: string | null; channel: string | null; subaccountShareGhs: number | null };
+/** One page of settlements, with Paystack's raw rows alongside and the page count from its meta. */
+export const listSettlementsPage = (page: number, perPage: number, from?: string, d?: PaystackDeps) =>
+    call(`/settlement?perPage=${perPage}&page=${page}${from ? `&from=${encodeURIComponent(from)}` : ""}`, {
+        method: "GET",
+        parse: (x: any, body: any) => ({
+            rows: parseSettlements(x), raw: Array.isArray(x) ? x as unknown[] : [],
+            pageCount: Math.max(1, Math.floor(pesewas(body?.meta?.pageCount) ?? 1)),
+        }),
+    }, d);
+
+export type SettlementTx = {
+    reference: string; amountGhs: number; paidAt: string | null; channel: string | null; subaccountShareGhs: number | null;
+    /** Paystack's cut of this transaction (GH₵), when it says. */
+    feesGhs: number | null;
+    /** The row exactly as Paystack sent it. */
+    raw: unknown;
+};
 
 export const settlementTransactions = (id: string, subaccountCode: string | null, d?: PaystackDeps) =>
     call(`/settlement/${encodeURIComponent(id)}/transactions?perPage=100`, {
         method: "GET",
         parse: (x: any): SettlementTx[] => (Array.isArray(x) ? x : []).map((t: any) => {
             const share = subaccountCode ? subaccountShareOf(t, subaccountCode) : null;
+            const fees = pesewas(t?.fees);
             return {
                 reference: str(t?.reference), amountGhs: (pesewas(t?.amount) ?? 0) / 100,
                 paidAt: t?.paid_at ? str(t.paid_at) : t?.paidAt ? str(t.paidAt) : null, channel: t?.channel ? str(t.channel) : null,
                 subaccountShareGhs: share === null ? null : share / 100,
+                feesGhs: fees === null ? null : fees / 100, raw: t,
             };
         }),
     }, d);
