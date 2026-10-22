@@ -318,26 +318,44 @@ test("savedSettlementsView: a failed read is a calm 'unavailable'", async () => 
     expect(v).toMatchObject({ ok: false, reason: "unavailable", syncedAt: null });
 });
 
-test("savedReader: syncedAt is the newest synced_at in the table, not a cron_runs time", async () => {
-    const { savedReader } = await import("../../../src/lib/billing/paystackReports");
-    const tables: string[] = [];
-    const fake = {
-        from(table: string) {
-            tables.push(table);
-            let cols = "";
+/** A fake table that honours select(cols), order(col, {ascending, nullsFirst}) and limit(n) over real rows. */
+function fakeTable(rows: Record<string, any>[]) {
+    return {
+        from(_table: string) {
+            let cols: string[] = [];
+            let ord: { col: string; asc: boolean } | null = null;
             const q: any = {
-                select(c: string) { cols = c; return q; }, order() { return q; },
-                limit() {
-                    return Promise.resolve(cols === "synced_at"
-                        ? { data: [{ synced_at: "2026-10-22T11:30:00.000Z" }], error: null }
-                        : { data: [{ id: "A", status: "success", settled_at: "2026-10-21T00:00:00.000Z", fees_ghs: "0", net_ghs: "3.43", subaccount_code: ADMIN }], error: null });
+                select(c: string) { cols = c.split(",").map(x => x.trim()); return q; },
+                order(col: string, o: { ascending?: boolean } = {}) { ord = { col, asc: o.ascending !== false }; return q; },
+                limit(n: number) {
+                    let out = [...rows];
+                    if (ord) out.sort((a, b) => (ord!.asc ? 1 : -1) * String(a[ord!.col] ?? "").localeCompare(String(b[ord!.col] ?? "")));
+                    return Promise.resolve({ data: out.slice(0, n).map(r => Object.fromEntries(cols.map(c => [c, r[c]]))), error: null });
                 },
             };
             return q;
         },
     };
-    const r = await savedReader(fake)();
+}
+
+test("savedReader: syncedAt is the newest synced_at in the table (not the newest-settled row, not the oldest)", async () => {
+    const { savedReader } = await import("../../../src/lib/billing/paystackReports");
+    const row = (id: string, settled_at: string, synced_at: string) => ({ id, status: "success", settled_at, fees_ghs: "0", net_ghs: "3.43", subaccount_code: ADMIN, synced_at });
+    // The newest-settled row (A) was synced EARLIER than an older settlement (C) that was re-read later.
+    const rows = [
+        row("A", "2026-10-21T00:00:00.000Z", "2026-10-22T09:00:00.000Z"),
+        row("B", "2026-10-20T00:00:00.000Z", "2026-10-22T10:00:00.000Z"),
+        row("C", "2026-10-19T00:00:00.000Z", "2026-10-22T11:30:00.000Z"),
+        row("D", "2026-10-18T00:00:00.000Z", "2026-10-21T08:00:00.000Z"),
+    ];
+    const r = await savedReader(fakeTable(rows))();
     expect(r.syncedAt).toBe("2026-10-22T11:30:00.000Z");
-    expect(r.rows[0]).toMatchObject({ id: "A", net_ghs: 3.43, fees_ghs: 0 });
-    expect(new Set(tables)).toEqual(new Set(["paystack_settlements"]));
+    expect(r.rows.map(x => x.id)).toEqual(["A", "B", "C", "D"]);
+    expect(r.rows[0]).toMatchObject({ net_ghs: 3.43, fees_ghs: 0 });
+});
+
+test("savedReader: no saved rows gives syncedAt null", async () => {
+    const { savedReader } = await import("../../../src/lib/billing/paystackReports");
+    const r = await savedReader(fakeTable([]))();
+    expect(r).toEqual({ rows: [], syncedAt: null });
 });

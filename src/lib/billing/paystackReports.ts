@@ -41,16 +41,18 @@ export type SavedSettlementRow = { id: string; status: string; settled_at: strin
 
 /**
  * Reads the latest 50 saved settlements. `syncedAt` is the newest `synced_at`
- * in the table: every successful settlements read re-saves recent rows with
- * synced_at = now, and a failed read saves nothing, so it is the true last
- * successful sync (a cron_runs "ok" is not: the job is ok even when the sync
- * reports failed parts). Takes the client so tests can pass a fake.
+ * in the table: every successful read of the settlement list re-saves recent
+ * rows with synced_at = now, and a failed read saves nothing, so it is the
+ * last successful read of the settlement list. A run whose list read worked
+ * advances it even if a later part (transactions, snapshot) failed. A
+ * cron_runs "ok" proves nothing here: the job is ok even when the sync
+ * reports failed parts. Takes the client so tests can pass a fake.
  */
 export function savedReader(client: any = db): SavedReader {
     return async () => {
         const [s, c] = await Promise.all([
             client.from("paystack_settlements").select("id, status, settled_at, fees_ghs, net_ghs, subaccount_code").order("settled_at", { ascending: false, nullsFirst: false }).limit(50),
-            client.from("paystack_settlements").select("synced_at").order("synced_at", { ascending: false }).limit(1),
+            client.from("paystack_settlements").select("synced_at").order("synced_at", { ascending: false, nullsFirst: false }).limit(1),
         ]);
         if (s.error) throw s.error;
         return {
