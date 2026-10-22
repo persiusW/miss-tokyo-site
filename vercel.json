@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/billing-cutoff",
       "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/paystack-sync",
+      "schedule": "35 * * * *"
     }
   ]
 }
