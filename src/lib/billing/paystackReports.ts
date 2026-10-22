@@ -21,6 +21,29 @@ export async function adminSubaccountCodes(stored: string | null): Promise<strin
     return [...codes];
 }
 
+type SplitReader = (code: string) => Promise<PsResult<{ shares: { subaccountCode: string }[] }>>;
+
+/**
+ * The same codes, for the settlement sync: a split group that cannot be read
+ * is a failure, never a shorter list. A shorter list would save admin
+ * settlements as not admin. `splitCode` and `readSplit` are for tests.
+ */
+export async function adminSubaccountCodesStrict(
+    stored: string | null,
+    opts: { splitCode?: string | null; readSplit?: SplitReader } = {},
+): Promise<PsResult<string[]>> {
+    const codes = new Set<string>();
+    if (stored) codes.add(stored);
+    const env = "splitCode" in opts ? opts.splitCode : process.env.PAYSTACK_SPLIT_CODE;
+    if (env) {
+        const read = opts.readSplit ?? ((c: string) => cachedPs(`split:${c}`, TEN_MIN, () => getSplit(c)));
+        const s = await read(env);
+        if (!s.ok) return { ok: false, reason: s.reason, message: s.message };
+        for (const sh of s.data.shares) if (sh.subaccountCode) codes.add(sh.subaccountCode);
+    }
+    return { ok: true, data: [...codes] };
+}
+
 export type SettlementView = { checkedAt: number | null } & (
     | { ok: true; main: Settlement[]; admin: Settlement[] }
     | { ok: false; reason: "not_configured" | "unavailable" | "refused" });

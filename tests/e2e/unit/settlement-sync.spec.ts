@@ -109,6 +109,7 @@ const BILL: any = {
 function harness(opts: {
     pages?: Settlement[][]; txs?: Record<string, SettlementTx[]>; enabled?: boolean | Error; orders?: any[];
     store?: { settlements?: any[]; txs?: any[] }; pageError?: boolean; txPages?: Record<string, SettlementTx[][]>;
+    adminCodes?: string[] | Error;
 } = {}) {
     const pages = opts.pages ?? [[sett("9001"), sett("9002", { subaccountCode: null })], [sett("9003", { settledAt: "2026-10-10T00:00:00.000Z" })]];
     const txs = opts.txs ?? { "9001": [stx("r1"), stx("r2")], "9003": [stx("r3"), stx("r4")] };
@@ -118,7 +119,7 @@ function harness(opts: {
     const calls = { listPage: [] as any[], txPage: [] as any[], orders: [] as string[][] };
     const deps: SyncDeps = {
         enabled: async () => { if (opts.enabled instanceof Error) throw opts.enabled; return opts.enabled ?? true; },
-        adminCodes: async () => [ADMIN],
+        adminCodes: async () => { if (opts.adminCodes instanceof Error) throw opts.adminCodes; return opts.adminCodes ?? [ADMIN]; },
         listPage: async (page, perPage, from) => {
             calls.listPage.push({ page, perPage, from });
             if (opts.pageError) return { ok: false, reason: "unavailable" };
@@ -286,6 +287,26 @@ test("sync: a failed snapshot says 'snapshot' failed and does not throw", async 
     h.deps.currentBill = async () => { throw new Error("db down"); };
     const r = await syncPaystackSettlements(NOW, h.deps);
     expect(r).toMatchObject({ snapshot: false, failed: ["snapshot"] });
+});
+
+test("sync: unreadable admin codes save no settlements, say 'settings' failed, and still sync saved admin settlements", async () => {
+    const stored = { id: "old", status: "success", is_admin: true, settled_at: "2026-10-10T00:00:00.000Z", subaccount_code: ADMIN };
+    const h = harness({ adminCodes: new Error("split unreadable"), store: { settlements: [stored] }, txs: { old: [stx("o1")] } });
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(r).toMatchObject({ skipped: false, settlements: 0, txs: 1, snapshot: true, failed: ["settings"] });
+    expect(h.calls.listPage).toHaveLength(0);
+    expect([...h.settlements.keys()]).toEqual(["old"]);
+});
+
+test("adminSubaccountCodesStrict: stored code plus the split's codes; an unreadable split is a failure, not a shorter list", async () => {
+    const { adminSubaccountCodesStrict } = await import("../../../src/lib/billing/paystackReports");
+    const split = (codes: string[]) => async () => ({ ok: true as const, data: { shares: codes.map(subaccountCode => ({ subaccountCode })) } });
+    const both = await adminSubaccountCodesStrict("ACCT_stored", { splitCode: "SPL_x", readSplit: split(["ACCT_env", "ACCT_stored", ""]) });
+    expect(both).toEqual({ ok: true, data: ["ACCT_stored", "ACCT_env"] });
+    const failed = await adminSubaccountCodesStrict("ACCT_stored", { splitCode: "SPL_x", readSplit: async () => ({ ok: false, reason: "unavailable" }) });
+    expect(failed.ok).toBe(false);
+    const noSplit = await adminSubaccountCodesStrict("ACCT_stored", { splitCode: null, readSplit: async () => { throw new Error("not called"); } });
+    expect(noSplit).toEqual({ ok: true, data: ["ACCT_stored"] });
 });
 
 test("settlementTransactions: page 2 is asked for with &page=2, page 1 keeps the old URL", async () => {

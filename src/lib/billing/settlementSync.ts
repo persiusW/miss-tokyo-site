@@ -3,7 +3,7 @@
 // bottom is the hourly job, with every outside call injectable.
 import { listSettlementsPage, settlementTransactions, type PsResult, type Settlement, type SettlementTx } from "@/lib/paystack/api";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { adminSubaccountCodes } from "./paystackReports";
+import { adminSubaccountCodesStrict } from "./paystackReports";
 import { periodFor } from "./period";
 import { getBillingSettings, ratesOf, type BillingSettings } from "./settings";
 import { billFor, type Bill } from "./statements";
@@ -79,6 +79,7 @@ export const syncNote = (r: SyncResult) => `settlements ${r.settlements}, txs ${
 export type SyncDeps = {
     /** The switch. Throws when it cannot be read: a broken read never runs a sync silently. */
     enabled: () => Promise<boolean>;
+    /** Every admin subaccount code. Throws when any source of them cannot be read: settlements are then not saved this run. */
     adminCodes: () => Promise<string[]>;
     listPage: (page: number, perPage: number, from?: string) => Promise<PsResult<{ rows: Settlement[]; raw: unknown[]; pageCount: number }>>;
     txPage: (id: string, subaccountCode: string | null, page: number) => Promise<PsResult<SettlementTx[]>>;
@@ -122,7 +123,9 @@ const realDeps: SyncDeps = {
     },
     async adminCodes() {
         const s = await getBillingSettings();
-        return adminSubaccountCodes(s.adminSubaccountCode);
+        const r = await adminSubaccountCodesStrict(s.adminSubaccountCode);
+        if (!r.ok) throw new Error(`admin split unreadable: ${r.reason}`);
+        return r.data;
     },
     listPage: (page, perPage, from) => listSettlementsPage(page, perPage, from),
     txPage: (id, subaccountCode, page) => settlementTransactions(id, subaccountCode, undefined, page),
@@ -203,15 +206,16 @@ export async function syncPaystackSettlements(now: Date, deps: Partial<SyncDeps>
         return { ...result, skipped: true };
     }
 
-    let codes: string[] = [];
-    try { codes = await d.adminCodes(); } catch (e) { fail("settings", e); }
+    // Without every admin code an admin settlement would be saved as not
+    // admin, so an unreadable code skips step 1 for this run.
+    const codes = await d.adminCodes().catch(e => { fail("settings", e); return null; });
 
     // 1. Settlements. Every page is read before anything is saved: a run that
     // stops half way saves nothing, so the newest-saved date (where the next
     // run starts from) never moves past settlements we have not read yet.
     // The start is three days before the newest saved settlement, or earlier
     // when a saved one is still open, so a pending one is re-read until it settles.
-    try {
+    if (codes) try {
         const [max, open] = await Promise.all([d.maxSettledAt(), d.oldestOpenSettledAt()]);
         const times = [max ? new Date(max).getTime() - LOOKBACK_MS : NaN, open ? new Date(open).getTime() : NaN].filter(Number.isFinite);
         const from = times.length ? new Date(Math.min(...times)).toISOString().slice(0, 10) : undefined;
