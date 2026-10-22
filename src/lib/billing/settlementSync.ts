@@ -92,7 +92,7 @@ export type SyncDeps = {
     savedAdminIds: (ids: string[]) => Promise<string[]>;
     upsertSettlements: (rows: SettlementRow[]) => Promise<void>;
     /** Admin settlements whose transactions are unsaved, or that settled at or after `recentIso`. */
-    settlementsNeedingTxs: (recentIso: string) => Promise<{ id: string; subaccount_code: string | null }[]>;
+    settlementsNeedingTxs: (recentIso: string) => Promise<{ id: string; subaccount_code: string | null; settled_at: string | null }[]>;
     ordersFor: (references: string[]) => Promise<OrderMatch[]>;
     upsertTxs: (rows: SettlementTxRow[]) => Promise<void>;
     markTxsSynced: (id: string, iso: string) => Promise<void>;
@@ -104,6 +104,8 @@ const LOOKBACK_MS = 3 * DAY_MS;
 const SETTLEMENT_PAGE = 50;
 const TX_PAGE = 100;
 const MAX_PAGES = 200;
+/** Settlements whose transactions one run reads, oldest first: a backfill finishes over several runs instead of timing one out. */
+const MAX_TX_SETTLEMENTS = 30;
 
 /** Paystack settlement statuses that will not change again. Anything else (pending, processing) is re-read on every run. */
 const TERMINAL_STATUSES = ["success", "paid"];
@@ -163,8 +165,9 @@ const realDeps: SyncDeps = {
         if (error) throw error;
     },
     async settlementsNeedingTxs(recentIso) {
-        const { data, error } = await db.from("paystack_settlements").select("id, subaccount_code")
-            .eq("is_admin", true).or(`txs_synced_at.is.null,settled_at.gte.${recentIso}`);
+        const { data, error } = await db.from("paystack_settlements").select("id, subaccount_code, settled_at")
+            .eq("is_admin", true).or(`txs_synced_at.is.null,settled_at.gte.${recentIso}`)
+            .order("settled_at", { ascending: true, nullsFirst: false });
         if (error) throw error;
         return data ?? [];
     },
@@ -255,7 +258,9 @@ export async function syncPaystackSettlements(now: Date, deps: Partial<SyncDeps>
 
     // 2. Transactions of admin settlements not yet saved, or settled recently.
     try {
-        const due = await d.settlementsNeedingTxs(new Date(now.getTime() - LOOKBACK_MS).toISOString());
+        const due = (await d.settlementsNeedingTxs(new Date(now.getTime() - LOOKBACK_MS).toISOString()))
+            .sort((a, b) => a.settled_at === b.settled_at ? 0 : a.settled_at === null ? 1 : b.settled_at === null ? -1 : a.settled_at < b.settled_at ? -1 : 1)
+            .slice(0, MAX_TX_SETTLEMENTS);
         for (const st of due) {
             try {
                 const txs: SettlementTx[] = [];

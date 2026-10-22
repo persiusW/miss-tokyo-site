@@ -138,7 +138,7 @@ function harness(opts: {
         upsertSettlements: async rows => { for (const r of rows) settlements.set(r.id, { ...settlements.get(r.id), ...r }); },
         settlementsNeedingTxs: async recentIso => [...settlements.values()]
             .filter(r => r.is_admin && (!r.txs_synced_at || (r.settled_at && r.settled_at >= recentIso)))
-            .map(r => ({ id: r.id, subaccount_code: r.subaccount_code })),
+            .map(r => ({ id: r.id, subaccount_code: r.subaccount_code, settled_at: r.settled_at ?? null })),
         ordersFor: async refs => { calls.orders.push(refs); return opts.orders ?? []; },
         upsertTxs: async rows => { for (const r of rows) txStore.set(`${r.settlement_id}|${r.reference}`, r); },
         markTxsSynced: async (id, iso) => { settlements.get(id).txs_synced_at = iso; },
@@ -322,6 +322,19 @@ test("sync: a settlement read on two pages is upserted once, the last read winni
     expect(upserted).toEqual([["9001", "9002"]]);
     expect(r.settlements).toBe(2);
     expect(h.settlements.get("9001").status).toBe("success");
+});
+
+test("sync: transactions are read for at most 30 settlements a run, oldest first, so a backfill finishes over runs", async () => {
+    const day = (i: number) => new Date(Date.UTC(2026, 8, 1) + i * DAY).toISOString();
+    // 45 dated admin settlements with no transactions saved, stored newest first, plus one with no date (read last).
+    const stored = [{ id: "nodate", status: "success", is_admin: true, subaccount_code: ADMIN, settled_at: null },
+        ...Array.from({ length: 45 }, (_, i) => ({ id: `s${44 - i}`, status: "success", is_admin: true, subaccount_code: ADMIN, settled_at: day(44 - i) }))];
+    const h = harness({ pages: [[]], txs: {}, store: { settlements: stored } });
+    await syncPaystackSettlements(NOW, h.deps);
+    expect(h.calls.txPage.map(c => c.id)).toEqual(Array.from({ length: 30 }, (_, i) => `s${i}`));
+    h.calls.txPage.length = 0;
+    await syncPaystackSettlements(NOW, h.deps);
+    expect(h.calls.txPage.map(c => c.id)).toEqual([...Array.from({ length: 15 }, (_, i) => `s${30 + i}`), "nodate"]);
 });
 
 test("sync: a failed read of saved admin ids saves no settlements", async () => {
