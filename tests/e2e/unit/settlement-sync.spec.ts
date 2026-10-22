@@ -132,6 +132,7 @@ function harness(opts: {
         },
         currentBill: async () => ({ bill: BILL, settings: { ...BILLING_DEFAULTS } }),
         maxSettledAt: async () => [...settlements.values()].map(r => r.settled_at).filter(Boolean).sort().pop() ?? null,
+        oldestOpenSettledAt: async () => [...settlements.values()].filter(r => r.settled_at && !["success", "paid"].includes(r.status)).map(r => r.settled_at).sort()[0] ?? null,
         upsertSettlements: async rows => { for (const r of rows) settlements.set(r.id, { ...settlements.get(r.id), ...r }); },
         settlementsNeedingTxs: async recentIso => [...settlements.values()]
             .filter(r => r.is_admin && (!r.txs_synced_at || (r.settled_at && r.settled_at >= recentIso)))
@@ -176,6 +177,44 @@ test("sync: an unreadable switch skips and says 'settings' failed", async () => 
     const r = await syncPaystackSettlements(NOW, h.deps);
     expect(r).toMatchObject({ skipped: true, failed: ["settings"] });
     expect(h.calls.listPage).toHaveLength(0);
+});
+
+test("sync: a first run that fails on page 2 saves nothing, so the next run starts with no from", async () => {
+    const h = harness({ pages: [[sett("9001")], [sett("9002")]] });
+    const realList = h.deps.listPage;
+    h.deps.listPage = async (page, perPage, from) => page === 2 ? (h.calls.listPage.push({ page, perPage, from }), { ok: false, reason: "unavailable" } as const) : realList(page, perPage, from);
+    const first = await syncPaystackSettlements(NOW, h.deps);
+    expect(first.failed).toContain("settlements");
+    expect(first.settlements).toBe(0);
+    expect(h.settlements.size).toBe(0);
+    h.deps.listPage = realList;
+    h.calls.listPage.length = 0;
+    const second = await syncPaystackSettlements(NOW, h.deps);
+    expect(h.calls.listPage[0].from).toBeUndefined();
+    expect(second.settlements).toBe(2);
+});
+
+test("sync: a pending settlement older than the newest pulls from back to its own date", async () => {
+    const h = harness({ pages: [[]], store: { settlements: [
+        { id: "new", status: "success", is_admin: false, settled_at: "2026-10-20T00:00:00.000Z" },
+        { id: "stale", status: "pending", is_admin: false, settled_at: "2026-10-10T00:00:00.000Z" },
+    ] } });
+    await syncPaystackSettlements(NOW, h.deps);
+    expect(h.calls.listPage[0].from).toBe("2026-10-10");
+});
+
+test("sync: an undefined dep does not replace the real one", async () => {
+    const h = harness({ enabled: false });
+    const r = await syncPaystackSettlements(NOW, { ...h.deps, listPage: undefined });
+    expect(r.skipped).toBe(true);
+});
+
+test("sync: hitting the transaction page cap says 'transactions' failed and leaves the settlement unmarked", async () => {
+    const h = harness({ pages: [[sett("9001")]] });
+    h.deps.txPage = async () => ({ ok: true, data: Array.from({ length: 100 }, (_, i) => stx(`c${Math.random()}-${i}`)) });
+    const r = await syncPaystackSettlements(NOW, h.deps);
+    expect(r.failed).toEqual(["transactions"]);
+    expect(h.settlements.get("9001").txs_synced_at).toBeUndefined();
 });
 
 test("sync: a Paystack page error says 'settlements' failed and keeps the stored rows", async () => {

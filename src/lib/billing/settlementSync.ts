@@ -82,6 +82,8 @@ export type SyncDeps = {
     /** The period's bill with the settings it was priced under. */
     currentBill: (now: Date) => Promise<{ bill: Bill; settings: BillingSettings }>;
     maxSettledAt: () => Promise<string | null>;
+    /** The oldest settled_at among saved settlements Paystack has not yet marked successful (still pending or processing). */
+    oldestOpenSettledAt: () => Promise<string | null>;
     upsertSettlements: (rows: SettlementRow[]) => Promise<void>;
     /** Admin settlements whose transactions are unsaved, or that settled at or after `recentIso`. */
     settlementsNeedingTxs: (recentIso: string) => Promise<{ id: string; subaccount_code: string | null }[]>;
@@ -96,6 +98,9 @@ const LOOKBACK_MS = 3 * DAY_MS;
 const SETTLEMENT_PAGE = 50;
 const TX_PAGE = 100;
 const MAX_PAGES = 200;
+
+/** Paystack settlement statuses that will not change again. Anything else (pending, processing) is re-read on every run. */
+const TERMINAL_STATUSES = ["success", "paid"];
 
 const db = supabaseAdmin as any;
 
@@ -125,6 +130,13 @@ const realDeps: SyncDeps = {
     },
     async maxSettledAt() {
         const { data, error } = await db.from("paystack_settlements").select("settled_at").not("settled_at", "is", null).order("settled_at", { ascending: false }).limit(1);
+        if (error) throw error;
+        return data?.[0]?.settled_at ?? null;
+    },
+    async oldestOpenSettledAt() {
+        const { data, error } = await db.from("paystack_settlements").select("settled_at")
+            .not("settled_at", "is", null).not("status", "in", `(${TERMINAL_STATUSES.join(",")})`)
+            .order("settled_at", { ascending: true }).limit(1);
         if (error) throw error;
         return data?.[0]?.settled_at ?? null;
     },
@@ -172,7 +184,8 @@ const realDeps: SyncDeps = {
  * `failed`, goes to the log, and the other steps still run.
  */
 export async function syncPaystackSettlements(now: Date, deps: Partial<SyncDeps> = {}): Promise<SyncResult> {
-    const d: SyncDeps = { ...realDeps, ...deps };
+    const d: SyncDeps = { ...realDeps };
+    for (const [k, v] of Object.entries(deps)) if (v !== undefined) (d as any)[k] = v;
     const result: SyncResult = { skipped: false, settlements: 0, txs: 0, snapshot: false, failed: [] };
     const fail = (label: string, e?: unknown) => {
         console.error(`[settlement-sync] ${label} failed`, e instanceof Error ? e.message : e ?? "");
@@ -190,18 +203,28 @@ export async function syncPaystackSettlements(now: Date, deps: Partial<SyncDeps>
     let codes: string[] = [];
     try { codes = await d.adminCodes(); } catch (e) { fail("settings", e); }
 
-    // 1. Settlements, page by page, from three days before the newest one saved.
+    // 1. Settlements. Every page is read before anything is saved: a run that
+    // stops half way saves nothing, so the newest-saved date (where the next
+    // run starts from) never moves past settlements we have not read yet.
+    // The start is three days before the newest saved settlement, or earlier
+    // when a saved one is still open, so a pending one is re-read until it settles.
     try {
-        const max = await d.maxSettledAt();
-        const maxMs = max ? new Date(max).getTime() : NaN;
-        const from = Number.isFinite(maxMs) ? new Date(maxMs - LOOKBACK_MS).toISOString().slice(0, 10) : undefined;
-        for (let page = 1, pages = 1; page <= pages && page <= MAX_PAGES; page++) {
+        const [max, open] = await Promise.all([d.maxSettledAt(), d.oldestOpenSettledAt()]);
+        const times = [max ? new Date(max).getTime() - LOOKBACK_MS : NaN, open ? new Date(open).getTime() : NaN].filter(Number.isFinite);
+        const from = times.length ? new Date(Math.min(...times)).toISOString().slice(0, 10) : undefined;
+        const rows: SettlementRow[] = [];
+        let complete = false;
+        for (let page = 1, pages = 1; page <= pages; page++) {
+            if (page > MAX_PAGES) { fail("settlements", "page limit reached"); break; }
             const r = await d.listPage(page, SETTLEMENT_PAGE, from);
             if (!r.ok) { fail("settlements", r.reason); break; }
             pages = r.data.pageCount;
-            const rows = r.data.rows.map((s, i) => settlementRow(s, r.data.raw[i], codes, now));
+            rows.push(...r.data.rows.map((s, i) => settlementRow(s, r.data.raw[i], codes, now)));
+            if (page >= pages) complete = true;
+        }
+        if (complete) {
             await d.upsertSettlements(rows);
-            result.settlements += rows.length;
+            result.settlements = rows.length;
         }
     } catch (e) { fail("settlements", e); }
 
@@ -211,14 +234,14 @@ export async function syncPaystackSettlements(now: Date, deps: Partial<SyncDeps>
         for (const st of due) {
             try {
                 const txs: SettlementTx[] = [];
-                let failedPage = false;
+                let complete = false;
                 for (let page = 1; page <= MAX_PAGES; page++) {
                     const r = await d.txPage(st.id, st.subaccount_code, page);
-                    if (!r.ok) { failedPage = true; fail("transactions", r.reason); break; }
+                    if (!r.ok) { fail("transactions", r.reason); break; }
                     txs.push(...r.data);
-                    if (r.data.length < TX_PAGE) break;
+                    if (r.data.length < TX_PAGE) { complete = true; break; }
                 }
-                if (failedPage) continue;
+                if (!complete) { fail("transactions", `settlement ${st.id} not fully read`); continue; }
                 const unique = [...new Map(txs.filter(t => t.reference).map(t => [t.reference, t])).values()];
                 const orders = unique.length ? await d.ordersFor(unique.map(t => t.reference)) : [];
                 const byPaystack = new Map(orders.filter(o => o.paystack_reference).map(o => [o.paystack_reference as string, o]));
