@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Banner, Btn, Card, ConfirmPanel, Empty, ErrorState, Field, Kpi, Money, Panel, Percent, RadioCards, Seg, Select, ghs, plural, when } from "@/components/admin/ui";
+import { Badge, Banner, Btn, Card, ConfirmPanel, Empty, ErrorState, Field, Kpi, Money, Panel, Percent, RadioCards, Seg, Select, ghs, plural, when, ago } from "@/components/admin/ui";
 import { SHARE_MODES, SHARE_MODE_TEXT, shareDue, type ShareMode } from "@/lib/billing/payoutRules";
 import { canRetireSplits, cutoverStage, type CutoverCheck, type Stage } from "@/lib/billing/cutover";
 import type { Bank, Split } from "@/lib/paystack/api";
 import type { LedgerView, PayoutsData } from "./data";
-import { adoptSplitSubaccount, checkFirstPayment, checkPayoutAccount, listPayoutBanks, recordManualPayout, savePayoutAccount, savePayoutBearer, saveShareRule, setOldSplitActive, setPayoutSplitLive } from "./actions";
+import { adoptSplitSubaccount, checkFirstPayment, checkPayoutAccount, listPayoutBanks, recordManualPayout, savePayoutAccount, savePayoutBearer, saveShareRule, setOldSplitActive, setPayoutSplitLive, syncSettlementsNow } from "./actions";
 import { useRun } from "./useRun";
 
 const OUTCOME: Record<string, [string, "ok" | "warn" | "neutral" | "info"]> = {
@@ -184,7 +184,13 @@ export function PayoutsTab({ d }: { d: PayoutsData }) {
                 <Kpi label="Payouts run from" value={s.payoutSplitLive ? "The dashboard" : "Paystack split"} ctx={STAGE_TEXT[stage]} />
             </div>
 
-            <Card title="The site's Paystack split today" action={<Badge plain>Read from Paystack</Badge>}>
+            <Card title="The site's Paystack split today" action={d.settlements.syncedAt === undefined ? <Badge plain>Read from Paystack</Badge> : undefined}>
+                {d.settlements.syncedAt !== undefined && (
+                    <div className="card-body" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span className="sm muted">Saved from Paystack · last synced {d.settlements.syncedAt ? ago(d.settlements.syncedAt) : "not yet"}</span>
+                        <Btn sm kind="ghost" disabled={!!busy} onClick={() => run("sync", () => syncSettlementsNow(), "Synced with Paystack.")}>{busy === "sync" ? "Syncing…" : "Sync now"}</Btn>
+                    </div>
+                )}
                 <div className="card-body stack">
                     {!d.paystackConnected ? <Banner tone="warn" title="Paystack isn't set up on this server">PAYSTACK_SECRET_KEY is missing, so nothing can be read.</Banner>
                         : !d.envSplitCode ? <Banner tone="info" title="The site doesn't use a split">PAYSTACK_SPLIT_CODE is empty, so online payments go wholly to the main account unless the automatic share is on.</Banner>

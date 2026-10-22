@@ -295,3 +295,25 @@ test("settlementTransactions: page 2 is asked for with &page=2, page 1 keeps the
     expect(f.urls[0]).toMatch(/\/settlement\/9001\/transactions\?perPage=100$/);
     expect(f.urls[1]).toContain("perPage=100&page=2");
 });
+
+test("savedSettlementsView: splits admin and main by the admin codes passed in, same shape as the live view", async () => {
+    const { savedSettlementsView } = await import("../../../src/lib/billing/paystackReports");
+    const rows = [
+        { id: "A", status: "success", settled_at: "2026-10-21T00:00:00.000Z", fees_ghs: 0, net_ghs: 3.43, subaccount_code: ADMIN },
+        { id: "B", status: "success", settled_at: "2026-10-20T00:00:00.000Z", fees_ghs: 2.4, net_ghs: 120, subaccount_code: null },
+        { id: "C", status: "success", settled_at: "2026-10-19T00:00:00.000Z", fees_ghs: null, net_ghs: 9, subaccount_code: "ACCT_other" },
+    ];
+    const v = await savedSettlementsView([ADMIN], async () => ({ rows, syncedAt: "2026-10-22T11:00:00.000Z" }));
+    expect(v.ok).toBe(true);
+    if (!v.ok) return;
+    expect(v.admin).toEqual([{ id: "A", status: "success", amountGhs: 3.43, feesGhs: 0, settledAt: "2026-10-21T00:00:00.000Z", subaccountCode: ADMIN }]);
+    expect(v.main.map(s => s.id)).toEqual(["B"]);
+    expect(v.main[0]).toMatchObject({ amountGhs: 120, feesGhs: 2.4, subaccountCode: null });
+    expect(v.syncedAt).toBe("2026-10-22T11:00:00.000Z");
+});
+
+test("savedSettlementsView: a failed read is a calm 'unavailable'", async () => {
+    const { savedSettlementsView } = await import("../../../src/lib/billing/paystackReports");
+    const v = await savedSettlementsView([ADMIN], async () => { throw new Error("db down"); });
+    expect(v).toMatchObject({ ok: false, reason: "unavailable", syncedAt: null });
+});
