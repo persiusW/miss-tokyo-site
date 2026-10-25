@@ -52,10 +52,11 @@ const refresh = (id?: string) => {
 
 /** One order's panel. */
 export async function getOrder(id: string): Promise<Result<{ detail: OrderDetail }>> {
-    if (!(await me())) return DENIED;
+    const caller = await me();
+    if (!caller) return DENIED;
     if (!UUID.test(id)) return { ok: false, error: GONE };
     try {
-        const detail = await loadOrderDetail(id);
+        const detail = await loadOrderDetail(id, caller.role);
         return detail ? { ok: true, detail } : { ok: false, error: GONE };
     } catch (e) {
         logCause("GEN-00", e, { where: "orders.get" });
@@ -64,10 +65,11 @@ export async function getOrder(id: string): Promise<Result<{ detail: OrderDetail
 }
 
 export async function getTimeline(id: string): Promise<Result<{ items: TimelineItem[] }>> {
-    if (!(await me())) return DENIED;
+    const caller = await me();
+    if (!caller) return DENIED;
     if (!UUID.test(id)) return { ok: false, error: GONE };
     try {
-        return { ok: true, items: await loadOrderTimeline(id) };
+        return { ok: true, items: await loadOrderTimeline(id, caller.role) };
     } catch (e) {
         logCause("GEN-00", e, { where: "orders.timeline" });
         return { ok: false, error: "We couldn't load the timeline. Please try again." };

@@ -10,7 +10,7 @@ import { requireStaff } from "@/lib/ai/requireStaff";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendTeamInviteMessages } from "@/lib/teamInviteMessages";
 import { inviteTeamMember, sendPasswordResetLink } from "@/app/(dashboard)/settings/actions";
-import { INVITE_ROLES, isStaffRole, refusalOf, roleLabel, staffRefusal, type StaffRoleKey } from "./staffCopy";
+import { canManageRole, inviteRolesFor, isStaffRole, refusalOf, roleLabel, staffRefusal } from "./staffCopy";
 
 type Result = { ok: true; message: string; signedOutSelf?: boolean; warning?: boolean } | { ok: false; error: string };
 
@@ -29,6 +29,22 @@ async function nameOf(id: string): Promise<{ name: string; email: string | null 
     return { name: data?.full_name || data?.email || "This person", email: data?.email ?? null };
 }
 
+// Only an admin sees or changes an admin (staffCopy seesAdmins). To anyone else
+// an admin isn't on the list, so acting on one reads as "not there".
+const HIDDEN: Result = { ok: false, error: staffRefusal("not_found") };
+const GONE_INVITE: Result = { ok: false, error: "That invite was already used or revoked. Refresh the page." };
+
+/** The role someone has, or is waiting to get back while deactivated. */
+async function standingRole(id: string): Promise<string | null> {
+    const { data } = await supabaseAdmin.from("profiles").select("role, staff_deactivated_role").eq("id", id).maybeSingle();
+    if (!data) return null;
+    return data.staff_deactivated_role === "admin" ? "admin" : data.role;
+}
+
+async function hiddenFrom(me: { role: string }, id: string): Promise<boolean> {
+    return !canManageRole(me.role, await standingRole(id));
+}
+
 function refused(error: { message?: string } | null, what: string): Result {
     const reason = refusalOf(error?.message);
     if (!reason) console.error(`[staff] ${what} failed:`, error?.message);
@@ -43,6 +59,8 @@ export async function changeStaffRole(memberId: string, role: string): Promise<R
     const me = await caller();
     if (!me) return FORBIDDEN;
     if (!UUID.test(memberId) || !isStaffRole(role)) return { ok: false, error: staffRefusal("bad_role") };
+    if (!canManageRole(me.role, role)) return { ok: false, error: "Choose Owner or Sales staff." };
+    if (await hiddenFrom(me, memberId)) return HIDDEN;
 
     const { data: prev, error } = await supabaseAdmin.rpc("fn_staff_set_role", { p_target: memberId, p_role: role });
     if (error) return refused(error, "role change");
@@ -60,6 +78,7 @@ export async function deactivateStaff(memberId: string): Promise<Result> {
     const me = await caller();
     if (!me) return FORBIDDEN;
     if (!UUID.test(memberId)) return { ok: false, error: staffRefusal("not_found") };
+    if (await hiddenFrom(me, memberId)) return HIDDEN;
 
     const { data: prev, error } = await supabaseAdmin.rpc("fn_staff_deactivate", { p_target: memberId, p_actor: me.userId });
     if (error) return refused(error, "deactivate");
@@ -82,6 +101,7 @@ export async function reactivateStaff(memberId: string): Promise<Result> {
     const me = await caller();
     if (!me) return FORBIDDEN;
     if (!UUID.test(memberId)) return { ok: false, error: staffRefusal("not_found") };
+    if (await hiddenFrom(me, memberId)) return HIDDEN;
 
     const { data: role, error } = await supabaseAdmin.rpc("fn_staff_reactivate", { p_target: memberId });
     if (error) return refused(error, "reactivate");
@@ -106,6 +126,7 @@ export async function removeFromStaff(memberId: string): Promise<Result> {
     const me = await caller();
     if (!me) return FORBIDDEN;
     if (!UUID.test(memberId)) return { ok: false, error: staffRefusal("not_found") };
+    if (await hiddenFrom(me, memberId)) return HIDDEN;
 
     const who = await nameOf(memberId);
     const { data: was } = await supabaseAdmin.from("profiles").select("role, staff_deactivated_role").eq("id", memberId).maybeSingle();
@@ -128,6 +149,7 @@ export async function signOutEverywhere(memberId: string): Promise<Result> {
     const me = await caller();
     if (!me) return FORBIDDEN;
     if (!UUID.test(memberId)) return { ok: false, error: staffRefusal("not_found") };
+    if (await hiddenFrom(me, memberId)) return HIDDEN;
 
     const { error } = await supabaseAdmin.rpc("fn_staff_sign_out_everywhere", { p_target: memberId });
     if (error) return refused(error, "sign out everywhere");
@@ -146,6 +168,7 @@ export async function sendStaffResetLink(memberId: string): Promise<Result> {
     const me = await caller();
     if (!me) return FORBIDDEN;
     if (!UUID.test(memberId)) return { ok: false, error: staffRefusal("not_found") };
+    if (await hiddenFrom(me, memberId)) return HIDDEN;
     const { data: p } = await supabaseAdmin.from("profiles").select("email, role").eq("id", memberId).maybeSingle();
     if (!p?.email || !isStaffRole(p.role)) return { ok: false, error: staffRefusal("not_staff") };
 
@@ -158,7 +181,7 @@ export async function sendStaffResetLink(memberId: string): Promise<Result> {
 export async function inviteStaff(input: { fullName: string; email: string; phone?: string; role: string }): Promise<Result> {
     const me = await caller();
     if (!me) return FORBIDDEN;
-    if (!INVITE_ROLES.includes(input.role as StaffRoleKey)) return { ok: false, error: "Choose Sales staff or Admin." };
+    if (!inviteRolesFor(me.role).some(r => r === input.role)) return { ok: false, error: "Choose a role for them." };
     if (!input.fullName.trim()) return { ok: false, error: "Add their name so the team knows who this is." };
 
     // The existing invite flow: team_invitations row, email with the setup
@@ -191,7 +214,7 @@ export async function resendInvite(inviteId: string): Promise<Result> {
     const me = await caller();
     if (!me) return FORBIDDEN;
     const inv = await pendingInvite(inviteId);
-    if (!inv) return { ok: false, error: "That invite was already used or revoked. Refresh the page." };
+    if (!inv || !canManageRole(me.role, inv.role)) return GONE_INVITE;
 
     // A fresh 7 days from now, same link.
     const expires = new Date(Date.now() + 7 * 86_400_000).toISOString();
@@ -215,7 +238,7 @@ export async function revokeInvite(inviteId: string): Promise<Result> {
     const me = await caller();
     if (!me) return FORBIDDEN;
     const inv = await pendingInvite(inviteId);
-    if (!inv) return { ok: false, error: "That invite was already used or revoked. Refresh the page." };
+    if (!inv || !canManageRole(me.role, inv.role)) return GONE_INVITE;
 
     const { data, error } = await supabaseAdmin.from("team_invitations").update({ status: "revoked" }).eq("id", inv.id).eq("status", "pending").select("id");
     if (error || !data?.length) {

@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/utils/logActivity";
 import { after } from "next/server";
 import { INVITABLE_ROLES } from "@/lib/teamInvites";
 import { sendTeamInviteMessages } from "@/lib/teamInviteMessages";
+import { canManageRole } from "@/components/admin/v2/staff/staffCopy";
 
 interface InviteData {
     fullName: string;
@@ -39,7 +40,8 @@ export async function inviteTeamMember(data: InviteData) {
         return { success: false, error: "Forbidden: Only admins and owners can invite team members." };
     }
 
-    if (!INVITABLE_ROLES.includes(data.role)) {
+    // Only an admin can make an admin (staffCopy seesAdmins).
+    if (!INVITABLE_ROLES.includes(data.role) || !canManageRole(callerProfile.role, data.role)) {
         return { success: false, error: "Invalid role." };
     }
 
@@ -124,6 +126,12 @@ export async function removeTeamMember(userId: string) {
         return { success: false, error: "Forbidden: Only admins and owners can remove members." };
     }
 
+    // Only an admin can remove an admin; to anyone else an admin isn't on staff.
+    const { data: target } = await supabaseAdmin.from("profiles").select("role, staff_deactivated_role").eq("id", userId).maybeSingle();
+    if (!canManageRole(callerData.role, target?.role) || !canManageRole(callerData.role, target?.staff_deactivated_role)) {
+        return { success: false, error: "That account no longer exists." };
+    }
+
     // Demote role to 'customer' so they lose dashboard access without destroying
     // their account or triggering FK constraint failures on orders/pos_sessions/logs.
     // fn_staff_remove does it under the staff lock and refuses to demote the
@@ -181,6 +189,12 @@ export async function sendPasswordResetLink(targetEmail: string) {
         .eq("id", userData.user.id)
         .single();
     if (!callerData || (callerData.role !== "admin" && callerData.role !== "owner")) {
+        return { success: false, error: "Forbidden: Only admins and owners can send reset links." };
+    }
+
+    // Only an admin can send an admin a reset link.
+    const { data: targets } = await supabaseAdmin.from("profiles").select("role, staff_deactivated_role").ilike("email", targetEmail.trim().replace(/[\\%_]/g, "\\$&"));
+    if ((targets ?? []).some(t => !canManageRole(callerData.role, t.role) || !canManageRole(callerData.role, t.staff_deactivated_role))) {
         return { success: false, error: "Forbidden: Only admins and owners can send reset links." };
     }
 

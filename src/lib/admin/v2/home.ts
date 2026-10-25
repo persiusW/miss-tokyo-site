@@ -6,7 +6,7 @@ import { getAiSettings } from "@/lib/ai/settings";
 import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { walletIsLow } from "@/lib/whatsapp/walletAlertRules";
 import { fulKey, type FulKey } from "@/components/admin/ui/status";
-import { activityText, QUIET_ACTIONS } from "@/lib/admin/activityText";
+import { activityText, hideAdminRows, QUIET_ACTIONS } from "@/lib/admin/activityText";
 import type { StaffRole } from "@/lib/admin/v2/server";
 import { inboxBreakdown, toPackCount } from "./counts";
 import { applyReady, applyToPack, applyUnpaid } from "./orderViews";
@@ -136,10 +136,10 @@ export async function loadLatest(): Promise<LatestOrder[]> {
 
 export type TeamActivity = { id: string; who: string; what: string; href?: string; created_at: string };
 
-export async function loadActivity(): Promise<TeamActivity[]> {
-    const { data, error } = await supabaseAdmin.from("activity_logs")
+export async function loadActivity(viewer: StaffRole): Promise<TeamActivity[]> {
+    const { data, error } = await hideAdminRows(supabaseAdmin.from("activity_logs")
         .select("id, user_id, action_type, resource, resource_id, details, created_at")
-        .not("action_type", "in", `(${QUIET_ACTIONS.join(",")})`)
+        .not("action_type", "in", `(${QUIET_ACTIONS.join(",")})`), viewer)
         .order("created_at", { ascending: false }).limit(5);
     if (error) throw error;
     const ids = [...new Set((data ?? []).map(a => a.user_id).filter(Boolean))] as string[];

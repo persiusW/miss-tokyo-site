@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Empty, ErrorState, Field, Panel, RadioCards, SRow, TwoTap, ago, initials, toast, when } from "@/components/admin/ui";
 import type { StaffMember } from "./data";
-import { LAST_OWNER_TEXT, ROLE_DESC, ROLE_LABEL, STAFF_ROLES, type StaffRoleKey } from "./staffCopy";
+import { LAST_OWNER_TEXT, ROLE_DESC, ROLE_LABEL, assignableRoles, type StaffRoleKey } from "./staffCopy";
 import { changeStaffRole, deactivateStaff, reactivateStaff, removeFromStaff, sendStaffResetLink, signOutEverywhere } from "./actions";
 
 const soft = (t: string) => (/^(Just now|Today|Yesterday)/.test(t) ? t[0].toLowerCase() + t.slice(1) : t);
@@ -20,7 +20,7 @@ function panelLine(m: StaffMember): string {
     return lastLine(m);
 }
 
-export function PeopleTab({ members, failed, meId }: { members: StaffMember[]; failed: boolean; meId: string }) {
+export function PeopleTab({ members, failed, meId, viewer }: { members: StaffMember[]; failed: boolean; meId: string; viewer: StaffRoleKey }) {
     const router = useRouter();
     const [open, setOpen] = useState<string | null>(null);
     const m = members.find(x => x.id === open) ?? null;
@@ -49,7 +49,7 @@ export function PeopleTab({ members, failed, meId }: { members: StaffMember[]; f
                         </div>
                     )}
             </Card>
-            {m && <MemberPanel key={m.id} m={m} self={m.id === meId} lastOwner={m.role === "owner" && !m.deactivated && owners <= 1}
+            {m && <MemberPanel key={m.id} m={m} viewer={viewer} self={m.id === meId} lastOwner={m.role === "owner" && !m.deactivated && owners <= 1}
                 onClose={() => setOpen(null)} onDone={() => { setOpen(null); router.refresh(); }} />}
         </>
     );
@@ -57,7 +57,7 @@ export function PeopleTab({ members, failed, meId }: { members: StaffMember[]; f
 
 type Busy = null | "save" | "reset" | "signout" | "deactivate" | "reactivate" | "remove";
 
-function MemberPanel({ m, self, lastOwner, onClose, onDone }: { m: StaffMember; self: boolean; lastOwner: boolean; onClose: () => void; onDone: () => void }) {
+function MemberPanel({ m, viewer, self, lastOwner, onClose, onDone }: { m: StaffMember; viewer: StaffRoleKey; self: boolean; lastOwner: boolean; onClose: () => void; onDone: () => void }) {
     const [role, setRole] = useState<StaffRoleKey>(m.role);
     const [busy, setBusy] = useState<Busy>(null);
 
@@ -96,7 +96,7 @@ function MemberPanel({ m, self, lastOwner, onClose, onDone }: { m: StaffMember; 
                 <>
                     <Field label="Role">
                         <RadioCards label="Role" value={role} onChange={setRole}
-                            options={STAFF_ROLES.map(r => ({ v: r, title: ROLE_LABEL[r], desc: ROLE_DESC[r], disabled: lastOwner && r !== "owner" }))} />
+                            options={assignableRoles(viewer).map(r => ({ v: r, title: ROLE_LABEL[r], desc: ROLE_DESC[r], disabled: lastOwner && r !== "owner" }))} />
                     </Field>
                     {lastOwner && <p className="help">{LAST_OWNER_TEXT}</p>}
                     {self && !lastOwner && <p className="help">This is you. You can change your own role, but someone else has to deactivate you.</p>}

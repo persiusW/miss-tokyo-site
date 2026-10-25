@@ -7,12 +7,16 @@
 //           name: "packed order #4A8FF381". Never the raw action_type.
 //     href: where the row should open (the order), when there is one.
 //   QUIET_ACTIONS: action types a short feed leaves out (sign-ins).
+//   hideAdminRows(query, viewer): leaves out rows an admin logged unless the
+//     viewer is an admin. Only admins see admins (staffCopy seesAdmins); the
+//     read policy on activity_logs applies the same rule to browser sessions.
 //
 // Every action_type the app logs today is handled (lib/utils/logActivity
 // callers); anything new falls back to "updated <name>" rather than showing a
 // code. NOTE for the merge: the Staff area builds its own readable log in a
 // parallel branch; the two should become one module.
 import { sectionByKey } from "@/components/admin/v2/settings/schema";
+import { seesAdmins } from "@/components/admin/v2/staff/staffCopy";
 
 export type ActivityRow = {
     action_type: string;
@@ -142,4 +146,9 @@ export function activityText(row: ActivityRow): ActivityText {
     }
     if (res === "team") return { what: "changed the team" };
     return { what: `${verb ?? "updated"} ${name || "something"}` };
+}
+
+// Typed loosely: a structural constraint on the PostgREST builder is too deep for tsc.
+export function hideAdminRows<Q>(query: Q, viewer: string): Q {
+    return seesAdmins(viewer) ? query : (query as any).neq("user_role", "admin");
 }

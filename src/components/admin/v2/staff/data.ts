@@ -1,7 +1,8 @@
 // Server-side reads for the Staff pages. Service-role client on purpose: the
 // RLS lockdown leaves server pages on the anon client silently empty.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { ACTIVITY_PAGE, STAFF_ROLES, actionFilter, describeActivity, isStaffRole, type ActivityRow, type StaffRoleKey } from "./staffCopy";
+import { hideAdminRows } from "@/lib/admin/activityText";
+import { ACTIVITY_PAGE, STAFF_ROLES, actionFilter, canManageRole, describeActivity, isStaffRole, type ActivityRow, type StaffRoleKey } from "./staffCopy";
 
 export type StaffMember = {
     id: string;
@@ -21,7 +22,8 @@ export type StaffBase = { members: StaffMember[]; invites: StaffInvite[]; failed
 
 const ORDER: Record<StaffRoleKey, number> = { owner: 0, admin: 1, sales_staff: 2 };
 
-export async function loadStaffBase(): Promise<StaffBase> {
+/** Everyone on staff and every pending invite this viewer may see: admins only to admins. */
+export async function loadStaffBase(viewer: StaffRoleKey): Promise<StaffBase> {
     const [people, invites] = await Promise.all([
         supabaseAdmin
             .from("profiles")
@@ -44,7 +46,7 @@ export async function loadStaffBase(): Promise<StaffBase> {
         const deactivated = !!p.staff_deactivated_at && !isStaffRole(p.role);
         const role = (deactivated ? p.staff_deactivated_role : p.role) as StaffRoleKey;
         return { p, deactivated, role: isStaffRole(role) ? role : "sales_staff" as StaffRoleKey };
-    });
+    }).filter(r => canManageRole(viewer, r.role) && canManageRole(viewer, r.p.staff_deactivated_role));
 
     // Last active: each person's newest SIGN_IN row (one indexed read each; the
     // staff list is small), falling back to the auth account's last sign-in,
@@ -75,7 +77,7 @@ export async function loadStaffBase(): Promise<StaffBase> {
 
     return {
         members,
-        invites: (invites.data ?? []).map(x => ({ id: x.id, name: x.full_name, email: x.email, role: x.role, phone: x.phone, sent: x.created_at, expiresAt: x.expires_at })),
+        invites: (invites.data ?? []).filter(x => canManageRole(viewer, x.role)).map(x => ({ id: x.id, name: x.full_name, email: x.email, role: x.role, phone: x.phone, sent: x.created_at, expiresAt: x.expires_at })),
         failed: false,
     };
 }
@@ -94,7 +96,7 @@ export function parseActivityFilters(sp: Record<string, string | string[] | unde
 }
 
 /** One page of the activity log, newest first, filtered on the server. */
-export async function loadActivity(f: ActivityFilters): Promise<{ items: ActivityItem[]; hasMore: boolean; failed: boolean }> {
+export async function loadActivity(f: ActivityFilters, viewer: StaffRoleKey): Promise<{ items: ActivityItem[]; hasMore: boolean; failed: boolean }> {
     const from = (f.page - 1) * ACTIVITY_PAGE;
     // One extra row says whether there's a next page without counting the table.
     let q = supabaseAdmin
@@ -102,6 +104,7 @@ export async function loadActivity(f: ActivityFilters): Promise<{ items: Activit
         .select("id, user_id, user_role, action_type, resource, resource_id, details, created_at")
         .order("created_at", { ascending: false })
         .range(from, from + ACTIVITY_PAGE);
+    q = hideAdminRows(q, viewer);
     if (f.who) q = q.eq("user_id", f.who);
     const af = actionFilter(f.action);
     if (af) {

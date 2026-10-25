@@ -16,6 +16,32 @@ export const ROLE_DESC: Record<StaffRoleKey, string> = {
 /** Roles an invite may grant (lib/teamInvites INVITABLE_ROLES: owner is never handed out by invite). */
 export const INVITE_ROLES: StaffRoleKey[] = ["sales_staff", "admin"];
 
+// ── Admin is for admins only ─────────────────────────────────────────────
+// Admin is the developer's role. Only an admin sees admins (on People, Invites,
+// Activity and the role tables) or can make, change or remove one. The database
+// enforces the same rule for browser sessions (migration
+// 20261025120000_admin_only_admin); the server actions check it because they run
+// on the service role.
+
+export function seesAdmins(viewer: string | null | undefined): boolean {
+    return viewer === "admin";
+}
+
+/** Whether this viewer may act on someone whose role (or role waiting to come back) is `target`. */
+export function canManageRole(viewer: string | null | undefined, target: string | null | undefined): boolean {
+    return seesAdmins(viewer) || target !== "admin";
+}
+
+/** Roles this viewer can pick on People. */
+export function assignableRoles(viewer: string | null | undefined): StaffRoleKey[] {
+    return STAFF_ROLES.filter(r => canManageRole(viewer, r));
+}
+
+/** Roles this viewer can invite as. */
+export function inviteRolesFor(viewer: string | null | undefined): StaffRoleKey[] {
+    return INVITE_ROLES.filter(r => canManageRole(viewer, r));
+}
+
 export function isStaffRole(r: unknown): r is StaffRoleKey {
     return typeof r === "string" && (STAFF_ROLES as readonly string[]).includes(r);
 }
@@ -85,6 +111,15 @@ export const PERMS: PermRow[] = [
     { area: "AI cost markup and the admin inbox", owner: "no", admin: "yes", sales: "no" },
     { area: "Admin tools: payouts, processing fee, billing prices and switches", owner: "no", admin: "yes", sales: "no" },
 ];
+
+/** The role table this viewer sees: without admins, no Admin column and no admin-only rows. */
+export function permsFor(viewer: string | null | undefined): { columns: StaffRoleKey[]; rows: PermRow[] } {
+    if (seesAdmins(viewer)) return { columns: [...STAFF_ROLES], rows: PERMS };
+    return {
+        columns: ["owner", "sales_staff"],
+        rows: PERMS.filter(p => p.owner !== "no" || p.sales !== "no"),
+    };
+}
 
 // ── Activity log in sentences ────────────────────────────────────────────
 

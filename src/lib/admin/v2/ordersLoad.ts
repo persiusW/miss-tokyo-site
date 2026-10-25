@@ -7,7 +7,8 @@
 // numbers a person taps on and the list they land on always agree.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { buildSearchClause, sanitiseTerm } from "@/lib/refSearch";
-import { activityText } from "@/lib/admin/activityText";
+import { activityText, hideAdminRows } from "@/lib/admin/activityText";
+import { canManageRole } from "@/components/admin/v2/staff/staffCopy";
 import { orderLines, refundable, packedUnits, type OrderLine } from "@/lib/orders/refundMath";
 import { applyReady, applyToPack, applyUnpaid } from "./orderViews";
 import {
@@ -132,15 +133,18 @@ export type OrderDetail = {
     subtotal: number;
 };
 
-async function names(ids: (string | null | undefined)[]): Promise<Map<string, string>> {
+/** First names by id. An admin's name is left out unless the viewer is an admin (staffCopy seesAdmins). */
+async function names(ids: (string | null | undefined)[], viewer: string): Promise<Map<string, string>> {
     const u = [...new Set(ids.filter((x): x is string => !!x))];
     if (!u.length) return new Map();
-    const { data } = await db.from("profiles").select("id, full_name, email").in("id", u);
-    return new Map((data ?? []).map((p: any) => [p.id, (p.full_name || p.email || "").trim().split(/\s+/)[0] || "Someone"]));
+    const { data } = await db.from("profiles").select("id, full_name, email, role, staff_deactivated_role").in("id", u);
+    return new Map((data ?? [])
+        .filter((p: any) => canManageRole(viewer, p.role) && canManageRole(viewer, p.staff_deactivated_role))
+        .map((p: any) => [p.id, (p.full_name || p.email || "").trim().split(/\s+/)[0] || "Someone"]));
 }
 
 /** One order and everything its panel shows. Null when there's no such order. Throws on a database error. */
-export async function loadOrderDetail(id: string): Promise<OrderDetail | null> {
+export async function loadOrderDetail(id: string, viewer: string): Promise<OrderDetail | null> {
     const { data: order, error } = await db.from("orders").select(DETAIL_FIELDS).eq("id", id).maybeSingle();
     if (error) throw error;
     if (!order) return null;
@@ -157,7 +161,7 @@ export async function loadOrderDetail(id: string): Promise<OrderDetail | null> {
     ]);
     if (refunds.error) throw refunds.error;
     if (ful.error) throw ful.error;
-    const who = await names([...(refunds.data ?? []).map((r: any) => r.actor), ...(ful.data ?? []).map((f: any) => f.created_by)]);
+    const who = await names([...(refunds.data ?? []).map((r: any) => r.actor), ...(ful.data ?? []).map((f: any) => f.created_by)], viewer);
     const byProduct = new Map<string, any>((prod.data ?? []).map((p: any) => [p.id, p]));
     const packed = packedUnits(ful.data ?? []);
     const refundRows: RefundView[] = (refunds.data ?? []).map((r: any) => ({
@@ -190,10 +194,10 @@ export async function loadOrderDetail(id: string): Promise<OrderDetail | null> {
 const COVERED = new Set(["REFUND_ORDER", "PARTIAL_FULFILMENT", "NOTE_TO_CUSTOMER"]);
 
 /** Every event for one order (BACKEND_GAPS 21), newest first. Throws on a database error. */
-export async function loadOrderTimeline(id: string): Promise<TimelineItem[]> {
+export async function loadOrderTimeline(id: string, viewer: string): Promise<TimelineItem[]> {
     const [o, act, notes, att, sale, refunds, ful] = await Promise.all([
         db.from("orders").select("created_at, paid_at, ready_at, source, total_amount, payment_method, items").eq("id", id).maybeSingle(),
-        db.from("activity_logs").select("created_at, user_id, action_type, resource, resource_id, details").eq("resource", "order").eq("resource_id", id).order("created_at", { ascending: false }).limit(200),
+        hideAdminRows(db.from("activity_logs").select("created_at, user_id, action_type, resource, resource_id, details").eq("resource", "order").eq("resource_id", id), viewer).order("created_at", { ascending: false }).limit(200),
         db.from("notification_log").select("created_at, channel, event, status, body").eq("order_id", id).order("created_at", { ascending: false }).limit(200),
         db.from("payment_attempts").select("created_at, status, amount_ghs").eq("order_id", id).limit(100),
         db.from("sale_payment_attempts").select("created_at, status, amount_ghs, channel, error_code").eq("order_id", id).limit(100),
@@ -202,7 +206,7 @@ export async function loadOrderTimeline(id: string): Promise<TimelineItem[]> {
     ]);
     for (const r of [o, act, notes, att, sale, refunds, ful]) if (r.error) throw r.error;
     if (!o.data) return [];
-    const who = await names([...(act.data ?? []).map((a: any) => a.user_id), ...(refunds.data ?? []).map((r: any) => r.actor), ...(ful.data ?? []).map((f: any) => f.created_by)]);
+    const who = await names([...(act.data ?? []).map((a: any) => a.user_id), ...(refunds.data ?? []).map((r: any) => r.actor), ...(ful.data ?? []).map((f: any) => f.created_by)], viewer);
     const total = orderLines(o.data.items).reduce((s, l) => s + l.quantity, 0);
     const units = (items: unknown) => (Array.isArray(items) ? items : []).reduce((s: number, i: any) => s + (Number(i?.quantity) || 0), 0);
     return buildTimeline({
