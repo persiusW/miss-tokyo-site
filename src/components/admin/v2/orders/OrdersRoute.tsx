@@ -34,7 +34,7 @@ export async function OrdersV2({ searchParams, openId }: { searchParams: SP; ope
     let detail: OrderDetail | null | "error" = null;
     if (openId) {
         try {
-            detail = await loadOrderDetail(openId);
+            detail = await loadOrderDetail(openId, auth.role);
         } catch (e) {
             logCause("GEN-00", e, { where: "orders.detail" });
             detail = "error";

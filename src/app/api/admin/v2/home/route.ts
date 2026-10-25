@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     try {
         if (part === "needs") {
             const [needs, restored, latest, activity] = await Promise.all([
-                loadNeeds(auth.role, now), loadRestored(now), loadLatest(), loadActivity(),
+                loadNeeds(auth.role, now), loadRestored(now), loadLatest(), loadActivity(auth.role),
             ]);
             return NextResponse.json({ needs: needsRows(needs, now), restored, latest, activity, at: now.toISOString() });
         }

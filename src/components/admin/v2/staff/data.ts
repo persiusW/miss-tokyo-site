@@ -1,6 +1,7 @@
 // Server-side reads for the Staff pages. Service-role client on purpose: the
 // RLS lockdown leaves server pages on the anon client silently empty.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { hideAdminRows } from "@/lib/admin/activityText";
 import { ACTIVITY_PAGE, STAFF_ROLES, actionFilter, canManageRole, describeActivity, isStaffRole, type ActivityRow, type StaffRoleKey } from "./staffCopy";
 
 export type StaffMember = {
@@ -95,7 +96,7 @@ export function parseActivityFilters(sp: Record<string, string | string[] | unde
 }
 
 /** One page of the activity log, newest first, filtered on the server. */
-export async function loadActivity(f: ActivityFilters): Promise<{ items: ActivityItem[]; hasMore: boolean; failed: boolean }> {
+export async function loadActivity(f: ActivityFilters, viewer: StaffRoleKey): Promise<{ items: ActivityItem[]; hasMore: boolean; failed: boolean }> {
     const from = (f.page - 1) * ACTIVITY_PAGE;
     // One extra row says whether there's a next page without counting the table.
     let q = supabaseAdmin
@@ -103,6 +104,7 @@ export async function loadActivity(f: ActivityFilters): Promise<{ items: Activit
         .select("id, user_id, user_role, action_type, resource, resource_id, details, created_at")
         .order("created_at", { ascending: false })
         .range(from, from + ACTIVITY_PAGE);
+    q = hideAdminRows(q, viewer);
     if (f.who) q = q.eq("user_id", f.who);
     const af = actionFilter(f.action);
     if (af) {
