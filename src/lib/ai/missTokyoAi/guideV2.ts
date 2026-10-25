@@ -207,7 +207,7 @@ export const V2_GUIDE: V2Entry[] = [
         area: "staff",
         route: "staff",
         roles: FULL,
-        body: `Staff (owners and admins): tabs People, Invites, What each role can do, and Activity (filter by person, action and day — answers "who changed this order"). "Invite staff" (name, email, optional phone: the invite link is texted too) can invite Sales staff or Admin, not Owner; to make someone an owner, change their role afterwards. Tap a person to change their role, "Send reset link", "Sign out everywhere" (ends their session on every phone and computer), "Deactivate" (tap twice; they can't sign in until someone taps "Reactivate"), or "Remove from staff" (they keep a shop account). The store always keeps at least one owner. Invites can be resent ("Send again") or revoked (tap twice); an invite link works for 7 days.`,
+        body: `Staff (owners and admins): tabs People, Invites, What each role can do, and Activity (filter by person, action and day — answers "who changed this order"). "Invite staff" (name, email, optional phone: the invite link is texted too) invites Sales staff (an admin can also invite Admin), never Owner; to make someone an owner, invite them as Sales staff, then change their role on People. Only an admin can see, invite, change or remove an admin: owners don't see admins on People, Invites, Activity, Home's "Team activity" or an order's history, and their role table has no Admin column. Tap a person to change their role, "Send reset link", "Sign out everywhere" (ends their session on every phone and computer), "Deactivate" (tap twice; they can't sign in until someone taps "Reactivate"), or "Remove from staff" (they keep a shop account). The store always keeps at least one owner. Invites can be resent ("Send again") or revoked (tap twice); an invite link works for 7 days.`,
     },
     {
         id: "billing",
@@ -255,7 +255,7 @@ export const V2_CANNOT_DO: ((v: AdminView) => string | null)[] = [
     () => "Restore a gift card's balance by cancelling or refunding an order paid with it, or edit a gift card's amount.",
     () => "Sell at a custom price, give a manual discount amount, or sell an item that is not in the catalogue at the POS.",
     () => "Split one POS payment between cash and card (a gift card plus a pay link or cash for the rest does work).",
-    v => (isOn(v, "staff") ? "Invite an Owner from Staff (invite them as Admin, then change their role)." : "Invite an Owner from the Team page."),
+    v => (isOn(v, "staff") ? "Invite an Owner from Staff (invite them as Sales staff, then change their role on People)." : "Invite an Owner from the Team page."),
     v => `Type a new size, colour or brand on the product form (add it to ${placeNames(v).options} first).`,
     v => (isOn(v, "products") ? "Import products or stock from a CSV file (Inventory can export stock, not import it)." : "Import products or stock from a CSV file."),
     () => "Change the processing fee, the payout accounts or the billing prices as an owner or sales staff: the admin sets them in Admin tools.",
