@@ -10,10 +10,10 @@ export const dynamic = "force-dynamic";
 export default async function StaffPermissionsPage() {
     const g = await requireV2Page("staff", "/staff/permissions", ["owner", "admin"]);
     if (!g.allowed) return <Denied title="Staff" />;
-    const base = await loadStaffBase();
+    const base = await loadStaffBase(g.role);
     return (
-        <StaffShell tab="permissions" people={base.failed ? null : base.members.filter(m => !m.deactivated).length} invites={base.failed ? null : base.invites.length}>
-            <PermissionsTab />
+        <StaffShell viewer={g.role} tab="permissions" people={base.failed ? null : base.members.filter(m => !m.deactivated).length} invites={base.failed ? null : base.invites.length}>
+            <PermissionsTab viewer={g.role} />
         </StaffShell>
     );
 }

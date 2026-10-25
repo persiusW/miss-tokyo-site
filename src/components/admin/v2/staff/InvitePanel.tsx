@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { Btn, Field, Panel, RadioCards, toast } from "@/components/admin/ui";
 import { inviteStaff } from "./actions";
-import { INVITE_ROLES, ROLE_DESC, ROLE_LABEL, type StaffRoleKey } from "./staffCopy";
+import { ROLE_DESC, ROLE_LABEL, inviteRolesFor, type StaffRoleKey } from "./staffCopy";
 
 /** Invite staff: the existing flow (team_invitations + an email with the setup link). */
-export function InvitePanel({ open, onClose, onSent }: { open: boolean; onClose: () => void; onSent: () => void }) {
+export function InvitePanel({ open, viewer, onClose, onSent }: { open: boolean; viewer: StaffRoleKey; onClose: () => void; onSent: () => void }) {
     const [email, setEmail] = useState("");
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
@@ -44,7 +44,7 @@ export function InvitePanel({ open, onClose, onSent }: { open: boolean; onClose:
             </Field>
             <Field label="Role" help="To make someone an owner, invite them first, then change their role on People.">
                 <RadioCards label="Role" value={role} onChange={setRole}
-                    options={INVITE_ROLES.map(r => ({ v: r, title: ROLE_LABEL[r], desc: ROLE_DESC[r] }))} />
+                    options={inviteRolesFor(viewer).map(r => ({ v: r, title: ROLE_LABEL[r], desc: ROLE_DESC[r] }))} />
             </Field>
         </Panel>
     );

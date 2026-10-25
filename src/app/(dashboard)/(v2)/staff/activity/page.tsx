@@ -11,9 +11,9 @@ export default async function StaffActivityPage({ searchParams }: { searchParams
     const g = await requireV2Page("staff", "/staff/activity", ["owner", "admin"]);
     if (!g.allowed) return <Denied title="Staff" />;
     const filters = parseActivityFilters(await searchParams);
-    const [base, log] = await Promise.all([loadStaffBase(), loadActivity(filters)]);
+    const [base, log] = await Promise.all([loadStaffBase(g.role), loadActivity(filters)]);
     return (
-        <StaffShell tab="activity" people={base.failed ? null : base.members.filter(m => !m.deactivated).length} invites={base.failed ? null : base.invites.length}>
+        <StaffShell viewer={g.role} tab="activity" people={base.failed ? null : base.members.filter(m => !m.deactivated).length} invites={base.failed ? null : base.invites.length}>
             <ActivityTab items={log.items} hasMore={log.hasMore} failed={log.failed} filters={filters} members={base.members} />
         </StaffShell>
     );

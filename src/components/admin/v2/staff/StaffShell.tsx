@@ -5,11 +5,12 @@ import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Btn, PageHeader, Tabs } from "@/components/admin/ui";
 import { InvitePanel } from "./InvitePanel";
+import type { StaffRoleKey } from "./staffCopy";
 import "./staff.css";
 
 export type StaffTab = "members" | "invites" | "permissions" | "activity";
 
-export function StaffShell({ tab, people, invites, children }: { tab: StaffTab; people: number | null; invites: number | null; children: ReactNode }) {
+export function StaffShell({ viewer, tab, people, invites, children }: { viewer: StaffRoleKey; tab: StaffTab; people: number | null; invites: number | null; children: ReactNode }) {
     const router = useRouter();
     const [inviting, setInviting] = useState(false);
     return (
@@ -23,7 +24,7 @@ export function StaffShell({ tab, people, invites, children }: { tab: StaffTab; 
                 { v: "activity", l: "Activity", href: "/staff/activity" },
             ]} />
             {children}
-            <InvitePanel open={inviting} onClose={() => setInviting(false)}
+            <InvitePanel open={inviting} viewer={viewer} onClose={() => setInviting(false)}
                 onSent={() => { setInviting(false); router.push("/staff/invites"); router.refresh(); }} />
         </>
     );
