@@ -467,6 +467,8 @@ export async function POST(req: Request) {
                                 "New Order Received!",
                                 `Order #${orderRef} for GH₵ ${amountGHS.toFixed(2)} from ${fullName || customerEmail} has been paid.`,
                             ),
+                            !phone ? Promise.resolve() : notifyOrderOnWhatsApp(
+                                { id: newOrder.id, customer_name: fullName, customer_phone: phone, delivery_method: deliveryMethod }, "paid"),
                         ]);
                         if (emailResult.status === "rejected") console.error("[webhook] sendOrderConfirmation failed:", emailResult.reason);
                         if (smsResult.status === "rejected") console.error("[webhook] sendSMS failed:", smsResult.reason);

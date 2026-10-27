@@ -19,6 +19,7 @@ import { zoneLabel } from "@/lib/delivery";
 import { buildShippingAddress } from "@/lib/geo";
 import { ensureCustomerAccount, saveCustomerContact, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
 import { releaseDiscountHolds } from "@/lib/discountValidation";
+import { notifyOrderOnWhatsApp } from "@/lib/whatsapp/notifyOrder";
 
 /**
  * True when Postgres/PostgREST rejected the write because the column does not
@@ -326,6 +327,10 @@ export async function settlePosSession(
         // Write the ledger, then drop the hold — the value is now spent, not reserved
         trackDiscountUsage(posDiscountCode || undefined, posDiscountTag, posDiscountAmount, newOrder.id)
             .then(() => releaseDiscountHolds({ posSessionId })),
+        // WhatsApp, best effort: the customer's confirmation.
+        posSession.customer_phone
+            ? notifyOrderOnWhatsApp({ id: newOrder.id, customer_name: posSession.customer_name, customer_phone: posSession.customer_phone, delivery_method: deliveryMethod }, "paid")
+            : Promise.resolve(),
     ]);
 
     if (emailResult.status === "rejected") {
