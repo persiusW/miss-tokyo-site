@@ -13,7 +13,7 @@ import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { sendSMS } from "@/lib/sms";
 import { createWhatsAppHandler } from "./assistantHandler";
 import { providerMessage } from "./choices";
-import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnNote, setOptOut, waitingInbound } from "./conversationStore";
+import { chatForConversation, latestNotice, loadWaConversation, logOutbound, offeredOptions, quotedMessage, recentHistory, returnDetails, returnNote, setOptOut, waitingInbound } from "./conversationStore";
 import { forwardToTeam, localNumber, whyText, type HandoffReason } from "./handoff";
 import { logConversationEvent } from "./events";
 import { claimReferral, claimTeamAlert, claimTurnLock, releaseTurnLock } from "./teamWatch";
@@ -100,11 +100,13 @@ export async function pipelineFor(
             const c = await loadWaConversation(id);
             if (!c) return null;
             const note = reason === "return_request" ? await returnNote(id).catch(() => null) : null;
-            return { name: c.name, phone: c.phone, history: await recentHistory(id), note };
+            const details = reason === "return_request" ? await returnDetails(id).catch(() => null) : null;
+            return { name: c.name, phone: c.phone, history: await recentHistory(id), note, returnDetails: details };
         },
         sendWhatsApp: (to, text) => sender.sendText(to, text, { event: "whatsapp_handoff_team" }),
         templateId: settings.whatsappHandoffTemplateId,
-        sendTemplate: (to, templateId) => sender.sendTemplate(to, { templateId, type: "text" }, { event: "whatsapp_handoff_team" }),
+        richTemplateIdFor: key => settings.whatsappTemplateIds[key] ?? null,
+        sendTemplate: (to, templateId, placeholders) => sender.sendTemplate(to, { templateId, type: "text", placeholders }, { event: "whatsapp_handoff_team" }),
         sendSms: (to, text) => sendSMS({ to, message: text }, { event: "whatsapp_handoff_team" }),
         inboxUrl: id => `${site}/customers/whatsapp?c=${id}`,
     }).then(async () => {
