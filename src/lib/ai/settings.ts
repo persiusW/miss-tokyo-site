@@ -2,7 +2,8 @@
 // an AI feature that cannot see its kill switch or its spend cap must not run.
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { normaliseWaNumber, SHOP_SETTING_VALIDATORS } from "@/lib/ai/shopAssistant/settingsRules";
-import { STATUS_TEMPLATE_EVENTS, statusTemplateIdsValue, templateIdValue, type StatusTemplateEvent } from "@/lib/ai/templateSettings";
+import { MAX_STAFF_ALERT_NUMBERS, STATUS_TEMPLATE_EVENTS, staffNumbersValue, statusTemplateIdsValue, templateIdsValue, templateIdValue, type StatusTemplateEvent } from "@/lib/ai/templateSettings";
+import { TEMPLATE_KEYS, type TemplateKey } from "@/lib/whatsapp/templates";
 
 export type AiSettings = {
     dailySpendCapGhs: number;
@@ -23,6 +24,10 @@ export type AiSettings = {
     whatsappStatusTemplateIds: Partial<Record<StatusTemplateEvent, number>>;
     /** Approved template (team_chat_alert) for the WhatsApp half of a handoff alert; null = free text, which WhatsApp drops outside 24h. */
     whatsappHandoffTemplateId: number | null;
+    /** Approved templates with variables (whatsapp/templates), by key; a key without one falls back to the variable-free template or SMS. */
+    whatsappTemplateIds: Partial<Record<TemplateKey, number>>;
+    /** Staff WhatsApp numbers (233…) told about each new paid order; empty = none. */
+    staffAlertNumbers: string[];
     /** The WhatsApp assistant may ask with tappable buttons and lists (offer_choices). */
     whatsappChoices: boolean;
     /** One WhatsApp reminder for WhatsApp orders unpaid after 30 minutes. */
@@ -96,6 +101,8 @@ export const EDITABLE_AI_SETTINGS = {
     whatsapp_returns_enabled: (v: unknown) => typeof v === "boolean",
     whatsapp_status_template_ids: statusTemplateIdsValue,
     whatsapp_handoff_template_id: templateIdValue,
+    whatsapp_template_ids: templateIdsValue,
+    whatsapp_staff_alert_numbers: staffNumbersValue,
 } as const;
 
 export type EditableAiSettingKey = keyof typeof EDITABLE_AI_SETTINGS;
@@ -127,6 +134,8 @@ const OFF: AiSettings = {
     whatsappStatusTemplateId: null,
     whatsappStatusTemplateIds: {},
     whatsappHandoffTemplateId: null,
+    whatsappTemplateIds: {},
+    staffAlertNumbers: [],
     whatsappChoices: false,
     whatsappUnpaidNudge: false,
     whatsappRestockAlerts: false,
@@ -181,6 +190,21 @@ export async function getAiSettings(): Promise<AiSettings> {
             return out;
         })(),
         whatsappHandoffTemplateId: templateId(map.get("whatsapp_handoff_template_id")),
+        whatsappTemplateIds: (() => {
+            const raw = map.get("whatsapp_template_ids");
+            const out: Partial<Record<TemplateKey, number>> = {};
+            if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+                for (const k of TEMPLATE_KEYS) {
+                    const id = templateId((raw as Record<string, unknown>)[k]);
+                    if (id) out[k] = id;
+                }
+            }
+            return out;
+        })(),
+        staffAlertNumbers: (() => {
+            const raw = map.get("whatsapp_staff_alert_numbers");
+            return Array.isArray(raw) ? [...new Set(raw.map(normaliseWaNumber).filter((n): n is string => !!n))].slice(0, MAX_STAFF_ALERT_NUMBERS) : [];
+        })(),
         whatsappChoices: bool("whatsapp_choices_enabled"),
         whatsappUnpaidNudge: bool("whatsapp_unpaid_nudge_enabled"),
         whatsappRestockAlerts: bool("whatsapp_restock_alerts_enabled"),
