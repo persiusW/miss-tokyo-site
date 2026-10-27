@@ -4,6 +4,7 @@ import { sizeMatches } from "../../../src/lib/ai/shopAssistant/format";
 import { RESTOCK_PROMPT_NOTE, systemPromptFor } from "../../../src/lib/ai/shopAssistant/prompt";
 import { CUSTOMER_TOOL_DEFS, NOTIFY_WHEN_BACK_TOOL, OPTIONAL_TOOL_NAMES } from "../../../src/lib/ai/shopAssistant/toolDefs";
 import { NOTICE_TYPE } from "../../../src/lib/whatsapp/notices";
+import { fillTemplate } from "../../../src/lib/whatsapp/templates";
 import {
     pickOption, restockPlaceholders, restockText, runRestockAlerts, wantedInStock, type RestockDeps, type RestockRequest,
 } from "../../../src/lib/whatsapp/restock";
@@ -50,8 +51,9 @@ const req = (over: Partial<RestockRequest> = {}): RestockRequest => ({
 
 test("the alert names the piece, the option and the link", () => {
     expect(restockText(req(), SITE)).toBe("Good news, Ama! Lindsy Bodycon (size M — 10, Red) is back in stock at Miss Tokyo: https://misstokyo.shop/products/lindsy-bodycon\n\nReply here if you'd like to order it.");
-    expect(restockPlaceholders(req({ size: null, colour: null, conversation: { ...req().conversation, name: null } }), SITE))
-        .toEqual(["there", "Lindsy Bodycon", "https://misstokyo.shop/products/lindsy-bodycon"]);
+    // The template holds https://misstokyo.shop/products/, so {{3}} is the slug alone.
+    expect(restockPlaceholders(req({ size: null, colour: null, conversation: { ...req().conversation, name: null } })))
+        .toEqual(["there", "Lindsy Bodycon", "lindsy-bodycon"]);
 });
 
 function deps(o: { reqs?: RestockRequest[]; templateId?: number | null; sendOk?: boolean } = {}) {
@@ -89,7 +91,9 @@ test("outside the window: the template when there is one, otherwise it waits", a
     expect(waiting.status.get(old.id)).toBeUndefined();
     const t = deps({ reqs: [old], templateId: 1072346328969351 });
     expect(await runRestockAlerts(t.d)).toEqual({ expired: 2, sent_template: 1 });
-    expect(t.templates).toEqual([[1072346328969351, restockPlaceholders(old, SITE)]]);
+    expect(t.templates).toEqual([[1072346328969351, restockPlaceholders(old)]]);
+    // Logged in the words the customer saw.
+    expect(t.logged[0][0]).toBe(fillTemplate("back_in_stock", restockPlaceholders(old))!.text);
 });
 
 test("still sold out, inactive, or STOP: nothing sent and the request stays open", async () => {

@@ -1,7 +1,7 @@
 // Back-in-stock alerts on WhatsApp. A customer asks the assistant to be told
 // when a sold-out piece (optionally a size and colour) is back; an hourly run
 // sends one message when it is. Inside the 24-hour window that is a text;
-// later only the approved template goes (whatsapp_restock_template_id), and
+// later only the approved back_in_stock template goes (whatsapp_template_ids), and
 // without one the request waits. Never to a customer who replied STOP.
 // Requests lapse after 60 days. Pure: everything live is injected.
 import type { Stock } from "@/lib/ai/catalogStock";
@@ -10,6 +10,7 @@ import { normAttr } from "@/lib/utils/normAttr";
 import type { MessagingResult } from "@/lib/messaging/provider";
 import { REPLY_WINDOW_MS } from "./pipeline";
 import { NOTICE_TYPE } from "./notices";
+import { fillTemplate } from "./templates";
 
 export const RESTOCK_KEEP_DAYS = 60;
 /** Open alerts per conversation. */
@@ -53,9 +54,9 @@ export function restockText(r: RestockRequest, siteUrl: string): string {
     return `Good news, ${firstName(r.conversation.name)}! ${piece(r)} is back in stock at Miss Tokyo: ${siteUrl}/products/${r.product.slug}\n\nReply here if you'd like to order it.`;
 }
 
-/** The template's {{1}} name, {{2}} piece, {{3}} link. */
-export function restockPlaceholders(r: RestockRequest, siteUrl: string): string[] {
-    return [firstName(r.conversation.name), piece(r), `${siteUrl}/products/${r.product.slug}`];
+/** The back_in_stock template's {{1}} name, {{2}} piece, {{3}} product slug (the template holds https://misstokyo.shop/products/). */
+export function restockPlaceholders(r: RestockRequest): string[] {
+    return [firstName(r.conversation.name), piece(r), r.product.slug];
 }
 
 export type RestockOutcome = "sent_text" | "sent_template" | "not_yet" | "waiting_for_template" | "opted_out" | "claimed_elsewhere" | "failed";
@@ -81,11 +82,13 @@ export async function alertOne(r: RestockRequest, deps: RestockDeps, now: number
     if (r.conversation.optedOut) return "opted_out";
     const inWindow = !!r.conversation.lastInboundAt && now - Date.parse(r.conversation.lastInboundAt) < REPLY_WINDOW_MS;
     if (!inWindow && !deps.templateId) return "waiting_for_template";
+    const filled = inWindow ? null : fillTemplate("back_in_stock", restockPlaceholders(r));
+    if (!inWindow && !filled) return "waiting_for_template";
     if (!(await deps.claim(r.id))) return "claimed_elsewhere";
-    const text = restockText(r, deps.siteUrl);
-    const res = inWindow
-        ? await deps.sendText(r.conversation.phone, text)
-        : await deps.sendTemplate(r.conversation.phone, deps.templateId!, restockPlaceholders(r, deps.siteUrl));
+    const text = filled ? filled.text : restockText(r, deps.siteUrl);
+    const res = filled
+        ? await deps.sendTemplate(r.conversation.phone, deps.templateId!, filled.placeholders)
+        : await deps.sendText(r.conversation.phone, text);
     if (!res.ok) { await deps.release(r.id); return "failed"; }
     await deps.logOutbound(r.conversationId, text, res.messageId, NOTICE_TYPE);
     return inWindow ? "sent_text" : "sent_template";

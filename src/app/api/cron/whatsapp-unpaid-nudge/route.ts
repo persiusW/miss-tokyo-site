@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     try {
         const settings = await getAiSettings();
         if (!settings.whatsappEnabled || !settings.whatsappUnpaidNudge) return NextResponse.json({ ok: true, mode: "off" });
-        const counts = await runUnpaidNudges(liveNudgeDeps());
+        const counts = await runUnpaidNudges(liveNudgeDeps(settings.whatsappTemplateIds.order_not_paid ?? null));
         if (counts.failed) console.warn("[cron/whatsapp-unpaid-nudge] some reminders failed", counts);
         return NextResponse.json({ ok: true, ...counts });
     } catch (e) {

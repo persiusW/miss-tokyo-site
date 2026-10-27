@@ -9,7 +9,7 @@ import type { NudgeDeps } from "./unpaidNudge";
 const db = supabaseAdmin as any;
 const last9 = (phone: string) => phone.replace(/\D/g, "").slice(-9);
 
-export function liveNudgeDeps(): NudgeDeps {
+export function liveNudgeDeps(templateId: number | null = null): NudgeDeps {
     const sender = createChatbotsAfrica();
     return {
         candidates: async (from, to) => {
@@ -40,6 +40,8 @@ export function liveNudgeDeps(): NudgeDeps {
             return (data ?? []).some((o: { customer_phone: string | null }) => last9(o.customer_phone ?? "") === last9(phone));
         },
         sendText: (to, text) => sender.sendText(to, text, { event: "whatsapp_unpaid_nudge" }),
+        templateId,
+        sendTemplate: (to, id, placeholders) => sender.sendTemplate(to, { templateId: id, type: "text", placeholders }, { event: "whatsapp_unpaid_nudge" }),
         logOutbound,
     };
 }

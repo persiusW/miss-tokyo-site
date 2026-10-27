@@ -2,7 +2,8 @@
 // Items are held for 15 minutes, so 30 to 60 minutes after placing, the hold
 // has gone: the reminder offers to check the pieces and send a new Pay now
 // link, never the old one. Sent only inside the 24-hour window (no template
-// needed), never to a customer who replied STOP, never while a person has
+// needed); later, or too near the window's end for a reply to land, only
+// with the approved order_not_paid template. Never to a customer who replied STOP, never while a person has
 // the chat, and not when they have placed another order since. Each order is
 // claimed before sending, so it is reminded at most once.
 import { toDestination } from "@/lib/messaging/chatbotsAfrica";
@@ -10,6 +11,7 @@ import type { MessagingResult } from "@/lib/messaging/provider";
 import { REPLY_WINDOW_MS } from "./pipeline";
 import { orderRef } from "./orderUpdates";
 import { NOTICE_TYPE } from "./notices";
+import { fillTemplate } from "./templates";
 
 export const NUDGE_AFTER_MS = 30 * 60_000;
 export const NUDGE_UNTIL_MS = 60 * 60_000;
@@ -29,6 +31,9 @@ export type NudgeDeps = {
     /** Another order on this phone placed after `since` (paid or still waiting). */
     orderedSince: (phone: string, since: string, exceptId: string) => Promise<boolean>;
     sendText: (to: string, text: string) => Promise<MessagingResult>;
+    /** The approved order_not_paid template; absent or null = inside the window only. */
+    templateId?: number | null;
+    sendTemplate?: (to: string, templateId: number, placeholders: string[]) => Promise<MessagingResult>;
     logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
     now?: () => number;
 };
@@ -48,10 +53,12 @@ export async function nudgeOne(o: NudgeOrder, deps: NudgeDeps, now: number): Pro
     if (!conv) return "no_chat";
     if (conv.optedOut) return "opted_out";
     if (conv.handedOff) return "with_person";
-    if (!conv.lastInboundAt || now - Date.parse(conv.lastInboundAt) > REPLY_WINDOW_MS - WINDOW_MARGIN_MS) return "outside_window";
+    const open = !!conv.lastInboundAt && now - Date.parse(conv.lastInboundAt) <= REPLY_WINDOW_MS - WINDOW_MARGIN_MS;
+    const filled = !open && deps.templateId && deps.sendTemplate ? fillTemplate("order_not_paid", [firstName(o), orderRef(o)]) : null;
+    if (!open && !filled) return "outside_window";
     if (await deps.orderedSince(to, o.created_at, o.id)) return "ordered_again";
-    const text = nudgeText(o);
-    const r = await deps.sendText(to, text);
+    const text = filled ? filled.text : nudgeText(o);
+    const r = filled ? await deps.sendTemplate!(to, deps.templateId!, filled.placeholders) : await deps.sendText(to, text);
     if (!r.ok) return "failed";
     await deps.logOutbound(conv.id, text, r.messageId, NOTICE_TYPE);
     return "sent";
