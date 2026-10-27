@@ -19,6 +19,9 @@ import { isWalletCheckMinute } from "@/lib/whatsapp/walletAlertRules";
 import { shopWhatsappNumber } from "@/lib/ai/shopAssistant/store";
 import { sweepInbound } from "@/lib/whatsapp/pipeline";
 import { pipelineFor } from "@/lib/whatsapp/processing";
+import { notifyTeamOnWhatsApp } from "@/lib/whatsapp/templateSendLive";
+import { budgetChoice, walletChoice } from "@/lib/whatsapp/teamAlerts";
+import { USD_TO_GHS } from "@/lib/ai/pricing";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -32,9 +35,15 @@ export async function GET(req: Request) {
     try {
         const settings = await getAiSettings();
         const alertTo = settings.alertNumber ?? settings.whatsappHandoffNumber ?? await shopWhatsappNumber(settings).catch(() => null);
-        const spendAlerts = await checkSpendAlerts({ capGhs: settings.dailySpendCapGhs, to: alertTo });
+        const spendAlerts = await checkSpendAlerts({
+            capGhs: settings.dailySpendCapGhs, to: alertTo,
+            alsoWhatsApp: (level, spentUsd) => notifyTeamOnWhatsApp([alertTo], budgetChoice(level, spentUsd * USD_TO_GHS, settings.dailySpendCapGhs), { event: `ai_spend_${level}` }, settings),
+        });
         const wallet = settings.whatsappEnabled && isWalletCheckMinute(new Date())
-            ? await checkWallet({ thresholdGhs: settings.walletAlertGhs, to: alertTo, balance: () => createChatbotsAfrica().balance() })
+            ? await checkWallet({
+                thresholdGhs: settings.walletAlertGhs, to: alertTo, balance: () => createChatbotsAfrica().balance(),
+                alsoWhatsApp: (balance, threshold) => notifyTeamOnWhatsApp([alertTo], walletChoice(balance, threshold), { event: "wa_wallet_low" }, settings),
+            })
             : "skipped";
         const pipeline = await pipelineFor(PROVIDER, settings);
         if (!pipeline) return NextResponse.json({ ok: true, mode: "capture", spendAlerts, wallet });
