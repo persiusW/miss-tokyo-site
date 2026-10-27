@@ -189,7 +189,11 @@ export async function POST(req: NextRequest) {
 
             // ── WhatsApp: notify customers (best effort) ─────────────────────
             await Promise.allSettled(orders.map(o =>
-                notifyOrderOnWhatsApp(o, "shipped", { rider: { name: rider.full_name, phone: rider.phone_number } })));
+                notifyOrderOnWhatsApp(o, "shipped", {
+                    rider: { name: rider.full_name, phone: rider.phone_number },
+                    // A mixed order's first dispatch carries the in-stock items only.
+                    partShipped: !!o.is_mixed_order && !((o.customer_metadata as Record<string, unknown> | null)?.regular_items_dispatched_at),
+                })));
 
             // ── Push: notify customers ────────────────────────────────────────
             const customerPushPromises = orders
