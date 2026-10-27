@@ -7,7 +7,7 @@ import { chatIsStale } from "@/lib/ai/shopAssistant/limits";
 import type { ShopChat } from "@/lib/ai/shopAssistant/types";
 import { optionsFrom } from "./choices";
 import { unseenNotice } from "./notices";
-import { returnSummary } from "./returns";
+import { returnSummary, returnWords } from "./returns";
 import type { HistoryLine } from "./handoff";
 import { waitingMessages } from "./inbox";
 import type { InboundMessage } from "./pipeline";
@@ -114,6 +114,16 @@ export async function returnNote(conversationId: string): Promise<string | null>
     if (!r) return null;
     const { data: o } = await db.from("orders").select("updated_at").eq("id", r.order_id).maybeSingle();
     return returnSummary({ ref: String(r.order_id).slice(0, 8).toUpperCase(), reason: r.reason, wants: r.wants, details: r.details, lastUpdate: o?.updated_at ?? null });
+}
+
+/** The latest return request in this chat (last 24 hours), for the team's template. */
+export async function returnDetails(conversationId: string): Promise<{ ref: string; reason: string; wants: string } | null> {
+    const since = new Date(Date.now() - 86_400_000).toISOString();
+    const { data, error } = await db.from("return_requests").select("order_id, reason, wants")
+        .eq("conversation_id", conversationId).gte("created_at", since).order("created_at", { ascending: false }).limit(1);
+    if (error) throw error;
+    const r = (data ?? [])[0];
+    return r ? { ref: String(r.order_id).slice(0, 8).toUpperCase(), ...returnWords(r.reason, r.wants) } : null;
 }
 
 export async function recentHistory(conversationId: string, limit = 10): Promise<HistoryLine[]> {

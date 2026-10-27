@@ -8,7 +8,11 @@ import { spendAlertText, spendLevel, type SpendLevel } from "@/lib/ai/spendAlert
 import { sendSMS } from "@/lib/sms";
 
 /** Sends what is due. Returns the levels sent. Never throws. */
-export async function checkSpendAlerts(a: { capGhs: number; to: string | null }): Promise<SpendLevel[]> {
+export async function checkSpendAlerts(a: {
+    capGhs: number; to: string | null;
+    /** Also on WhatsApp (the team_ai_budget template), best effort. */
+    alsoWhatsApp?: (level: 80 | 100, spentUsd: number) => Promise<unknown>;
+}): Promise<SpendLevel[]> {
     try {
         if (!a.to) return [];
         const spent = await todaySpendUsd();
@@ -23,6 +27,7 @@ export async function checkSpendAlerts(a: { capGhs: number; to: string | null })
                 .eq("event", event).gte("created_at", startOfTodayUtc()).limit(1);
             if (error || (data ?? []).length > 0) continue;
             await sendSMS({ to: a.to, message: spendAlertText(l, spent, a.capGhs) }, { event });
+            await a.alsoWhatsApp?.(l, spent).catch(() => undefined);
             sent.push(l);
         }
         return sent;

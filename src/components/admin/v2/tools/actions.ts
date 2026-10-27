@@ -24,6 +24,8 @@ import { cachedPs, forgetPs, TEN_MIN } from "@/lib/paystack/cache";
 import { verifyReference } from "@/lib/paystackReconcile";
 import { normaliseWaNumber } from "@/lib/ai/shopAssistant/settingsRules";
 import { STATUS_TEMPLATE_EVENTS, templateIdValue } from "@/lib/ai/templateSettings";
+import { MAX_STAFF_ALERT_NUMBERS } from "@/lib/ai/templateSettings";
+import { TEMPLATE_KEYS } from "@/lib/whatsapp/templates";
 import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { sendSMS } from "@/lib/sms";
 import { syncPaystackSettlements, syncNote } from "@/lib/billing/settlementSync";
@@ -402,7 +404,7 @@ export async function saveAgentLimits(input: Record<string, string | boolean>): 
 
 // ── WhatsApp ────────────────────────────────────────────────────────────
 
-export async function saveWhatsAppSetup(input: { alertNumber: string; walletBelow: string; handoffTemplate: string; restockTemplate: string; status: Record<string, string> }): Promise<R> {
+export async function saveWhatsAppSetup(input: { alertNumber: string; walletBelow: string; handoffTemplate: string; status: Record<string, string> }): Promise<R> {
     const me = await toolsAdmin();
     if (!me) return DENIED;
     const n = String(input?.alertNumber ?? "").trim();
@@ -410,16 +412,38 @@ export async function saveWhatsAppSetup(input: { alertNumber: string; walletBelo
     if (number === null) return { ok: false, error: "Enter a Ghana phone number for alerts, or leave it blank." };
     const below = num(input?.walletBelow, 0, 100_000);
     if (below === null) return { ok: false, error: "Wallet alert: an amount in cedis, or 0 to turn it off." };
-    const ids = [String(input?.handoffTemplate ?? "").trim(), String(input?.restockTemplate ?? "").trim()];
+    const ids = [String(input?.handoffTemplate ?? "").trim()];
     const status = Object.fromEntries(STATUS_TEMPLATE_EVENTS.map(e => [e, String(input?.status?.[e] ?? "").trim()]));
     if (![...ids, ...Object.values(status)].every(templateIdValue)) return { ok: false, error: "A template id is the number shown in Chatbots Africa's Message Templates." };
     const ai = [
         { key: "whatsapp_wallet_alert_number", value: number }, { key: "whatsapp_wallet_alert_ghs", value: below },
-        { key: "whatsapp_handoff_template_id", value: ids[0] }, { key: "whatsapp_restock_template_id", value: ids[1] },
+        { key: "whatsapp_handoff_template_id", value: ids[0] },
         { key: "whatsapp_status_template_ids", value: status },
     ];
     if (!(await settingsSave({ ai }, me.userId))) return { ok: false, error: FAILED };
     log(me, "whatsapp", "whatsapp_setup", { keys: ai.map(a => a.key) });
+    revalidatePath("/tools/whatsapp");
+    return { ok: true };
+}
+
+/** The ids of the templates with variables, and the staff numbers told about new orders. */
+export async function saveWhatsAppTemplates(input: { templates: Record<string, string>; staffNumbers: string }): Promise<R> {
+    const me = await toolsAdmin();
+    if (!me) return DENIED;
+    const templates = Object.fromEntries(TEMPLATE_KEYS.map(k => [k, String(input?.templates?.[k] ?? "").trim()]));
+    if (!Object.values(templates).every(templateIdValue)) return { ok: false, error: "A template id is the number shown in Chatbots Africa's Message Templates." };
+    const raw = String(input?.staffNumbers ?? "").split(/[\s,;]+/).filter(Boolean);
+    const numbers = raw.map(normaliseWaNumber);
+    if (numbers.some(n => n === null)) return { ok: false, error: "Staff numbers: Ghana phone numbers, separated by commas." };
+    const staff = [...new Set(numbers as string[])];
+    if (staff.length > MAX_STAFF_ALERT_NUMBERS) return { ok: false, error: `Up to ${MAX_STAFF_ALERT_NUMBERS} staff numbers.` };
+    // Both rows come with the 2026-10-27 migration; until it runs there is nowhere to save them.
+    const { data: rows, error } = await supabaseAdmin.from("ai_settings").select("key").in("key", ["whatsapp_template_ids", "whatsapp_staff_alert_numbers"]);
+    if (error) { logCause("GEN-00", error, { where: "tools.saveWhatsAppTemplates" }); return { ok: false, error: FAILED }; }
+    if ((rows ?? []).length < 2) return { ok: false, error: "We are updating this feature. Please try again shortly. Sorry for the inconvenience." };
+    const ai = [{ key: "whatsapp_template_ids", value: templates }, { key: "whatsapp_staff_alert_numbers", value: staff }];
+    if (!(await settingsSave({ ai }, me.userId))) return { ok: false, error: FAILED };
+    log(me, "whatsapp", "whatsapp_templates", { set: Object.entries(templates).filter(([, v]) => v).map(([k]) => k), staff: staff.length });
     revalidatePath("/tools/whatsapp");
     return { ok: true };
 }

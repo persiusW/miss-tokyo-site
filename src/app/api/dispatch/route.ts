@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendSMSLogged } from "@/lib/sms";
 import { notifyOrderOnWhatsApp } from "@/lib/whatsapp/notifyOrder";
+import { notifyTeamOnWhatsApp } from "@/lib/whatsapp/templateSendLive";
+import { riderChoice } from "@/lib/whatsapp/teamAlerts";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendCustomerPush } from "@/lib/customerPush";
 import { sendEmail } from "@/lib/email";
@@ -171,6 +173,10 @@ export async function POST(req: NextRequest) {
                 to: rider.phone_number,
                 message: `${bizName} Dispatch: You have ${orders.length} order${orders.length > 1 ? "s" : ""} to deliver. ${orderLines}. Contact dispatch for full details.`,
             });
+            // The rider has likely never written to the shop, so only a template reaches them (best effort).
+            const deliveries = orders.slice(0, 5)
+                .map(o => [o.customer_name || "Customer", (o.shipping_address as any)?.region || (o.shipping_address as any)?.city || ""].filter(Boolean).join(", "));
+            await notifyTeamOnWhatsApp([rider.phone_number], riderChoice(rider.full_name, orders.length, orders.length > 5 ? [...deliveries, `and ${orders.length - 5} more`] : deliveries), { event: "dispatch:rider" });
         }
 
         if (shouldNotifyCustomer) {
@@ -189,7 +195,11 @@ export async function POST(req: NextRequest) {
 
             // ── WhatsApp: notify customers (best effort) ─────────────────────
             await Promise.allSettled(orders.map(o =>
-                notifyOrderOnWhatsApp(o, "shipped", { rider: { name: rider.full_name, phone: rider.phone_number } })));
+                notifyOrderOnWhatsApp(o, "shipped", {
+                    rider: { name: rider.full_name, phone: rider.phone_number },
+                    // A mixed order's first dispatch carries the in-stock items only.
+                    partShipped: !!o.is_mixed_order && !((o.customer_metadata as Record<string, unknown> | null)?.regular_items_dispatched_at),
+                })));
 
             // ── Push: notify customers ────────────────────────────────────────
             const customerPushPromises = orders

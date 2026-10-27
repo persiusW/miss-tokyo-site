@@ -9,7 +9,11 @@ import { walletAlertText, walletIsLow } from "./walletAlertRules";
 
 const EVENT = "wa_wallet_low";
 
-export async function checkWallet(a: { thresholdGhs: number; to: string | null; balance: () => Promise<BalanceResult> }): Promise<"sent" | "ok" | "skipped"> {
+export async function checkWallet(a: {
+    thresholdGhs: number; to: string | null; balance: () => Promise<BalanceResult>;
+    /** Also on WhatsApp (the team_wallet_low template), best effort. */
+    alsoWhatsApp?: (balance: number, thresholdGhs: number) => Promise<unknown>;
+}): Promise<"sent" | "ok" | "skipped"> {
     try {
         if (!a.to || !(a.thresholdGhs > 0)) return "skipped";
         const r = await a.balance();
@@ -18,6 +22,7 @@ export async function checkWallet(a: { thresholdGhs: number; to: string | null; 
             .eq("event", EVENT).gte("created_at", startOfTodayUtc()).limit(1);
         if (error || (data ?? []).length > 0) return "skipped";
         await sendSMS({ to: a.to, message: walletAlertText(r.balance!, a.thresholdGhs) }, { event: EVENT });
+        await a.alsoWhatsApp?.(r.balance!, a.thresholdGhs).catch(() => undefined);
         return "sent";
     } catch (e) {
         console.error("[whatsapp] wallet check failed", { err: String(e) });

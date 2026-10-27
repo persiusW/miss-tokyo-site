@@ -27,3 +27,8 @@ export function returnSummary(a: { ref: string; reason: ReturnReason; wants: Ret
     const said = a.details ? ` They said: "${a.details.replace(/\s+/g, " ").replace(/"/g, "'").slice(0, 200)}".` : "";
     return `Return request for order ${a.ref}: ${REASON_WORDS[a.reason]}; wants ${WANT_WORDS[a.wants]}.${said}${when}`;
 }
+
+/** The reason and the wish in words, for the team's template. */
+export function returnWords(reason: ReturnReason, wants: ReturnWant): { reason: string; wants: string } {
+    return { reason: REASON_WORDS[reason] ?? "other", wants: WANT_WORDS[wants] ?? "not sure yet" };
+}

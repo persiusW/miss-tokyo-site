@@ -63,7 +63,7 @@ export function liveRestockDeps(settings: AiSettings, siteUrl: string): RestockD
         sendText: (to, text) => sender.sendText(to, text, { event: "whatsapp_restock_alert" }),
         sendTemplate: (to, templateId, placeholders) => sender.sendTemplate(to, { templateId, type: "text", placeholders }, { event: "whatsapp_restock_alert" }),
         logOutbound,
-        templateId: settings.whatsappRestockTemplateId,
+        templateId: settings.whatsappTemplateIds.back_in_stock ?? null,
         siteUrl,
     };
 }

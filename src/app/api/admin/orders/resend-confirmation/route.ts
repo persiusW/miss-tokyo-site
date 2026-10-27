@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { sendSMSOrThrow, injectSmsVars } from "@/lib/sms";
 import { zoneLabel } from "@/lib/delivery";
+import { notifyOrderOnWhatsApp } from "@/lib/whatsapp/notifyOrder";
 
 export async function POST(req: NextRequest) {
     const serverClient = await createClient();
@@ -101,6 +102,8 @@ export async function POST(req: NextRequest) {
             console.error("[resend-confirmation] SMS failed:", err);
             emailErrors.push("The confirmation SMS didn't go out.");
         }
+        // WhatsApp too, best effort: it never fails the resend.
+        await notifyOrderOnWhatsApp(order, "paid");
     }
 
     if (emailErrors.length > 0) {

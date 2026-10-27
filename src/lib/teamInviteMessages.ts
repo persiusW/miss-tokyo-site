@@ -1,6 +1,8 @@
 import { getUrl } from "@/lib/utils/getUrl";
 import { sendSMSOrThrow } from "@/lib/sms";
 import { sendEmail } from "@/lib/email";
+import { notifyTeamOnWhatsApp } from "@/lib/whatsapp/templateSendLive";
+import { inviteChoice } from "@/lib/whatsapp/teamAlerts";
 
 /**
  * The team-invite email (and SMS when there's a phone number), shared by the
@@ -39,6 +41,8 @@ export async function sendTeamInviteMessages(invite: { email: string; role: stri
         }
 
         if (formattedPhone) {
+            // WhatsApp too, best effort: someone invited has never written to the shop, so only the team_invite template reaches them.
+            await notifyTeamOnWhatsApp([formattedPhone], inviteChoice({ role: invite.role, token: invite.token }), { event: "team_invite" });
             try {
                 await sendSMSOrThrow({ to: formattedPhone, message });
             } catch (smsErr) {
