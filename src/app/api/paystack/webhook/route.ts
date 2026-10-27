@@ -8,6 +8,7 @@ import { isReclaimableCancellation } from "@/lib/reclaimCancelled";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendSMSLogged, injectSmsVars } from "@/lib/sms";
 import { notifyOrderOnWhatsApp } from "@/lib/whatsapp/notifyOrder";
+import { notifyStaffNewOrder } from "@/lib/whatsapp/templateSendLive";
 import { sendOrderConfirmation } from "@/lib/orderEmail";
 import { activateAndDeliverGiftCard } from "@/lib/giftCardDelivery";
 import { ensureCustomerAccount, saveCustomerContact, sendAdminPushNotifications, trackDiscountUsage } from "@/lib/orderSettlement";
@@ -407,6 +408,8 @@ export async function POST(req: Request) {
                         // WhatsApp order update, once, alongside the confirmation SMS (best effort).
                         (emailAlreadySent || !phone) ? Promise.resolve() : notifyOrderOnWhatsApp(
                             { id: orderId, customer_name: fullName, customer_phone: phone, delivery_method: deliveryMethod }, "paid"),
+                        // Staff alert numbers hear about it on WhatsApp too, once (best effort).
+                        isAlreadyProcessed ? Promise.resolve() : notifyStaffNewOrder(orderId),
                     ]);
                     if (emailResult.status === "rejected") console.error("[webhook] sendOrderConfirmation failed:", emailResult.reason);
                     if (smsResult.status === "rejected") console.error("[webhook] sendSMS failed:", smsResult.reason);
@@ -469,6 +472,7 @@ export async function POST(req: Request) {
                             ),
                             !phone ? Promise.resolve() : notifyOrderOnWhatsApp(
                                 { id: newOrder.id, customer_name: fullName, customer_phone: phone, delivery_method: deliveryMethod }, "paid"),
+                            isAlreadyProcessed ? Promise.resolve() : notifyStaffNewOrder(newOrder.id),
                         ]);
                         if (emailResult.status === "rejected") console.error("[webhook] sendOrderConfirmation failed:", emailResult.reason);
                         if (smsResult.status === "rejected") console.error("[webhook] sendSMS failed:", smsResult.reason);
