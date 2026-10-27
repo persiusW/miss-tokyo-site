@@ -20,6 +20,8 @@ import { reconcileOrderStock } from "@/lib/inventory";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendEmail } from "@/lib/email";
 import { PLACEHOLDER_EMAIL_DOMAIN } from "@/lib/checkout/createCheckoutOrder";
+import { notifyCustomerOnWhatsApp } from "@/lib/whatsapp/templateSendLive";
+import { fillTemplate, firstNameOf, ghs } from "@/lib/whatsapp/templates";
 import { createPaystackRefund, type PaystackRefundResult } from "./paystackRefund";
 import { REFUND_REASONS, orderLines, planRefund, refundedSoFar, round2, type RefundItem, type RefundMode, type RefundRow } from "./refundMath";
 
@@ -68,7 +70,7 @@ export async function refundOrder(orderId: string, body: RefundBody, actor: { us
 
     const { data: order, error: oErr } = await supabaseAdmin
         .from("orders")
-        .select("id, ref, status, payment_status, total_amount, items, payment_method, paystack_reference, customer_email, customer_name, customer_metadata")
+        .select("id, ref, status, payment_status, total_amount, items, payment_method, paystack_reference, customer_email, customer_name, customer_phone, customer_metadata")
         .eq("id", orderId)
         .maybeSingle();
     if (oErr) return fail(500, "", "GEN-00");
@@ -167,6 +169,14 @@ export async function refundOrder(orderId: string, body: RefundBody, actor: { us
             }),
         }, { event: "refund", orderId });
         emailed = r.ok;
+    }
+    // WhatsApp too, best effort: the refund is recorded whatever happens here.
+    if (body.notify && order.customer_phone) {
+        const values = [firstNameOf(order.customer_name), ghs(plan.amount), order.ref ?? orderId.slice(0, 8).toUpperCase()];
+        await notifyCustomerOnWhatsApp(
+            { phone: order.customer_phone, freeText: fillTemplate("refund_sent", values)?.text ?? null, templates: [{ key: "refund_sent", values }] },
+            { event: "refund", orderId },
+        );
     }
 
     after(() => logActivity({

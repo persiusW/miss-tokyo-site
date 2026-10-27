@@ -13,6 +13,8 @@ import { parseDeliverySettings, parseZone, resolveDeliveryFee } from '@/lib/deli
 import { POS_FALLBACK_EMAIL } from '@/lib/posContact';
 import { logActivity } from '@/lib/utils/logActivity';
 import { sendEmail } from "@/lib/email";
+import { notifyCustomerOnWhatsApp } from "@/lib/whatsapp/templateSendLive";
+import { ghs } from "@/lib/whatsapp/templates";
 import { apiError } from "@/lib/errors/apiError";
 import { cleanSaleKey } from '@/lib/payments/attemptRules';
 import { recordError, recordStart } from '@/lib/payments/attempts';
@@ -466,6 +468,16 @@ export async function POST(req: NextRequest) {
             }, { event: "pos_pay_link" })
             : Promise.resolve(null),
     ]);
+
+    // WhatsApp too, after the response: inside the 24-hour window the same
+    // words as the SMS, outside it the payment link template (best effort).
+    if (session.customer_phone) {
+        after(() => notifyCustomerOnWhatsApp({
+            phone: session.customer_phone,
+            freeText: `Hi ${firstName}, your Miss Tokyo order (GH${String.fromCharCode(8373)}${amountWithFee.toFixed(2)}) is ready. Review and pay here: ${previewUrl} (expires in ${holdMinutes} mins)`,
+            templates: [{ key: "payment_link", values: [firstName, ghs(amountWithFee), sessionId, String(holdMinutes)] }],
+        }, { event: "pos_pay_link" }).then(() => undefined));
+    }
 
     let emailStatus: 'sent' | 'failed' | 'no_email' = 'no_email';
     let emailError: string | null = null;

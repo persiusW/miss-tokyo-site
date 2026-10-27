@@ -3,6 +3,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
 import { sendEmail } from "@/lib/email";
 import { sendSMSLogged } from "@/lib/sms";
+import { notifyCustomerOnWhatsApp } from "@/lib/whatsapp/templateSendLive";
+import { fillTemplate } from "@/lib/whatsapp/templates";
 import { apiError } from "@/lib/errors/apiError";
 import { logActivity } from "@/lib/utils/logActivity";
 
@@ -122,6 +124,12 @@ export async function POST(req: NextRequest) {
                         ? (smsTpl.greeting ? `${smsTpl.greeting} ` : "") + smsTpl.body_text
                         : `Hi ${firstName}, your ${bizName} account has been approved for wholesale access! Log in to start shopping wholesale prices. ${baseUrl}/account`,
                 }) : Promise.resolve(),
+                // WhatsApp too, best effort.
+                profile.phone ? notifyCustomerOnWhatsApp({
+                    phone: profile.phone,
+                    freeText: fillTemplate("wholesale_approved", [firstName])?.text ?? null,
+                    templates: [{ key: "wholesale_approved", values: [firstName] }],
+                }, { event: "set-wholesale" }) : Promise.resolve(),
             ]);
         } else {
             // Revoke — email only
