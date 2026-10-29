@@ -170,7 +170,9 @@ export function Composer(p: { conversationId: string; can: Can; windowOpen: bool
         setBusy(false);
         if (!r.ok) { toast.error(r.data?.error ?? CALM); return; }
         setText("");
-        toast.success(mode === "reply" ? "Sent. The assistant stays quiet in this chat until you hand it back." : "The assistant is replying with your note. Its answer shows here within a minute.");
+        toast.success(mode === "tell" ? "The assistant is replying with your note. Its answer shows here within a minute."
+            : r.data?.waiting ? (r.data.asked ? "Saved. We've asked them on WhatsApp to reply, and your message goes the moment they do." : "Saved with your earlier message. Both go the moment they reply.")
+            : "Sent. The assistant stays quiet in this chat until you hand it back.");
         p.onDone();
     };
 
@@ -188,8 +190,8 @@ export function Composer(p: { conversationId: string; can: Can; windowOpen: bool
                     {seg("reply", "Reply myself")}{seg("tell", "Tell the assistant")}
                 </div>
             )}
-            {!p.windowOpen ? (
-                <div style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>Their last message was over 24 hours ago, so WhatsApp won't deliver a message from here. Reply from your WhatsApp phone.</div>
+            {!p.windowOpen && mode === "tell" ? (
+                <div style={{ fontSize: 12, color: "var(--ac-ink-3)" }}>Their last message was over 24 hours ago, so the assistant can't message them first. Use Reply myself instead.</div>
             ) : (
                 <>
                     <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
@@ -201,6 +203,11 @@ export function Composer(p: { conversationId: string; can: Can; windowOpen: bool
                             {busy ? "Sending…" : "Send"}
                         </button>
                     </div>
+                    {!p.windowOpen && (
+                        <div style={{ marginTop: 6, fontSize: 12, color: "var(--ac-ink-3)" }} data-wa-late-hint>
+                            Their last message was over 24 hours ago. We&apos;ll send them a WhatsApp asking them to reply, and your message goes the moment they do.
+                        </div>
+                    )}
                     {mode === "tell" && (
                         <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, fontSize: 12, color: "var(--ac-ink-3)" }}>
                             <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} data-wa-remember />

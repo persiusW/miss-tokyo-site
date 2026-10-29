@@ -237,7 +237,9 @@ function Composer(p: { conversationId: string; can: Can; windowLeft: string | nu
         setBusy(false);
         if (!r.ok) { toast.fromResponse(r.data, { audience: "staff" }); return; }
         setText("");
-        toast.success(mode === "reply" ? "Sent on WhatsApp. The assistant stays quiet in this chat until you hand it back." : "The assistant is replying with your note. Its answer shows here within a minute.");
+        toast.success(mode === "tell" ? "The assistant is replying with your note. Its answer shows here within a minute."
+            : r.data?.waiting ? (r.data.asked ? "Saved. We've asked them on WhatsApp to reply, and your message goes the moment they do." : "Saved with your earlier message. Both go the moment they reply.")
+            : "Sent on WhatsApp. The assistant stays quiet in this chat until you hand it back.");
         p.onDone();
     };
 
@@ -253,9 +255,9 @@ function Composer(p: { conversationId: string; can: Can; windowLeft: string | nu
             {modes.length > 1 && (
                 <Seg label="Who writes" value={mode} onChange={setMode} options={[{ v: "reply", l: "Reply myself" }, { v: "tell", l: "Tell the assistant" }]} />
             )}
-            {!p.windowLeft ? (
-                <Banner tone="neutral" title="WhatsApp won't deliver a message from here">
-                    Their last message was over 24 hours ago. Reply from the shop&apos;s WhatsApp phone.
+            {!p.windowLeft && mode === "tell" ? (
+                <Banner tone="neutral" title="The assistant can't message them first">
+                    Their last message was over 24 hours ago. Use Reply myself instead.
                 </Banner>
             ) : (
                 <>
@@ -270,7 +272,11 @@ function Composer(p: { conversationId: string; can: Can; windowLeft: string | nu
                         </div>
                     )}
                     <div className="hrow between wrap">
-                        <p className="help" style={{ margin: 0 }}>WhatsApp only lets you reply within 24 hours of their last message. This chat is open for {p.windowLeft}.</p>
+                        <p className="help" style={{ margin: 0 }} data-wa-late-hint={p.windowLeft ? undefined : ""}>
+                            {p.windowLeft
+                                ? `WhatsApp only lets you reply within 24 hours of their last message. This chat is open for ${p.windowLeft}.`
+                                : "Their last message was over 24 hours ago. We'll send them a WhatsApp asking them to reply, and your message goes the moment they do."}
+                        </p>
                         <Btn kind="primary" onClick={() => void go()} disabled={busy || !text.trim()}>{busy ? "Sending…" : "Send"}</Btn>
                     </div>
                 </>

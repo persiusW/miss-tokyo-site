@@ -72,6 +72,11 @@ export type AssistantDeps = {
     carriedBefore?: (m: InboundMessage, receivedAt: string) => Promise<{ texts: InboundMessage[]; photos: InboundMessage[] }>;
     /** Text: waits out the burst window; true when the sender's next text came inside it (that one answers both). */
     textFollowsSoon?: (m: InboundMessage, receivedAt: string) => Promise<boolean>;
+    /**
+     * Messages staff left while the customer's window was shut (pendingNotes.ts): sends them and
+     * gives the chat to the team. Returns how many went; when any did, the assistant doesn't answer.
+     */
+    deliverNotes?: (c: Conversation, phone: string) => Promise<number>;
     siteUrl: string;
 };
 
@@ -205,6 +210,13 @@ export function createWhatsAppHandler(deps: AssistantDeps) {
         // The team has the chat and the customer wrote: they hear about it (rationed to once an hour),
         // alongside the reply rather than before it.
         const alerting = c.handedOffAt ? deps.withTeam?.(c).catch(() => undefined) : undefined;
+        // The team left a message while the window was shut: this reply opens it, so it goes now and the team takes the chat.
+        // STOP / START are answered as always (a note never goes to someone opting out).
+        if (deps.deliverNotes && m.from && !/^\s*(stop|unsubscribe|start|subscribe)\s*[.!]?\s*$/i.test(m.text ?? "")
+            && (await deps.deliverNotes(c, m.from).catch(e => { console.error("[whatsapp] waiting notes not sent", { err: String(e) }); return 0; })) > 0) {
+            await alerting;
+            return;
+        }
         // Staff are replying in this chat themselves: the assistant stays out of it.
         if (c.quiet) { await alerting; return; }
         try { await respond(m, c, receivedAt); } finally { await alerting; }

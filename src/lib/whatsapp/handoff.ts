@@ -17,7 +17,9 @@ import { fillTemplate, type FilledTemplate } from "./templates";
 
 export type HandoffReason = "customer_asked" | "unsupported_message" | "awaiting_assistant" | "processing_failed" | "daily_limit" | "assistant_failed" | "return_request"
     /** Not a handover: the team already has the chat and the customer wrote again. */
-    | "wrote_again";
+    | "wrote_again"
+    /** The customer replied and got the message staff left while their window was shut. */
+    | "note_delivered";
 
 const WHY: Record<HandoffReason, string> = {
     customer_asked: "asked for a person",
@@ -28,6 +30,7 @@ const WHY: Record<HandoffReason, string> = {
     assistant_failed: "hit a problem with the assistant",
     return_request: "wants to return or exchange an order",
     wrote_again: "wrote again while waiting for a person",
+    note_delivered: "replied, and the team's waiting message was sent to them",
 };
 
 /** "asked for a person", for alerts. */
