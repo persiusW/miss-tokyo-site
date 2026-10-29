@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabaseServer";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendEmail } from "@/lib/email";
 import { apiError } from "@/lib/errors/apiError";
+import { normaliseOrderPhone } from "@/lib/phone";
+import { giftCardNotices } from "@/lib/whatsapp/giftCardNotices";
+import { notifyCustomerOnWhatsApp } from "@/lib/whatsapp/templateSendLive";
 
 function genCode(): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -32,10 +35,15 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const { recipient_email, recipient_name, sender_name, message, initial_value } = await req.json();
+        const { recipient_email, recipient_name, recipient_phone, sender_name, message, initial_value } = await req.json();
 
         if (!recipient_email || !initial_value) {
             return NextResponse.json({ error: "recipient_email and initial_value are required." }, { status: 400 });
+        }
+        // Optional: the card goes on WhatsApp too.
+        const recipientPhone = recipient_phone ? normaliseOrderPhone(String(recipient_phone)) : null;
+        if (recipient_phone && !recipientPhone) {
+            return NextResponse.json({ error: "Check the WhatsApp number, or leave it blank." }, { status: 400 });
         }
 
         // Generate unique code (retry up to 3 times on collision)
@@ -56,6 +64,7 @@ export async function POST(req: NextRequest) {
                 remaining_value: Number(initial_value),
                 recipient_email,
                 recipient_name: recipient_name || null,
+                recipient_phone: recipientPhone,
                 sender_name: sender_name || null,
                 message: message || null,
                 is_active: true,
@@ -101,6 +110,13 @@ export async function POST(req: NextRequest) {
                   </div>
                 </div>`,
             }, { event: "gift_card_issued" });
+        }
+
+        if (recipientPhone) {
+            for (const n of giftCardNotices({
+                mode: "email", amount: Number(initial_value), code: card.code, expiresAt: card.expires_at ?? null,
+                senderName: sender_name, senderPhone: null, recipientName: recipient_name, recipientPhone,
+            }, new Date())) after(() => notifyCustomerOnWhatsApp(n, { event: "gift_card_issued" }));
         }
 
         // A gift card is money. Now that the activity log actually records what

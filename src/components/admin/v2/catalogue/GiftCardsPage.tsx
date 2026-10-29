@@ -12,6 +12,7 @@ import {
 } from "@/components/admin/ui";
 import { PAGE_SIZE, giftStatus } from "@/lib/admin/v2/catalogue";
 import type { GiftCardRow, GiftQuery, GiftStats } from "@/lib/admin/v2/catalogueLoad";
+import { normaliseOrderPhone } from "@/lib/phone";
 import { CatalogueHeader } from "./CatalogueHeader";
 import { cancelGiftCard, giftCardDetail, type Redemption } from "./actions";
 
@@ -194,18 +195,20 @@ function IssuePanel({ onClose, onIssued }: { onClose: () => void; onIssued: () =
     const [custom, setCustom] = useState("");
     const [to, setTo] = useState("");
     const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
     const [from, setFrom] = useState("Miss Tokyo");
     const [msg, setMsg] = useState("");
     const [busy, setBusy] = useState(false);
     const value = amt === "other" ? Number(custom) || 0 : Number(amt);
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-    const ok = value > 0 && value <= 100000 && emailOk;
+    const phoneOk = !phone.trim() || !!normaliseOrderPhone(phone);
+    const ok = value > 0 && value <= 100000 && emailOk && phoneOk;
     const issue = async () => {
         setBusy(true);
         try {
             const res = await fetch("/api/gift-cards/issue", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ recipient_email: email.trim(), recipient_name: to.trim(), sender_name: from.trim(), message: msg.trim(), initial_value: value }),
+                body: JSON.stringify({ recipient_email: email.trim(), recipient_name: to.trim(), recipient_phone: phone.trim() || undefined, sender_name: from.trim(), message: msg.trim(), initial_value: value }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) { toast.fromResponse(json, { audience: "staff" }); return; }
@@ -225,6 +228,9 @@ function IssuePanel({ onClose, onIssued }: { onClose: () => void; onIssued: () =
                     <input id="gc-email" className="input" type="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} />
                 </Field>
             </div>
+            <Field label="Recipient's WhatsApp number" htmlFor="gc-phone" help="Optional. The code goes on WhatsApp too." error={phoneOk ? null : "Check the number, or leave it blank."}>
+                <input id="gc-phone" className="input" type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} />
+            </Field>
             <Field label="From" htmlFor="gc-from"><input id="gc-from" className="input" value={from} onChange={e => setFrom(e.target.value)} /></Field>
             <Field label="Message" htmlFor="gc-msg" help="Optional. Printed on the gift card email."><textarea id="gc-msg" className="textarea" rows={3} value={msg} onChange={e => setMsg(e.target.value)} /></Field>
             {ok && <Banner tone="neutral" title={`${ghs(value)} to ${to.trim() || email.trim()}`}>{"The code works at checkout and at the POS until it's spent or cancelled."}</Banner>}

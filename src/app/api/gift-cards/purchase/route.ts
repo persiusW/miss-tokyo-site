@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateGiftCardCode } from "@/lib/gift-cards";
 import { errorText } from "@/lib/errors/catalogue";
+import { normaliseOrderPhone } from "@/lib/phone";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -21,6 +22,11 @@ function validate(body: Record<string, unknown>): FieldErrors {
         if (!recipient_email || !EMAIL_RE.test(String(recipient_email))) errors.recipient_email = "A valid recipient email is required.";
     }
 
+    // WhatsApp numbers are optional: blank is email only, anything else must be a real number.
+    const { sender_phone, recipient_phone } = body as Record<string, unknown>;
+    if (sender_phone && !normaliseOrderPhone(String(sender_phone))) errors.sender_phone = "Enter a valid phone number, or leave it blank.";
+    if (delivery_mode === "email" && recipient_phone && !normaliseOrderPhone(String(recipient_phone))) errors.recipient_phone = "Enter a valid phone number, or leave it blank.";
+
     if (delivery_date) {
         const d = new Date(String(delivery_date));
         const today = new Date();
@@ -39,6 +45,8 @@ export async function POST(req: NextRequest) {
             recipient_name, recipient_email, personal_message, delivery_date,
             sender_name, sender_email,
         } = body as Record<string, string | number | undefined>;
+        const senderPhone = normaliseOrderPhone(body?.sender_phone ? String(body.sender_phone) : null);
+        const recipientPhone = delivery_mode === "email" ? normaliseOrderPhone(body?.recipient_phone ? String(body.recipient_phone) : null) : null;
 
         // ── Fetch site settings ───────────────────────────────────────────────
         const { data: s } = await supabaseAdmin
@@ -98,6 +106,8 @@ export async function POST(req: NextRequest) {
                 sender_name: String(sender_name),
                 recipient_name: recipient_name ? String(recipient_name) : null,
                 recipient_email: recipient_email ? String(recipient_email) : null,
+                sender_phone: senderPhone,
+                recipient_phone: recipientPhone,
                 message: personal_message ? String(personal_message) : null,
                 delivery_mode: String(delivery_mode),
                 delivery_date: delivery_date ? String(delivery_date) : null,
@@ -143,6 +153,8 @@ export async function POST(req: NextRequest) {
                     recipient_name: recipient_name ? String(recipient_name) : null,
                     sender_email: String(sender_email),
                     sender_name: String(sender_name),
+                    sender_phone: senderPhone,
+                    recipient_phone: recipientPhone,
                     personal_message: personal_message ? String(personal_message) : null,
                     delivery_date: delivery_date ? String(delivery_date) : null,
                     expires_at,

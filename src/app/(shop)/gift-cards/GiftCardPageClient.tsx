@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ShownImage } from "@/lib/content/wording";
 import { Check, Copy, CreditCard, ShieldCheck, Mail, Gift } from "lucide-react";
+import { normaliseOrderPhone } from "@/lib/phone";
 
 type Config = {
     enabled: boolean;
@@ -27,6 +28,7 @@ type SuccessData = {
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_ERROR = "Enter a valid phone number, or leave it blank.";
 const todayISO = () => new Date().toISOString().split("T")[0];
 
 // ── Shared field styles (flat/square, matching reference) ─────────────────────
@@ -298,6 +300,8 @@ export function GiftCardPageClient({ config, heroImage = null }: { config: Confi
     const [deliveryDate, setDeliveryDate] = useState(todayISO());
     const [senderName, setSenderName] = useState("");
     const [senderEmail, setSenderEmail] = useState("");
+    const [recipientPhone, setRecipientPhone] = useState("");
+    const [senderPhone, setSenderPhone] = useState("");
     const [errors, setErrors] = useState<FieldErrors>({});
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState<SuccessData | null>(null);
@@ -326,6 +330,8 @@ export function GiftCardPageClient({ config, heroImage = null }: { config: Confi
         }
         if (!senderName.trim()) e.sender_name = "Your name is required.";
         if (!EMAIL_RE.test(senderEmail)) e.sender_email = "Enter a valid email address.";
+        if (deliveryMode === "email" && recipientPhone.trim() && !normaliseOrderPhone(recipientPhone)) e.recipient_phone = PHONE_ERROR;
+        if (senderPhone.trim() && !normaliseOrderPhone(senderPhone)) e.sender_phone = PHONE_ERROR;
         return e;
     }
 
@@ -348,6 +354,8 @@ export function GiftCardPageClient({ config, heroImage = null }: { config: Confi
                     delivery_date: deliveryDate || undefined,
                     sender_name: senderName,
                     sender_email: senderEmail,
+                    recipient_phone: deliveryMode === "email" && recipientPhone.trim() ? recipientPhone : undefined,
+                    sender_phone: senderPhone.trim() ? senderPhone : undefined,
                 }),
             });
             const data = await res.json();
@@ -596,6 +604,21 @@ export function GiftCardPageClient({ config, heroImage = null }: { config: Confi
                                             </div>
 
                                             <div>
+                                                <label style={labelStyle}>Recipient WhatsApp Number (Optional)</label>
+                                                <input
+                                                    type="tel"
+                                                    inputMode="tel"
+                                                    value={recipientPhone}
+                                                    onChange={e => { setRecipientPhone(e.target.value); setErrors(er => ({ ...er, recipient_phone: "" })); }}
+                                                    placeholder="024 123 4567"
+                                                    style={inputStyle}
+                                                />
+                                                {errors.recipient_phone
+                                                    ? <p style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>{errors.recipient_phone}</p>
+                                                    : <p style={{ fontSize: 11, color: "#8C8479", marginTop: 4 }}>We&apos;ll send the gift card on WhatsApp too.</p>}
+                                            </div>
+
+                                            <div>
                                                 <label style={labelStyle}>Personal Message (Optional)</label>
                                                 <textarea
                                                     rows={3}
@@ -646,6 +669,20 @@ export function GiftCardPageClient({ config, heroImage = null }: { config: Confi
                                         />
                                         {errors.sender_email && <p style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>{errors.sender_email}</p>}
                                     </div>
+                                </div>
+                                <div style={{ marginTop: 16 }}>
+                                    <label style={labelStyle}>Your WhatsApp Number (Optional)</label>
+                                    <input
+                                        type="tel"
+                                        inputMode="tel"
+                                        value={senderPhone}
+                                        onChange={e => { setSenderPhone(e.target.value); setErrors(er => ({ ...er, sender_phone: "" })); }}
+                                        placeholder="024 123 4567"
+                                        style={inputStyle}
+                                    />
+                                    {errors.sender_phone
+                                        ? <p style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>{errors.sender_phone}</p>
+                                        : <p style={{ fontSize: 11, color: "#8C8479", marginTop: 4 }}>{deliveryMode === "self" ? "We'll send your gift card on WhatsApp too." : "We'll confirm on WhatsApp when it's sent."}</p>}
                                 </div>
                             </form>
 

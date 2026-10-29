@@ -4,6 +4,8 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendEmail } from "@/lib/email";
+import { giftCardNotices } from "@/lib/whatsapp/giftCardNotices";
+import { notifyCustomerOnWhatsApp } from "@/lib/whatsapp/templateSendLive";
 
 export type GiftCardMeta = {
     gift_card_id?: string;
@@ -13,6 +15,9 @@ export type GiftCardMeta = {
     recipient_name?: string | null;
     sender_email?: string | null;
     sender_name?: string | null;
+    /** Optional WhatsApp numbers (233…); the card and the buyer's confirmation go there too. */
+    sender_phone?: string | null;
+    recipient_phone?: string | null;
     personal_message?: string | null;
     delivery_date?: string | null;
     expires_at?: string | null;
@@ -144,6 +149,15 @@ export async function activateAndDeliverGiftCard(meta: GiftCardMeta, amountPesew
         } catch (emailErr) {
             console.warn("[giftCardDelivery] email send failed (non-fatal):", emailErr);
         }
+    }
+
+    // WhatsApp beside the emails, to the numbers the buyer gave; only from the path that activated the card.
+    if (card) {
+        const notices = giftCardNotices({
+            mode: delivery_mode, amount: amtNum, code, expiresAt: expires_at,
+            senderName: sender_name, senderPhone: meta.sender_phone, recipientName: recipient_name, recipientPhone: meta.recipient_phone,
+        }, new Date());
+        for (const n of notices) await notifyCustomerOnWhatsApp(n, { event: "gift_card_whatsapp" });
     }
 
     return {

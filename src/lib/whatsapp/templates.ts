@@ -203,7 +203,4 @@ export const NOT_SENT_YET: Partial<Record<TemplateKey, string>> = {
     document_ready: "invoices and quotes don't keep a phone number yet",
     order_message_waiting: "a note sent outside the 24-hour window needs a way to wait for the customer's reply",
     team_follow_up: "the inbox needs a follow-up button for chats past 24 hours",
-    gift_card_ready: "gift card checkout doesn't ask for a phone number yet",
-    gift_card_from_sender: "gift card checkout doesn't ask for a phone number yet",
-    gift_card_sent: "gift card checkout doesn't ask for a phone number yet",
 };
