@@ -12,7 +12,9 @@ import {
     ghs, toast, when, type Tone,
 } from "@/components/admin/ui";
 import type { DocumentRow, LegacyLinkRow } from "@/lib/admin/v2/ordersLoad";
-import { emailDocument, saveDocument, setDocumentStatus, type DocInput } from "./actions";
+import { normaliseOrderPhone, displayPhone } from "@/lib/phone";
+import { documentCanWhatsApp } from "@/lib/whatsapp/documentNotice";
+import { emailDocument, saveDocument, setDocumentStatus, whatsappDocument, type DocInput } from "./actions";
 import { OrdersHeader } from "./OrdersHeader";
 import "./orders.css";
 
@@ -119,6 +121,7 @@ function DocPanel({ data, doc, onClose, onSaved }: { data: DocsData; doc?: Docum
     const [kind, setKind] = useState<Kind>((doc?.type as Kind) ?? "invoice");
     const [name, setName] = useState(doc?.customer_name ?? "");
     const [email, setEmail] = useState(doc?.customer_email ?? "");
+    const [phone, setPhone] = useState(doc?.customer_phone ? displayPhone(doc.customer_phone) : "");
     const [lines, setLines] = useState<Line[]>(doc?.line_items?.length
         ? doc.line_items.map(l => ({ description: l.description ?? "", qty: String(l.qty ?? 1), unit_price: String(l.unit_price ?? "") }))
         : [{ description: "", qty: "1", unit_price: "" }]);
@@ -134,7 +137,7 @@ function DocPanel({ data, doc, onClose, onSaved }: { data: DocsData; doc?: Docum
     useEffect(() => { setPayUrl(null); }, [doc?.id]);
 
     const input = (status: "draft" | "pending"): DocInput => ({
-        id: doc?.id ?? null, type: kind, customer_name: name, customer_email: email, tax_rate: Number(tax) || 0, notes, status,
+        id: doc?.id ?? null, type: kind, customer_name: name, customer_email: email, customer_phone: phone, tax_rate: Number(tax) || 0, notes, status,
         lines: lines.map(l => ({ description: l.description, qty: Number(l.qty) || 1, unit_price: Number(l.unit_price) || 0 })),
     });
 
@@ -170,6 +173,16 @@ function DocPanel({ data, doc, onClose, onSaved }: { data: DocsData; doc?: Docum
         setBusy(false);
         if (!r.ok) { toast.error(r.error); return; }
         toast.success(`Sent to ${r.to} by email`);
+        onSaved(doc.id);
+    };
+
+    const sendWhatsApp = async () => {
+        if (!doc) return;
+        setBusy(true);
+        const r = await whatsappDocument(doc.id);
+        setBusy(false);
+        if (!r.ok) { toast.error(r.error); return; }
+        toast.success(`Sent to ${displayPhone(r.to)} on WhatsApp`);
         onSaved(doc.id);
     };
 
@@ -214,6 +227,12 @@ function DocPanel({ data, doc, onClose, onSaved }: { data: DocsData; doc?: Docum
                         <Field label="Customer name" htmlFor="dname"><input id="dname" className="input" value={name} onChange={e => setName(e.target.value)} maxLength={120} /></Field>
                         <Field label="Customer email" htmlFor="demail" help="Needed to email it."><input id="demail" className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} /></Field>
                     </div>
+                    {kind !== "quotation" && (
+                        <Field label="Customer WhatsApp number" htmlFor="dphone" help="Optional. Needed to send it on WhatsApp."
+                            error={phone.trim() && !normaliseOrderPhone(phone) ? "Check the number, or leave it blank." : null}>
+                            <input id="dphone" className="input" type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} />
+                        </Field>
+                    )}
                     <div className="stack-sm">
                         <div className="label">What it&apos;s for</div>
                         {lines.map((l, i) => (
@@ -263,10 +282,11 @@ function DocPanel({ data, doc, onClose, onSaved }: { data: DocsData; doc?: Docum
                         {payUrl && <div className="xs muted" style={{ overflowWrap: "anywhere" }}>{payUrl}</div>}
                         <div className="hrow-sm wrap">
                             {doc.customer_email && open && <Btn sm icon="mail" onClick={sendEmail} disabled={busy}>Email to {doc.customer_email}</Btn>}
+                            {doc.customer_phone && open && documentCanWhatsApp(doc.type) && <Btn sm icon="chat" onClick={sendWhatsApp} disabled={busy}>WhatsApp to {displayPhone(doc.customer_phone)}</Btn>}
                             <Btn sm icon="copy" onClick={() => copy(viewUrl, "Link to view it")}>Copy link to view it</Btn>
                             <BtnLink sm icon="print" href={viewUrl} external>Open printable copy</BtnLink>
                         </div>
-                        <p className="help">To send it on WhatsApp or by SMS, copy a link and paste it into your message.</p>
+                        <p className="help">{doc.type === "quotation" ? "A quote is emailed or printed. To share it another way, copy a link and paste it into your message." : "No WhatsApp number on it? Copy a link and paste it into your own message."}</p>
                     </div>
                 </Card>
             )}

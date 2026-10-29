@@ -24,8 +24,15 @@ export type ListMessage = {
     sections: { title: string; rows: ListRow[] }[];
 };
 
+/**
+ * A Chatbots Africa (Meta) template id: its digits as text. Meta's ids run to
+ * 17 digits, past what a JS number holds exactly, so it is never a number here.
+ */
+export type TemplateId = string;
+export const isTemplateId = (v: unknown): v is TemplateId => typeof v === "string" && /^[1-9]\d{0,19}$/.test(v);
+
 export type TemplateMessage = {
-    templateId: number;
+    templateId: TemplateId;
     type: "text" | "image" | "video" | "audio" | "document";
     /** Fills {{1}}, {{2}}, ... in order. */
     placeholders?: string[];

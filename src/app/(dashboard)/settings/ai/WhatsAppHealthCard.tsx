@@ -252,7 +252,7 @@ function SettingSwitch(p: {
 
     async function save() {
         const id = templateId.trim();
-        if (id && !(/^\d{1,16}$/.test(id) && Number.isSafeInteger(Number(id)))) { toast.error("The template id is a number from Chatbots Africa's Message Templates."); return; }
+        if (!templateIdValue(id)) { toast.error("The template id is a number from Chatbots Africa's Message Templates."); return; }
         const changes: [string, unknown][] = [];
         if (row && on !== (row.value === true)) changes.push([p.settingKey, on]);
         if (p.template && templateRow && id !== String(templateRow.value ?? "")) changes.push([p.template.key, id]);

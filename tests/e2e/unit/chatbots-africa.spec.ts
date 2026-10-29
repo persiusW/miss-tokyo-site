@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { CHATBOTS_AFRICA_BASE, createChatbotsAfrica, shapeList, shapeQuickReply, shapeTemplate, toDestination, WA_LIMITS, type SendRecord } from "../../../src/lib/messaging/chatbotsAfrica";
+import { bodyJson, CHATBOTS_AFRICA_BASE, createChatbotsAfrica, shapeList, shapeQuickReply, shapeTemplate, toDestination, WA_LIMITS, type SendRecord } from "../../../src/lib/messaging/chatbotsAfrica";
 
 type Call = { url: string; init: RequestInit; body: any };
 
@@ -87,14 +87,25 @@ test("WhatsApp limits: at most 3 quick replies and 10 list rows, checked before 
 });
 
 test("templates send the id, type and placeholders as an array", async () => {
-    expect(shapeTemplate({ templateId: 12, type: "text", placeholders: ["Abena", "GH₵ 1,250.00"] }))
-        .toEqual({ template_id: 12, type: "text", placeholder: ["Abena", "GH₵ 1,250.00"] });
-    expect(shapeTemplate({ templateId: 12, type: "image" })).toMatchObject({ code: "invalid" });
-    expect(shapeTemplate({ templateId: 3, type: "image", link: "https://misstokyo.shop/x.jpg" })).toEqual({ template_id: 3, type: "image", link: "https://misstokyo.shop/x.jpg" });
+    expect(shapeTemplate({ templateId: "12", type: "text", placeholders: ["Abena", "GH₵ 1,250.00"] }))
+        .toEqual({ template_id: "12", type: "text", placeholder: ["Abena", "GH₵ 1,250.00"] });
+    expect(shapeTemplate({ templateId: "12", type: "image" })).toMatchObject({ code: "invalid" });
+    expect(shapeTemplate({ templateId: "3", type: "image", link: "https://misstokyo.shop/x.jpg" })).toEqual({ template_id: "3", type: "image", link: "https://misstokyo.shop/x.jpg" });
     const { provider, calls } = harness();
-    await provider.sendTemplate("0241234567", { templateId: 12, type: "text", placeholders: ["Abena"] });
+    await provider.sendTemplate("0241234567", { templateId: "12", type: "text", placeholders: ["Abena"] });
     expect(calls[0].url).toBe(`${CHATBOTS_AFRICA_BASE}/send/message/template`);
     expect(calls[0].body).toEqual({ apikey: "test-key", destination: "233241234567", template_id: 12, type: "text", placeholder: ["Abena"] });
+});
+
+test("a 17-digit template id goes out digit for digit, as a JSON number", async () => {
+    // Number("28786919977596947") would round it to …948: the id Meta approved must reach it exactly.
+    expect(bodyJson({ apikey: "k", template_id: "28786919977596947", type: "text" })).toBe('{"apikey":"k","type":"text","template_id":28786919977596947}');
+    expect(bodyJson({ apikey: "k", message: "hi" })).toBe('{"apikey":"k","message":"hi"}');
+    expect(shapeTemplate({ templateId: "0123", type: "text" })).toMatchObject({ code: "invalid" });
+    expect(shapeTemplate({ templateId: 12 as unknown as string, type: "text" })).toMatchObject({ code: "invalid" });
+    const { provider, calls } = harness();
+    await provider.sendTemplate("0241234567", { templateId: "28786919977596947", type: "text", placeholders: ["Abena"] });
+    expect(String(calls[0].init.body)).toContain('"template_id":28786919977596947}');
 });
 
 test("opt-out posts status false; balance is a GET with the key in the query string", async () => {

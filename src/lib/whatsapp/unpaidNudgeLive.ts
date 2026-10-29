@@ -4,12 +4,13 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createChatbotsAfrica } from "@/lib/messaging/chatbotsAfrica";
 import { logOutbound } from "./conversationStore";
 import type { NudgeDeps } from "./unpaidNudge";
+import type { TemplateId } from "@/lib/messaging/provider";
 
 // wa_nudged_at is not in the generated Supabase types until the migration is applied.
 const db = supabaseAdmin as any;
 const last9 = (phone: string) => phone.replace(/\D/g, "").slice(-9);
 
-export function liveNudgeDeps(templateId: number | null = null): NudgeDeps {
+export function liveNudgeDeps(templateId: TemplateId | null = null): NudgeDeps {
     const sender = createChatbotsAfrica();
     return {
         candidates: async (from, to) => {

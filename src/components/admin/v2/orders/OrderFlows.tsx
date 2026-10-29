@@ -335,7 +335,8 @@ export function NoteModal({ d, onClose, onSent }: { d: OrderDetail; onClose: () 
         const { ok, data } = await postJson(`/api/admin/orders/${d.order.id}/note`, { channel: via, body: txt });
         setBusy(false);
         if (!ok) { toast.fromResponse(data, { audience: "staff" }); return; }
-        toast.success(`Note sent to ${firstName(d.order.customer_name) || "the customer"} by ${via === "whatsapp" ? "WhatsApp" : "email"}`);
+        const who = firstName(d.order.customer_name) || "the customer";
+        toast.success(data?.waiting ? `Saved. ${who} has been asked on WhatsApp to reply, and your note goes the moment they do.` : `Note sent to ${who} by ${via === "whatsapp" ? "WhatsApp" : "email"}`);
         onSent();
     };
 
@@ -344,7 +345,7 @@ export function NoteModal({ d, onClose, onSent }: { d: OrderDetail; onClose: () 
             footer={<><Btn kind="ghost" onClick={onClose} disabled={busy}>Cancel</Btn><Btn kind="primary" disabled={!txt.trim() || !to || busy} onClick={go}>{busy ? "Sending…" : "Send note"}</Btn></>}>
             <Seg label="Send by" value={via} onChange={setVia} options={[{ v: "whatsapp", l: "WhatsApp" }, { v: "email", l: "Email" }]} />
             <Field label="Message" htmlFor="cnote"
-                help={to ? `Goes to ${to} and appears in the order timeline.${via === "whatsapp" ? " WhatsApp only delivers it if they've messaged the shop in the last 24 hours." : ""}` : via === "whatsapp" ? "There's no phone number on this order." : "There's no email address on this order."}>
+                help={to ? `Goes to ${to} and appears in the order timeline.${via === "whatsapp" ? " If they haven't messaged the shop in the last 24 hours, WhatsApp asks them to reply first and the note goes when they do." : ""}` : via === "whatsapp" ? "There's no phone number on this order." : "There's no email address on this order."}>
                 <textarea data-autofocus id="cnote" className="textarea" value={txt} maxLength={1000} onChange={e => setTxt(e.target.value)} placeholder="e.g. Your rider Kofi will call when he's 10 minutes away." />
             </Field>
         </Modal>

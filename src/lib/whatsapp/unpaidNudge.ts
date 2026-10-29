@@ -7,7 +7,7 @@
 // the chat, and not when they have placed another order since. Each order is
 // claimed before sending, so it is reminded at most once.
 import { toDestination } from "@/lib/messaging/chatbotsAfrica";
-import type { MessagingResult } from "@/lib/messaging/provider";
+import type { MessagingResult, TemplateId } from "@/lib/messaging/provider";
 import { REPLY_WINDOW_MS } from "./pipeline";
 import { orderRef } from "./orderUpdates";
 import { NOTICE_TYPE } from "./notices";
@@ -32,8 +32,8 @@ export type NudgeDeps = {
     orderedSince: (phone: string, since: string, exceptId: string) => Promise<boolean>;
     sendText: (to: string, text: string) => Promise<MessagingResult>;
     /** The approved order_not_paid template; absent or null = inside the window only. */
-    templateId?: number | null;
-    sendTemplate?: (to: string, templateId: number, placeholders: string[]) => Promise<MessagingResult>;
+    templateId?: TemplateId | null;
+    sendTemplate?: (to: string, templateId: TemplateId, placeholders: string[]) => Promise<MessagingResult>;
     logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
     now?: () => number;
 };

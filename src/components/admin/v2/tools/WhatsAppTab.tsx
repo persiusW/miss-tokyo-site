@@ -29,7 +29,7 @@ export function WhatsAppTab({ ai }: { ai: Record<string, unknown> | null }) {
     const [asking, setAsking] = useState(false);
     const idInput = (label: string, value: string, onChange: (v: string) => void, help?: string) => (
         <SRow key={label} label={label} help={help}>
-            <input className="input" inputMode="numeric" aria-label={label} placeholder="From Chatbots Africa" style={{ width: 200 }} value={value} onChange={e => onChange(e.target.value.replace(/\D/g, "").slice(0, 16))} />
+            <input className="input" inputMode="numeric" aria-label={label} placeholder="From Chatbots Africa" style={{ width: 200 }} value={value} onChange={e => onChange(e.target.value.replace(/\D/g, "").slice(0, 20))} />
         </SRow>
     );
 
@@ -61,7 +61,7 @@ export function WhatsAppTab({ ai }: { ai: Record<string, unknown> | null }) {
                             {TEMPLATE_KEYS.filter(k => !NOT_SENT_YET[k]).map(k => idInput(WA_TEMPLATES[k].label, templates[k], v => setTemplates({ ...templates, [k]: v }),
                                 `${WA_TEMPLATES[k].name} · to ${WA_TEMPLATES[k].audience === "team" ? "the team" : "the customer"}`))}
                         </div>
-                        <div className="card-body"><p className="xs muted">Not sent yet: {Object.entries(NOT_SENT_YET).map(([k, why]) => `${WA_TEMPLATES[k as keyof typeof WA_TEMPLATES].name} (${why})`).join("; ")}.</p></div>
+                        {Object.keys(NOT_SENT_YET).length > 0 && <div className="card-body"><p className="xs muted">Not sent yet: {Object.entries(NOT_SENT_YET).map(([k, why]) => `${WA_TEMPLATES[k as keyof typeof WA_TEMPLATES].name} (${why})`).join("; ")}.</p></div>}
                         <div className="card-body"><Btn kind="primary" disabled={!!busy} onClick={() => run("wa-rich", () => saveWhatsAppTemplates({ templates, staffNumbers }), "Templates saved.")}>{busy === "wa-rich" ? "Saving…" : "Save templates"}</Btn></div>
                     </>}
             </Card>

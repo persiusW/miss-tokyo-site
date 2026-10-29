@@ -1,6 +1,8 @@
 // Reply myself: staff write to the customer from the inbox, from the shop's
 // WhatsApp line. The chat goes to the team and the assistant stays quiet in it
-// until it is handed back. Order staff (admin, owner, sales staff).
+// until it is handed back. Past the 24-hour window the message waits for the
+// customer's reply and they are asked to reply (template team_follow_up).
+// Order staff (admin, owner, sales staff).
 import { NextRequest, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/ai/requireStaff";
 import { logCause } from "@/lib/errors/apiError";
@@ -24,9 +26,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     try {
         const r = await sendAsStaff({
             conversationId: id, text: String(body?.text ?? ""), staffId: auth.userId,
-            staffName: await staffName(auth.userId).catch(() => null), takeOver: true,
+            staffName: await staffName(auth.userId).catch(() => null), takeOver: true, late: { kind: "follow_up" },
         });
-        return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error }, { status: r.status });
+        if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+        return NextResponse.json(r.waiting ? { ok: true, waiting: true, asked: r.asked } : { ok: true });
     } catch (e) {
         logCause("GEN-00", e, { route: "whatsapp/inbox/[id]/reply" });
         return NextResponse.json({ error: "We couldn't send that. Please try again." }, { status: 500 });

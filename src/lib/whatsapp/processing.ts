@@ -29,6 +29,9 @@ import { carriedBefore, textFollows, textFollowsSoon, type PairingDeps } from ".
 import { parseChatbotsAfrica } from "./parsers/chatbotsAfrica";
 import { FALLBACK_TEXT, type Conversation, type InboundMessage, type InboundParser, type PipelineDeps } from "./pipeline";
 import { supabaseInboundStore } from "./pipelineStore";
+import { deliverPendingNotes } from "./pendingNotes";
+import { hasWaitingNotes, keepWithTeam, liveDeliverDeps } from "./pendingNotesLive";
+import { STAFF_REPLYING } from "./staffSend";
 
 type WaitingAnswerer = (waiting: InboundMessage[], c: Conversation) => Promise<void>;
 type NoteAnswerer = (c: Conversation, from: string, note: string) => Promise<void>;
@@ -125,6 +128,12 @@ export async function pipelineFor(
         return moved;
     };
 
+    // A waiting staff note went: the team hears (the handover alert) and the assistant stays quiet, as after "Reply myself".
+    const noteToTeam = async (conversationId: string) => {
+        await handOff(conversationId, "note_delivered");
+        await keepWithTeam(conversationId, STAFF_REPLYING);
+    };
+
     const pairing: PairingDeps = { eventsBetween: (from, to, phone) => supabaseInboundStore.eventsBetween(provider, from, to, phone), parse };
 
     const handle = createWhatsAppHandler({
@@ -171,6 +180,9 @@ export async function pipelineFor(
             settings, whatsappNumber: teamNumber, waConversationId: a.conversationId, images: a.images, withTeam: a.withTeam,
             facts: [await factsFor(a.conversationId, a.phone), a.staffNote ? staffNoteFact(a.staffNote) : null].filter(Boolean).join("\n") || null,
         }),
+        deliverNotes: async (c, phone) => (await hasWaitingNotes(c.id))
+            ? withTurnLock(c.id, () => deliverPendingNotes(c.id, phone, liveDeliverDeps(noteToTeam)), { claim: claimTurnLock, release: releaseTurnLock })
+            : 0,
         siteUrl: site,
     });
 

@@ -45,7 +45,7 @@ test("with team_chat_alert set, the template goes instead of the free text; the 
         teamNumber: "233553898704",
         load: async () => ({ name: "Test Customer", phone: PHONE, history: [] }),
         sendWhatsApp: async (to: string) => { sent.push(`text:${to}`); return { ok: true as const, messageId: "w" }; },
-        templateId: 1668035684678215,
+        templateId: "1668035684678215",
         sendTemplate: async (to: string, id: number) => { sent.push(`template:${to}:${id}`); return { ok: true as const, messageId: "t" }; },
         sendSms: async (to: string, text: string) => { sent.push(`sms:${to}:${text}`); return { ok: true }; },
         inboxUrl: (id: string) => `https://x/customers/whatsapp?c=${id}`,

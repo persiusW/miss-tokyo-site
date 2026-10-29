@@ -311,14 +311,14 @@ export async function loadAbandoned(range: AbandonedRange, page: number): Promis
 // ── Invoices, quotes and pay links ───────────────────────────────────────────
 
 export type DocumentRow = {
-    id: string; type: string; amount: number; status: string; customer_name: string | null; customer_email: string | null;
+    id: string; type: string; amount: number; status: string; customer_name: string | null; customer_email: string | null; customer_phone: string | null;
     line_items: { description?: string; qty?: number; unit_price?: number }[]; tax_rate: number; notes: string | null; created_at: string;
 };
 export type LegacyLinkRow = { id: string; email: string; amount: number; description: string | null; paystack_url: string | null; status: string; created_at: string };
 
 export async function loadDocuments(): Promise<{ docs: DocumentRow[]; links: LegacyLinkRow[]; taxRate: number; feePct: number; feeLabel: string }> {
     const [d, l, b, f] = await Promise.all([
-        db.from("documents").select("id, type, amount, status, customer_name, customer_email, line_items, tax_rate, notes, created_at").order("created_at", { ascending: false }).limit(500),
+        db.from("documents").select("id, type, amount, status, customer_name, customer_email, customer_phone, line_items, tax_rate, notes, created_at").order("created_at", { ascending: false }).limit(500),
         db.from("pay_links").select("id, email, amount, description, paystack_url, status, created_at").order("created_at", { ascending: false }).limit(200),
         db.from("business_settings").select("tax_rate").eq("id", "default").maybeSingle(),
         // The fee the Paystack link adds (api/invoice/paystack-link reads the same row).

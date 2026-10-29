@@ -10,7 +10,7 @@
 // order_status_update_v4, else that status's variable-free template
 // (whatsapp_status_template_ids), and with none nothing (the SMS still goes).
 // Never throws: an update must not stop a status change.
-import type { MessagingResult } from "@/lib/messaging/provider";
+import type { MessagingResult, TemplateId } from "@/lib/messaging/provider";
 import { sendNotice, type TemplateChoice } from "./templateSend";
 import { firstNameOf, readableNumber, type TemplateKey } from "./templates";
 
@@ -83,12 +83,12 @@ export type UpdateConversation = { id: string; optedOut: boolean; lastInboundAt:
 export type UpdateDeps = {
     enabled: boolean;                 // whatsapp_enabled and whatsapp_status_notifications
     /** The variable-free template for a status, or null when it has none. */
-    templateIdFor: (event: OrderEvent) => number | null;
+    templateIdFor: (event: OrderEvent) => TemplateId | null;
     /** An approved template with variables, by key (whatsapp_template_ids); absent = none. */
-    variableTemplateIdFor?: (key: TemplateKey) => number | null;
+    variableTemplateIdFor?: (key: TemplateKey) => TemplateId | null;
     conversationFor: (phone: string) => Promise<UpdateConversation>;
     sendText: (to: string, text: string) => Promise<MessagingResult>;
-    sendTemplate: (to: string, templateId: number, placeholders?: string[]) => Promise<MessagingResult>;
+    sendTemplate: (to: string, templateId: TemplateId, placeholders?: string[]) => Promise<MessagingResult>;
     logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
     now?: () => number;
 };

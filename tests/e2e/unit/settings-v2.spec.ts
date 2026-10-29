@@ -41,8 +41,8 @@ const VALID: AiValidators = {
     shop_whatsapp_number: v => v === "" || /^233\d{9}$/.test(String(v)),
     whatsapp_handoff_number: v => v === "" || /^233\d{9}$/.test(String(v)),
     whatsapp_wallet_alert_number: v => v === "" || /^233\d{9}$/.test(String(v)),
-    whatsapp_handoff_template_id: v => v === "" || /^\d{1,16}$/.test(String(v)),
-    whatsapp_restock_template_id: v => v === "" || /^\d{1,16}$/.test(String(v)),
+    whatsapp_handoff_template_id: v => v === "" || /^[1-9]\d{0,19}$/.test(String(v)),
+    whatsapp_restock_template_id: v => v === "" || /^[1-9]\d{0,19}$/.test(String(v)),
 };
 const OWNER_VALID = Object.fromEntries(Object.entries(VALID).filter(([k]) => k !== "admin_cost_markup_pct"));
 

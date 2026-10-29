@@ -56,7 +56,7 @@ test("the alert names the piece, the option and the link", () => {
         .toEqual(["there", "Lindsy Bodycon", "lindsy-bodycon"]);
 });
 
-function deps(o: { reqs?: RestockRequest[]; templateId?: number | null; sendOk?: boolean } = {}) {
+function deps(o: { reqs?: RestockRequest[]; templateId?: string | null; sendOk?: boolean } = {}) {
     const texts: string[] = [];
     const templates: [number, string[]][] = [];
     const logged: [string, string | undefined][] = [];
@@ -89,9 +89,9 @@ test("outside the window: the template when there is one, otherwise it waits", a
     const waiting = deps({ reqs: [old] });
     expect(await runRestockAlerts(waiting.d)).toEqual({ expired: 2, waiting_for_template: 1 });
     expect(waiting.status.get(old.id)).toBeUndefined();
-    const t = deps({ reqs: [old], templateId: 1072346328969351 });
+    const t = deps({ reqs: [old], templateId: "1072346328969351" });
     expect(await runRestockAlerts(t.d)).toEqual({ expired: 2, sent_template: 1 });
-    expect(t.templates).toEqual([[1072346328969351, restockPlaceholders(old)]]);
+    expect(t.templates).toEqual([["1072346328969351", restockPlaceholders(old)]]);
     // Logged in the words the customer saw.
     expect(t.logged[0][0]).toBe(fillTemplate("back_in_stock", restockPlaceholders(old))!.text);
 });

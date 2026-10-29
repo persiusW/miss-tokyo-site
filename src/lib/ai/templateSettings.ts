@@ -2,14 +2,14 @@
 // the settings validators can be unit-tested without a database.
 import { normaliseWaNumber } from "@/lib/ai/shopAssistant/settingsRules";
 import { TEMPLATE_KEYS } from "@/lib/whatsapp/templates";
+import { isTemplateId } from "@/lib/messaging/provider";
 
 /** Order statuses with their own WhatsApp template (the same list as ORDER_EVENTS in whatsapp/orderUpdates). */
 export const STATUS_TEMPLATE_EVENTS = ["paid", "packed", "shipped", "ready_for_pickup", "fulfilled", "cancelled"] as const;
 export type StatusTemplateEvent = (typeof STATUS_TEMPLATE_EVENTS)[number];
 
-/** "" or a template id as Chatbots Africa shows it: up to 16 digits, exact as a number. */
-export const templateIdValue = (v: unknown): boolean =>
-    v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v)));
+/** "" or a template id as Chatbots Africa shows it (digits, up to 17 and beyond: kept as text). */
+export const templateIdValue = (v: unknown): boolean => v === "" || isTemplateId(v);
 
 /** { paid: "123…", packed: "", … }: only known statuses, each "" or an id. */
 export const statusTemplateIdsValue = (v: unknown): boolean =>

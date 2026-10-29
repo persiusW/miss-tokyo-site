@@ -7,7 +7,7 @@
 import type { Stock } from "@/lib/ai/catalogStock";
 import { sizeMatches } from "@/lib/ai/shopAssistant/format";
 import { normAttr } from "@/lib/utils/normAttr";
-import type { MessagingResult } from "@/lib/messaging/provider";
+import type { MessagingResult, TemplateId } from "@/lib/messaging/provider";
 import { REPLY_WINDOW_MS } from "./pipeline";
 import { NOTICE_TYPE } from "./notices";
 import { fillTemplate } from "./templates";
@@ -70,9 +70,9 @@ export type RestockDeps = {
     /** notified → pending again, after a send that failed. */
     release: (id: string) => Promise<void>;
     sendText: (to: string, text: string) => Promise<MessagingResult>;
-    sendTemplate: (to: string, templateId: number, placeholders: string[]) => Promise<MessagingResult>;
+    sendTemplate: (to: string, templateId: TemplateId, placeholders: string[]) => Promise<MessagingResult>;
     logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
-    templateId: number | null;
+    templateId: TemplateId | null;
     siteUrl: string;
     now?: () => number;
 };

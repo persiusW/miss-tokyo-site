@@ -15,6 +15,9 @@ import { requireStaff } from "@/lib/ai/requireStaff";
 import { logActivity } from "@/lib/utils/logActivity";
 import { logCause } from "@/lib/errors/apiError";
 import { sendEmail } from "@/lib/email";
+import { normaliseOrderPhone } from "@/lib/phone";
+import { documentCanWhatsApp, documentNotice } from "@/lib/whatsapp/documentNotice";
+import { notifyCustomerOnWhatsApp } from "@/lib/whatsapp/templateSendLive";
 import { bulkUpdateOrderStatus, updateFulfillmentStatus, updateOrderStatus } from "@/app/(dashboard)/sales/orders/actions";
 import { orderLines, planPack, unpackedUnits, type RefundItem } from "@/lib/orders/refundMath";
 import { remindOne } from "@/lib/orders/abandonedCarts";
@@ -312,6 +315,8 @@ export type DocInput = {
     id?: string | null;
     type: "invoice" | "quotation" | "pay_link";
     customer_name: string; customer_email: string;
+    /** Optional WhatsApp number; "" = none. */
+    customer_phone?: string;
     lines: { description: string; qty: number; unit_price: number }[];
     tax_rate: number; notes: string;
     status: "draft" | "pending";
@@ -335,11 +340,15 @@ export async function saveDocument(input: DocInput): Promise<Result<{ id: string
     if (!lines.length || lines.some(l => l.unit_price <= 0 || !l.description)) return { ok: false, error: "Give every line a description and an amount." };
     const email = String(input.customer_email ?? "").trim().toLowerCase();
     if (email && !EMAIL_RE.test(email)) return { ok: false, error: "That email address doesn't look right." };
+    const rawPhone = String(input.customer_phone ?? "").trim();
+    const phone = rawPhone ? normaliseOrderPhone(rawPhone) : null;
+    if (rawPhone && !phone) return { ok: false, error: "That WhatsApp number doesn't look right." };
     const tax = Math.min(100, Math.max(0, Number(input.tax_rate) || 0));
     const amount = docTotal(lines, tax);
     const row = {
         type, amount, line_items: lines, tax_rate: tax, notes: String(input.notes ?? "").trim().slice(0, 1000) || null,
         customer_name: String(input.customer_name ?? "").trim().slice(0, 120) || null, customer_email: email || null,
+        customer_phone: phone,
         status: input.status === "draft" ? "draft" : "pending",
     };
     try {
@@ -406,4 +415,24 @@ export async function emailDocument(id: string, payUrl: string | null): Promise<
     if (d.status === "draft") await db.from("documents").update({ status: "pending" }).eq("id", id);
     refresh();
     return { ok: true, to: d.customer_email };
+}
+
+/** Send an invoice or pay link on WhatsApp (template document_ready outside the 24-hour window). */
+export async function whatsappDocument(id: string): Promise<Result<{ to: string }>> {
+    if (!(await me(FULL))) return FULL_ONLY;
+    if (!UUID.test(id)) return { ok: false, error: FAILED };
+    const { data: d } = await db.from("documents").select("id, type, amount, status, customer_name, customer_phone").eq("id", id).maybeSingle();
+    if (!d) return { ok: false, error: "That document isn't there any more. Please refresh." };
+    if (!documentCanWhatsApp(d.type)) return { ok: false, error: "A quote can't be sent on WhatsApp. Email or print it instead." };
+    const notice = documentNotice({ ...d, amount: Number(d.amount) || 0 });
+    if (!notice) return { ok: false, error: "Add the customer's WhatsApp number first." };
+    const r = await notifyCustomerOnWhatsApp(notice, { event: `document:${d.type}` });
+    if (r === "off") return { ok: false, error: "WhatsApp is switched off for the shop. Email it instead." };
+    if (r === "opted_out") return { ok: false, error: "This customer asked not to get WhatsApp messages. Email it instead." };
+    if (r === "no_template") return { ok: false, error: "WhatsApp can't reach them right now. Email it, or copy the link into your own message." };
+    if (r === "no_phone") return { ok: false, error: "That WhatsApp number doesn't look right." };
+    if (r === "failed") return { ok: false, error: "The WhatsApp message didn't go out. Please try again." };
+    if (d.status === "draft") await db.from("documents").update({ status: "pending" }).eq("id", id);
+    refresh();
+    return { ok: true, to: d.customer_phone };
 }
