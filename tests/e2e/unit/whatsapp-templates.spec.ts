@@ -95,7 +95,7 @@ test("a notice: free text inside the window, else the first template with an id,
     expect(general.calls).toEqual(["template:233200000001:8:Ama|4A8FF381|on its way"]);
 
     const legacy = noticeDeps();
-    expect(await sendNotice({ phone: "0200000001", freeText: "x", templates: choices, legacy: { templateId: 7, text: "Old words." }, tag: "[order 4A8FF381]" }, legacy.d)).toBe("sent_template");
+    expect(await sendNotice({ phone: "0200000001", freeText: "x", templates: choices, legacy: { templateId: "7", text: "Old words." }, tag: "[order 4A8FF381]" }, legacy.d)).toBe("sent_template");
     expect(legacy.calls).toEqual(["template:233200000001:7:"]);
     expect(legacy.logged).toEqual(["Old words.\n[order 4A8FF381]"]);
 
@@ -123,14 +123,14 @@ test("sendOrderUpdate: the template with variables beats the variable-free one, 
     const calls: string[] = [];
     const base: UpdateDeps = {
         enabled: true,
-        templateIdFor: () => 4321,
+        templateIdFor: () => "4321",
         conversationFor: async () => ({ id: "c1", optedOut: false, lastInboundAt: null }),
         sendText: async () => ({ ok: true, messageId: "t" }),
         sendTemplate: async (to, id, ph) => { calls.push(`${id}:${(ph ?? []).join("|")}`); return { ok: true, messageId: "w" }; },
         logOutbound: async () => {},
         now: () => NOW,
     };
-    expect(await sendOrderUpdate(ORDER, "paid", {}, { ...base, variableTemplateIdFor: k => (k === "order_confirmed" ? 55 : null) })).toBe("sent_template");
+    expect(await sendOrderUpdate(ORDER, "paid", {}, { ...base, variableTemplateIdFor: k => (k === "order_confirmed" ? "55" : null) })).toBe("sent_template");
     expect(await sendOrderUpdate(ORDER, "paid", {}, base)).toBe("sent_template");
     expect(calls).toEqual(["55:Ama|4A8FF381", "4321:"]);
     expect(STATUS_TEMPLATES.paid.text).not.toMatch(/\{\{/);
@@ -138,7 +138,7 @@ test("sendOrderUpdate: the template with variables beats the variable-free one, 
 
 test("team templates: always a template, only with an id, each number once", async () => {
     const sent: string[] = [];
-    const deps = (id: number | null) => ({ templateIdFor: () => id, sendTemplate: async (to: string, t: number, ph: string[]) => { sent.push(`${to}:${t}:${ph.join("|")}`); return { ok: true as const, messageId: "w" }; } });
+    const deps = (id: string | null) => ({ templateIdFor: () => id, sendTemplate: async (to: string, t: string, ph: string[]) => { sent.push(`${to}:${t}:${ph.join("|")}`); return { ok: true as const, messageId: "w" }; } });
     const choice = newOrderChoice({ id: "4a8ff381-0000-4000-8000-000000000000", customer: "Ama Mensah", total: 450, channel: "till", pickup: false, area: "East Legon, Accra" });
     expect(choice.values).toEqual(["4A8FF381", "Ama Mensah", "450.00", "the till", "delivery to East Legon", "4a8ff381-0000-4000-8000-000000000000"]);
     expect(await sendTeamTemplate(["233200000001", "0200000001", null], choice, deps(77))).toBe(1);
@@ -165,20 +165,20 @@ test("handoff: the detailed template first, then team_chat_alert, then free text
         teamNumber: "233200000099",
         load: async () => chat,
         sendWhatsApp: async () => { sent.push("text"); return { ok: true as const, messageId: "t" }; },
-        templateId: 2323512958424807,
+        templateId: "2323512958424807",
         sendTemplate: async (_to: string, id: number, ph?: string[]) => { sent.push(`${id}:${(ph ?? []).length}`); return { ok: true as const, messageId: "w" }; },
         sendSms: async () => ({ ok: true }),
         inboxUrl: (id: string) => `https://misstokyo.shop/customers/whatsapp?c=${id}`,
     };
-    await forwardToTeam("c1", "return_request", { ...deps, richTemplateIdFor: k => (k === "team_return_request" ? 61 : null) });
-    await forwardToTeam("c1", "customer_asked", { ...deps, richTemplateIdFor: k => (k === "team_return_request" ? 61 : null) });
+    await forwardToTeam("c1", "return_request", { ...deps, richTemplateIdFor: k => (k === "team_return_request" ? "61" : null) });
+    await forwardToTeam("c1", "customer_asked", { ...deps, richTemplateIdFor: k => (k === "team_return_request" ? "61" : null) });
     await forwardToTeam("c1", "customer_asked", { ...deps, templateId: null });
     expect(sent).toEqual(["61:6", "2323512958424807:0", "text"]);
 });
 
 test("the unpaid reminder goes as a template outside the window only when it has one", async () => {
     const sent: string[] = [];
-    const deps = (templateId: number | null): NudgeDeps => ({
+    const deps = (templateId: string | null): NudgeDeps => ({
         candidates: async () => [{ id: "4a8ff381-0000-4000-8000-000000000001", customer_name: "Ama", customer_phone: "0200000001", created_at: hoursAgo(0.7) }],
         claim: async () => true,
         conversation: async () => ({ id: "c1", optedOut: false, handedOff: false, lastInboundAt: hoursAgo(26) }),

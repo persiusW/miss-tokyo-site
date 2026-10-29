@@ -6,7 +6,7 @@
 // words the customer saw, so staff and the assistant know what was said.
 // Pure: everything live is injected.
 import { toDestination } from "@/lib/messaging/chatbotsAfrica";
-import type { MessagingResult } from "@/lib/messaging/provider";
+import type { MessagingResult, TemplateId } from "@/lib/messaging/provider";
 import { REPLY_WINDOW_MS } from "./pipeline";
 import { NOTICE_TYPE } from "./notices";
 import { fillTemplate, type FilledTemplate, type TemplateKey } from "./templates";
@@ -17,11 +17,11 @@ export type NoticeConversation = { id: string; optedOut: boolean; lastInboundAt:
 
 export type NoticeDeps = {
     /** The approved id for a template key, or null. */
-    templateIdFor: (key: TemplateKey) => number | null;
+    templateIdFor: (key: TemplateKey) => TemplateId | null;
     /** The customer's conversation, opened if they have none so the notice shows in the inbox. */
     conversationFor: (phone: string) => Promise<NoticeConversation>;
     sendText: (to: string, text: string) => Promise<MessagingResult>;
-    sendTemplate: (to: string, templateId: number, placeholders?: string[]) => Promise<MessagingResult>;
+    sendTemplate: (to: string, templateId: TemplateId, placeholders?: string[]) => Promise<MessagingResult>;
     logOutbound: (conversationId: string, text: string, waMessageId: string | null, type?: string) => Promise<void>;
     now?: () => number;
 };
@@ -33,7 +33,7 @@ export type Notice = {
     /** Tried in order. */
     templates: readonly TemplateChoice[];
     /** The variable-free template for this event, and its words. */
-    legacy?: { templateId: number | null; text: string } | null;
+    legacy?: { templateId: TemplateId | null; text: string } | null;
     /** Added to the log of a variable-free template, which can't name the order (e.g. "[order 4A8FF381]"). */
     tag?: string | null;
 };
@@ -42,8 +42,8 @@ export type NoticeOutcome = "no_phone" | "opted_out" | "no_template" | "sent_tex
 
 /** The first choice with an approved id and complete values. */
 export function pickTemplate(
-    choices: readonly TemplateChoice[], idFor: (key: TemplateKey) => number | null,
-): { key: TemplateKey; templateId: number; filled: FilledTemplate } | null {
+    choices: readonly TemplateChoice[], idFor: (key: TemplateKey) => TemplateId | null,
+): { key: TemplateKey; templateId: TemplateId; filled: FilledTemplate } | null {
     for (const c of choices) {
         const templateId = idFor(c.key);
         if (!templateId) continue;
@@ -94,8 +94,8 @@ export async function sendNotice(n: Notice, deps: NoticeDeps): Promise<NoticeOut
 }
 
 export type TeamSendDeps = {
-    templateIdFor: (key: TemplateKey) => number | null;
-    sendTemplate: (to: string, templateId: number, placeholders: string[]) => Promise<MessagingResult>;
+    templateIdFor: (key: TemplateKey) => TemplateId | null;
+    sendTemplate: (to: string, templateId: TemplateId, placeholders: string[]) => Promise<MessagingResult>;
 };
 
 /**

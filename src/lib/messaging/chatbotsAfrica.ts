@@ -6,7 +6,7 @@
 //
 // Never log a request URL or body here: both carry the API key.
 import type { NotificationMeta } from "@/lib/notificationLog";
-import type { BalanceResult, ListMessage, MessagingProvider, MessagingResult, QuickReply, TemplateMessage } from "./provider";
+import { isTemplateId, type BalanceResult, type ListMessage, type MessagingProvider, type MessagingResult, type QuickReply, type TemplateMessage } from "./provider";
 
 export const CHATBOTS_AFRICA_BASE = "https://api.chatbotsafrica.com/api/v1.0";
 const PROVIDER = "chatbots_africa";
@@ -83,13 +83,24 @@ export function shapeList(m: ListMessage): { interactive: string } | Invalid {
 }
 
 export function shapeTemplate(m: TemplateMessage): Record<string, unknown> | Invalid {
-    if (!Number.isInteger(m.templateId) || m.templateId <= 0) return invalid("template id");
+    if (!isTemplateId(m.templateId)) return invalid("template id");
     if (m.type !== "text" && !/^https:\/\//i.test(m.link ?? "")) return invalid("media templates need an https link");
     const out: Record<string, unknown> = { template_id: m.templateId, type: m.type };
     // An array, as the docs advise: a value holding a comma would split a joined string.
     if (m.placeholders?.length) out.placeholder = m.placeholders.map(String);
     if (m.type !== "text") out.link = m.link;
     return out;
+}
+
+/**
+ * The request body. A template id goes as a JSON number written digit for
+ * digit: JSON.stringify of a JS number would round a 17-digit id.
+ */
+export function bodyJson(fields: Record<string, unknown>): string {
+    const { template_id, ...rest } = fields;
+    const json = JSON.stringify(rest);
+    if (!isTemplateId(template_id)) return json;
+    return `${json.slice(0, -1)}${json === "{}" ? "" : ","}"template_id":${template_id}}`;
 }
 
 /**
@@ -137,7 +148,7 @@ export function createChatbotsAfrica(deps: Deps = {}): MessagingProvider {
             const res = await doFetch(`${CHATBOTS_AFRICA_BASE}${path}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Accept: "application/json" },
-                body: JSON.stringify({ apikey, destination, ...fields }),
+                body: bodyJson({ apikey, destination, ...fields }),
                 signal: AbortSignal.timeout(TIMEOUT_MS),
             });
             const data = await res.json().catch(() => null);

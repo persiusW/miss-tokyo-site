@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { normaliseWaNumber, SHOP_SETTING_VALIDATORS } from "@/lib/ai/shopAssistant/settingsRules";
 import { MAX_STAFF_ALERT_NUMBERS, STATUS_TEMPLATE_EVENTS, staffNumbersValue, statusTemplateIdsValue, templateIdsValue, templateIdValue, type StatusTemplateEvent } from "@/lib/ai/templateSettings";
 import { TEMPLATE_KEYS, type TemplateKey } from "@/lib/whatsapp/templates";
+import { isTemplateId, type TemplateId } from "@/lib/messaging/provider";
 
 export type AiSettings = {
     dailySpendCapGhs: number;
@@ -19,13 +20,13 @@ export type AiSettings = {
     /** Order updates on WhatsApp (also needs whatsapp_enabled). */
     whatsappStatusNotifications: boolean;
     /** Approved Chatbots Africa template id for updates outside the 24h window; null = text inside the window only. Superseded by whatsappStatusTemplateIds. */
-    whatsappStatusTemplateId: number | null;
+    whatsappStatusTemplateId: TemplateId | null;
     /** One approved template per order status (no variables); a status without one goes by SMS only outside the 24h window. */
-    whatsappStatusTemplateIds: Partial<Record<StatusTemplateEvent, number>>;
+    whatsappStatusTemplateIds: Partial<Record<StatusTemplateEvent, TemplateId>>;
     /** Approved template (team_chat_alert) for the WhatsApp half of a handoff alert; null = free text, which WhatsApp drops outside 24h. */
-    whatsappHandoffTemplateId: number | null;
+    whatsappHandoffTemplateId: TemplateId | null;
     /** Approved templates with variables (whatsapp/templates), by key; a key without one falls back to the variable-free template or SMS. */
-    whatsappTemplateIds: Partial<Record<TemplateKey, number>>;
+    whatsappTemplateIds: Partial<Record<TemplateKey, TemplateId>>;
     /** Staff WhatsApp numbers (233…) told about each new paid order; empty = none. */
     staffAlertNumbers: string[];
     /** The WhatsApp assistant may ask with tappable buttons and lists (offer_choices). */
@@ -35,7 +36,7 @@ export type AiSettings = {
     /** Back-in-stock alerts on WhatsApp (notify_when_back and the hourly run). */
     whatsappRestockAlerts: boolean;
     /** Approved template for alerts outside the 24h window; null = they wait for the customer's next message. */
-    whatsappRestockTemplateId: number | null;
+    whatsappRestockTemplateId: TemplateId | null;
     /** Returns and exchanges taken in WhatsApp chats (start_return), then handed to the team. */
     whatsappReturns: boolean;
     dashboardAgentEnabled: boolean;
@@ -91,13 +92,12 @@ export const EDITABLE_AI_SETTINGS = {
     whatsapp_wallet_alert_number: SHOP_SETTING_VALIDATORS.shop_whatsapp_number,
     whatsapp_wallet_alert_ghs: (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100_000,
     whatsapp_status_notifications: (v: unknown) => typeof v === "boolean",
-    /** "" or the approved template's numeric id. */
-    // Meta template ids run to 16 digits (e.g. 1072346328969350); they must stay exact as a number.
-    whatsapp_status_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v))),
+    /** "" or the approved template's id (digits, kept as text: Meta's run to 17). */
+    whatsapp_status_template_id: templateIdValue,
     whatsapp_choices_enabled: (v: unknown) => typeof v === "boolean",
     whatsapp_unpaid_nudge_enabled: (v: unknown) => typeof v === "boolean",
     whatsapp_restock_alerts_enabled: (v: unknown) => typeof v === "boolean",
-    whatsapp_restock_template_id: (v: unknown) => v === "" || (typeof v === "string" && /^\d{1,16}$/.test(v) && Number.isSafeInteger(Number(v))),
+    whatsapp_restock_template_id: templateIdValue,
     whatsapp_returns_enabled: (v: unknown) => typeof v === "boolean",
     whatsapp_status_template_ids: statusTemplateIdsValue,
     whatsapp_handoff_template_id: templateIdValue,
@@ -150,10 +150,10 @@ const OFF: AiSettings = {
     shop: { enabled: false, dailyMessagesPerVisitor: 0, capSharePct: 0, whatsappNumber: null },
 };
 
-/** A Chatbots Africa template id kept as a safe integer; anything else is none. */
-function templateId(raw: unknown): number | null {
-    const v = Number(raw);
-    return raw !== "" && Number.isSafeInteger(v) && v > 0 ? v : null;
+/** A Chatbots Africa template id, its digits as text; anything else is none. A number (older rows) is read only while exact. */
+function templateId(raw: unknown): TemplateId | null {
+    const v = typeof raw === "number" && Number.isSafeInteger(raw) ? String(raw) : raw;
+    return isTemplateId(v) ? v : null;
 }
 
 export async function getAiSettings(): Promise<AiSettings> {
@@ -180,7 +180,7 @@ export async function getAiSettings(): Promise<AiSettings> {
         whatsappStatusTemplateId: templateId(map.get("whatsapp_status_template_id")),
         whatsappStatusTemplateIds: (() => {
             const raw = map.get("whatsapp_status_template_ids");
-            const out: Partial<Record<StatusTemplateEvent, number>> = {};
+            const out: Partial<Record<StatusTemplateEvent, TemplateId>> = {};
             if (raw && typeof raw === "object" && !Array.isArray(raw)) {
                 for (const e of STATUS_TEMPLATE_EVENTS) {
                     const id = templateId((raw as Record<string, unknown>)[e]);
@@ -192,7 +192,7 @@ export async function getAiSettings(): Promise<AiSettings> {
         whatsappHandoffTemplateId: templateId(map.get("whatsapp_handoff_template_id")),
         whatsappTemplateIds: (() => {
             const raw = map.get("whatsapp_template_ids");
-            const out: Partial<Record<TemplateKey, number>> = {};
+            const out: Partial<Record<TemplateKey, TemplateId>> = {};
             if (raw && typeof raw === "object" && !Array.isArray(raw)) {
                 for (const k of TEMPLATE_KEYS) {
                     const id = templateId((raw as Record<string, unknown>)[k]);

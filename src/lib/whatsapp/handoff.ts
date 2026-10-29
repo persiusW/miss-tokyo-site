@@ -12,7 +12,7 @@
 // chat; without one the variable-free team_chat_alert says the SMS has the
 // details. A short SMS goes as well, every time, and the inbox always has the
 // full chat.
-import type { MessagingResult } from "@/lib/messaging/provider";
+import type { MessagingResult, TemplateId } from "@/lib/messaging/provider";
 import { fillTemplate, type FilledTemplate } from "./templates";
 
 export type HandoffReason = "customer_asked" | "unsupported_message" | "awaiting_assistant" | "processing_failed" | "daily_limit" | "assistant_failed" | "return_request"
@@ -88,10 +88,10 @@ export type ForwardDeps = {
     load: (conversationId: string) => Promise<ForwardChat | null>;
     sendWhatsApp: (to: string, text: string) => Promise<MessagingResult>;
     /** team_chat_alert: sent instead of the free text when its id is set. */
-    templateId?: number | null;
+    templateId?: TemplateId | null;
     /** The approved team_chat_handoff / team_return_request ids; preferred over team_chat_alert. */
-    richTemplateIdFor?: (key: "team_chat_handoff" | "team_return_request") => number | null;
-    sendTemplate?: (to: string, templateId: number, placeholders?: string[]) => Promise<MessagingResult>;
+    richTemplateIdFor?: (key: "team_chat_handoff" | "team_return_request") => TemplateId | null;
+    sendTemplate?: (to: string, templateId: TemplateId, placeholders?: string[]) => Promise<MessagingResult>;
     sendSms: (to: string, text: string) => Promise<{ ok: boolean }>;
     inboxUrl: (conversationId: string) => string;
 };

@@ -5,12 +5,12 @@ import { STATUS_TEMPLATE_EVENTS, STATUS_TEMPLATE_FIELDS, statusTemplateIdsValue,
 const NOW = Date.parse("2026-10-14T21:00:00Z");
 const ORDER = { id: "4a8ff381-0000-4000-8000-000000000000", customer_name: "Ama Mensah", customer_phone: "0200000001", delivery_method: "pickup" };
 
-function deps(o: { enabled?: boolean; templateId?: number | null; lastInboundAt?: string | null; optedOut?: boolean; ok?: boolean } = {}) {
+function deps(o: { enabled?: boolean; templateId?: string | null; lastInboundAt?: string | null; optedOut?: boolean; ok?: boolean } = {}) {
     const calls: string[] = [];
     const logged: string[] = [];
     const d: UpdateDeps = {
         enabled: o.enabled ?? true,
-        templateIdFor: () => (o.templateId === undefined ? 4321 : o.templateId),
+        templateIdFor: () => (o.templateId === undefined ? "4321" : o.templateId),
         conversationFor: async () => ({ id: "c1", optedOut: !!o.optedOut, lastInboundAt: o.lastInboundAt === undefined ? new Date(NOW - 3600_000).toISOString() : o.lastInboundAt }),
         sendText: async (to, text) => { calls.push(`text:${to}:${text}`); return o.ok === false ? { ok: false, code: "network" } : { ok: true, messageId: "wamid.U" }; },
         sendTemplate: async (to, id) => { calls.push(`template:${to}:${id}`); return { ok: true, messageId: "wamid.T" }; },
@@ -42,7 +42,7 @@ test("outside the window: that status's own template, no values, logged with the
     expect(logged).toEqual([`${STATUS_TEMPLATES.fulfilled.text}\n[order 4A8FF381]`]);
     // A status without its own template goes by SMS only.
     const some = deps({ lastInboundAt: null });
-    some.d.templateIdFor = e => (e === "paid" ? 111 : null);
+    some.d.templateIdFor = e => (e === "paid" ? "111" : null);
     expect(await sendOrderUpdate(ORDER, "paid", {}, some.d)).toBe("sent_template");
     expect(await sendOrderUpdate(ORDER, "packed", {}, some.d)).toBe("no_template");
     expect(some.calls).toEqual(["template:233200000001:111"]);
@@ -62,7 +62,7 @@ test("one template per status, no variables, unique names, matching the settings
     expect(ok({ paid: "1072346328969350", packed: "" })).toBe(true);
     expect(ok({})).toBe(true);
     expect(ok({ refunded: "1" })).toBe(false);
-    expect(ok({ paid: "12345678901234567" })).toBe(false);
+    expect(ok({ paid: "28786919977596947" })).toBe(true);
     expect(ok({ paid: 123 })).toBe(false);
     expect(ok(["1"])).toBe(false);
     expect(ok(null)).toBe(false);

@@ -29,7 +29,7 @@ export function WhatsAppTab({ ai }: { ai: Record<string, unknown> | null }) {
     const [asking, setAsking] = useState(false);
     const idInput = (label: string, value: string, onChange: (v: string) => void, help?: string) => (
         <SRow key={label} label={label} help={help}>
-            <input className="input" inputMode="numeric" aria-label={label} placeholder="From Chatbots Africa" style={{ width: 200 }} value={value} onChange={e => onChange(e.target.value.replace(/\D/g, "").slice(0, 16))} />
+            <input className="input" inputMode="numeric" aria-label={label} placeholder="From Chatbots Africa" style={{ width: 200 }} value={value} onChange={e => onChange(e.target.value.replace(/\D/g, "").slice(0, 20))} />
         </SRow>
     );
 
