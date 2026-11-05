@@ -2,6 +2,10 @@
 .adm2 .inbox{display:flex;flex-direction:column;gap:var(--s4)}
 .adm2 .inbox .tabs{margin-bottom:0}
 .adm2 .inbox-stats{gap:var(--s3)}
+.adm2 .inbox-period .seg{flex-wrap:wrap}
+.adm2 .inbox-dates{align-items:flex-end}
+.adm2 .inbox-dates .field{margin:0}
+.adm2 .inbox-dates .input{width:auto;min-width:0}
 .adm2 .inbox-ellipsis{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .adm2 .inbox-warn{color:var(--warn-ink)}
 .adm2 .inbox-tools{display:flex;flex-direction:column;gap:var(--s3)}
@@ -32,7 +36,7 @@
 .adm2 .inbox-file{color:inherit;text-decoration:underline}
 .adm2 .inbox-media-missing{font-style:italic;color:var(--ink-3);margin-bottom:var(--s1)}
 @media (max-width:1180px){
-  .adm2 .inbox.has-sel>.chips,.adm2 .inbox.has-sel>.inbox-stats{display:none}
+  .adm2 .inbox.has-sel>.chips,.adm2 .inbox.has-sel>.inbox-stats,.adm2 .inbox.has-sel>.inbox-stats-panel{display:none}
   .adm2 .inbox-list-scroll{max-height:none;min-height:0;overflow:visible}
   .adm2 .inbox-thread{max-height:calc(100dvh - var(--top-h) - 320px)}
 }
