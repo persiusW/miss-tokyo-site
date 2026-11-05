@@ -7,7 +7,7 @@
 // customer's last message; after that only an approved template goes. So:
 // inside the window a plain text; outside it the template with the order's
 // details (whatsapp_template_ids, whatsapp/templates), else the general
-// order_status_update_v4, else that status's variable-free template
+// order_status_update_v3, else that status's variable-free template
 // (whatsapp_status_template_ids), and with none nothing (the SMS still goes).
 // Never throws: an update must not stop a status change.
 import type { MessagingResult, TemplateId } from "@/lib/messaging/provider";

@@ -57,12 +57,11 @@ export const WA_TEMPLATES: Record<TemplateKey, TemplateSpec> = {
         body: `Hi {{1}}, your Miss Tokyo order {{2}} is ready for pickup.\n\nYou can collect it from our store at {{3}}.\n\n${REPLY}`,
         vars: ["first name", "order ref", "store address"],
     },
-    // Approved before this list was written. Only its opening words were on
-    // hand (2026-10-27); confirm the rest against Chatbots Africa and correct
-    // this body, which only the inbox log uses.
+    // Approved before this list was written, so it keeps its old name. Words
+    // read from Chatbots Africa on 2026-11-05.
     order_status: {
-        name: "order_status_update_v4", audience: "customer", label: "Any other order update (packed, delivered, cancelled)",
-        body: `Hi {{1}}, update on your Miss Tokyo order {{2}}. Your order is {{3}}.\n\n${REPLY}`,
+        name: "order_status_update_v3", audience: "customer", label: "Any other order update (packed, delivered, cancelled)",
+        body: `Hi {{1}}, this is an update on your Miss Tokyo order {{2}}.\n\nYour order is now {{3}}.\n\n${REPLY}`,
         vars: ["first name", "order ref", "status"],
     },
     refund_sent: {
