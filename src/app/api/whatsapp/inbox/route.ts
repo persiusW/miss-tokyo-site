@@ -9,7 +9,7 @@ import { requireStaff } from "@/lib/ai/requireStaff";
 import { logCause } from "@/lib/errors/apiError";
 import { cleanSearch } from "@/lib/ai/missTokyoAi/tools/shared";
 import { inTab, shapeConversation, sortInbox, tabCounts, TABS, type ConversationRow, type InboxTab, type MessageRow } from "@/lib/whatsapp/inbox";
-import { composerOn, teachOn } from "@/lib/whatsapp/flags";
+import { composerOn, statsPeriodOn, teachOn } from "@/lib/whatsapp/flags";
 
 const STATS_DAYS = 7;
 
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
             .catch(e => { logCause("GEN-00", e, { route: "whatsapp/inbox stats" }); return null; });
         return NextResponse.json({
             tab, counts, stats,
-            can: { teach: teachOn() && (auth.role === "admin" || auth.role === "owner"), reply: composerOn() },
+            can: { teach: teachOn() && (auth.role === "admin" || auth.role === "owner"), reply: composerOn(), statsPeriod: statsPeriodOn() },
             conversations: shown.map(c => shapeConversation(rows.get(c.id)!, last.get(c.id) ?? null, now)),
         });
     } catch (e) {

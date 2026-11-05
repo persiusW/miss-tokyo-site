@@ -17,14 +17,24 @@ const ORDER = { id: "4a8ff381-0000-4000-8000-000000000000", customer_name: "Ama 
 const BURNED = ["order_status_update", "order_status_update_v2", "order_status_update_v3", "team_chat_handoff", "team_chat_alert",
     "order_payment_received", "order_packed", "order_on_its_way", "order_ready_for_pickup", "order_delivered", "order_cancel", "order_cancelled"];
 
+test("the general status template is the approved v3, word for word", () => {
+    const { name, body, vars } = WA_TEMPLATES.order_status;
+    expect(name).toBe("order_status_update_v3");
+    expect(body).toBe("Hi {{1}}, this is an update on your Miss Tokyo order {{2}}.\n\nYour order is now {{3}}.\n\nIf you have any questions about your order, reply to this message and our team will help you.");
+    expect(vars).toHaveLength(3);
+    expect(fillTemplate("order_status", ["Ama", "4A8FF381", "delivered"])!.text).toContain("Your order is now delivered.");
+});
+
 test("every template passes Meta's rules", () => {
     const names = TEMPLATE_KEYS.map(k => WA_TEMPLATES[k].name);
     expect(new Set(names).size).toBe(names.length);
     for (const k of TEMPLATE_KEYS) {
         const { name, body, vars } = WA_TEMPLATES[k];
-        // New names carry the prefix; order_status_update_v4 was approved before.
-        if (k !== "order_status") expect(name).toMatch(/^miss_tokyo_[a-z0-9_]+$/);
-        expect(BURNED).not.toContain(name);
+        // New names carry the prefix and are unused; order_status_update_v3 was approved before.
+        if (k !== "order_status") {
+            expect(name).toMatch(/^miss_tokyo_[a-z0-9_]+$/);
+            expect(BURNED).not.toContain(name);
+        }
         // Never starts or ends with a variable, never two side by side.
         expect(body).not.toMatch(/^\s*\{\{/);
         expect(body).not.toMatch(/\{\{\d+\}\}[\s.]*$/);

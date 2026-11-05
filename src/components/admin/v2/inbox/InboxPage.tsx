@@ -3,7 +3,7 @@
 // Admin v2 Inbox: WhatsApp chats, contact-form messages, custom requests and
 // (for the admin) the questions Miss Tokyo AI sent them, in one list with the
 // open conversation beside it. The chip (?f=), the search (?q=), the WhatsApp
-// view (?w=) and the open conversation (?c=<source>:<id>) live in the URL so
+// view (?w=), the figures' period (?p=) and the open conversation (?c=<source>:<id>) live in the URL so
 // links and refresh land in the same place. Below 1180px one pane shows at a
 // time. WhatsApp data comes from /api/whatsapp/inbox (unchanged); the rest from
 // /api/admin/v2/inbox, whose "needs" figure is the side-nav count.
@@ -14,6 +14,7 @@ import {
     type IconName,
 } from "@/components/admin/ui";
 import { useAdminV2 } from "@/components/admin/shell/AdminV2Context";
+import { StatsPanel } from "./StatsPanel";
 import {
     FILTER_LABEL, SOURCE_LABEL, chatItem, filtersFor, isFilter, itemKey, parseKey, sortItems,
     type InboxFilter, type InboxItem, type InboxSource,
@@ -26,7 +27,7 @@ import "./inbox.css";
 
 const SRC_ICON: Record<InboxSource, IconName> = { whatsapp: "wa", form: "mail", request: "spark", ai: "spark" };
 type Stats = { days: number; chats: number; waiting: number; assistantOrders: number; assistantSalesGhs: number; handedOver: number };
-type WaList = { conversations: InboxConversation[]; counts: Record<InboxTab, number>; stats?: Stats | null };
+type WaList = { conversations: InboxConversation[]; counts: Record<InboxTab, number>; stats?: Stats | null; can?: { statsPeriod?: boolean } };
 type SrcList = {
     items: InboxItem[]; more: boolean; totals: { form: number; request: number; ai: number };
     needs: { chats: number; forms: number; requests: number; questions: number; total: number }; showRequests: boolean;
@@ -159,7 +160,8 @@ export function InboxPage({ canTeachTab }: { canTeachTab: boolean }) {
                 {chips.map(f => <Chip key={f} pressed={filter === f} onClick={() => pick(f)} count={counts[f] ?? null}>{FILTER_LABEL[f]}</Chip>)}
             </div>
 
-            {filter === "whatsapp" && stats && (
+            {filter === "whatsapp" && wa?.can?.statsPeriod && <StatsPanel waiting={wa.counts.needs} />}
+            {filter === "whatsapp" && stats && !wa?.can?.statsPeriod && (
                 <div className="grid-4 inbox-stats">
                     <Kpi label="Chats" value={stats.chats} ctx={`Customers who wrote in the last ${stats.days} days`} />
                     <Kpi label="Ordered with the assistant" value={stats.assistantOrders}

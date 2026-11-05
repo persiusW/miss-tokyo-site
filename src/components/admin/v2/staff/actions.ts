@@ -10,6 +10,7 @@ import { requireStaff } from "@/lib/ai/requireStaff";
 import { logActivity } from "@/lib/utils/logActivity";
 import { sendTeamInviteMessages } from "@/lib/teamInviteMessages";
 import { inviteTeamMember, sendPasswordResetLink } from "@/app/(dashboard)/settings/actions";
+import { INVITE_EMAIL_FAILED } from "@/lib/teamInviteDispatch";
 import { canManageRole, inviteRolesFor, isStaffRole, refusalOf, roleLabel, staffRefusal } from "./staffCopy";
 
 type Result = { ok: true; message: string; signedOutSelf?: boolean; warning?: boolean } | { ok: false; error: string };
@@ -199,6 +200,7 @@ export async function inviteStaff(input: { fullName: string; email: string; phon
         return { ok: false, error: res.error || "The invite didn't go out. Please try again shortly." };
     }
     done();
+    if (res.warning === INVITE_EMAIL_FAILED) return { ok: true, warning: true, message: `Invite texted. The email to ${email} didn't go out.` };
     return res.warning
         ? { ok: true, warning: true, message: `Invite emailed to ${email}. The text message didn't go out.` }
         : { ok: true, message: `Invite sent to ${email}` };
@@ -231,6 +233,7 @@ export async function resendInvite(inviteId: string): Promise<Result> {
         details: { action: "resend", email: inv.email, role: inv.role },
     }));
     done();
+    if (sent.warning === INVITE_EMAIL_FAILED) return { ok: true, warning: true, message: `Invite texted again. The email to ${inv.email} didn't go out.` };
     return { ok: true, message: `Invite sent again to ${inv.email}` };
 }
 
